@@ -12,6 +12,13 @@ Chrome 原生书签增强产品已完成 0.2.3 可靠性加固。侧边栏读取
 
 ## 最近更新
 
+### 2026-07-29 · GitHub 首次完整同步
+
+- 当前 Aarre 扩展源码、AI 书签能力、Supabase 函数与迁移、自动化测试、设计验收资料和项目文档已完整提交并推送到 `ArvenWang/Aarre` 的 `main` 分支。
+- 功能提交为 `9b369aa feat: build Aarre intelligent bookmark experience`；远端仓库采用现有本地 `main` 历史，没有创建额外分支，也没有包含 `.env`、本地 Key、`node_modules` 或 `dist`。
+- 推送前已完成敏感信息扫描和 Git diff 检查；`npm run check` 在 Node.js 22.22.2 下通过，包含 13 个测试文件、52 个测试、类型检查和生产构建；`npm run verify:artifacts` 通过。
+- 推送完成后继续核对本地 `HEAD` 与 `origin/main`，确保工作区无未提交改动、远端没有遗漏提交。
+
 ### 2026-07-29 · 编辑信息层级、GitHub 封面与毛玻璃吸顶
 
 - 书签编辑页移除“完整简介”“已完成”和“初始由 AI 生成”等冗余标签；AI 分析说明改为明确区分：主题是 AI 归纳的内容方向，标签是可由用户自行增删的检索关键词。
