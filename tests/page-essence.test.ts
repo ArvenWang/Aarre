@@ -14,6 +14,8 @@ describe("page essence", () => {
             <meta name="description" content="A practical guide to motion.">
             <meta name="keywords" content="motion, interaction, ux">
             <meta property="og:image" content="/images/motion-cover.jpg">
+            <link rel="apple-touch-icon" sizes="180x180" href="/apple.png">
+            <link rel="manifest" href="/site.webmanifest">
             <link rel="icon" href="/icons/site.svg">
           </head>
           <body>
@@ -32,6 +34,7 @@ describe("page essence", () => {
       siteName: "Design Notes",
       imageUrl: "https://example.com/images/motion-cover.jpg",
       faviconUrl: "https://example.com/icons/site.svg",
+      manifestUrl: "https://example.com/site.webmanifest",
       keywords: ["motion", "interaction", "ux"],
       h1: "Purposeful motion",
       h2: ["Timing", "Accessibility"],
@@ -39,6 +42,18 @@ describe("page essence", () => {
         "Use motion to explain how interface states are related.",
       pathTokens: ["guides", "motion", "design"]
     });
+    expect(essence.siteIconCandidates).toEqual([
+      {
+        url: "https://example.com/apple.png",
+        source: "apple-touch-icon",
+        declaredSize: 180
+      },
+      {
+        url: "https://example.com/icons/site.svg",
+        source: "svg-icon",
+        vector: true
+      }
+    ]);
   });
 
   it("blocks local, private and common internal hosts", () => {

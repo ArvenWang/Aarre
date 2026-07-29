@@ -18,7 +18,17 @@ import {
   extractPageEssenceFromHtml,
   isInternalOrSensitiveUrl
 } from "../lib/page-essence";
-import { cacheRepresentativeImage } from "../lib/thumbnail";
+import {
+  cacheRepresentativeImage,
+  cacheSiteBrandIcon
+} from "../lib/thumbnail";
+import {
+  categoryCoverForResource,
+  matchCoverRule,
+  recordPageImageSample,
+  registrableHost,
+  resolveRuleAsset
+} from "../lib/cover-registry";
 import {
   createUndoBatch,
   snapshotCreatedMutation,
@@ -44,9 +54,12 @@ import {
   getLocalResource,
   getLocalResources,
   getOutbox,
+  getSiteBrand,
+  getSiteBrands,
   getUndoSnapshot,
   getUndoSnapshots,
   putUndoSnapshot,
+  putSiteBrand,
   upsertLocalResource
 } from "../lib/storage";
 import {
@@ -74,6 +87,8 @@ import type {
   RestoreResult,
   SaveBookmarkInput,
   SaveBookmarkResult,
+  SiteBrandRecord,
+  SiteIconCandidate,
   UndoMutation,
   UndoSnapshotBatch
 } from "../lib/types";
@@ -1275,6 +1290,7 @@ async function saveBookmark(
     tags: existing?.tags || [],
     tagsSource: existing?.tagsSource,
     topics: existing?.topics || [],
+    aliases: existing?.aliases,
     contentExcerpt: input.capture.excerpt,
     contentHash,
     selectedText: input.capture.selectedText,
@@ -1285,6 +1301,10 @@ async function saveBookmark(
     ...(existing?.thumbnailDataUrl
       ? { thumbnailDataUrl: existing.thumbnailDataUrl }
       : {}),
+    coverSource: existing?.coverSource,
+    coverUpdatedAt: existing?.coverUpdatedAt,
+    categoryCoverId: existing?.categoryCoverId,
+    snapshotAt: existing?.snapshotAt,
     faviconUrl: input.capture.faviconUrl,
     nativeBookmarkIds: [
       ...new Set([...(existing?.nativeBookmarkIds || []), bookmark.id])
@@ -1328,6 +1348,10 @@ async function saveBookmark(
     }
   }
 
+  resource = {
+    ...resource,
+    categoryCoverId: categoryCoverForResource(resource)
+  };
   await upsertLocalResource(resource);
   let synced = resource;
   if (auth.configured) {
@@ -1480,6 +1504,254 @@ async function pageEssenceForResource(resource: ResourceRecord) {
   }
 }
 
+function iconSize(value: unknown): number | undefined {
+  if (typeof value !== "string") return undefined;
+  const sizes = [...value.matchAll(/(\d+)\s*x\s*(\d+)/gi)]
+    .map((match) => Math.min(Number(match[1]), Number(match[2])))
+    .filter((size) => Number.isFinite(size) && size > 0);
+  return sizes.length ? Math.max(...sizes) : undefined;
+}
+
+async function manifestIconCandidates(
+  manifestUrl: string
+): Promise<SiteIconCandidate[]> {
+  if (!manifestUrl) return [];
+  try {
+    const response = await fetch(manifestUrl, {
+      credentials: "omit",
+      redirect: "follow",
+      headers: { Accept: "application/manifest+json,application/json" },
+      signal: AbortSignal.timeout(8_000)
+    });
+    if (!response.ok) return [];
+    const manifest = JSON.parse(
+      await readLimitedText(response, 256 * 1024)
+    ) as {
+      icons?: Array<{
+        src?: unknown;
+        sizes?: unknown;
+        type?: unknown;
+      }>;
+    };
+    if (!Array.isArray(manifest.icons)) return [];
+    return manifest.icons
+      .flatMap((icon): SiteIconCandidate[] => {
+        if (typeof icon.src !== "string" || !icon.src.trim()) return [];
+        try {
+          const url = new URL(icon.src, response.url || manifestUrl).toString();
+          const vector =
+            icon.type === "image/svg+xml" || /\.svg(?:[?#]|$)/i.test(url);
+          const declaredSize = iconSize(icon.sizes);
+          return [
+            {
+              url,
+              source: "manifest",
+              ...(declaredSize ? { declaredSize } : {}),
+              ...(vector ? { vector: true } : {})
+            }
+          ];
+        } catch {
+          return [];
+        }
+      })
+      .sort(
+        (left, right) =>
+          (right.declaredSize || 0) - (left.declaredSize || 0)
+      );
+  } catch {
+    return [];
+  }
+}
+
+async function conventionalIconCandidates(
+  pageUrl: string
+): Promise<SiteIconCandidate[]> {
+  try {
+    const origin = new URL(pageUrl).origin;
+    const paths = [
+      "/apple-touch-icon-180x180.png",
+      "/apple-touch-icon.png",
+      "/apple-touch-icon-precomposed.png",
+      "/apple-touch-icon-152x152.png"
+    ];
+    for (const path of paths) {
+      const url = new URL(path, origin).toString();
+      try {
+        const response = await fetch(url, {
+          method: "HEAD",
+          credentials: "omit",
+          redirect: "follow",
+          signal: AbortSignal.timeout(5_000)
+        });
+        if (response.ok) {
+          return [
+            {
+              url,
+              source: "conventional-apple-touch-icon",
+              declaredSize: path.includes("152") ? 152 : 180
+            }
+          ];
+        }
+      } catch {
+        // Continue to the next conventional path.
+      }
+    }
+    const svgUrl = new URL("/favicon.svg", origin).toString();
+    try {
+      const response = await fetch(svgUrl, {
+        method: "HEAD",
+        credentials: "omit",
+        redirect: "follow",
+        signal: AbortSignal.timeout(5_000)
+      });
+      if (response.ok) {
+        return [
+          {
+            url: svgUrl,
+            source: "svg-icon",
+            vector: true
+          }
+        ];
+      }
+    } catch {
+      // No conventional SVG icon.
+    }
+  } catch {
+    // Invalid URLs are filtered before this function.
+  }
+  return [];
+}
+
+function uniqueIconCandidates(
+  candidates: SiteIconCandidate[]
+): SiteIconCandidate[] {
+  const seen = new Set<string>();
+  return candidates.filter((candidate) => {
+    if (!candidate.url || seen.has(candidate.url)) return false;
+    seen.add(candidate.url);
+    return true;
+  });
+}
+
+async function scanSiteBrand(
+  resource: ResourceRecord,
+  essence: ReturnType<typeof extractPageEssenceFromHtml>,
+  force: boolean
+): Promise<SiteBrandRecord | undefined> {
+  const pageUrl = new URL(resource.url);
+  const host = pageUrl.hostname.toLocaleLowerCase();
+  const existing = await getSiteBrand(host);
+  const cacheFresh =
+    existing &&
+    Date.now() - Date.parse(existing.updatedAt) <
+      30 * 24 * 60 * 60 * 1_000;
+  if (cacheFresh && !force) return existing;
+
+  const rule = matchCoverRule(resource.url);
+  const registryAsset = resolveRuleAsset(resource.url, "brandAsset");
+  const apple = essence.siteIconCandidates.filter(
+    (candidate) => candidate.source === "apple-touch-icon"
+  );
+  const declaredSvg = essence.siteIconCandidates.filter(
+    (candidate) => candidate.source === "svg-icon"
+  );
+  const largeBitmap = essence.siteIconCandidates.filter(
+    (candidate) => candidate.source === "large-icon"
+  );
+  const tile = essence.siteIconCandidates.filter(
+    (candidate) => candidate.source === "msapplication-tile"
+  );
+  const candidates = uniqueIconCandidates([
+    ...(registryAsset
+      ? [{ url: registryAsset, source: "registry" as const }]
+      : []),
+    ...apple,
+    ...(await conventionalIconCandidates(resource.url)),
+    ...(await manifestIconCandidates(essence.manifestUrl)),
+    ...declaredSvg,
+    ...largeBitmap,
+    ...tile
+  ]);
+  let result = await cacheSiteBrandIcon(candidates);
+
+  const baseHost = registrableHost(host);
+  if (!result.iconDataUrl && baseHost && baseHost !== host) {
+    const base = await getSiteBrand(baseHost);
+    if (base?.iconDataUrl && !force) {
+      const aliased = { ...base, host, updatedAt: now() };
+      await putSiteBrand(aliased);
+      return aliased;
+    }
+    const baseUrl = `${pageUrl.protocol}//${baseHost}/`;
+    result = await cacheSiteBrandIcon(
+      await conventionalIconCandidates(baseUrl)
+    );
+    const baseRecord: SiteBrandRecord = {
+      host: baseHost,
+      ...result,
+      ...(rule?.skipPageImage ? { skipPageImage: true } : {}),
+      updatedAt: now()
+    };
+    await putSiteBrand(baseRecord);
+    if (result.iconDataUrl) {
+      const aliased = { ...baseRecord, host, updatedAt: now() };
+      await putSiteBrand(aliased);
+      return aliased;
+    }
+  }
+
+  const record: SiteBrandRecord = {
+    host,
+    ...result,
+    ...(rule?.skipPageImage ? { skipPageImage: true } : {}),
+    updatedAt: now()
+  };
+  await putSiteBrand(record);
+  return record;
+}
+
+async function registerPageImageSample(
+  resource: ResourceRecord,
+  imageUrl: string
+): Promise<boolean> {
+  if (!imageUrl) return false;
+  const host = new URL(resource.url).hostname.toLocaleLowerCase();
+  const existing = await getSiteBrand(host);
+  const sampleResult = recordPageImageSample(
+    existing?.pageImageSamples || {},
+    imageUrl,
+    resource.resourceKey
+  );
+  await putSiteBrand({
+    ...(existing || {}),
+    host,
+    pageImageSamples: sampleResult.samples,
+    ...(sampleResult.isCommonBanner ? { skipPageImage: true } : {}),
+    updatedAt: now()
+  });
+  if (!sampleResult.isCommonBanner) return false;
+
+  const resources = await getLocalResources();
+  for (const item of resources) {
+    let sameHost = false;
+    try {
+      sameHost =
+        new URL(item.url).hostname.toLocaleLowerCase() === host;
+    } catch {
+      sameHost = false;
+    }
+    if (!sameHost || item.imageUrl !== imageUrl) continue;
+    const { thumbnailDataUrl: _removed, ...withoutThumbnail } = item;
+    await upsertLocalResource({
+      ...withoutThumbnail,
+      imageUrl: "",
+      coverSource: "category:common-banner",
+      coverUpdatedAt: now()
+    });
+  }
+  return true;
+}
+
 async function scheduleLibraryScan(): Promise<void> {
   await chrome.alarms.create(LIBRARY_SCAN_ALARM, {
     delayInMinutes: 0.1,
@@ -1491,7 +1763,7 @@ function needsRepresentativeImageRefresh(
   resource: ResourceRecord
 ): boolean {
   if (!resource.thumbnailDataUrl) {
-    return true;
+    return !resource.coverSource;
   }
   try {
     const pageUrl = new URL(resource.url);
@@ -1536,18 +1808,18 @@ function needsRepresentativeImageRefresh(
 }
 
 async function startLibraryScan(force = false): Promise<LibraryScanStatus> {
-  const runtime = await getAiRuntimeSettings();
-  if (!runtime.apiKey) {
-    throw new Error("请先在设置中配置并验证一个 AI API Key。");
-  }
+  const hasAi = Boolean((await getAiRuntimeSettings()).apiKey);
   await importNativeBookmarks();
   const resources = (await getLocalResources()).filter(
     (resource) =>
       resource.nativeBookmarkIds.length > 0 &&
       (force ||
-        resource.aiStatus !== "ready" ||
-        !resource.summary.trim() ||
-        !resource.tags.length ||
+        !resource.coverSource ||
+        (hasAi &&
+          (resource.aiStatus !== "ready" ||
+            !resource.summary.trim() ||
+            !resource.tags.length ||
+            !resource.aliases?.length)) ||
         needsRepresentativeImageRefresh(resource))
   );
   const timestamp = now();
@@ -1711,11 +1983,14 @@ async function runLibraryScan(): Promise<void> {
         continue;
       }
 
+      const hasAi = Boolean((await getAiRuntimeSettings()).apiKey);
       const needsAi =
-        job.force ||
-        resource.aiStatus !== "ready" ||
-        !resource.summary.trim() ||
-        !resource.tags.length;
+        hasAi &&
+        (job.force ||
+          resource.aiStatus !== "ready" ||
+          !resource.summary.trim() ||
+          !resource.tags.length ||
+          !resource.aliases?.length);
       let scannedResource: ResourceRecord = {
         ...resource,
         aiStatus: needsAi ? "processing" : resource.aiStatus,
@@ -1724,14 +1999,45 @@ async function runLibraryScan(): Promise<void> {
       await upsertLocalResource(scannedResource);
       try {
         const essence = await pageEssenceForResource(resource);
+        const siteBrand = await scanSiteBrand(
+          resource,
+          essence,
+          job.force
+        );
+        const coverRule = matchCoverRule(resource.url);
+        const registryPageImage = resolveRuleAsset(
+          resource.url,
+          "pageImage"
+        );
         let thumbnailDataUrl = resource.thumbnailDataUrl || "";
-        const refreshRepresentativeImage =
-          needsRepresentativeImageRefresh(resource);
-        const representativeImageUrl =
-          essence.imageUrl || resource.imageUrl;
+        let representativeImageUrl =
+          coverRule?.skipPageImage || siteBrand?.skipPageImage
+            ? ""
+            : registryPageImage ||
+              essence.imageUrl ||
+              resource.imageUrl;
+        const commonPageImage =
+          representativeImageUrl &&
+          !registryPageImage &&
+          (await registerPageImageSample(
+            resource,
+            representativeImageUrl
+          ));
+        if (commonPageImage) representativeImageUrl = "";
+        const coverSource = commonPageImage
+          ? "category:common-banner"
+          : coverRule?.skipPageImage || siteBrand?.skipPageImage
+          ? `category:${coverRule?.id || "common-banner"}`
+          : registryPageImage
+            ? `registry:${coverRule?.id || "page-image"}`
+            : representativeImageUrl
+              ? "page-metadata"
+              : "category";
         if (
           representativeImageUrl &&
-          (refreshRepresentativeImage || job.force)
+          (!thumbnailDataUrl ||
+            resource.imageUrl !== representativeImageUrl ||
+            job.force)
         ) {
           try {
             thumbnailDataUrl = await cacheRepresentativeImage(
@@ -1745,6 +2051,8 @@ async function runLibraryScan(): Promise<void> {
           ...scannedResource,
           imageUrl: representativeImageUrl,
           faviconUrl: essence.faviconUrl || resource.faviconUrl,
+          coverSource,
+          coverUpdatedAt: now(),
           ...(thumbnailDataUrl ? { thumbnailDataUrl } : {})
         };
         await upsertLocalResource(scannedResource);
@@ -1755,6 +2063,7 @@ async function runLibraryScan(): Promise<void> {
         const auth = await getAuthState();
         const nextResource: ResourceRecord = {
           ...enriched,
+          categoryCoverId: categoryCoverForResource(enriched),
           syncStatus: auth.configured ? "pending" : enriched.syncStatus
         };
         await upsertLocalResource(nextResource);
@@ -1905,6 +2214,7 @@ async function importNativeBookmarks(): Promise<ImportResult> {
       tags: existing?.tags || [],
       tagsSource: existing?.tagsSource,
       topics: existing?.topics || [],
+      aliases: existing?.aliases,
       contentExcerpt: existing?.contentExcerpt || "",
       contentHash: existing?.contentHash || "",
       selectedText: existing?.selectedText || "",
@@ -1916,6 +2226,19 @@ async function importNativeBookmarks(): Promise<ImportResult> {
       ...(existing?.thumbnailDataUrl
         ? { thumbnailDataUrl: existing.thumbnailDataUrl }
         : {}),
+      coverSource: existing?.coverSource,
+      coverUpdatedAt: existing?.coverUpdatedAt,
+      categoryCoverId:
+        existing?.categoryCoverId ||
+        categoryCoverForResource({
+          url: primary.node.url!,
+          title:
+            primary.node.title || new URL(primary.node.url!).hostname,
+          topics: existing?.topics || [],
+          tags: existing?.tags || [],
+          summary: existing?.summary || ""
+        }),
+      snapshotAt: existing?.snapshotAt,
       faviconUrl: existing?.faviconUrl || "",
       nativeBookmarkIds,
       nativeFolderPath: primary.path,
@@ -2240,6 +2563,8 @@ async function handleRequest(request: ExtensionRequest): Promise<unknown> {
       return (await getLocalResources()).filter(
         (resource) => resource.nativeBookmarkIds.length > 0
       );
+    case "GET_SITE_BRANDS":
+      return getSiteBrands();
     case "GET_AGENT_CONVERSATIONS":
       return getAgentConversations();
     case "SAVE_AGENT_CONVERSATION":

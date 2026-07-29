@@ -21,6 +21,7 @@ import type {
   SaveBookmarkInput,
   SaveBookmarkResult,
   SearchResult,
+  SiteBrandRecord,
   UndoBatchResult,
   UndoSnapshotBatch
 } from "./types";
@@ -48,6 +49,7 @@ export type ExtensionRequest =
   | { type: "GET_UNDO_SNAPSHOTS" }
   | { type: "UNDO_BOOKMARK_BATCH"; batchId: string }
   | { type: "GET_LOCAL_RESOURCES" }
+  | { type: "GET_SITE_BRANDS" }
   | { type: "GET_AGENT_CONVERSATIONS" }
   | { type: "SAVE_AGENT_CONVERSATION"; conversation: AgentConversation }
   | { type: "DELETE_AGENT_CONVERSATION"; id: string }
@@ -102,6 +104,7 @@ export type ResponseDataByRequest = {
   GET_UNDO_SNAPSHOTS: UndoSnapshotBatch[];
   UNDO_BOOKMARK_BATCH: UndoBatchResult;
   GET_LOCAL_RESOURCES: ResourceRecord[];
+  GET_SITE_BRANDS: SiteBrandRecord[];
   GET_AGENT_CONVERSATIONS: AgentConversation[];
   SAVE_AGENT_CONVERSATION: AgentConversation;
   DELETE_AGENT_CONVERSATION: { deleted: true };

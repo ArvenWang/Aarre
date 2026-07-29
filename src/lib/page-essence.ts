@@ -1,4 +1,8 @@
-import type { PageEssence } from "./types";
+import type {
+  PageEssence,
+  SiteIconCandidate,
+  SiteIconSource
+} from "./types";
 
 const MAX_HTML_LENGTH = 600_000;
 
@@ -118,6 +122,76 @@ function faviconHref(html: string): string {
     if (href) return compact(href, 500);
   }
   return "";
+}
+
+function declaredIconSize(tag: string): number | undefined {
+  const sizes = attribute(tag, "sizes").toLowerCase();
+  const values = [...sizes.matchAll(/(\d+)\s*x\s*(\d+)/g)]
+    .map((match) => Math.min(Number(match[1]), Number(match[2])))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  return values.length ? Math.max(...values) : undefined;
+}
+
+function iconCandidates(
+  html: string,
+  pageUrl: string
+): SiteIconCandidate[] {
+  const apple: SiteIconCandidate[] = [];
+  const svg: SiteIconCandidate[] = [];
+  const bitmap: SiteIconCandidate[] = [];
+  for (const match of html.matchAll(/<link\s+[^>]*>/gi)) {
+    const tag = match[0];
+    const rel = attribute(tag, "rel").toLowerCase().split(/\s+/);
+    const href = absoluteUrl(attribute(tag, "href"), pageUrl);
+    if (!href) continue;
+    const declaredSize = declaredIconSize(tag);
+    const candidate = (
+      source: SiteIconSource,
+      vector = false
+    ): SiteIconCandidate => ({
+      url: href,
+      source,
+      ...(declaredSize ? { declaredSize } : {}),
+      ...(vector ? { vector: true } : {})
+    });
+    if (
+      rel.includes("apple-touch-icon") ||
+      rel.includes("apple-touch-icon-precomposed")
+    ) {
+      apple.push(candidate("apple-touch-icon"));
+      continue;
+    }
+    if (!rel.includes("icon")) continue;
+    const vector =
+      attribute(tag, "type").toLowerCase() === "image/svg+xml" ||
+      /\.svg(?:[?#]|$)/i.test(href);
+    if (vector) {
+      svg.push(candidate("svg-icon", true));
+    } else if (!declaredSize || declaredSize >= 128) {
+      bitmap.push(candidate("large-icon"));
+    }
+  }
+  const sortLargest = (
+    left: SiteIconCandidate,
+    right: SiteIconCandidate
+  ) => (right.declaredSize || 0) - (left.declaredSize || 0);
+  const tileUrl = absoluteUrl(
+    metaContent(html, ["msapplication-TileImage"]),
+    pageUrl
+  );
+  return [
+    ...apple.sort(sortLargest),
+    ...svg.sort(sortLargest),
+    ...bitmap.sort(sortLargest),
+    ...(tileUrl
+      ? [
+          {
+            url: tileUrl,
+            source: "msapplication-tile" as const
+          }
+        ]
+      : [])
+  ];
 }
 
 function jsonLdImages(html: string): string[] {
@@ -342,6 +416,8 @@ export function extractPageEssenceFromHtml(
     siteName: metaContent(source, ["og:site_name", "application-name"]),
     imageUrl: representativeImage(source, url),
     faviconUrl: absoluteUrl(faviconHref(source), url),
+    manifestUrl: absoluteUrl(linkHref(source, "manifest"), url),
+    siteIconCandidates: iconCandidates(source, url),
     keywords: metaContent(source, ["keywords"])
       .split(/[,，、|]/)
       .map((item) => item.trim())

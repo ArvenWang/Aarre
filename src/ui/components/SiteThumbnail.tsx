@@ -1,10 +1,17 @@
 import { useEffect, useState } from "react";
-import { SiteIcon } from "./SiteIcon";
+import {
+  categoryCoverUrl,
+  coverBrightnessForHost,
+  listCoverPipeline
+} from "../../lib/cover-registry";
+import type { ListCoverStyle } from "../../lib/display-settings";
 
 interface SiteThumbnailProps {
   url: string;
   imageUrl?: string;
-  faviconUrl?: string;
+  brandImageUrl?: string;
+  categoryCoverId?: string;
+  coverStyle?: ListCoverStyle;
   label?: string;
   className?: string;
 }
@@ -12,17 +19,30 @@ interface SiteThumbnailProps {
 export function SiteThumbnail({
   url,
   imageUrl = "",
-  faviconUrl = "",
+  brandImageUrl = "",
+  categoryCoverId = "",
+  coverStyle = "site",
   label = "",
   className = ""
 }: SiteThumbnailProps) {
+  const categoryImageUrl = categoryCoverUrl(categoryCoverId);
+  const preferredImageUrl =
+    (coverStyle === "page" ||
+      listCoverPipeline(url) === "page-image") &&
+    imageUrl
+      ? imageUrl
+      : brandImageUrl || categoryImageUrl;
   const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
     setImageFailed(false);
-  }, [imageUrl]);
+  }, [preferredImageUrl]);
 
-  const showPreview = Boolean(imageUrl) && !imageFailed;
+  const displayImageUrl =
+    imageFailed && preferredImageUrl !== categoryImageUrl
+      ? categoryImageUrl
+      : preferredImageUrl;
+  const usingCategory = displayImageUrl === categoryImageUrl;
 
   return (
     <span
@@ -30,24 +50,21 @@ export function SiteThumbnail({
       aria-hidden="true"
       title={label || undefined}
     >
-      {showPreview ? (
-        <img
-          className="site-thumbnail-image"
-          src={imageUrl}
-          alt=""
-          loading="lazy"
-          onError={() => setImageFailed(true)}
-        />
-      ) : (
-        <SiteIcon
-          url={url}
-          faviconUrl={faviconUrl}
-          label={label}
-          className="site-thumbnail-favicon"
-          size={32}
-          requestSize={16}
-        />
-      )}
+      <img
+        className="site-thumbnail-image"
+        src={displayImageUrl}
+        alt=""
+        loading="lazy"
+        data-cover-kind={usingCategory ? "category" : "site"}
+        style={
+          usingCategory
+            ? {
+                filter: `brightness(${coverBrightnessForHost(url)})`
+              }
+            : undefined
+        }
+        onError={() => setImageFailed(true)}
+      />
     </span>
   );
 }

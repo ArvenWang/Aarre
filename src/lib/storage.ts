@@ -6,6 +6,7 @@ import {
 import type {
   OutboxItem,
   ResourceRecord,
+  SiteBrandRecord,
   UndoSnapshotBatch
 } from "./types";
 
@@ -31,6 +32,13 @@ interface BookmarkLayerDatabase extends DBSchema {
     value: UndoSnapshotBatch;
     indexes: {
       "by-created-at": string;
+    };
+  };
+  siteBrands: {
+    key: string;
+    value: SiteBrandRecord;
+    indexes: {
+      "by-updated-at": string;
     };
   };
 }
@@ -115,6 +123,18 @@ export function normalizeResourceRecord(value: unknown): ResourceRecord {
     ...(stringValue(record.thumbnailDataUrl)
       ? { thumbnailDataUrl: stringValue(record.thumbnailDataUrl) }
       : {}),
+    ...(stringValue(record.coverSource)
+      ? { coverSource: stringValue(record.coverSource) }
+      : {}),
+    ...(stringValue(record.coverUpdatedAt)
+      ? { coverUpdatedAt: stringValue(record.coverUpdatedAt) }
+      : {}),
+    ...(stringValue(record.categoryCoverId)
+      ? { categoryCoverId: stringValue(record.categoryCoverId) }
+      : {}),
+    ...(stringValue(record.snapshotAt)
+      ? { snapshotAt: stringValue(record.snapshotAt) }
+      : {}),
     faviconUrl: stringValue(record.faviconUrl),
     nativeBookmarkIds: stringArray(record.nativeBookmarkIds),
     nativeFolderPath: stringArray(record.nativeFolderPath),
@@ -135,7 +155,7 @@ function database(): Promise<IDBPDatabase<BookmarkLayerDatabase>> {
   if (!databasePromise) {
     databasePromise = openDB<BookmarkLayerDatabase>(
       "bookmark-layer",
-      2,
+      3,
       {
         upgrade(db, oldVersion) {
           if (oldVersion < 1) {
@@ -155,11 +175,75 @@ function database(): Promise<IDBPDatabase<BookmarkLayerDatabase>> {
             });
             undoSnapshots.createIndex("by-created-at", "createdAt");
           }
+          if (oldVersion < 3) {
+            const siteBrands = db.createObjectStore("siteBrands", {
+              keyPath: "host"
+            });
+            siteBrands.createIndex("by-updated-at", "updatedAt");
+          }
         }
       }
     );
   }
   return databasePromise;
+}
+
+function normalizeSiteBrand(value: SiteBrandRecord): SiteBrandRecord {
+  const pageImageSamples =
+    value.pageImageSamples &&
+    typeof value.pageImageSamples === "object"
+      ? Object.fromEntries(
+          Object.entries(value.pageImageSamples)
+            .filter(
+              ([url, keys]) =>
+                Boolean(url) &&
+                Array.isArray(keys) &&
+                keys.every((key) => typeof key === "string")
+            )
+            .slice(0, 20)
+            .map(([url, keys]) => [url, [...new Set(keys)].slice(0, 3)])
+        )
+      : undefined;
+  return {
+    host: value.host.toLocaleLowerCase(),
+    ...(value.iconDataUrl ? { iconDataUrl: value.iconDataUrl } : {}),
+    ...(value.iconSource ? { iconSource: value.iconSource } : {}),
+    ...(value.iconRejectReason
+      ? { iconRejectReason: value.iconRejectReason }
+      : {}),
+    ...(typeof value.nativeWidth === "number"
+      ? { nativeWidth: value.nativeWidth }
+      : {}),
+    ...(typeof value.nativeHeight === "number"
+      ? { nativeHeight: value.nativeHeight }
+      : {}),
+    ...(value.skipPageImage
+      ? { skipPageImage: true }
+      : {}),
+    ...(pageImageSamples && Object.keys(pageImageSamples).length
+      ? { pageImageSamples }
+      : {}),
+    updatedAt: value.updatedAt
+  };
+}
+
+export async function putSiteBrand(
+  brand: SiteBrandRecord
+): Promise<void> {
+  const db = await database();
+  await db.put("siteBrands", normalizeSiteBrand(brand));
+}
+
+export async function getSiteBrand(
+  host: string
+): Promise<SiteBrandRecord | undefined> {
+  const db = await database();
+  return db.get("siteBrands", host.toLocaleLowerCase());
+}
+
+export async function getSiteBrands(): Promise<SiteBrandRecord[]> {
+  const db = await database();
+  return db.getAll("siteBrands");
 }
 
 export async function putUndoSnapshot(

@@ -10,6 +10,7 @@ import type {
   NavigationSuggestion,
   ResourceRecord
 } from "../../lib/types";
+import { categoryCoverForResource } from "../../lib/cover-registry";
 import aiAutomationCover from "../../../design-assets/bookmark-covers/taxonomy-pilot/ai-automation-v1.png";
 import artCreationCover from "../../../design-assets/bookmark-covers/taxonomy-pilot/art-creation-v2.png";
 import audioPodcastCover from "../../../design-assets/bookmark-covers/taxonomy-pilot/audio-podcast-v1.png";
@@ -455,6 +456,13 @@ const previewGeneratedCoverResources: ResourceRecord[] =
       siteName: new URL(sample.url).hostname,
       language: "zh-CN",
       imageUrl: sample.imageUrl,
+      categoryCoverId: categoryCoverForResource({
+        url: sample.url,
+        title: sample.title,
+        topics: [sample.category],
+        tags: [sample.category],
+        summary: ""
+      }),
       faviconUrl: "",
       nativeBookmarkIds: [node.id],
       nativeFolderPath: ["书签栏"],

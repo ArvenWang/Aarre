@@ -15,6 +15,7 @@ import {
   filterBookmarkTree
 } from "../../lib/bookmark-search";
 import { findBookmarkByUrl } from "../../lib/bookmark-tree";
+import { registrableHost } from "../../lib/cover-registry";
 import { sendExtensionRequest } from "../../lib/messages";
 import {
   buildLocalSearchIndex,
@@ -25,6 +26,11 @@ import {
   AI_PROVIDER_PRESETS,
   getAiProviderPreset
 } from "../../lib/settings";
+import {
+  getDisplaySettings,
+  saveDisplaySettings,
+  type ListCoverStyle
+} from "../../lib/display-settings";
 import type {
   AiProviderId,
   AiSettingsStatus,
@@ -38,6 +44,7 @@ import type {
   PendingSaveDraft,
   PageCapture,
   ResourceRecord,
+  SiteBrandRecord,
   UndoSnapshotBatch
 } from "../../lib/types";
 import {
@@ -75,6 +82,21 @@ function resourceForUrl(
   if (direct) return direct;
   try {
     return resourceByUrl.get(canonicalizeUrl(url));
+  } catch {
+    return undefined;
+  }
+}
+
+function siteBrandForUrl(
+  siteBrandByHost: Map<string, SiteBrandRecord>,
+  input: string
+): SiteBrandRecord | undefined {
+  try {
+    const host = new URL(input).hostname.toLocaleLowerCase();
+    return (
+      siteBrandByHost.get(host) ||
+      siteBrandByHost.get(registrableHost(host))
+    );
   } catch {
     return undefined;
   }
@@ -266,12 +288,16 @@ function FolderSelect({
 
 interface SettingsPageProps {
   appState: AppState | null;
+  listCoverStyle: ListCoverStyle;
+  onListCoverStyleChange: (style: ListCoverStyle) => void;
   onAppStateChange: (state: AppState) => void;
   onClose: () => void;
 }
 
 function SettingsPage({
   appState,
+  listCoverStyle,
+  onListCoverStyleChange,
   onAppStateChange,
   onClose
 }: SettingsPageProps) {
@@ -458,6 +484,27 @@ function SettingsPage({
     }
   }
 
+  async function handleCoverStyle(style: ListCoverStyle) {
+    if (action) return;
+    setAction("cover-style");
+    setError("");
+    try {
+      const next = await saveDisplaySettings({
+        listCoverStyle: style
+      });
+      onListCoverStyleChange(next.listCoverStyle);
+      setMessage(
+        style === "site"
+          ? "列表已优先显示清晰的站点标识。"
+          : "列表已优先显示页面封面；没有合格封面时仍会安全回退。"
+      );
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "封面设置保存失败");
+    } finally {
+      setAction("");
+    }
+  }
+
   const accountName =
     appState?.auth.userName ||
     appState?.auth.userEmail ||
@@ -597,6 +644,48 @@ function SettingsPage({
         </section>
 
         <section
+          className="settings-section"
+          aria-labelledby="cover-style-title"
+        >
+          <div className="settings-section-heading">
+            <div>
+              <h2 id="cover-style-title">列表封面风格</h2>
+              <p>
+                站点标识在 48px 下更清晰；页面封面更丰富，但细节可能更少。
+              </p>
+            </div>
+          </div>
+          <div
+            className="settings-provider-tabs"
+            role="radiogroup"
+            aria-label="列表封面风格"
+          >
+            <button
+              type="button"
+              role="radio"
+              aria-checked={listCoverStyle === "site"}
+              data-active={listCoverStyle === "site"}
+              className="settings-provider-tab"
+              disabled={Boolean(action)}
+              onClick={() => void handleCoverStyle("site")}
+            >
+              站点标识（整齐）
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={listCoverStyle === "page"}
+              data-active={listCoverStyle === "page"}
+              className="settings-provider-tab"
+              disabled={Boolean(action)}
+              onClick={() => void handleCoverStyle("page")}
+            >
+              页面封面（丰富）
+            </button>
+          </div>
+        </section>
+
+        <section
           className="settings-section settings-scan-section"
           aria-labelledby="library-scan-title"
         >
@@ -604,7 +693,7 @@ function SettingsPage({
             <div>
               <h2 id="library-scan-title">全目录扫描</h2>
               <p>
-                逐个读取可访问网页，补充代表图、简介、标签和主题。
+                逐个读取可访问网页，补充站点标识和代表图；已配置 AI 时同时生成简介、标签和主题。
               </p>
             </div>
             <span
@@ -652,7 +741,7 @@ function SettingsPage({
             ) : null}
           </div>
           <p className="settings-scan-privacy">
-            代表图会压缩后只保存在本机；简介和标签会产生所选 AI 服务商的调用费用。内部网址、局域网和受保护地址不会发送给 AI。
+            站点标识和代表图会压缩后只保存在本机；简介和标签会产生所选 AI 服务商的调用费用。内部网址、局域网和受保护地址不会发起任何网络请求。
           </p>
           <div className="settings-scan-actions">
             {appState?.libraryScan.state === "running" ? (
@@ -689,7 +778,6 @@ function SettingsPage({
                 className="button button-dark button-small"
                 disabled={
                   Boolean(action) ||
-                  !settings?.apiKeyConfigured ||
                   !appState?.localResourceCount
                 }
                 onClick={() => void handleLibraryScan("start")}
@@ -700,7 +788,9 @@ function SettingsPage({
                     appState?.localResourceCount &&
                     Boolean(appState?.localResourceCount)
                     ? "检查并补全"
-                    : "扫描全部书签"}
+                    : settings?.apiKeyConfigured
+                      ? "扫描全部书签"
+                      : "更新站点标识"}
               </button>
             )}
           </div>
@@ -858,6 +948,8 @@ function countBookmarks(node: NativeBookmarkNode): number {
 interface TreeProps {
   nodes: NativeBookmarkNode[];
   resourceByUrl: Map<string, ResourceRecord>;
+  siteBrandByHost: Map<string, SiteBrandRecord>;
+  coverStyle: ListCoverStyle;
   depth?: number;
   expanded: Set<string>;
   onToggle: (id: string) => void;
@@ -876,6 +968,8 @@ interface TreeProps {
 function BookmarkTree({
   nodes,
   resourceByUrl,
+  siteBrandByHost,
+  coverStyle,
   depth = 0,
   expanded,
   onToggle,
@@ -1063,10 +1157,15 @@ function BookmarkTree({
                 ) : (
                   <SiteThumbnail
                     url={node.url || ""}
-                    imageUrl={
-                      metadata?.thumbnailDataUrl || metadata?.imageUrl
+                    imageUrl={metadata?.thumbnailDataUrl}
+                    brandImageUrl={
+                      siteBrandForUrl(
+                        siteBrandByHost,
+                        node.url || ""
+                      )?.iconDataUrl
                     }
-                    faviconUrl={metadata?.faviconUrl}
+                    categoryCoverId={metadata?.categoryCoverId}
+                    coverStyle={coverStyle}
                     label={node.title}
                     className="bookmark-thumbnail"
                   />
@@ -1101,6 +1200,8 @@ function BookmarkTree({
                   <BookmarkTree
                     nodes={node.children}
                     resourceByUrl={resourceByUrl}
+                    siteBrandByHost={siteBrandByHost}
+                    coverStyle={coverStyle}
                     depth={depth + 1}
                     expanded={expanded}
                     onToggle={onToggle}
@@ -1441,6 +1542,9 @@ export function SidePanelApp() {
   const [snapshot, setSnapshot] = useState<BookmarkBarSnapshot | null>(null);
   const [appState, setAppState] = useState<AppState | null>(null);
   const [resources, setResources] = useState<ResourceRecord[]>([]);
+  const [siteBrands, setSiteBrands] = useState<SiteBrandRecord[]>([]);
+  const [listCoverStyle, setListCoverStyle] =
+    useState<ListCoverStyle>("site");
   const [folders, setFolders] = useState<NativeFolderOption[]>([]);
   const [agentPrompt, setAgentPrompt] = useState("");
   const [panelView, setPanelView] = useState<
@@ -1538,13 +1642,15 @@ export function SidePanelApp() {
     const nextResources = await sendExtensionRequest({
       type: "GET_LOCAL_RESOURCES"
     });
-    const [nextSnapshot, nextState] = await Promise.all([
+    const [nextSnapshot, nextState, nextSiteBrands] = await Promise.all([
       sendExtensionRequest({ type: "GET_BOOKMARK_BAR" }),
-      sendExtensionRequest({ type: "GET_APP_STATE" })
+      sendExtensionRequest({ type: "GET_APP_STATE" }),
+      sendExtensionRequest({ type: "GET_SITE_BRANDS" })
     ]);
     setSnapshot(nextSnapshot);
     setAppState(nextState);
     setResources(nextResources);
+    setSiteBrands(nextSiteBrands);
   }, []);
 
   const loadConversations = useCallback(async () => {
@@ -1557,6 +1663,9 @@ export function SidePanelApp() {
   }, []);
 
   useEffect(() => {
+    void getDisplaySettings()
+      .then((settings) => setListCoverStyle(settings.listCoverStyle))
+      .catch(() => undefined);
     void refresh().catch((caught) => {
       setError(caught instanceof Error ? caught.message : "书签栏读取失败");
     });
@@ -1599,11 +1708,15 @@ export function SidePanelApp() {
         return;
       }
       void sendExtensionRequest({ type: "GET_LOCAL_RESOURCES" })
-        .then((nextResources) => {
+        .then(async (nextResources) => {
+          const nextSiteBrands = await sendExtensionRequest({
+            type: "GET_SITE_BRANDS"
+          });
           const safeResources = Array.isArray(nextResources)
             ? nextResources
             : [];
           setResources(safeResources);
+          setSiteBrands(nextSiteBrands);
           setAppState((current) =>
             current
               ? {
@@ -1791,6 +1904,16 @@ export function SidePanelApp() {
     }
     return map;
   }, [resources]);
+  const siteBrandByHost = useMemo(
+    () =>
+      new Map(
+        siteBrands.map((brand) => [
+          brand.host.toLocaleLowerCase(),
+          brand
+        ])
+      ),
+    [siteBrands]
+  );
   const localSearchIndex = useMemo(
     () => buildLocalSearchIndex(resources),
     [resources]
@@ -2486,6 +2609,8 @@ export function SidePanelApp() {
     return (
       <SettingsPage
         appState={appState}
+        listCoverStyle={listCoverStyle}
+        onListCoverStyleChange={setListCoverStyle}
         onAppStateChange={setAppState}
         onClose={() => setPanelView("library")}
       />
@@ -2728,11 +2853,17 @@ export function SidePanelApp() {
                       >
                         <SiteThumbnail
                           url={result.resource.url}
-                          imageUrl={
-                            result.resource.thumbnailDataUrl ||
-                            result.resource.imageUrl
+                          imageUrl={result.resource.thumbnailDataUrl}
+                          brandImageUrl={
+                            siteBrandForUrl(
+                              siteBrandByHost,
+                              result.resource.url
+                            )?.iconDataUrl
                           }
-                          faviconUrl={result.resource.faviconUrl}
+                          categoryCoverId={
+                            result.resource.categoryCoverId
+                          }
+                          coverStyle={listCoverStyle}
                           label={result.resource.title}
                           className="bookmark-thumbnail"
                         />
@@ -2783,6 +2914,8 @@ export function SidePanelApp() {
               <BookmarkTree
                 nodes={visibleBookmarkNodes}
                 resourceByUrl={resourceByUrl}
+                siteBrandByHost={siteBrandByHost}
+                coverStyle={listCoverStyle}
                 expanded={visibleExpanded}
                 onToggle={(id) =>
                   setExpanded((current) => {

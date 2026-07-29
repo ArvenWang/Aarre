@@ -1,17 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { signInWithGoogle, signOut } from "../../lib/auth";
 import { sendExtensionRequest } from "../../lib/messages";
+import { registrableHost } from "../../lib/cover-registry";
+import {
+  getDisplaySettings,
+  type ListCoverStyle
+} from "../../lib/display-settings";
 import type {
   AppState,
   ResourceRecord,
-  SearchResult
+  SearchResult,
+  SiteBrandRecord
 } from "../../lib/types";
 import {
   BookmarkIcon,
   RefreshIcon,
   SearchIcon
 } from "../components/Icons";
-import { SiteIcon } from "../components/SiteIcon";
+import { SiteThumbnail } from "../components/SiteThumbnail";
 
 type LibraryFilter = "all" | "ready" | "pending";
 
@@ -39,12 +45,27 @@ function hostFromUrl(url: string): string {
   }
 }
 
+function brandForUrl(
+  brands: Map<string, SiteBrandRecord>,
+  input: string
+): SiteBrandRecord | undefined {
+  try {
+    const host = new URL(input).hostname.toLocaleLowerCase();
+    return brands.get(host) || brands.get(registrableHost(host));
+  } catch {
+    return undefined;
+  }
+}
+
 export function ManagerApp() {
   const initialQuery = new URLSearchParams(window.location.search).get("q") || "";
   const [appState, setAppState] = useState<AppState | null>(null);
   const [query, setQuery] = useState(initialQuery);
   const [filter, setFilter] = useState<LibraryFilter>("all");
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [siteBrands, setSiteBrands] = useState<SiteBrandRecord[]>([]);
+  const [listCoverStyle, setListCoverStyle] =
+    useState<ListCoverStyle>("site");
   const [loading, setLoading] = useState(true);
   const [action, setAction] = useState("");
   const [error, setError] = useState("");
@@ -66,6 +87,10 @@ export function ManagerApp() {
     try {
       const state = await sendExtensionRequest({ type: "GET_APP_STATE" });
       setAppState(state);
+      setSiteBrands(
+        await sendExtensionRequest({ type: "GET_SITE_BRANDS" })
+      );
+      setListCoverStyle((await getDisplaySettings()).listCoverStyle);
       if (
         state.auth.configured &&
         state.auth.signedIn &&
@@ -107,6 +132,16 @@ export function ManagerApp() {
     }
     return results;
   }, [filter, results]);
+  const siteBrandByHost = useMemo(
+    () =>
+      new Map(
+        siteBrands.map((brand) => [
+          brand.host.toLocaleLowerCase(),
+          brand
+        ])
+      ),
+    [siteBrands]
+  );
 
   async function handleSearch(event: React.FormEvent) {
     event.preventDefault();
@@ -302,11 +337,17 @@ export function ManagerApp() {
             <article className="resource-card" key={resource.resourceKey}>
               <div className="resource-topline">
                 <div className="resource-source">
-                  <SiteIcon
+                  <SiteThumbnail
                     url={resource.url}
-                    faviconUrl={resource.faviconUrl}
+                    imageUrl={resource.thumbnailDataUrl}
+                    brandImageUrl={
+                      brandForUrl(siteBrandByHost, resource.url)
+                        ?.iconDataUrl
+                    }
+                    categoryCoverId={resource.categoryCoverId}
+                    coverStyle={listCoverStyle}
                     label={resource.siteName || hostFromUrl(resource.url)}
-                    size={32}
+                    className="manager-site-thumbnail"
                   />
                   <span>{resource.siteName || hostFromUrl(resource.url)}</span>
                 </div>
@@ -380,7 +421,7 @@ export function ManagerApp() {
             {results.length
               ? "切换到“全部”查看当前收藏。"
               : query
-                ? "换一种描述，或关闭云端向量搜索后使用关键词。"
+                ? "换一种标题、标签、摘要描述或拼音首字母再试。"
                 : "Chrome 书签栏中的内容会自动出现在这里，无需导入。"}
           </p>
         </div>

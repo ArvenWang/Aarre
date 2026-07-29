@@ -106,6 +106,10 @@ export interface ResourceRecord {
   imageUrl: string;
   /** 代表图的本地 WebP 缓存，不上传云端，避免列表受站点防盗链影响。 */
   thumbnailDataUrl?: string;
+  coverSource?: string;
+  coverUpdatedAt?: string;
+  categoryCoverId?: string;
+  snapshotAt?: string;
   faviconUrl: string;
   nativeBookmarkIds: string[];
   nativeFolderPath: string[];
@@ -114,6 +118,34 @@ export interface ResourceRecord {
   createdAt: string;
   updatedAt: string;
   lastSyncedAt?: string;
+}
+
+export type SiteIconSource =
+  | "registry"
+  | "apple-touch-icon"
+  | "conventional-apple-touch-icon"
+  | "manifest"
+  | "svg-icon"
+  | "large-icon"
+  | "msapplication-tile";
+
+export interface SiteIconCandidate {
+  url: string;
+  source: SiteIconSource;
+  declaredSize?: number;
+  vector?: boolean;
+}
+
+export interface SiteBrandRecord {
+  host: string;
+  iconDataUrl?: string;
+  iconSource?: SiteIconSource;
+  iconRejectReason?: string;
+  nativeWidth?: number;
+  nativeHeight?: number;
+  skipPageImage?: boolean;
+  pageImageSamples?: Record<string, string[]>;
+  updatedAt: string;
 }
 
 export interface OutboxItem {
@@ -381,6 +413,8 @@ export interface PageEssence {
   siteName: string;
   imageUrl: string;
   faviconUrl: string;
+  manifestUrl: string;
+  siteIconCandidates: SiteIconCandidate[];
   keywords: string[];
   ogType: string;
   h1: string;

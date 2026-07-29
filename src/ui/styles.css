@@ -4464,7 +4464,7 @@ a:focus-visible {
   overflow: hidden;
   border-radius: 10px;
   color: #8f9299;
-  background: #f2f3f5;
+  background: #fff;
 }
 
 .site-thumbnail-image {
@@ -4472,6 +4472,12 @@ a:focus-visible {
   height: 100%;
   display: block;
   object-fit: cover;
+}
+
+.manager-site-thumbnail {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
 }
 
 .site-thumbnail-favicon {

@@ -9,11 +9,14 @@ import {
   getLocalResource,
   getLocalResources,
   getOutbox,
+  getSiteBrand,
+  getSiteBrands,
   getUndoSnapshot,
   getUndoSnapshots,
   mergeLocalResources,
   normalizeResourceRecord,
   putUndoSnapshot,
+  putSiteBrand,
   removeOutboxItem,
   upsertLocalResource
 } from "../src/lib/storage";
@@ -82,6 +85,28 @@ describe("IndexedDB storage", () => {
     expect(normalized.thumbnailDataUrl).toBe(
       "data:image/webp;base64,AAAA"
     );
+  });
+
+  it("stores shared site-brand diagnostics independently of resources", async () => {
+    await putSiteBrand({
+      host: "Docs.Example.com",
+      iconSource: "manifest",
+      iconDataUrl: "data:image/webp;base64,BRAND",
+      nativeWidth: 512,
+      nativeHeight: 512,
+      updatedAt: "2026-07-30T00:00:00.000Z"
+    });
+
+    expect(await getSiteBrand("docs.example.com")).toMatchObject({
+      host: "docs.example.com",
+      iconSource: "manifest",
+      nativeWidth: 512
+    });
+    expect(
+      (await getSiteBrands()).some(
+        (brand) => brand.host === "docs.example.com"
+      )
+    ).toBe(true);
   });
 
   it("upserts resources and returns newest first", async () => {
