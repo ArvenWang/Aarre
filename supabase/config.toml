@@ -1,0 +1,13 @@
+project_id = "bookmark-layer"
+
+[functions.enrich-bookmark]
+verify_jwt = true
+
+[functions.search-bookmarks]
+verify_jwt = true
+
+[auth.external.google]
+enabled = true
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_SECRET)"
+skip_nonce_check = false

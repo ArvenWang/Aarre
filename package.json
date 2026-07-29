@@ -1,0 +1,35 @@
+{
+  "name": "bookmark-layer",
+  "version": "0.2.2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "vite",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm run test && npm run build"
+  },
+  "dependencies": {
+    "@mozilla/readability": "0.6.0",
+    "@supabase/supabase-js": "2.111.0",
+    "idb": "8.0.3",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/chrome": "0.2.2",
+    "@types/node": "24.10.1",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.4",
+    "esbuild": "0.28.1",
+    "fake-indexeddb": "6.2.5",
+    "jsdom": "30.0.0",
+    "typescript": "7.0.2",
+    "vite": "8.1.5",
+    "vitest": "4.1.10"
+  }
+}
