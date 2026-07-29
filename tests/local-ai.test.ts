@@ -118,7 +118,8 @@ describe("local AI enrichment", () => {
                 content: JSON.stringify({
                   summary: "这篇文章介绍了书签信息架构。",
                   tags: ["书签", "# 信息架构", "产品设计"],
-                  topics: ["知识管理"]
+                  topics: ["知识管理"],
+                  aliases: ["bookmark architecture", "收藏整理", "知识库设计"]
                 })
               }
             }
@@ -145,6 +146,7 @@ describe("local AI enrichment", () => {
       tags: ["书签", "信息架构", "产品设计"],
       tagsSource: "ai",
       topics: ["知识管理"],
+      aliases: ["bookmark architecture", "收藏整理", "知识库设计"],
       aiStatus: "ready",
       syncStatus: "local"
     });
@@ -162,7 +164,8 @@ describe("local AI enrichment", () => {
                   content: JSON.stringify({
                     summary: "AI 更新后的完整简介。",
                     tags: ["AI 新标签"],
-                    topics: ["新主题"]
+                    topics: ["新主题"],
+                    aliases: ["更新别名", "refresh alias", "主题检索"]
                   })
                 }
               }
@@ -186,7 +189,8 @@ describe("local AI enrichment", () => {
       summary: "AI 更新后的完整简介。",
       tags: ["用户保留", "稍后阅读"],
       tagsSource: "user",
-      topics: ["新主题"]
+      topics: ["新主题"],
+      aliases: ["更新别名", "refresh alias", "主题检索"]
     });
   });
 
@@ -248,8 +252,8 @@ describe("local AI enrichment", () => {
     expect(String(request.body)).toContain("信息架构");
   });
 
-  it("gives the model the whole compact catalog instead of only keyword matches", async () => {
-    const resources = Array.from({ length: 30 }, (_, index) => ({
+  it("limits a 2,000-item library to local Top 50 and a 20k prompt", async () => {
+    const resources = Array.from({ length: 2_000 }, (_, index) => ({
       ...resource,
       resourceKey: `catalog-${index + 1}`,
       url: `https://example.com/item-${index + 1}`,
@@ -264,8 +268,8 @@ describe("local AI enrichment", () => {
             {
               message: {
                 content: JSON.stringify({
-                  answer: "相关内容在目录末尾。",
-                  source_ids: ["r30"]
+                  answer: "已检查本地召回结果。",
+                  source_ids: ["r50"]
                 })
               }
             }
@@ -278,11 +282,14 @@ describe("local AI enrichment", () => {
 
     const result = await askBookmarkAgent("寻找另一种用途", resources);
 
-    expect(result.catalogSize).toBe(30);
-    expect(result.examinedCount).toBe(30);
-    expect(result.sources[0]?.resourceKey).toBe("catalog-30");
+    expect(result.catalogSize).toBe(2_000);
+    expect(result.examinedCount).toBe(50);
+    expect(result.sources[0]?.resourceKey).toBe("catalog-50");
     const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
-    expect(String(request.body)).toContain("收藏 30");
+    const requestBody = String(request.body);
+    expect(requestBody).toContain("收藏 50");
+    expect(requestBody).not.toContain("收藏 51");
+    expect(requestBody.length).toBeLessThanOrEqual(20_000);
   });
 
   it("prepares a real delete proposal without falsely claiming it already ran", async () => {

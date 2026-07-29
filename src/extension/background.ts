@@ -2,7 +2,6 @@ import { getAuthState } from "../lib/auth";
 import {
   processOutbox,
   pullCloudResources,
-  semanticSearch,
   syncOneResource
 } from "../lib/cloud";
 import {
@@ -2076,41 +2075,13 @@ async function drainOutbox(maxBatches = 50): Promise<{
   return { synced, failed };
 }
 
-async function getResources(query = "", semantic = false) {
+async function getResources(query = "") {
   await importNativeBookmarks();
   void syncPendingIfReady();
   const local = await getLocalResources();
   const linked = local.filter((item) => item.nativeBookmarkIds.length > 0);
   if (!query.trim()) {
     return linked;
-  }
-
-  if (semantic) {
-    try {
-      const cloudResults = await semanticSearch(query);
-      const nativeByKey = new Map(
-        linked.map((resource) => [resource.resourceKey, resource])
-      );
-      return cloudResults.flatMap((result) => {
-        const native = nativeByKey.get(result.resource.resourceKey);
-        if (!native) return [];
-        return [
-          {
-            ...result,
-            resource: {
-              ...result.resource,
-              title: native.title,
-              url: native.url,
-              canonicalUrl: native.canonicalUrl,
-              nativeBookmarkIds: native.nativeBookmarkIds,
-              nativeFolderPath: native.nativeFolderPath
-            }
-          }
-        ];
-      });
-    } catch {
-      return searchLocalResources(linked, query);
-    }
   }
 
   return searchLocalResources(linked, query);
@@ -2287,7 +2258,7 @@ async function handleRequest(request: ExtensionRequest): Promise<unknown> {
     case "CANCEL_LIBRARY_SCAN":
       return updateLibraryScanState("cancelled");
     case "GET_RESOURCES":
-      return getResources(request.query, request.semantic);
+      return getResources(request.query);
     case "SYNC_NOW":
       return syncNow();
     case "IMPORT_NATIVE_BOOKMARKS":

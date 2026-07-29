@@ -102,6 +102,9 @@ export function normalizeResourceRecord(value: unknown): ResourceRecord {
     tags: stringArray(record.tags),
     ...(tagsSource ? { tagsSource } : {}),
     topics: stringArray(record.topics),
+    ...(stringArray(record.aliases).length
+      ? { aliases: stringArray(record.aliases) }
+      : {}),
     contentExcerpt: stringValue(record.contentExcerpt),
     contentHash: stringValue(record.contentHash),
     selectedText: stringValue(record.selectedText),

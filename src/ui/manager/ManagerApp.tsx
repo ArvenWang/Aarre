@@ -43,7 +43,6 @@ export function ManagerApp() {
   const initialQuery = new URLSearchParams(window.location.search).get("q") || "";
   const [appState, setAppState] = useState<AppState | null>(null);
   const [query, setQuery] = useState(initialQuery);
-  const [semantic, setSemantic] = useState(true);
   const [filter, setFilter] = useState<LibraryFilter>("all");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,12 +53,11 @@ export function ManagerApp() {
     async (nextQuery = query) => {
       const items = await sendExtensionRequest({
         type: "GET_RESOURCES",
-        query: nextQuery,
-        semantic: semantic && Boolean(nextQuery.trim())
+        query: nextQuery
       });
       setResults(asSearchResults(items));
     },
-    [query, semantic]
+    [query]
   );
 
   const refresh = useCallback(async () => {
@@ -210,7 +208,7 @@ export function ManagerApp() {
         <div>
           <h1>我的收藏</h1>
           <p>
-            保留 Chrome 原生书签，并补充摘要、标签和语义检索。
+            保留 Chrome 原生书签，并补充摘要、标签和智能检索。
           </p>
         </div>
 
@@ -231,18 +229,9 @@ export function ManagerApp() {
           </button>
         </form>
 
-        <label className="semantic-toggle">
-          <input
-            type="checkbox"
-            checked={semantic}
-            onChange={(event) => setSemantic(event.target.checked)}
-            disabled={!appState?.auth.signedIn}
-          />
-          <span>
-            云端向量搜索
-            {!appState?.auth.signedIn ? "（登录后可用）" : ""}
-          </span>
-        </label>
+        <p className="semantic-toggle">
+          搜索在本机完成，支持标题、标签、摘要、中文和拼音首字母。
+        </p>
       </section>
 
       {!appState?.auth.configured ? (

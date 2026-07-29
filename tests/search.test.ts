@@ -62,4 +62,50 @@ describe("searchLocalResources", () => {
     ];
     expect(searchLocalResources(items, "")).toHaveLength(2);
   });
+
+  it("matches Chinese concepts through AI aliases when the title is English", () => {
+    const results = searchLocalResources(
+      [
+        resource({
+          resourceKey: "machine-learning",
+          title: "Machine Learning Field Guide",
+          aliases: ["机器学习", "ML", "模型训练"]
+        })
+      ],
+      "机器学习"
+    );
+
+    expect(results[0]?.resource.resourceKey).toBe("machine-learning");
+    expect(results[0]?.matchReason).toBe("检索别名");
+  });
+
+  it("matches Chinese titles using pinyin initials", () => {
+    const results = searchLocalResources(
+      [
+        resource({
+          resourceKey: "cn-ml",
+          title: "机器学习实践"
+        })
+      ],
+      "jqxx"
+    );
+
+    expect(results[0]?.resource.resourceKey).toBe("cn-ml");
+    expect(results[0]?.matchReason).toBe("拼音首字母");
+  });
+
+  it("recalls descriptive questions through generated aliases", () => {
+    const results = searchLocalResources(
+      [
+        resource({
+          resourceKey: "web-vitals",
+          title: "Web Vitals 优化实践",
+          aliases: ["怎么让页面加载更快", "网页性能优化", "加载速度"]
+        })
+      ],
+      "怎么让页面加载更快"
+    );
+
+    expect(results[0]?.resource.resourceKey).toBe("web-vitals");
+  });
 });

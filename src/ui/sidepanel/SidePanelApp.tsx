@@ -8,8 +8,18 @@ import {
   useState
 } from "react";
 import { signInWithGoogle, signOut } from "../../lib/auth";
+import {
+  bookmarkMatchUrls,
+  bookmarkNodesByUrl,
+  collectFolderIds,
+  filterBookmarkTree
+} from "../../lib/bookmark-search";
 import { findBookmarkByUrl } from "../../lib/bookmark-tree";
 import { sendExtensionRequest } from "../../lib/messages";
+import {
+  buildLocalSearchIndex,
+  searchLocalIndex
+} from "../../lib/search";
 import { canonicalizeUrl } from "../../lib/url";
 import {
   AI_PROVIDER_PRESETS,
@@ -40,6 +50,7 @@ import {
   FolderIcon,
   HistoryIcon,
   PlusIcon,
+  SearchIcon,
   SettingsIcon,
   StarIcon
 } from "../components/Icons";
@@ -1439,6 +1450,10 @@ export function SidePanelApp() {
   const [activeConversation, setActiveConversation] =
     useState<AgentConversation | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [libraryQuery, setLibraryQuery] = useState("");
+  const [librarySearchMode, setLibrarySearchMode] = useState<
+    "tree" | "ranked"
+  >("tree");
   const [draggedId, setDraggedId] = useState("");
   const [editor, setEditor] = useState<EditorState>(null);
   const [editTitle, setEditTitle] = useState("");
@@ -1462,6 +1477,10 @@ export function SidePanelApp() {
     atEnd: false
   });
   const pendingDraftInFlight = useRef(false);
+  const librarySearchSnapshot = useRef<{
+    expanded: Set<string>;
+    scrollTop: number;
+  } | null>(null);
   const dialogRef = useRef<HTMLElement | null>(null);
   const contentRef = useRef<HTMLElement | null>(null);
   const scrollHideTimer = useRef<number | undefined>(undefined);
@@ -1749,7 +1768,7 @@ export function SidePanelApp() {
     [appState, snapshot]
   );
   const currentSaved = Boolean(currentSavedNode);
-  const visibleBookmarkNodes = useMemo(() => {
+  const bookmarkRoots = useMemo(() => {
     if (!snapshot) return [];
     const roots = snapshot.roots?.length
       ? snapshot.roots
@@ -1764,9 +1783,6 @@ export function SidePanelApp() {
         : [{ ...root, unmodifiable: true }]
     );
   }, [snapshot]);
-  const hasVisibleFolders = visibleBookmarkNodes.some(
-    (node) => !node.url
-  );
   const resourceByUrl = useMemo(() => {
     const map = new Map<string, ResourceRecord>();
     for (const resource of Array.isArray(resources) ? resources : []) {
@@ -1775,6 +1791,65 @@ export function SidePanelApp() {
     }
     return map;
   }, [resources]);
+  const localSearchIndex = useMemo(
+    () => buildLocalSearchIndex(resources),
+    [resources]
+  );
+  const rankedSearchResults = useMemo(
+    () =>
+      libraryQuery.trim()
+        ? searchLocalIndex(localSearchIndex, libraryQuery)
+        : [],
+    [libraryQuery, localSearchIndex]
+  );
+  const nativeNodeByUrl = useMemo(
+    () => bookmarkNodesByUrl(bookmarkRoots),
+    [bookmarkRoots]
+  );
+  const rankedNativeResults = useMemo(
+    () =>
+      rankedSearchResults.flatMap((result) => {
+        const node =
+          nativeNodeByUrl.get(result.resource.url) ||
+          nativeNodeByUrl.get(result.resource.canonicalUrl);
+        return node ? [{ ...result, node }] : [];
+      }),
+    [nativeNodeByUrl, rankedSearchResults]
+  );
+  const filteredBookmarkNodes = useMemo(
+    () =>
+      libraryQuery.trim()
+        ? filterBookmarkTree(
+            bookmarkRoots,
+            libraryQuery,
+            bookmarkMatchUrls(
+              rankedSearchResults.map((result) => result.resource.url)
+            )
+          )
+        : bookmarkRoots,
+    [bookmarkRoots, libraryQuery, rankedSearchResults]
+  );
+  const visibleBookmarkNodes =
+    librarySearchMode === "ranked" && libraryQuery.trim()
+      ? []
+      : filteredBookmarkNodes;
+  const visibleExpanded = useMemo(() => {
+    if (!libraryQuery.trim() || librarySearchMode === "ranked") {
+      return expanded;
+    }
+    return new Set([
+      ...expanded,
+      ...collectFolderIds(filteredBookmarkNodes)
+    ]);
+  }, [
+    expanded,
+    filteredBookmarkNodes,
+    libraryQuery,
+    librarySearchMode
+  ]);
+  const hasVisibleFolders = visibleBookmarkNodes.some(
+    (node) => !node.url
+  );
   const editorResource = useMemo(() => {
     if (editor?.kind !== "bookmark" || !editor.node.url) {
       return undefined;
@@ -2110,9 +2185,8 @@ export function SidePanelApp() {
     }
   }
 
-  function handleAgentSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    const query = agentPrompt.trim();
+  function submitAgentQuery(input: string) {
+    const query = input.trim();
     if (!query || busy) return;
     const timestamp = new Date().toISOString();
     const conversation =
@@ -2126,6 +2200,45 @@ export function SidePanelApp() {
             messages: []
           };
     void runAgentTurn(conversation, query);
+  }
+
+  function handleAgentSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    submitAgentQuery(agentPrompt);
+  }
+
+  function clearLibrarySearch() {
+    const previous = librarySearchSnapshot.current;
+    setLibraryQuery("");
+    setLibrarySearchMode("tree");
+    if (!previous) return;
+    setExpanded(new Set(previous.expanded));
+    librarySearchSnapshot.current = null;
+    window.requestAnimationFrame(() => {
+      if (contentRef.current) {
+        contentRef.current.scrollTop = previous.scrollTop;
+        syncScrollThumb();
+      }
+    });
+  }
+
+  function handleLibraryQueryChange(value: string) {
+    if (
+      value.trim() &&
+      !libraryQuery.trim() &&
+      !librarySearchSnapshot.current
+    ) {
+      librarySearchSnapshot.current = {
+        expanded: new Set(expanded),
+        scrollTop: contentRef.current?.scrollTop || 0
+      };
+    }
+    if (!value.trim()) {
+      clearLibrarySearch();
+      return;
+    }
+    setLibraryQuery(value);
+    setLibrarySearchMode("tree");
   }
 
   async function startSave(
@@ -2483,6 +2596,44 @@ export function SidePanelApp() {
         </div>
       </header>
 
+      <form
+        className="library-search"
+        role="search"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (libraryQuery.trim()) setLibrarySearchMode("ranked");
+        }}
+      >
+        <SearchIcon aria-hidden="true" />
+        <input
+          type="search"
+          value={libraryQuery}
+          onChange={(event) =>
+            handleLibraryQueryChange(event.target.value)
+          }
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && libraryQuery) {
+              event.preventDefault();
+              clearLibrarySearch();
+            }
+          }}
+          placeholder="搜索标题、标签、摘要或拼音"
+          aria-label="搜索 Chrome 书签"
+        />
+        {libraryQuery ? (
+          <button
+            type="button"
+            aria-label="清空搜索"
+            title="清空搜索"
+            onClick={clearLibrarySearch}
+          >
+            <CloseIcon />
+          </button>
+        ) : (
+          <kbd>↵</kbd>
+        )}
+      </form>
+
       {error ? (
         <div className="native-error" role="alert">
           <span>{error}</span>
@@ -2534,11 +2685,105 @@ export function SidePanelApp() {
           }}
         >
           {snapshot ? (
-            visibleBookmarkNodes.length ? (
+            librarySearchMode === "ranked" &&
+            libraryQuery.trim() ? (
+              rankedNativeResults.length ? (
+                <div className="library-search-results">
+                  <div className="library-search-summary">
+                    <span>
+                      找到 {rankedNativeResults.length} 条相关收藏
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setLibrarySearchMode("tree")}
+                    >
+                      在文件夹中查看
+                    </button>
+                  </div>
+                  {rankedNativeResults.map((result) => (
+                    <div
+                      className="library-search-result"
+                      key={result.node.id}
+                    >
+                      <button
+                        type="button"
+                        className="library-search-result-main"
+                        onClick={() =>
+                          void openNavigation({
+                            text: result.node.url || "",
+                            url: result.node.url
+                          })
+                        }
+                        onAuxClick={(event) => {
+                          if (event.button !== 1) return;
+                          event.preventDefault();
+                          void openNavigation(
+                            {
+                              text: result.node.url || "",
+                              url: result.node.url
+                            },
+                            true
+                          );
+                        }}
+                      >
+                        <SiteThumbnail
+                          url={result.resource.url}
+                          imageUrl={
+                            result.resource.thumbnailDataUrl ||
+                            result.resource.imageUrl
+                          }
+                          faviconUrl={result.resource.faviconUrl}
+                          label={result.resource.title}
+                          className="bookmark-thumbnail"
+                        />
+                        <span>
+                          <strong>{result.resource.title}</strong>
+                          <small>
+                            {result.resource.nativeFolderPath.join(
+                              " / "
+                            ) || hostFromUrl(result.resource.url)}
+                            {result.matchReason
+                              ? ` · 匹配${result.matchReason}`
+                              : ""}
+                          </small>
+                        </span>
+                      </button>
+                      {!result.node.unmodifiable ? (
+                        <button
+                          type="button"
+                          className="row-menu"
+                          aria-label={`编辑 ${result.node.title}`}
+                          title="编辑"
+                          onClick={() => startEdit(result.node)}
+                        >
+                          <EllipsisIcon />
+                        </button>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="native-empty library-search-empty">
+                  <span>
+                    <SearchIcon />
+                  </span>
+                  <strong>没有找到相关收藏</strong>
+                  <p>可以换个关键词，或让 AI 理解你的描述。</p>
+                  <button
+                    type="button"
+                    className="button button-dark button-small"
+                    disabled={Boolean(busy)}
+                    onClick={() => submitAgentQuery(libraryQuery)}
+                  >
+                    让 AI 帮我找
+                  </button>
+                </div>
+              )
+            ) : visibleBookmarkNodes.length ? (
               <BookmarkTree
                 nodes={visibleBookmarkNodes}
                 resourceByUrl={resourceByUrl}
-                expanded={expanded}
+                expanded={visibleExpanded}
                 onToggle={(id) =>
                   setExpanded((current) => {
                     const next = new Set(current);
@@ -2562,6 +2807,22 @@ export function SidePanelApp() {
                 onDragEnd={() => setDraggedId("")}
                 onMove={moveNode}
               />
+            ) : libraryQuery.trim() ? (
+              <div className="native-empty library-search-empty">
+                <span>
+                  <SearchIcon />
+                </span>
+                <strong>没有找到相关收藏</strong>
+                <p>按回车查看完整排序，或让 AI 理解你的描述。</p>
+                <button
+                  type="button"
+                  className="button button-dark button-small"
+                  disabled={Boolean(busy)}
+                  onClick={() => submitAgentQuery(libraryQuery)}
+                >
+                  让 AI 帮我找
+                </button>
+              </div>
             ) : (
               <div className="native-empty">
                 <span>

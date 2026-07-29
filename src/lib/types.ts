@@ -96,6 +96,7 @@ export interface ResourceRecord {
   tags: string[];
   tagsSource?: "ai" | "user";
   topics: string[];
+  aliases?: string[];
   contentExcerpt: string;
   contentHash: string;
   selectedText: string;
