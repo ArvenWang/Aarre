@@ -5,9 +5,14 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const outputsDirectory = resolve(root, "outputs");
-const entries = await readdir(outputsDirectory, {
-  withFileTypes: true
-});
+let entries = [];
+try {
+  entries = await readdir(outputsDirectory, {
+    withFileTypes: true
+  });
+} catch (error) {
+  if (error?.code !== "ENOENT") throw error;
+}
 const errors = [];
 
 for (const entry of entries) {
@@ -53,4 +58,8 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log("现有交付物文件名、Manifest 版本和压缩包结构一致。");
+console.log(
+  entries.length
+    ? "现有交付物文件名、Manifest 版本和压缩包结构一致。"
+    : "当前没有 outputs 交付物；跳过历史包校验。"
+);

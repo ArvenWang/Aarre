@@ -329,6 +329,13 @@ export async function getPageSnapshot(
   return db.get("pageSnapshots", canonicalUrl);
 }
 
+export async function getPageSnapshots(): Promise<PageSnapshot[]> {
+  const db = await database();
+  return (
+    await db.getAllFromIndex("pageSnapshots", "by-captured-at")
+  ).reverse();
+}
+
 export async function countPageSnapshots(): Promise<number> {
   const db = await database();
   return db.count("pageSnapshots");

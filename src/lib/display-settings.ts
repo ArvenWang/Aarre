@@ -6,12 +6,14 @@ export interface DisplaySettings {
   listCoverStyle: ListCoverStyle;
   pageSnapshotsEnabled: boolean;
   snapshotExcludedHosts: string[];
+  scanCostLimitCny: number;
 }
 
 const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = {
   listCoverStyle: "site",
   pageSnapshotsEnabled: true,
-  snapshotExcludedHosts: []
+  snapshotExcludedHosts: [],
+  scanCostLimitCny: 10
 };
 
 export function normalizeSnapshotExcludedHost(input: string): string {
@@ -41,6 +43,12 @@ export async function getDisplaySettings(): Promise<DisplaySettings> {
     listCoverStyle:
       stored?.listCoverStyle === "page" ? "page" : "site",
     pageSnapshotsEnabled: stored?.pageSnapshotsEnabled !== false,
+    scanCostLimitCny:
+      typeof stored?.scanCostLimitCny === "number" &&
+      Number.isFinite(stored.scanCostLimitCny) &&
+      stored.scanCostLimitCny >= 0.01
+        ? Math.min(10_000, stored.scanCostLimitCny)
+        : DEFAULT_DISPLAY_SETTINGS.scanCostLimitCny,
     snapshotExcludedHosts: Array.isArray(stored?.snapshotExcludedHosts)
       ? stored.snapshotExcludedHosts
           .filter((host): host is string => typeof host === "string")
@@ -61,6 +69,11 @@ export async function saveDisplaySettings(
     listCoverStyle:
       merged.listCoverStyle === "page" ? "page" : "site",
     pageSnapshotsEnabled: merged.pageSnapshotsEnabled !== false,
+    scanCostLimitCny:
+      typeof merged.scanCostLimitCny === "number" &&
+      Number.isFinite(merged.scanCostLimitCny)
+        ? Math.min(10_000, Math.max(0.01, merged.scanCostLimitCny))
+        : DEFAULT_DISPLAY_SETTINGS.scanCostLimitCny,
     snapshotExcludedHosts: [
       ...new Set(
         merged.snapshotExcludedHosts

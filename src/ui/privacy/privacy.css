@@ -1,0 +1,101 @@
+:root {
+  color: #242424;
+  background: #f7f6f1;
+  font-family:
+    Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-synthesis: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.privacy-shell {
+  width: min(100% - 40px, 780px);
+  margin: 0 auto;
+  padding: 72px 0 96px;
+}
+
+.privacy-shell header {
+  margin-bottom: 56px;
+}
+
+.privacy-shell header span {
+  color: #70706c;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.14em;
+}
+
+.privacy-shell h1 {
+  margin: 16px 0 18px;
+  font-size: clamp(38px, 8vw, 72px);
+  line-height: 0.98;
+  letter-spacing: -0.06em;
+}
+
+.privacy-shell header p {
+  max-width: 650px;
+  color: #666560;
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.privacy-shell section {
+  padding: 28px 0;
+  border-top: 1px solid #dcdad2;
+}
+
+.privacy-shell h2 {
+  margin: 0 0 16px;
+  font-size: 18px;
+}
+
+.privacy-shell h3 {
+  margin: 22px 0 6px;
+  font-size: 13px;
+}
+
+.privacy-shell p,
+.privacy-shell li,
+.privacy-shell dd {
+  color: #5f5e59;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.privacy-shell ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.privacy-shell dl {
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.privacy-shell dl div {
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.privacy-shell dt {
+  font: 700 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.privacy-shell dd {
+  margin: 4px 0 0;
+}
+
+.privacy-shell a {
+  color: inherit;
+  text-decoration-color: #9ebd76;
+  text-underline-offset: 3px;
+}

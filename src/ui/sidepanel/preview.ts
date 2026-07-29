@@ -701,6 +701,13 @@ export function installSidePanelPreview() {
   };
   const previewChrome = {
     runtime: {
+      getManifest() {
+        return {
+          manifest_version: 3,
+          name: "Aarre Preview",
+          version: "0.0.0"
+        };
+      },
       getURL(path: string) {
         if (path === "/_favicon/") {
           return new URL("/icons/icon-32.png", window.location.origin).toString();
@@ -741,6 +748,259 @@ export function installSidePanelPreview() {
             return { ok: true, data: previewState };
           case "GET_LOCAL_RESOURCES":
             return { ok: true, data: structuredClone(previewResources) };
+          case "GET_RESOURCES":
+            return {
+              ok: true,
+              data: structuredClone(previewResources).map((resource) => ({
+                resource
+              }))
+            };
+          case "GET_LIBRARY_INSIGHTS":
+            return {
+              ok: true,
+              data: {
+                organizationPlan: {
+                  generatedAt: new Date().toISOString(),
+                  proposalCount: 4,
+                  actionableCount: 3,
+                  proposals: [
+                    {
+                      id: "preview-classify",
+                      kind: "classify",
+                      title: "把“前端性能”主题归到一起",
+                      description:
+                        "8 条同主题收藏已在「书签栏 / 前端代码」，建议移动 2 条散落收藏。",
+                      destructive: false,
+                      selectedByDefault: true,
+                      actions: [
+                        {
+                          id: "preview-move",
+                          type: "move_bookmark",
+                          label: "移动 Web Vitals 实践",
+                          description: "稍后读 → 前端代码",
+                          destructive: false,
+                          status: "pending",
+                          targetId: "preview-folder-0-0",
+                          destinationId: "preview-folder-1"
+                        }
+                      ],
+                      resourceKeys: ["preview-0"],
+                      beforePaths: ["书签栏 / 稍后读 / Web Vitals 实践"],
+                      afterPath: "书签栏 / 前端代码",
+                      previewLines: [
+                        "书签栏 / 稍后读 / Web Vitals 实践 → 书签栏 / 前端代码 / Web Vitals 实践"
+                      ]
+                    },
+                    {
+                      id: "preview-duplicate",
+                      kind: "duplicate",
+                      title: "合并 3 个重复收藏",
+                      description:
+                        "保留最早收藏的版本，其余副本默认不勾选。",
+                      destructive: true,
+                      selectedByDefault: false,
+                      actions: [
+                        {
+                          id: "preview-delete-duplicate",
+                          type: "delete_bookmark",
+                          label: "删除重复收藏",
+                          description: "保留更早版本",
+                          destructive: true,
+                          status: "pending",
+                          targetId: "preview-folder-3-0"
+                        }
+                      ],
+                      resourceKeys: ["preview-duplicate"],
+                      beforePaths: [
+                        "书签栏 / 设计 / 示例",
+                        "书签栏 / 稍后 / 示例"
+                      ],
+                      afterPath: "书签栏 / 设计 / 示例",
+                      previewLines: [
+                        "保留：书签栏 / 设计 / 示例",
+                        "待删除：书签栏 / 稍后 / 示例"
+                      ]
+                    },
+                    {
+                      id: "preview-dead",
+                      kind: "dead",
+                      title: "失效链接待确认",
+                      description:
+                        "服务器返回 404。删除项默认不勾选，建议先打开原网址或网页时光机复核。",
+                      destructive: true,
+                      selectedByDefault: false,
+                      actions: [
+                        {
+                          id: "preview-delete-dead",
+                          type: "delete_bookmark",
+                          label: "删除失效收藏",
+                          description: "服务器返回 404",
+                          destructive: true,
+                          status: "pending",
+                          targetId: "preview-dead-bookmark"
+                        }
+                      ],
+                      resourceKeys: ["preview-dead"],
+                      beforePaths: ["书签栏 / 稍后 / 旧版性能指南"],
+                      previewLines: [
+                        "网址：https://example.com/old-guide",
+                        "检测：服务器返回 404",
+                        "待删除：书签栏 / 稍后 / 旧版性能指南"
+                      ],
+                      recoveryLinks: [
+                        {
+                          label: "打开原网址",
+                          url: "https://example.com/old-guide"
+                        },
+                        {
+                          label: "在 Web Archive 中查找历史版本",
+                          url: "https://web.archive.org/web/*/https://example.com/old-guide"
+                        }
+                      ]
+                    },
+                    {
+                      id: "preview-large",
+                      kind: "large_folder",
+                      title: "大文件夹需要拆分",
+                      description:
+                        "「设计赏析」有 182 条收藏；只展示主题分布，不自动移动。",
+                      destructive: false,
+                      selectedByDefault: false,
+                      actions: [],
+                      resourceKeys: [],
+                      beforePaths: ["书签栏 / 设计赏析"],
+                      previewLines: ["交互设计 54 条", "设计系统 39 条"]
+                    }
+                  ]
+                },
+                readingQueue: previewResources.slice(0, 12).map(
+                  (resource, index) => ({
+                    nodeId: `reading-${index}`,
+                    resourceKey: resource.resourceKey,
+                    title: resource.title,
+                    url: resource.url,
+                    path: resource.nativeFolderPath,
+                    dateAdded: Date.now() - (index + 30) * 86_400_000
+                  })
+                )
+              }
+            };
+          case "GET_KNOWLEDGE_DASHBOARD":
+            return {
+              ok: true,
+              data: {
+                weekly: {
+                  period: "week",
+                  startAt: new Date(Date.now() - 7 * 86_400_000).toISOString(),
+                  endAt: new Date().toISOString(),
+                  createdCount: 14,
+                  attentionShift:
+                    "你的关注重点从“React 生态”转向“AI Agent 架构”：本期分别为 2 条和 9 条。",
+                  topicTrends: [
+                    { topic: "AI Agent", current: 9, previous: 3 },
+                    { topic: "前端性能", current: 4, previous: 2 },
+                    { topic: "React 生态", current: 2, previous: 8 }
+                  ],
+                  rarelyOpenedOver90Days: 34,
+                  knowledgeGaps: [
+                    {
+                      topic: "RAG",
+                      resourceCount: 12,
+                      angleCount: 2,
+                      message:
+                        "你在“RAG”上收了 12 条，但内容角度集中；下一篇可以刻意寻找评测或上线实践。"
+                    }
+                  ],
+                  resurfacing: previewResources.slice(0, 3).map(
+                    (resource, index) => ({
+                      resourceKey: resource.resourceKey,
+                      title: resource.title,
+                      url: resource.url,
+                      path: resource.nativeFolderPath,
+                      ageDays: 120 + index * 24,
+                      score: 50 - index,
+                      reason: "与你本周关注的主题直接相关"
+                    })
+                  ),
+                  health: {
+                    deadLinks: 7,
+                    newlyDetectedDeadLinks: 2,
+                    largeFolders: 1
+                  }
+                },
+                monthly: {
+                  period: "month",
+                  startAt: new Date(Date.now() - 30 * 86_400_000).toISOString(),
+                  endAt: new Date().toISOString(),
+                  createdCount: 47,
+                  attentionShift:
+                    "本月最集中的关注点是“产品设计”，共新增 18 条。",
+                  topicTrends: [
+                    { topic: "产品设计", current: 18, previous: 11 },
+                    { topic: "AI Agent", current: 16, previous: 7 }
+                  ],
+                  rarelyOpenedOver90Days: 34,
+                  knowledgeGaps: [],
+                  resurfacing: previewResources.slice(3, 6).map(
+                    (resource, index) => ({
+                      resourceKey: resource.resourceKey,
+                      title: resource.title,
+                      url: resource.url,
+                      path: resource.nativeFolderPath,
+                      ageDays: 156 + index * 31,
+                      score: 46 - index,
+                      reason: "与本月持续关注的主题相关"
+                    })
+                  ),
+                  health: {
+                    deadLinks: 7,
+                    newlyDetectedDeadLinks: 4,
+                    largeFolders: 1
+                  }
+                },
+                topicGraph: {
+                  nodes: [
+                    { id: "AI Agent", label: "AI Agent", count: 28 },
+                    { id: "产品设计", label: "产品设计", count: 23 },
+                    { id: "前端性能", label: "前端性能", count: 18 },
+                    { id: "React", label: "React", count: 16 },
+                    { id: "RAG", label: "RAG", count: 12 },
+                    { id: "动画", label: "动画", count: 9 }
+                  ],
+                  edges: [
+                    {
+                      source: "AI Agent",
+                      target: "RAG",
+                      weight: 8
+                    },
+                    {
+                      source: "产品设计",
+                      target: "动画",
+                      weight: 5
+                    },
+                    {
+                      source: "前端性能",
+                      target: "React",
+                      weight: 7
+                    }
+                  ]
+                },
+                resurfacing: previewResources.slice(0, 9).map(
+                  (resource, index) => ({
+                    resourceKey: resource.resourceKey,
+                    title: resource.title,
+                    url: resource.url,
+                    path: resource.nativeFolderPath,
+                    ageDays: 98 + index * 17,
+                    score: 60 - index,
+                    reason:
+                      index % 2
+                        ? "很少通过书签重新打开"
+                        : "与你最近关注的“产品设计”相关"
+                  })
+                )
+              }
+            };
           case "GET_SITE_BRANDS":
             return { ok: true, data: [] };
           case "GET_PAGE_SNAPSHOT":
@@ -863,6 +1123,21 @@ export function installSidePanelPreview() {
                 }
               ]
             };
+          case "GET_CONTEXT_RESURFACING":
+            return {
+              ok: true,
+              data: [
+                {
+                  resourceKey: "preview-resurface",
+                  title: "三个月前收藏的交互性能实践",
+                  url: "https://example.com/resurface",
+                  path: ["书签栏", "前端代码"],
+                  ageDays: 128,
+                  score: 62,
+                  reason: "与你当前浏览的内容相关，且已收藏 128 天"
+                }
+              ]
+            };
           case "GET_NAVIGATION_SUGGESTIONS":
             return { ok: true, data: previewSuggestions };
           case "NAVIGATE":
@@ -937,6 +1212,17 @@ export function installSidePanelPreview() {
             return {
               ok: true,
               data: { results, batchId: "preview-agent-undo" }
+            };
+          }
+          case "APPLY_ORGANIZATION_ACTIONS": {
+            const results = (request.actions || []).map((action) => ({
+              actionId: action.id,
+              success: true,
+              message: `已执行「${action.label}」。`
+            }));
+            return {
+              ok: true,
+              data: { results, batchId: "preview-organize-undo" }
             };
           }
           case "GET_LIBRARY_SCAN":

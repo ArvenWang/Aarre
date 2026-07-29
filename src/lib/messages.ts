@@ -18,9 +18,11 @@ import type {
   PageCapture,
   PageSnapshot,
   FolderSuggestion,
+  KnowledgeDashboard,
   LibraryInsights,
   LibraryScanEstimate,
   LibraryScanStatus,
+  ResurfacingItem,
   ResourceRecord,
   RestoreResult,
   SaveBookmarkInput,
@@ -53,6 +55,8 @@ export type ExtensionRequest =
       actions: BookmarkAgentActionProposal[];
     }
   | { type: "GET_LIBRARY_INSIGHTS" }
+  | { type: "GET_KNOWLEDGE_DASHBOARD" }
+  | { type: "GET_CONTEXT_RESURFACING" }
   | {
       type: "APPLY_ORGANIZATION_ACTIONS";
       actions: BookmarkAgentActionProposal[];
@@ -96,7 +100,11 @@ export type ExtensionRequest =
       type: "DELETE_NATIVE_BOOKMARK";
       payload: { id: string; recursive: boolean };
     }
-  | { type: "OPEN_MANAGER"; query?: string }
+  | {
+      type: "OPEN_MANAGER";
+      query?: string;
+      view?: "organize" | "report" | "topics" | "resurface" | "reading";
+    }
   | { type: "OPEN_SIDE_PANEL" }
   | { type: "AUTH_CHANGED" };
 
@@ -118,6 +126,8 @@ export type ResponseDataByRequest = {
     batchId?: string;
   };
   GET_LIBRARY_INSIGHTS: LibraryInsights;
+  GET_KNOWLEDGE_DASHBOARD: KnowledgeDashboard;
+  GET_CONTEXT_RESURFACING: ResurfacingItem[];
   APPLY_ORGANIZATION_ACTIONS: {
     results: BookmarkAgentActionExecutionResult[];
     batchId?: string;

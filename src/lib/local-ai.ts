@@ -2,6 +2,7 @@ import {
   getAiProviderPreset,
   getAiRuntimeSettings
 } from "./settings";
+import { runAiGatewayCall } from "./ai-gateway";
 import { searchLocalResources } from "./search";
 import type {
   AiProviderId,
@@ -315,7 +316,10 @@ async function generateWithGemini(
   };
 }
 
-async function generateConfiguredJson(prompt: string): Promise<{
+async function generateConfiguredJson(
+  prompt: string,
+  operation: "enrichment" | "agent" | "report" = "enrichment"
+): Promise<{
   content: string;
   providerName: string;
   usage: AiTokenUsage;
@@ -328,19 +332,20 @@ async function generateConfiguredJson(prompt: string): Promise<{
   }
 
   try {
-    const generated =
-      settings.provider === "gemini"
-        ? await generateWithGemini(
-            settings.model,
-            settings.apiKey,
-            prompt
-          )
-        : await generateWithOpenAiCompatible(
-            settings.provider,
-            settings.model,
-            settings.apiKey,
-            prompt
-          );
+    const generated = await runAiGatewayCall({
+      provider: settings.provider,
+      model: settings.model,
+      operation,
+      call: () =>
+        settings.provider === "gemini"
+          ? generateWithGemini(settings.model, settings.apiKey!, prompt)
+          : generateWithOpenAiCompatible(
+              settings.provider,
+              settings.model,
+              settings.apiKey!,
+              prompt
+            )
+    });
     return {
       ...generated,
       providerName: getAiProviderPreset(settings.provider).name
@@ -810,7 +815,7 @@ ${context.text || "（无）"}
 可操作目标：
 ${actionCatalogContext(availableActions) || "（无）"}
 `.trim();
-  const generated = await generateConfiguredJson(prompt);
+  const generated = await generateConfiguredJson(prompt, "agent");
   const parsed = parseJsonObject(generated.content);
   const generatedAnswer =
     typeof parsed.answer === "string" ? parsed.answer.trim() : "";

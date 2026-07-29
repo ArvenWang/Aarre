@@ -1,6 +1,6 @@
 {
   "name": "bookmark-layer",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -15,6 +15,7 @@
     "check:node": "node scripts/check-node.mjs",
     "check": "npm run check:node && npm run typecheck && npm run test && npm run build",
     "verify:artifacts": "node scripts/verify-artifacts.mjs",
+    "verify:store-assets": "node scripts/verify-store-assets.mjs",
     "package:artifacts": "npm run check && node scripts/package-artifacts.mjs"
   },
   "dependencies": {

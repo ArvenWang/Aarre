@@ -9,6 +9,7 @@ import {
 import type {
   AppState,
   BookmarkAgentActionExecutionResult,
+  KnowledgeDashboard,
   LibraryInsights,
   ResourceRecord,
   SearchResult,
@@ -22,7 +23,13 @@ import {
 import { SiteThumbnail } from "../components/SiteThumbnail";
 
 type LibraryFilter = "all" | "ready" | "pending";
-type ManagerView = "library" | "organize" | "reading";
+type ManagerView =
+  | "library"
+  | "organize"
+  | "reading"
+  | "report"
+  | "topics"
+  | "resurface";
 
 function asSearchResults(
   items: ResourceRecord[] | SearchResult[]
@@ -69,14 +76,99 @@ function brandForUrl(
   }
 }
 
+function TopicGraphView({
+  dashboard
+}: {
+  dashboard: KnowledgeDashboard;
+}) {
+  const width = 900;
+  const height = 520;
+  const positions = new Map(
+    dashboard.topicGraph.nodes.map((node, index, nodes) => {
+      const angle = (index / Math.max(1, nodes.length)) * Math.PI * 2;
+      const ring = index < 8 ? 150 : 220;
+      return [
+        node.id,
+        {
+          x: width / 2 + Math.cos(angle) * ring,
+          y: height / 2 + Math.sin(angle) * ring
+        }
+      ];
+    })
+  );
+  return (
+    <div className="topic-graph-card">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        role="img"
+        aria-label="收藏主题之间的共同出现关系图"
+      >
+        <g className="topic-edges">
+          {dashboard.topicGraph.edges.map((edge) => {
+            const source = positions.get(edge.source);
+            const target = positions.get(edge.target);
+            return source && target ? (
+              <line
+                key={`${edge.source}:${edge.target}`}
+                x1={source.x}
+                y1={source.y}
+                x2={target.x}
+                y2={target.y}
+                strokeWidth={Math.min(7, 0.8 + edge.weight)}
+              />
+            ) : null;
+          })}
+        </g>
+        <g className="topic-nodes">
+          {dashboard.topicGraph.nodes.map((node) => {
+            const point = positions.get(node.id)!;
+            const radius = Math.min(38, 13 + Math.sqrt(node.count) * 4);
+            return (
+              <g
+                key={node.id}
+                transform={`translate(${point.x} ${point.y})`}
+              >
+                <circle r={radius} />
+                <text textAnchor="middle" y="3">
+                  {node.label.slice(0, 12)}
+                </text>
+                <title>
+                  {node.label} · {node.count} 条收藏
+                </title>
+              </g>
+            );
+          })}
+        </g>
+      </svg>
+      <p>节点越大，相关收藏越多；连线越粗，两个主题越常在同一条收藏中出现。</p>
+    </div>
+  );
+}
+
 export function ManagerApp() {
-  const initialQuery = new URLSearchParams(window.location.search).get("q") || "";
+  const initialParams = new URLSearchParams(window.location.search);
+  const initialQuery = initialParams.get("q") || "";
+  const requestedView = initialParams.get("view");
+  const initialView: ManagerView = [
+    "organize",
+    "report",
+    "topics",
+    "resurface",
+    "reading"
+  ].includes(requestedView || "")
+    ? (requestedView as ManagerView)
+    : "library";
   const [appState, setAppState] = useState<AppState | null>(null);
   const [query, setQuery] = useState(initialQuery);
   const [filter, setFilter] = useState<LibraryFilter>("all");
-  const [view, setView] = useState<ManagerView>("library");
+  const [view, setView] = useState<ManagerView>(initialView);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [insights, setInsights] = useState<LibraryInsights | null>(null);
+  const [dashboard, setDashboard] =
+    useState<KnowledgeDashboard | null>(null);
+  const [reportPeriod, setReportPeriod] = useState<"week" | "month">(
+    "week"
+  );
   const [selectedActionIds, setSelectedActionIds] = useState<Set<string>>(
     new Set()
   );
@@ -117,6 +209,9 @@ export function ManagerApp() {
         type: "GET_LIBRARY_INSIGHTS"
       });
       setInsights(nextInsights);
+      setDashboard(
+        await sendExtensionRequest({ type: "GET_KNOWLEDGE_DASHBOARD" })
+      );
       setSelectedActionIds(
         new Set(
           nextInsights.organizationPlan.proposals
@@ -347,14 +442,26 @@ export function ManagerApp() {
               ? "我的收藏"
               : view === "organize"
                 ? "整理提案"
-                : "待读队列"}
+                : view === "reading"
+                  ? "待读队列"
+                  : view === "report"
+                    ? "知识报告"
+                    : view === "topics"
+                      ? "主题图谱"
+                      : "重新发现"}
           </h1>
           <p>
             {view === "library"
               ? "保留 Chrome 原生书签，并补充摘要、标签和智能检索。"
               : view === "organize"
                 ? "先预览，再选择应用。任何删除项都默认不勾选。"
-                : "按 Chrome 记录的打开时间排序；未记录到使用的收藏优先。"}
+                : view === "reading"
+                  ? "按 Chrome 记录的打开时间排序；未记录到使用的收藏优先。"
+                  : view === "report"
+                    ? "关注点迁移、知识缺口和收藏健康度都由现有本地元数据计算。"
+                    : view === "topics"
+                      ? "第一次从整体看见你收藏的知识主题及其联系。"
+                      : "把与你最近关注内容相关的老收藏主动带回来。"}
           </p>
         </div>
 
@@ -399,7 +506,10 @@ export function ManagerApp() {
               "整理提案",
               insights?.organizationPlan.proposalCount || 0
             ],
-            ["reading", "待读队列", insights?.readingQueue.length || 0]
+            ["reading", "待读队列", insights?.readingQueue.length || 0],
+            ["report", "报告", dashboard?.weekly.createdCount || 0],
+            ["topics", "主题图谱", dashboard?.topicGraph.nodes.length || 0],
+            ["resurface", "重新发现", dashboard?.resurfacing.length || 0]
           ] as const
         ).map(([value, label, count]) => (
           <button
@@ -582,7 +692,9 @@ export function ManagerApp() {
                         <small>
                           {proposal.destructive
                             ? "包含删除 · 默认不选"
-                            : "可撤销的移动建议"}
+                            : proposal.actions.length
+                              ? "可撤销的移动建议"
+                              : "仅提示 · 不自动执行"}
                         </small>
                       </div>
                     </header>
@@ -597,6 +709,20 @@ export function ManagerApp() {
                         </small>
                       ) : null}
                     </div>
+                    {proposal.recoveryLinks?.length ? (
+                      <div className="proposal-recovery-links">
+                        {proposal.recoveryLinks.map((link) => (
+                          <a
+                            key={link.url}
+                            href={link.url}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {link.label}
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
                   </article>
                 );
               })}
@@ -634,6 +760,148 @@ export function ManagerApp() {
           <div className="empty-state">
             <strong>待读队列还是空的</strong>
             <p>Chrome 书签进入本地索引后，会按使用时间排在这里。</p>
+          </div>
+        )
+      ) : view === "report" ? (
+        dashboard ? (
+          <section className="report-shell">
+            <div className="report-period-tabs">
+              <button
+                type="button"
+                data-active={reportPeriod === "week"}
+                onClick={() => setReportPeriod("week")}
+              >
+                周报
+              </button>
+              <button
+                type="button"
+                data-active={reportPeriod === "month"}
+                onClick={() => setReportPeriod("month")}
+              >
+                月报
+              </button>
+            </div>
+            {(() => {
+              const report =
+                reportPeriod === "week"
+                  ? dashboard.weekly
+                  : dashboard.monthly;
+              return (
+                <>
+                  <article className="report-lead">
+                    <span>注意力迁移</span>
+                    <h2>{report.attentionShift}</h2>
+                    <p>
+                      本期新增 {report.createdCount} 条 · 有{" "}
+                      {report.rarelyOpenedOver90Days} 条收藏超过 90
+                      天很少通过书签打开
+                    </p>
+                  </article>
+                  <div className="report-grid">
+                    <article>
+                      <span>主题变化</span>
+                      <div className="trend-list">
+                        {report.topicTrends.map((trend) => (
+                          <div key={trend.topic}>
+                            <strong>{trend.topic}</strong>
+                            <small>
+                              本期 {trend.current} · 上期 {trend.previous}
+                            </small>
+                          </div>
+                        ))}
+                      </div>
+                    </article>
+                    <article>
+                      <span>知识缺口</span>
+                      {report.knowledgeGaps.length ? (
+                        report.knowledgeGaps.slice(0, 3).map((gap) => (
+                          <p key={gap.topic}>{gap.message}</p>
+                        ))
+                      ) : (
+                        <p>当前还没有足够密集的同主题收藏来判断内容角度。</p>
+                      )}
+                    </article>
+                    <article>
+                      <span>收藏健康度</span>
+                      <dl className="health-metrics">
+                        <div>
+                          <dt>失效链接</dt>
+                          <dd>{report.health.deadLinks}</dd>
+                        </div>
+                        <div>
+                          <dt>本期新发现</dt>
+                          <dd>{report.health.newlyDetectedDeadLinks}</dd>
+                        </div>
+                        <div>
+                          <dt>过大文件夹</dt>
+                          <dd>{report.health.largeFolders}</dd>
+                        </div>
+                      </dl>
+                      <button
+                        type="button"
+                        className="report-link-button"
+                        onClick={() => setView("organize")}
+                      >
+                        查看整理提案
+                      </button>
+                    </article>
+                    <article>
+                      <span>重新浮现</span>
+                      {report.resurfacing.length ? (
+                        <div className="report-resurfacing">
+                          {report.resurfacing.slice(0, 3).map((item) => (
+                            <a
+                              key={item.resourceKey}
+                              href={item.url}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              <strong>{item.title}</strong>
+                              <small>{item.reason}</small>
+                            </a>
+                          ))}
+                        </div>
+                      ) : (
+                        <p>目前没有同时满足“足够久”和“与近期主题相关”的收藏。</p>
+                      )}
+                    </article>
+                  </div>
+                </>
+              );
+            })()}
+          </section>
+        ) : null
+      ) : view === "topics" ? (
+        dashboard?.topicGraph.nodes.length ? (
+          <section className="topic-graph-shell">
+            <TopicGraphView dashboard={dashboard} />
+          </section>
+        ) : (
+          <div className="empty-state">
+            <strong>主题信息还不够</strong>
+            <p>完成 AI 元数据扫描后，主题之间的关系会显示在这里。</p>
+          </div>
+        )
+      ) : view === "resurface" ? (
+        dashboard?.resurfacing.length ? (
+          <section className="resurfacing-grid">
+            {dashboard.resurfacing.map((item) => (
+              <article key={item.resourceKey}>
+                <span>{item.ageDays} 天前收藏</span>
+                <h3>
+                  <a href={item.url} target="_blank" rel="noreferrer">
+                    {item.title}
+                  </a>
+                </h3>
+                <p>{item.reason}</p>
+                <small>{item.path.join(" / ") || "书签栏"}</small>
+              </article>
+            ))}
+          </section>
+        ) : (
+          <div className="empty-state">
+            <strong>暂时没有值得重新带回来的收藏</strong>
+            <p>使用一段时间后，Aarre 会结合近期主题和收藏时间在这里推荐。</p>
           </div>
         )
       ) : visibleResults.length ? (

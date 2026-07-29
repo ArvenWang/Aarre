@@ -102,7 +102,7 @@ describe("buildLibraryInsights", () => {
     ).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ kind: "dead" })])
     );
-    expect(
+    const deadProposals =
       buildLibraryInsights(
         [
           resource({
@@ -116,12 +116,23 @@ describe("buildLibraryInsights", () => {
           })
         ],
         catalog
-      ).organizationPlan.proposals
-    ).toEqual(
+      ).organizationPlan.proposals;
+    expect(deadProposals).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           kind: "dead",
           selectedByDefault: false
+        })
+      ])
+    );
+    expect(
+      deadProposals.find((proposal) => proposal.kind === "dead")
+        ?.recoveryLinks
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          label: expect.stringContaining("Web Archive"),
+          url: expect.stringContaining("web.archive.org/web/*/")
         })
       ])
     );

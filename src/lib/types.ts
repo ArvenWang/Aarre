@@ -191,6 +191,16 @@ export interface AiUsageStats {
   updatedAt: string;
 }
 
+export type UserTier = "byok" | "free" | "pro";
+
+export interface AiEntitlement {
+  tier: UserTier;
+  monthlyTokenQuota: number | null;
+  usedTokensThisMonth: number;
+  period: string;
+  source: "local";
+}
+
 export interface OutboxItem {
   revision: string;
   resource: ResourceRecord;
@@ -493,6 +503,10 @@ export interface OrganizationProposal {
   beforePaths: string[];
   afterPath?: string;
   previewLines: string[];
+  recoveryLinks?: Array<{
+    label: string;
+    url: string;
+  }>;
 }
 
 export interface OrganizationPlan {
@@ -523,6 +537,70 @@ export interface FolderSuggestion {
 export interface LibraryInsights {
   organizationPlan: OrganizationPlan;
   readingQueue: ReadingQueueItem[];
+}
+
+export interface ResurfacingItem {
+  resourceKey: string;
+  title: string;
+  url: string;
+  path: string[];
+  ageDays: number;
+  score: number;
+  reason: string;
+}
+
+export interface TopicTrend {
+  topic: string;
+  current: number;
+  previous: number;
+}
+
+export interface KnowledgeGap {
+  topic: string;
+  resourceCount: number;
+  angleCount: number;
+  message: string;
+}
+
+export interface LibraryReport {
+  period: "week" | "month";
+  startAt: string;
+  endAt: string;
+  createdCount: number;
+  attentionShift: string;
+  topicTrends: TopicTrend[];
+  rarelyOpenedOver90Days: number;
+  knowledgeGaps: KnowledgeGap[];
+  resurfacing: ResurfacingItem[];
+  health: {
+    deadLinks: number;
+    newlyDetectedDeadLinks: number;
+    largeFolders: number;
+  };
+}
+
+export interface TopicGraphNode {
+  id: string;
+  label: string;
+  count: number;
+}
+
+export interface TopicGraphEdge {
+  source: string;
+  target: string;
+  weight: number;
+}
+
+export interface TopicGraph {
+  nodes: TopicGraphNode[];
+  edges: TopicGraphEdge[];
+}
+
+export interface KnowledgeDashboard {
+  weekly: LibraryReport;
+  monthly: LibraryReport;
+  topicGraph: TopicGraph;
+  resurfacing: ResurfacingItem[];
 }
 
 export interface PageEssence {

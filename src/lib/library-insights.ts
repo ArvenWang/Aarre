@@ -93,11 +93,15 @@ function deadLinkProposal(
   const writableNodes = nodes.filter((node) => node.writable);
   if (!writableNodes.length) return null;
   const isConfirmedDead = health.status === "dead";
+  const archiveUrl = `https://web.archive.org/web/*/${resource.url.replaceAll(
+    "#",
+    "%23"
+  )}`;
   return {
     id: `dead:${resource.resourceKey}`,
     kind: "dead",
     title: isConfirmedDead ? "失效链接待确认" : "疑似内容已删除",
-    description: `${health.reason || "链接检查未通过"}。删除项默认不勾选，建议先打开复核。`,
+    description: `${health.reason || "链接检查未通过"}。删除项默认不勾选，建议先打开原网址或网页时光机复核。`,
     destructive: true,
     selectedByDefault: false,
     actions: writableNodes.map((node) =>
@@ -113,6 +117,10 @@ function deadLinkProposal(
       ...writableNodes.map(
         (node) => `待删除：${pathLabel(node.path, node.title)}`
       )
+    ],
+    recoveryLinks: [
+      { label: "打开原网址", url: resource.url },
+      { label: "在 Web Archive 中查找历史版本", url: archiveUrl }
     ]
   };
 }

@@ -14,6 +14,10 @@ import {
   suggestFolders
 } from "../lib/library-insights";
 import {
+  buildKnowledgeDashboard,
+  resurfaceForContext
+} from "../lib/knowledge-insights";
+import {
   deleteAgentConversation,
   getAgentConversations,
   saveAgentConversation
@@ -2028,6 +2032,15 @@ async function startLibraryScan(force = false): Promise<LibraryScanStatus> {
     runtime.model,
     LIBRARY_SCAN_CONCURRENCY
   );
+  const displaySettings = await getDisplaySettings();
+  if (
+    estimate.estimatedCostCny !== null &&
+    estimate.estimatedCostCny > displaySettings.scanCostLimitCny
+  ) {
+    throw new Error(
+      `预计费用 ¥${estimate.estimatedCostCny.toFixed(4)}，超过你设置的单次上限 ¥${displaySettings.scanCostLimitCny.toFixed(2)}。请减少待处理数量或调整上限后再试。`
+    );
+  }
   const timestamp = now();
   const job: StoredLibraryScanJob = {
     id: crypto.randomUUID(),
@@ -2822,6 +2835,33 @@ async function getLibraryInsights() {
   );
 }
 
+async function getKnowledgeDashboard() {
+  await importNativeBookmarks();
+  const [resources, tree] = await Promise.all([
+    getLocalResources(),
+    chrome.bookmarks.getTree()
+  ]);
+  return buildKnowledgeDashboard(
+    resources.filter((resource) => resource.nativeBookmarkIds.length > 0),
+    buildBookmarkAgentCatalog(tree)
+  );
+}
+
+async function getContextResurfacing() {
+  const activeTab = await getActiveTabSummary();
+  if (!activeTab?.supported) return [];
+  await importNativeBookmarks();
+  const [resources, tree] = await Promise.all([
+    getLocalResources(),
+    chrome.bookmarks.getTree()
+  ]);
+  return resurfaceForContext(
+    resources.filter((resource) => resource.nativeBookmarkIds.length > 0),
+    buildBookmarkAgentCatalog(tree),
+    `${activeTab.title} ${hostFromUrl(activeTab.url)}`
+  );
+}
+
 async function getFolderSuggestions(
   capture: import("../lib/types").PageCapture
 ) {
@@ -2937,6 +2977,10 @@ async function handleRequest(request: ExtensionRequest): Promise<unknown> {
       return executeBookmarkAgentActions(request.actions);
     case "GET_LIBRARY_INSIGHTS":
       return getLibraryInsights();
+    case "GET_KNOWLEDGE_DASHBOARD":
+      return getKnowledgeDashboard();
+    case "GET_CONTEXT_RESURFACING":
+      return getContextResurfacing();
     case "APPLY_ORGANIZATION_ACTIONS":
       return executeBookmarkAgentActions(request.actions, {
         maxActions: 200,
@@ -2994,13 +3038,16 @@ async function handleRequest(request: ExtensionRequest): Promise<unknown> {
       return moveNativeBookmark(request.payload);
     case "DELETE_NATIVE_BOOKMARK":
       return deleteNativeBookmark(request.payload);
-    case "OPEN_MANAGER":
+    case "OPEN_MANAGER": {
+      const params = new URLSearchParams();
+      if (request.query) params.set("q", request.query);
+      if (request.view) params.set("view", request.view);
+      const suffix = params.size ? `?${params.toString()}` : "";
       await chrome.tabs.create({
-        url: chrome.runtime.getURL(
-          `manager.html${request.query ? `?q=${encodeURIComponent(request.query)}` : ""}`
-        )
+        url: chrome.runtime.getURL(`manager.html${suffix}`)
       });
       return { opened: true };
+    }
     case "OPEN_SIDE_PANEL": {
       const currentWindow = await chrome.windows.getCurrent();
       if (typeof currentWindow.id !== "number") {

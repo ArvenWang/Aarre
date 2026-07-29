@@ -22,6 +22,7 @@ import {
   searchLocalIndex
 } from "../../lib/search";
 import { canonicalizeUrl } from "../../lib/url";
+import { downloadAarreDataExport } from "../../lib/data-export";
 import {
   AI_PROVIDER_PRESETS,
   getAiProviderPreset
@@ -57,6 +58,7 @@ import type {
   PageCapture,
   PageSnapshot,
   ResourceRecord,
+  ResurfacingItem,
   SiteBrandRecord,
   UndoSnapshotBatch
 } from "../../lib/types";
@@ -580,6 +582,7 @@ function SettingsPage({
   const [message, setMessage] = useState("");
   const [snapshotsEnabled, setSnapshotsEnabled] = useState(true);
   const [snapshotExcludedHosts, setSnapshotExcludedHosts] = useState("");
+  const [scanCostLimitCny, setScanCostLimitCny] = useState(10);
   const [undoBatches, setUndoBatches] = useState<UndoSnapshotBatch[]>([]);
   const [scanEstimate, setScanEstimate] =
     useState<LibraryScanEstimate | null>(null);
@@ -614,6 +617,7 @@ function SettingsPage({
       setSnapshotExcludedHosts(
         display.snapshotExcludedHosts.join("\n")
       );
+      setScanCostLimitCny(display.scanCostLimitCny);
     });
   }, []);
 
@@ -712,6 +716,7 @@ function SettingsPage({
           return;
         }
         const permissionApi = chrome.permissions;
+        await saveDisplaySettings({ scanCostLimitCny });
         const granted = permissionApi?.request
           ? await permissionApi.request({
               origins: ["http://*/*", "https://*/*"]
@@ -778,6 +783,23 @@ function SettingsPage({
       );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "撤销失败");
+    } finally {
+      setAction("");
+    }
+  }
+
+  async function exportLocalData() {
+    if (action) return;
+    setAction("export-data");
+    setError("");
+    setMessage("");
+    try {
+      const result = await downloadAarreDataExport();
+      setMessage(
+        `已导出 ${result.filename}（${Math.max(1, Math.round(result.bytes / 1024)).toLocaleString()} KB）。`
+      );
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "数据导出失败");
     } finally {
       setAction("");
     }
@@ -1170,6 +1192,24 @@ function SettingsPage({
                   </dd>
                 </div>
               </dl>
+              <label className="settings-scan-limit">
+                <span>单次 AI 费用上限（人民币）</span>
+                <input
+                  type="number"
+                  min="0.01"
+                  max="10000"
+                  step="0.1"
+                  value={scanCostLimitCny}
+                  onChange={(event) =>
+                    setScanCostLimitCny(
+                      Math.min(
+                        10_000,
+                        Math.max(0.01, Number(event.target.value) || 0.01)
+                      )
+                    )
+                  }
+                />
+              </label>
               <small>
                 价格表更新于 {scanEstimate.pricingUpdatedAt}；人民币金额按估算汇率计算，以服务商账单为准。
               </small>
@@ -1317,6 +1357,38 @@ function SettingsPage({
           >
             重新查看引导
           </button>
+        </section>
+
+        <section
+          className="settings-section"
+          aria-labelledby="privacy-settings-title"
+        >
+          <div className="settings-section-heading">
+            <div>
+              <h2 id="privacy-settings-title">隐私与数据自主权</h2>
+              <p>
+                一键导出智能层元数据、Agent 会话、站点资产、页面快照、撤销记录和安全设置；API Key、Key 尾号与登录令牌永不写入导出文件。
+              </p>
+            </div>
+          </div>
+          <div className="settings-field-footer">
+            <a
+              className="button button-quiet button-small"
+              href={chrome.runtime.getURL("privacy.html")}
+              target="_blank"
+              rel="noreferrer"
+            >
+              查看隐私政策
+            </a>
+            <button
+              type="button"
+              className="button button-dark button-small"
+              disabled={Boolean(action)}
+              onClick={() => void exportLocalData()}
+            >
+              {action === "export-data" ? "正在打包…" : "导出全部本地数据"}
+            </button>
+          </div>
         </section>
 
         <section
@@ -2370,6 +2442,9 @@ export function SidePanelApp() {
   const [appState, setAppState] = useState<AppState | null>(null);
   const [resources, setResources] = useState<ResourceRecord[]>([]);
   const [siteBrands, setSiteBrands] = useState<SiteBrandRecord[]>([]);
+  const [contextResurfacing, setContextResurfacing] = useState<
+    ResurfacingItem[]
+  >([]);
   const [listCoverStyle, setListCoverStyle] =
     useState<ListCoverStyle>("site");
   const [aiConfigured, setAiConfigured] = useState(false);
@@ -2487,18 +2562,27 @@ export function SidePanelApp() {
     const nextResources = await sendExtensionRequest({
       type: "GET_LOCAL_RESOURCES"
     });
-    const [nextSnapshot, nextState, nextSiteBrands, nextAiSettings] =
-      await Promise.all([
+    const [
+      nextSnapshot,
+      nextState,
+      nextSiteBrands,
+      nextAiSettings,
+      nextResurfacing
+    ] = await Promise.all([
       sendExtensionRequest({ type: "GET_BOOKMARK_BAR" }),
       sendExtensionRequest({ type: "GET_APP_STATE" }),
       sendExtensionRequest({ type: "GET_SITE_BRANDS" }),
-      sendExtensionRequest({ type: "GET_AI_SETTINGS" })
+      sendExtensionRequest({ type: "GET_AI_SETTINGS" }),
+      sendExtensionRequest({ type: "GET_CONTEXT_RESURFACING" }).catch(
+        () => []
+      )
     ]);
     setSnapshot(nextSnapshot);
     setAppState(nextState);
     setResources(nextResources);
     setSiteBrands(nextSiteBrands);
     setAiConfigured(nextAiSettings.apiKeyConfigured);
+    setContextResurfacing(nextResurfacing);
   }, []);
 
   const loadConversations = useCallback(async () => {
@@ -4021,37 +4105,75 @@ export function SidePanelApp() {
                 </div>
               )
             ) : visibleBookmarkNodes.length ? (
-              <BookmarkTree
-                nodes={visibleBookmarkNodes}
-                resourceByUrl={resourceByUrl}
-                siteBrandByHost={siteBrandByHost}
-                coverStyle={listCoverStyle}
-                onPreviewIntent={showBookmarkPreview}
-                onPreviewLeave={closeBookmarkPreview}
-                expanded={visibleExpanded}
-                onToggle={(id) =>
-                  setExpanded((current) => {
-                    const next = new Set(current);
-                    if (next.has(id)) next.delete(id);
-                    else next.add(id);
-                    return next;
-                  })
-                }
-                onOpen={(node, newTab) =>
-                  void openNavigation(
-                    {
-                      text: node.url || "",
-                      url: node.url
-                    },
-                    newTab
-                  )
-                }
-                onEdit={startEdit}
-                draggedId={draggedId}
-                onDragStart={setDraggedId}
-                onDragEnd={() => setDraggedId("")}
-                onMove={moveNode}
-              />
+              <>
+                {!libraryQuery.trim() && contextResurfacing.length ? (
+                  <section className="context-resurfacing">
+                    <header>
+                      <strong>这会儿值得重看</strong>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void sendExtensionRequest({
+                            type: "OPEN_MANAGER",
+                            view: "resurface"
+                          })
+                        }
+                      >
+                        打开工作台
+                      </button>
+                    </header>
+                    {contextResurfacing.map((item) => (
+                      <button
+                        type="button"
+                        key={item.resourceKey}
+                        onClick={() =>
+                          void openNavigation({
+                            text: item.url,
+                            url: item.url
+                          })
+                        }
+                      >
+                        <span>
+                          <strong>{item.title}</strong>
+                          <small>{item.reason}</small>
+                        </span>
+                        <em>{item.ageDays} 天</em>
+                      </button>
+                    ))}
+                  </section>
+                ) : null}
+                <BookmarkTree
+                  nodes={visibleBookmarkNodes}
+                  resourceByUrl={resourceByUrl}
+                  siteBrandByHost={siteBrandByHost}
+                  coverStyle={listCoverStyle}
+                  onPreviewIntent={showBookmarkPreview}
+                  onPreviewLeave={closeBookmarkPreview}
+                  expanded={visibleExpanded}
+                  onToggle={(id) =>
+                    setExpanded((current) => {
+                      const next = new Set(current);
+                      if (next.has(id)) next.delete(id);
+                      else next.add(id);
+                      return next;
+                    })
+                  }
+                  onOpen={(node, newTab) =>
+                    void openNavigation(
+                      {
+                        text: node.url || "",
+                        url: node.url
+                      },
+                      newTab
+                    )
+                  }
+                  onEdit={startEdit}
+                  draggedId={draggedId}
+                  onDragStart={setDraggedId}
+                  onDragEnd={() => setDraggedId("")}
+                  onMove={moveNode}
+                />
+              </>
             ) : libraryQuery.trim() ? (
               <div className="native-empty library-search-empty">
                 <span>
