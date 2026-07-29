@@ -43,11 +43,14 @@ import {
 import type {
   AiProviderId,
   AiSettingsStatus,
+  AiUsageStats,
   AgentChatMessage,
   AgentConversation,
   AppState,
   BookmarkAgentActionProposal,
   BookmarkBarSnapshot,
+  FolderSuggestion,
+  LibraryScanEstimate,
   NativeBookmarkNode,
   NativeFolderOption,
   PendingSaveDraft,
@@ -578,6 +581,9 @@ function SettingsPage({
   const [snapshotsEnabled, setSnapshotsEnabled] = useState(true);
   const [snapshotExcludedHosts, setSnapshotExcludedHosts] = useState("");
   const [undoBatches, setUndoBatches] = useState<UndoSnapshotBatch[]>([]);
+  const [scanEstimate, setScanEstimate] =
+    useState<LibraryScanEstimate | null>(null);
+  const [usageStats, setUsageStats] = useState<AiUsageStats | null>(null);
   const backButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
@@ -600,6 +606,9 @@ function SettingsPage({
           caught instanceof Error ? caught.message : "无法读取最近的更改"
         )
       );
+    void sendExtensionRequest({ type: "GET_AI_USAGE" })
+      .then(setUsageStats)
+      .catch(() => undefined);
     void getDisplaySettings().then((display) => {
       setSnapshotsEnabled(display.pageSnapshotsEnabled);
       setSnapshotExcludedHosts(
@@ -689,6 +698,19 @@ function SettingsPage({
     setMessage("");
     try {
       if (intent === "start") {
+        if (!scanEstimate) {
+          const estimate = await sendExtensionRequest({
+            type: "GET_LIBRARY_SCAN_ESTIMATE",
+            force: false
+          });
+          setScanEstimate(estimate);
+          setMessage(
+            estimate.total
+              ? "请核对预计时间和费用，再确认开始。"
+              : "当前没有需要补充或复查的收藏。"
+          );
+          return;
+        }
         const permissionApi = chrome.permissions;
         const granted = permissionApi?.request
           ? await permissionApi.request({
@@ -704,6 +726,7 @@ function SettingsPage({
           type: "START_LIBRARY_SCAN",
           force: false
         });
+        setScanEstimate(null);
       } else {
         await sendExtensionRequest({
           type:
@@ -716,6 +739,9 @@ function SettingsPage({
       }
       const state = await sendExtensionRequest({ type: "GET_APP_STATE" });
       onAppStateChange(state);
+      setUsageStats(
+        await sendExtensionRequest({ type: "GET_AI_USAGE" })
+      );
       setMessage(
         intent === "start"
           ? "全目录扫描已开始，可以关闭设置页，任务会继续运行。"
@@ -1108,7 +1134,47 @@ function SettingsPage({
                 {appState.libraryScan.failed}
               </p>
             ) : null}
+            {(appState?.libraryScan.actualInputTokens ||
+              appState?.libraryScan.actualOutputTokens) ? (
+              <p>
+                实际令牌：输入{" "}
+                {appState.libraryScan.actualInputTokens || 0} · 输出{" "}
+                {appState.libraryScan.actualOutputTokens || 0} · 估算费用 ¥
+                {(appState.libraryScan.actualCostCny || 0).toFixed(4)}
+              </p>
+            ) : null}
           </div>
+          {scanEstimate ? (
+            <div className="settings-scan-estimate" role="status">
+              <strong>开始前确认</strong>
+              <p>
+                共检查 {scanEstimate.total} 条，其中{" "}
+                {scanEstimate.aiResourceCount} 条会调用{" "}
+                {scanEstimate.providerName} {scanEstimate.model}。
+              </p>
+              <dl>
+                <div>
+                  <dt>预计时间</dt>
+                  <dd>约 {scanEstimate.estimatedMinutes} 分钟</dd>
+                </div>
+                <div>
+                  <dt>并发</dt>
+                  <dd>{scanEstimate.concurrency} 条任务</dd>
+                </div>
+                <div>
+                  <dt>估算费用</dt>
+                  <dd>
+                    {scanEstimate.priceAvailable
+                      ? `¥${(scanEstimate.estimatedCostCny || 0).toFixed(4)}`
+                      : "自定义模型，无法可靠估算"}
+                  </dd>
+                </div>
+              </dl>
+              <small>
+                价格表更新于 {scanEstimate.pricingUpdatedAt}；人民币金额按估算汇率计算，以服务商账单为准。
+              </small>
+            </div>
+          ) : null}
           <p className="settings-scan-privacy">
             站点标识和代表图会压缩后只保存在本机；简介和标签会产生所选 AI 服务商的调用费用。内部网址、局域网和受保护地址不会发起任何网络请求。
           </p>
@@ -1147,12 +1213,19 @@ function SettingsPage({
                 className="button button-dark button-small"
                 disabled={
                   Boolean(action) ||
-                  !appState?.localResourceCount
+                  !appState?.localResourceCount ||
+                  Boolean(scanEstimate && !scanEstimate.total)
                 }
                 onClick={() => void handleLibraryScan("start")}
               >
                 {action === "scan-start"
-                  ? "正在启动…"
+                  ? scanEstimate
+                    ? "正在启动…"
+                    : "正在估算…"
+                  : scanEstimate
+                    ? scanEstimate.total
+                      ? "确认并开始"
+                      : "无需扫描"
                   : appState?.aiReadyResourceCount ===
                     appState?.localResourceCount &&
                     Boolean(appState?.localResourceCount)
@@ -1163,6 +1236,35 @@ function SettingsPage({
               </button>
             )}
           </div>
+          {scanEstimate ? (
+            <button
+              type="button"
+              className="text-button"
+              disabled={Boolean(action)}
+              onClick={() => {
+                setScanEstimate(null);
+                setMessage("");
+              }}
+            >
+              取消本次扫描
+            </button>
+          ) : null}
+          {usageStats ? (
+            <div className="settings-usage-summary">
+              <strong>累计 AI 用量（仅本机）</strong>
+              <span>
+                {usageStats.scanCount} 次扫描 · 输入{" "}
+                {usageStats.inputTokens.toLocaleString()} · 输出{" "}
+                {usageStats.outputTokens.toLocaleString()} · 估算 ¥
+                {usageStats.estimatedCostCny.toFixed(4)}
+              </span>
+              {usageStats.estimatedTokens ? (
+                <small>
+                  其中 {usageStats.estimatedTokens.toLocaleString()} 个令牌为服务商未返回用量时的本地估算。
+                </small>
+              ) : null}
+            </div>
+          ) : null}
         </section>
 
         <section
@@ -2275,6 +2377,9 @@ export function SidePanelApp() {
     boolean | null
   >(null);
   const [folders, setFolders] = useState<NativeFolderOption[]>([]);
+  const [folderSuggestions, setFolderSuggestions] = useState<
+    FolderSuggestion[]
+  >([]);
   const [agentPrompt, setAgentPrompt] = useState("");
   const [panelView, setPanelView] = useState<
     "library" | "settings" | "chat" | "history"
@@ -3268,6 +3373,7 @@ export function SidePanelApp() {
     setBusy("capture");
     setError("");
     setCaptureWarning("");
+    setFolderSuggestions([]);
     setNote("");
     try {
       const folderOptions = await sendExtensionRequest({
@@ -3287,6 +3393,12 @@ export function SidePanelApp() {
         setCapture(page);
         setEditTitle(existingBookmark?.title || page.title);
         setRequestAi(false);
+        setFolderSuggestions(
+          await sendExtensionRequest({
+            type: "GET_FOLDER_SUGGESTIONS",
+            capture: page
+          }).catch(() => [])
+        );
         setCaptureWarning(
           "这是链接收藏。保存后打开该网页，可继续补充正文摘要和 AI 标签。"
         );
@@ -3306,6 +3418,12 @@ export function SidePanelApp() {
           existingBookmark?.title || draft?.title || merged.title
         );
         setRequestAi(true);
+        setFolderSuggestions(
+          await sendExtensionRequest({
+            type: "GET_FOLDER_SUGGESTIONS",
+            capture: merged
+          }).catch(() => [])
+        );
       } catch {
         const page = draft
           ? captureFromDraft(draft)
@@ -3313,6 +3431,12 @@ export function SidePanelApp() {
         setCapture(page);
         setEditTitle(existingBookmark?.title || page.title);
         setRequestAi(false);
+        setFolderSuggestions(
+          await sendExtensionRequest({
+            type: "GET_FOLDER_SUGGESTIONS",
+            capture: page
+          }).catch(() => [])
+        );
         setCaptureWarning(
           "此页面受 Chrome 保护，仍可保存原生书签，但不会读取正文。"
         );
@@ -4219,6 +4343,30 @@ export function SidePanelApp() {
                         value={folderId}
                         onChange={setFolderId}
                       />
+                      {folderSuggestions.length ? (
+                        <div
+                          className="folder-suggestions"
+                          aria-label="推荐文件夹"
+                        >
+                          <small>本地推荐</small>
+                          {folderSuggestions.map((suggestion) => (
+                            <button
+                              type="button"
+                              key={suggestion.folderId}
+                              data-selected={
+                                folderId === suggestion.folderId
+                              }
+                              onClick={() =>
+                                setFolderId(suggestion.folderId)
+                              }
+                              title={suggestion.reason}
+                            >
+                              {suggestion.path.join(" / ")}
+                              <span>{suggestion.reason}</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                     <label className="native-field">
                       <span>备注（智能增强层）</span>

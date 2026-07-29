@@ -8,6 +8,8 @@ import {
 } from "../../lib/display-settings";
 import type {
   AppState,
+  BookmarkAgentActionExecutionResult,
+  LibraryInsights,
   ResourceRecord,
   SearchResult,
   SiteBrandRecord
@@ -20,6 +22,7 @@ import {
 import { SiteThumbnail } from "../components/SiteThumbnail";
 
 type LibraryFilter = "all" | "ready" | "pending";
+type ManagerView = "library" | "organize" | "reading";
 
 function asSearchResults(
   items: ResourceRecord[] | SearchResult[]
@@ -34,6 +37,15 @@ function displayDate(value: string): string {
     month: "short",
     day: "numeric",
     year: "numeric"
+  }).format(new Date(value));
+}
+
+function displayTimestamp(value?: number): string {
+  if (!value) return "从未记录到通过书签打开";
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "short",
+    day: "numeric"
   }).format(new Date(value));
 }
 
@@ -62,7 +74,18 @@ export function ManagerApp() {
   const [appState, setAppState] = useState<AppState | null>(null);
   const [query, setQuery] = useState(initialQuery);
   const [filter, setFilter] = useState<LibraryFilter>("all");
+  const [view, setView] = useState<ManagerView>("library");
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [insights, setInsights] = useState<LibraryInsights | null>(null);
+  const [selectedActionIds, setSelectedActionIds] = useState<Set<string>>(
+    new Set()
+  );
+  const [applyResults, setApplyResults] = useState<
+    BookmarkAgentActionExecutionResult[]
+  >([]);
+  const [undoBatchId, setUndoBatchId] = useState("");
+  const [confirmDestructiveApply, setConfirmDestructiveApply] =
+    useState(false);
   const [siteBrands, setSiteBrands] = useState<SiteBrandRecord[]>([]);
   const [listCoverStyle, setListCoverStyle] =
     useState<ListCoverStyle>("site");
@@ -89,6 +112,17 @@ export function ManagerApp() {
       setAppState(state);
       setSiteBrands(
         await sendExtensionRequest({ type: "GET_SITE_BRANDS" })
+      );
+      const nextInsights = await sendExtensionRequest({
+        type: "GET_LIBRARY_INSIGHTS"
+      });
+      setInsights(nextInsights);
+      setSelectedActionIds(
+        new Set(
+          nextInsights.organizationPlan.proposals
+            .filter((proposal) => proposal.selectedByDefault)
+            .flatMap((proposal) => proposal.actions.map((item) => item.id))
+        )
       );
       setListCoverStyle((await getDisplaySettings()).listCoverStyle);
       if (
@@ -142,6 +176,73 @@ export function ManagerApp() {
       ),
     [siteBrands]
   );
+  const selectedActions = useMemo(() => {
+    const actions =
+      insights?.organizationPlan.proposals.flatMap(
+        (proposal) => proposal.actions
+      ) || [];
+    return actions.filter((item) => selectedActionIds.has(item.id));
+  }, [insights, selectedActionIds]);
+
+  function toggleProposal(actionIds: string[], checked: boolean) {
+    setConfirmDestructiveApply(false);
+    setSelectedActionIds((current) => {
+      const next = new Set(current);
+      for (const id of actionIds) {
+        if (checked) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  }
+
+  async function applyOrganizationPlan() {
+    if (!selectedActions.length) return;
+    if (
+      selectedActions.some((item) => item.destructive) &&
+      !confirmDestructiveApply
+    ) {
+      setConfirmDestructiveApply(true);
+      return;
+    }
+    setAction("organize");
+    setError("");
+    try {
+      const result = await sendExtensionRequest({
+        type: "APPLY_ORGANIZATION_ACTIONS",
+        actions: selectedActions.slice(0, 200)
+      });
+      setApplyResults(result.results);
+      setUndoBatchId(result.batchId || "");
+      setConfirmDestructiveApply(false);
+      await refresh();
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "整理操作执行失败"
+      );
+    } finally {
+      setAction("");
+    }
+  }
+
+  async function undoOrganizationPlan() {
+    if (!undoBatchId) return;
+    setAction("undo-organize");
+    setError("");
+    try {
+      await sendExtensionRequest({
+        type: "UNDO_BOOKMARK_BATCH",
+        batchId: undoBatchId
+      });
+      setUndoBatchId("");
+      setApplyResults([]);
+      await refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "撤销整理失败");
+    } finally {
+      setAction("");
+    }
+  }
 
   async function handleSearch(event: React.FormEvent) {
     event.preventDefault();
@@ -241,46 +342,47 @@ export function ManagerApp() {
 
       <section className="manager-hero">
         <div>
-          <h1>我的收藏</h1>
+          <h1>
+            {view === "library"
+              ? "我的收藏"
+              : view === "organize"
+                ? "整理提案"
+                : "待读队列"}
+          </h1>
           <p>
-            保留 Chrome 原生书签，并补充摘要、标签和智能检索。
+            {view === "library"
+              ? "保留 Chrome 原生书签，并补充摘要、标签和智能检索。"
+              : view === "organize"
+                ? "先预览，再选择应用。任何删除项都默认不勾选。"
+                : "按 Chrome 记录的打开时间排序；未记录到使用的收藏优先。"}
           </p>
         </div>
 
-        <form className="search-box" onSubmit={handleSearch}>
-          <SearchIcon aria-hidden="true" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="例如：适合深色产品首页的轻量动态背景"
-            aria-label="搜索收藏"
-          />
-          <button
-            type="submit"
-            className="button button-dark"
-            disabled={action === "search"}
-          >
-            {action === "search" ? "搜索中…" : "搜索"}
-          </button>
-        </form>
+        {view === "library" ? (
+          <>
+            <form className="search-box" onSubmit={handleSearch}>
+              <SearchIcon aria-hidden="true" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="例如：适合深色产品首页的轻量动态背景"
+                aria-label="搜索收藏"
+              />
+              <button
+                type="submit"
+                className="button button-dark"
+                disabled={action === "search"}
+              >
+                {action === "search" ? "搜索中…" : "搜索"}
+              </button>
+            </form>
 
-        <p className="semantic-toggle">
-          搜索在本机完成，支持标题、标签、摘要、中文和拼音首字母。
-        </p>
-      </section>
-
-      {!appState?.auth.configured ? (
-        <section className="setup-banner">
-          <div>
-            <strong>云端尚未连接</strong>
-            <p>
-              本地收藏和 Chrome 同步可正常使用。配置 Supabase 与 Google
-              OAuth 后，摘要、标签和语义索引才会跨设备同步。
+            <p className="semantic-toggle">
+              搜索在本机完成，支持标题、标签、摘要、中文和拼音首字母。
             </p>
-          </div>
-          <code>{appState?.auth.redirectUrl || "加载重定向地址中…"}</code>
-        </section>
-      ) : null}
+          </>
+        ) : null}
+      </section>
 
       {appState?.auth.accountMatches === false ? (
         <div className="notice notice-error">
@@ -288,7 +390,32 @@ export function ManagerApp() {
         </div>
       ) : null}
 
-      <section className="library-toolbar">
+      <nav className="manager-view-tabs" aria-label="收藏管理功能">
+        {(
+          [
+            ["library", "收藏库", results.length],
+            [
+              "organize",
+              "整理提案",
+              insights?.organizationPlan.proposalCount || 0
+            ],
+            ["reading", "待读队列", insights?.readingQueue.length || 0]
+          ] as const
+        ).map(([value, label, count]) => (
+          <button
+            type="button"
+            key={value}
+            data-active={view === value}
+            aria-current={view === value ? "page" : undefined}
+            onClick={() => setView(value)}
+          >
+            {label}
+            <span>{count}</span>
+          </button>
+        ))}
+      </nav>
+
+      {view === "library" ? <section className="library-toolbar">
         <div className="library-filter-group">
           <div className="library-tabs" role="tablist" aria-label="收藏状态">
             {(
@@ -340,12 +467,175 @@ export function ManagerApp() {
             刷新
           </button>
         </div>
-      </section>
+      </section> : null}
 
       {error ? <div className="notice notice-error">{error}</div> : null}
 
       {loading ? (
         <div className="empty-state">正在读取你的收藏库…</div>
+      ) : view === "organize" ? (
+        <section className="organization-shell">
+          <header className="organization-toolbar">
+            <div>
+              <strong>
+                {insights?.organizationPlan.actionableCount || 0} 组可执行建议
+              </strong>
+              <small>
+                规则和相似度计算均在本机完成；失效链接来自实际网络检测。
+              </small>
+            </div>
+            <div>
+              <button
+                type="button"
+                className="button button-quiet"
+                onClick={() =>
+                  setSelectedActionIds(
+                    new Set(
+                      insights?.organizationPlan.proposals
+                        .filter((proposal) => !proposal.destructive)
+                        .flatMap((proposal) =>
+                          proposal.actions.map((item) => item.id)
+                        ) || []
+                    )
+                  )
+                }
+              >
+                全选安全项
+              </button>
+              <button
+                type="button"
+                className={
+                  confirmDestructiveApply
+                    ? "button button-danger"
+                    : "button button-dark"
+                }
+                disabled={!selectedActions.length || Boolean(action)}
+                onClick={() => void applyOrganizationPlan()}
+              >
+                {action === "organize"
+                  ? "执行中…"
+                  : confirmDestructiveApply
+                    ? `再次确认：应用 ${selectedActions.length} 项`
+                    : `应用已选 ${selectedActions.length} 项`}
+              </button>
+            </div>
+          </header>
+
+          {undoBatchId ? (
+            <div className="notice organization-result">
+              <span>
+                已执行 {applyResults.filter((item) => item.success).length} 项；
+                {applyResults.filter((item) => !item.success).length} 项失败。
+              </span>
+              <button
+                type="button"
+                className="button button-quiet"
+                disabled={action === "undo-organize"}
+                onClick={() => void undoOrganizationPlan()}
+              >
+                {action === "undo-organize" ? "撤销中…" : "撤销本次整理"}
+              </button>
+            </div>
+          ) : null}
+
+          {insights?.organizationPlan.proposals.length ? (
+            <div className="proposal-list">
+              {insights.organizationPlan.proposals.map((proposal) => {
+                const actionIds = proposal.actions.map((item) => item.id);
+                const selectedCount = actionIds.filter((id) =>
+                  selectedActionIds.has(id)
+                ).length;
+                return (
+                  <article
+                    className="proposal-card"
+                    data-destructive={proposal.destructive}
+                    key={proposal.id}
+                  >
+                    <header>
+                      {actionIds.length ? (
+                        <input
+                          type="checkbox"
+                          checked={
+                            selectedCount > 0 &&
+                            selectedCount === actionIds.length
+                          }
+                          ref={(element) => {
+                            if (element) {
+                              element.indeterminate =
+                                selectedCount > 0 &&
+                                selectedCount < actionIds.length;
+                            }
+                          }}
+                          onChange={(event) =>
+                            toggleProposal(
+                              actionIds,
+                              event.currentTarget.checked
+                            )
+                          }
+                          aria-label={`选择${proposal.title}`}
+                        />
+                      ) : (
+                        <span className="proposal-info-mark">i</span>
+                      )}
+                      <div>
+                        <strong>{proposal.title}</strong>
+                        <small>
+                          {proposal.destructive
+                            ? "包含删除 · 默认不选"
+                            : "可撤销的移动建议"}
+                        </small>
+                      </div>
+                    </header>
+                    <p>{proposal.description}</p>
+                    <div className="proposal-preview">
+                      {proposal.previewLines.slice(0, 12).map((line) => (
+                        <code key={line}>{line}</code>
+                      ))}
+                      {proposal.previewLines.length > 12 ? (
+                        <small>
+                          另有 {proposal.previewLines.length - 12} 项，将在应用时一并处理
+                        </small>
+                      ) : null}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="empty-state">
+              <strong>当前没有整理建议</strong>
+              <p>完成一次全目录扫描后，这里会显示分类、重复和失效链接建议。</p>
+            </div>
+          )}
+        </section>
+      ) : view === "reading" ? (
+        insights?.readingQueue.length ? (
+          <section className="reading-queue">
+            {insights.readingQueue.map((item, index) => (
+              <article key={item.nodeId}>
+                <span className="reading-index">{index + 1}</span>
+                <div>
+                  <h3>
+                    <a href={item.url} target="_blank" rel="noreferrer">
+                      {item.title}
+                    </a>
+                  </h3>
+                  <p>{item.path.join(" / ") || "书签栏"}</p>
+                  <small>
+                    {item.dateLastUsed
+                      ? `上次通过书签打开：${displayTimestamp(item.dateLastUsed)}`
+                      : "很少通过书签打开 · Chrome 尚未记录使用时间"}
+                  </small>
+                </div>
+              </article>
+            ))}
+          </section>
+        ) : (
+          <div className="empty-state">
+            <strong>待读队列还是空的</strong>
+            <p>Chrome 书签进入本地索引后，会按使用时间排在这里。</p>
+          </div>
+        )
       ) : visibleResults.length ? (
         <section className="resource-grid">
           {visibleResults.map(({ resource, score, matchReason }) => (

@@ -67,6 +67,13 @@ const SYNC_STATUSES = new Set<ResourceRecord["syncStatus"]>([
   "synced",
   "failed"
 ]);
+const LINK_HEALTH_STATUSES = new Set([
+  "healthy",
+  "login_required",
+  "temporary",
+  "dead",
+  "soft_404"
+]);
 
 function stringValue(value: unknown): string {
   return typeof value === "string" ? value : "";
@@ -77,6 +84,40 @@ function stringArray(value: unknown): string[] {
   return value.filter(
     (item): item is string => typeof item === "string" && item.length > 0
   );
+}
+
+function normalizeLinkHealth(
+  value: unknown
+): ResourceRecord["linkHealth"] {
+  if (!value || typeof value !== "object") return undefined;
+  const record = value as Partial<
+    NonNullable<ResourceRecord["linkHealth"]>
+  >;
+  if (
+    !LINK_HEALTH_STATUSES.has(record.status || "") ||
+    typeof record.checkedAt !== "string"
+  ) {
+    return undefined;
+  }
+  return {
+    status: record.status as NonNullable<
+      ResourceRecord["linkHealth"]
+    >["status"],
+    checkedAt: record.checkedAt,
+    consecutiveFailures:
+      typeof record.consecutiveFailures === "number"
+        ? Math.max(0, Math.floor(record.consecutiveFailures))
+        : 0,
+    ...(typeof record.httpStatus === "number"
+      ? { httpStatus: Math.floor(record.httpStatus) }
+      : {}),
+    ...(typeof record.finalUrl === "string" && record.finalUrl
+      ? { finalUrl: record.finalUrl }
+      : {}),
+    ...(typeof record.reason === "string" && record.reason
+      ? { reason: record.reason.slice(0, 240) }
+      : {})
+  };
 }
 
 /**
@@ -106,6 +147,7 @@ export function normalizeResourceRecord(value: unknown): ResourceRecord {
       : record.tagsSource === "ai" || stringArray(record.tags).length
         ? "ai"
         : undefined;
+  const linkHealth = normalizeLinkHealth(record.linkHealth);
 
   return {
     resourceKey:
@@ -143,6 +185,7 @@ export function normalizeResourceRecord(value: unknown): ResourceRecord {
     ...(stringValue(record.snapshotAt)
       ? { snapshotAt: stringValue(record.snapshotAt) }
       : {}),
+    ...(linkHealth ? { linkHealth } : {}),
     faviconUrl: stringValue(record.faviconUrl),
     nativeBookmarkIds: stringArray(record.nativeBookmarkIds),
     nativeFolderPath: stringArray(record.nativeFolderPath),

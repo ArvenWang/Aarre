@@ -843,6 +843,26 @@ export function installSidePanelPreview() {
             return { ok: true, data: previewFolderOptions() };
           case "CAPTURE_ACTIVE_PAGE":
             return { ok: true, data: previewCapture };
+          case "GET_FOLDER_SUGGESTIONS":
+            return {
+              ok: true,
+              data: [
+                {
+                  folderId: "preview-folder-0",
+                  name: "设计赏析",
+                  path: ["书签栏", "设计赏析"],
+                  score: 32,
+                  reason: "与 3 条相似收藏同目录"
+                },
+                {
+                  folderId: "preview-folder-1",
+                  name: "前端代码",
+                  path: ["书签栏", "前端代码"],
+                  score: 19,
+                  reason: "与 1 条相似收藏同目录"
+                }
+              ]
+            };
           case "GET_NAVIGATION_SUGGESTIONS":
             return { ok: true, data: previewSuggestions };
           case "NAVIGATE":
@@ -923,6 +943,35 @@ export function installSidePanelPreview() {
             return {
               ok: true,
               data: structuredClone(previewState.libraryScan)
+            };
+          case "GET_LIBRARY_SCAN_ESTIMATE":
+            return {
+              ok: true,
+              data: {
+                total: 261,
+                aiResourceCount: 206,
+                concurrency: 4,
+                estimatedMinutes: 16,
+                estimatedCostCny: 0.1946,
+                pricingUpdatedAt: "2026-07-30",
+                providerName: "DeepSeek",
+                model: "deepseek-v4-flash",
+                priceAvailable: true
+              }
+            };
+          case "GET_AI_USAGE":
+            return {
+              ok: true,
+              data: {
+                inputTokens: 48200,
+                outputTokens: 9600,
+                cachedInputTokens: 0,
+                estimatedTokens: 0,
+                estimatedCostCny: 0.0679,
+                scanCount: 2,
+                priceUpdatedAt: "2026-07-30",
+                updatedAt: new Date().toISOString()
+              }
             };
           case "START_LIBRARY_SCAN":
             previewState.libraryScan = {

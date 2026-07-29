@@ -10,6 +10,7 @@ import type {
   BookmarkAgentCatalog,
   BookmarkAgentTurn,
   BookmarkAgentResponse,
+  AiTokenUsage,
   PageCapture,
   PageEssence,
   ResourceRecord
@@ -28,6 +29,23 @@ const MAX_AGENT_CONTEXT_LENGTH = 12_000;
 const MAX_AGENT_HISTORY_CONTEXT_LENGTH = 2_000;
 const MAX_AGENT_ACTION_CONTEXT_LENGTH = 4_000;
 const MAX_AGENT_ACTIONS = 8;
+
+interface GeneratedText {
+  content: string;
+  usage: AiTokenUsage;
+}
+
+function estimatedTokenUsage(
+  prompt: string,
+  content: string
+): AiTokenUsage {
+  return {
+    inputTokens: Math.max(1, Math.ceil(prompt.length / 3)),
+    outputTokens: Math.max(1, Math.ceil(content.length / 2.5)),
+    cachedInputTokens: 0,
+    estimated: true
+  };
+}
 
 function enrichmentPrompt(
   resource: ResourceRecord,
@@ -174,7 +192,7 @@ async function generateWithOpenAiCompatible(
   model: string,
   apiKey: string,
   prompt: string
-): Promise<string> {
+): Promise<GeneratedText> {
   const baseUrl =
     provider === "openai"
       ? "https://api.openai.com/v1"
@@ -207,19 +225,42 @@ async function generateWithOpenAiCompatible(
 
   const body = (await response.json()) as {
     choices?: Array<{ message?: { content?: string } }>;
+    usage?: {
+      prompt_tokens?: number;
+      completion_tokens?: number;
+      prompt_cache_hit_tokens?: number;
+      prompt_tokens_details?: { cached_tokens?: number };
+    };
   };
   const content = body.choices?.[0]?.message?.content;
   if (typeof content !== "string") {
     throw new Error("AI 没有返回可用内容，请重试。");
   }
-  return content;
+  const inputTokens = body.usage?.prompt_tokens;
+  const outputTokens = body.usage?.completion_tokens;
+  return {
+    content,
+    usage:
+      typeof inputTokens === "number" &&
+      typeof outputTokens === "number"
+        ? {
+            inputTokens,
+            outputTokens,
+            cachedInputTokens:
+              body.usage?.prompt_tokens_details?.cached_tokens ||
+              body.usage?.prompt_cache_hit_tokens ||
+              0,
+            estimated: false
+          }
+        : estimatedTokenUsage(prompt, content)
+  };
 }
 
 async function generateWithGemini(
   model: string,
   apiKey: string,
   prompt: string
-): Promise<string> {
+): Promise<GeneratedText> {
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
     {
@@ -246,17 +287,38 @@ async function generateWithGemini(
     candidates?: Array<{
       content?: { parts?: Array<{ text?: string }> };
     }>;
+    usageMetadata?: {
+      promptTokenCount?: number;
+      candidatesTokenCount?: number;
+      cachedContentTokenCount?: number;
+    };
   };
   const content = body.candidates?.[0]?.content?.parts?.[0]?.text;
   if (typeof content !== "string") {
     throw new Error("Gemini 没有返回可用内容，请重试。");
   }
-  return content;
+  const inputTokens = body.usageMetadata?.promptTokenCount;
+  const outputTokens = body.usageMetadata?.candidatesTokenCount;
+  return {
+    content,
+    usage:
+      typeof inputTokens === "number" &&
+      typeof outputTokens === "number"
+        ? {
+            inputTokens,
+            outputTokens,
+            cachedInputTokens:
+              body.usageMetadata?.cachedContentTokenCount || 0,
+            estimated: false
+          }
+        : estimatedTokenUsage(prompt, content)
+  };
 }
 
 async function generateConfiguredJson(prompt: string): Promise<{
   content: string;
   providerName: string;
+  usage: AiTokenUsage;
 }> {
   const settings = await getAiRuntimeSettings();
   if (!settings.apiKey) {
@@ -266,7 +328,7 @@ async function generateConfiguredJson(prompt: string): Promise<{
   }
 
   try {
-    const content =
+    const generated =
       settings.provider === "gemini"
         ? await generateWithGemini(
             settings.model,
@@ -280,7 +342,7 @@ async function generateConfiguredJson(prompt: string): Promise<{
             prompt
           );
     return {
-      content,
+      ...generated,
       providerName: getAiProviderPreset(settings.provider).name
     };
   } catch (error) {
@@ -820,6 +882,14 @@ export async function enrichResourceFromEssence(
   resource: ResourceRecord,
   essence: PageEssence
 ): Promise<ResourceRecord> {
+  return (await enrichResourceFromEssenceWithUsage(resource, essence))
+    .resource;
+}
+
+export async function enrichResourceFromEssenceWithUsage(
+  resource: ResourceRecord,
+  essence: PageEssence
+): Promise<{ resource: ResourceRecord; usage: AiTokenUsage }> {
   const generated = await generateConfiguredJson(
     essenceEnrichmentPrompt(resource, essence)
   );
@@ -835,21 +905,24 @@ export async function enrichResourceFromEssence(
     .slice(0, 2_000);
 
   return {
-    ...resource,
-    summary: enrichment.summary,
-    tags:
-      resource.tagsSource === "user"
-        ? resource.tags
-        : enrichment.tags,
-    tagsSource:
-      resource.tagsSource === "user" ? "user" : "ai",
-    topics: enrichment.topics,
-    aliases: enrichment.aliases,
-    contentExcerpt: excerpt || resource.contentExcerpt,
-    siteName: essence.siteName || resource.siteName,
-    imageUrl: essence.imageUrl || resource.imageUrl,
-    faviconUrl: essence.faviconUrl || resource.faviconUrl,
-    aiStatus: "ready",
-    updatedAt: new Date().toISOString()
+    resource: {
+      ...resource,
+      summary: enrichment.summary,
+      tags:
+        resource.tagsSource === "user"
+          ? resource.tags
+          : enrichment.tags,
+      tagsSource:
+        resource.tagsSource === "user" ? "user" : "ai",
+      topics: enrichment.topics,
+      aliases: enrichment.aliases,
+      contentExcerpt: excerpt || resource.contentExcerpt,
+      siteName: essence.siteName || resource.siteName,
+      imageUrl: essence.imageUrl || resource.imageUrl,
+      faviconUrl: essence.faviconUrl || resource.faviconUrl,
+      aiStatus: "ready",
+      updatedAt: new Date().toISOString()
+    },
+    usage: generated.usage
   };
 }

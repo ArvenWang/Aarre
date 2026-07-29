@@ -110,6 +110,7 @@ export interface ResourceRecord {
   coverUpdatedAt?: string;
   categoryCoverId?: string;
   snapshotAt?: string;
+  linkHealth?: LinkHealthRecord;
   faviconUrl: string;
   nativeBookmarkIds: string[];
   nativeFolderPath: string[];
@@ -154,6 +155,40 @@ export interface PageSnapshot {
   capturedAt: string;
   width: number;
   height: number;
+}
+
+export type LinkHealthStatus =
+  | "healthy"
+  | "login_required"
+  | "temporary"
+  | "dead"
+  | "soft_404";
+
+export interface LinkHealthRecord {
+  status: LinkHealthStatus;
+  checkedAt: string;
+  consecutiveFailures: number;
+  httpStatus?: number;
+  finalUrl?: string;
+  reason?: string;
+}
+
+export interface AiTokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cachedInputTokens: number;
+  estimated: boolean;
+}
+
+export interface AiUsageStats {
+  inputTokens: number;
+  outputTokens: number;
+  cachedInputTokens: number;
+  estimatedTokens: number;
+  estimatedCostCny: number;
+  scanCount: number;
+  priceUpdatedAt: string;
+  updatedAt: string;
 }
 
 export interface OutboxItem {
@@ -269,6 +304,8 @@ export interface BookmarkAgentCatalogBookmark {
   url: string;
   path: string[];
   writable: boolean;
+  dateAdded?: number;
+  dateLastUsed?: number;
 }
 
 export interface BookmarkAgentCatalogFolder {
@@ -414,6 +451,78 @@ export interface LibraryScanStatus {
   updatedAt?: string;
   completedAt?: string;
   errors: LibraryScanError[];
+  concurrency?: number;
+  estimatedMinutes?: number;
+  estimatedCostCny?: number;
+  actualInputTokens?: number;
+  actualOutputTokens?: number;
+  actualCachedInputTokens?: number;
+  actualCostCny?: number;
+  pricingUpdatedAt?: string;
+  providerName?: string;
+  model?: string;
+}
+
+export interface LibraryScanEstimate {
+  total: number;
+  aiResourceCount: number;
+  concurrency: number;
+  estimatedMinutes: number;
+  estimatedCostCny?: number;
+  pricingUpdatedAt: string;
+  providerName?: string;
+  model?: string;
+  priceAvailable: boolean;
+}
+
+export type OrganizationProposalKind =
+  | "classify"
+  | "duplicate"
+  | "dead"
+  | "large_folder";
+
+export interface OrganizationProposal {
+  id: string;
+  kind: OrganizationProposalKind;
+  title: string;
+  description: string;
+  destructive: boolean;
+  selectedByDefault: boolean;
+  actions: BookmarkAgentActionProposal[];
+  resourceKeys: string[];
+  beforePaths: string[];
+  afterPath?: string;
+  previewLines: string[];
+}
+
+export interface OrganizationPlan {
+  generatedAt: string;
+  proposalCount: number;
+  actionableCount: number;
+  proposals: OrganizationProposal[];
+}
+
+export interface ReadingQueueItem {
+  nodeId: string;
+  resourceKey: string;
+  title: string;
+  url: string;
+  path: string[];
+  dateAdded?: number;
+  dateLastUsed?: number;
+}
+
+export interface FolderSuggestion {
+  folderId: string;
+  name: string;
+  path: string[];
+  score: number;
+  reason: string;
+}
+
+export interface LibraryInsights {
+  organizationPlan: OrganizationPlan;
+  readingQueue: ReadingQueueItem[];
 }
 
 export interface PageEssence {

@@ -6,9 +6,13 @@ import {
 } from "../lib/cloud";
 import {
   askBookmarkAgent,
-  enrichResourceFromEssence,
+  enrichResourceFromEssenceWithUsage,
   enrichResourceLocally
 } from "../lib/local-ai";
+import {
+  buildLibraryInsights,
+  suggestFolders
+} from "../lib/library-insights";
 import {
   deleteAgentConversation,
   getAgentConversations,
@@ -48,8 +52,22 @@ import { searchLocalResources } from "../lib/search";
 import {
   getAiSettingsStatus,
   getAiRuntimeSettings,
+  getAiProviderPreset,
   saveAiSettings
 } from "../lib/settings";
+import {
+  addScanAiUsage,
+  getAiUsageStats
+} from "../lib/usage-stats";
+import {
+  costCnyForUsage,
+  estimateScanCost
+} from "../lib/ai-cost";
+import { checkLinkHealth } from "../lib/link-health";
+import {
+  DomainRateLimiter,
+  interleaveResourcesByHost
+} from "../lib/scan-scheduler";
 import {
   completeOutboxItem,
   cleanupExpiredUndoSnapshots,
@@ -76,6 +94,8 @@ import {
 import { createPendingSaveDraft } from "../lib/pending-save";
 import type {
   ActiveTabSummary,
+  AiProviderId,
+  AiTokenUsage,
   AppState,
   BookmarkAgentActionExecutionResult,
   BookmarkAgentActionProposal,
@@ -83,6 +103,7 @@ import type {
   BookmarkBarSnapshot,
   ImportResult,
   LibraryScanStatus,
+  LibraryScanEstimate,
   NativeBookmarkNode,
   NativeFolderOption,
   NavigationInput,
@@ -117,11 +138,17 @@ const internalBookmarkTargets = new Set<string>();
 const pendingSaveDrafts = new Map<number, PendingSaveDraft>();
 const pageSnapshotTimers = new Map<number, number>();
 let libraryScanRunning = false;
+const libraryScanRateLimiter = new DomainRateLimiter(1_000);
+const LIBRARY_SCAN_CONCURRENCY = 4;
+const LINK_HEALTH_REFRESH_MS = 7 * 24 * 60 * 60 * 1_000;
 
 interface StoredLibraryScanJob extends LibraryScanStatus {
   resourceKeys: string[];
   nextIndex: number;
   force: boolean;
+  provider?: AiProviderId;
+  actualUsageEstimated?: boolean;
+  usageRecorded?: boolean;
 }
 
 function emptyLibraryScan(): StoredLibraryScanJob {
@@ -137,7 +164,9 @@ function emptyLibraryScan(): StoredLibraryScanJob {
     errors: [],
     resourceKeys: [],
     nextIndex: 0,
-    force: false
+    force: false,
+    actualUsageEstimated: false,
+    usageRecorded: false
   };
 }
 
@@ -148,6 +177,9 @@ function publicLibraryScan(
     resourceKeys: _resourceKeys,
     nextIndex: _nextIndex,
     force: _force,
+    provider: _provider,
+    actualUsageEstimated: _actualUsageEstimated,
+    usageRecorded: _usageRecorded,
     ...status
   } = job;
   return status;
@@ -972,7 +1004,8 @@ async function executeBookmarkAgentAction(
 }
 
 async function prepareAgentUndoBatch(
-  actions: BookmarkAgentActionProposal[]
+  actions: BookmarkAgentActionProposal[],
+  label = `AI 批量操作（${actions.length} 项）`
 ): Promise<UndoSnapshotBatch> {
   const mutations: UndoMutation[] = [];
   for (const action of actions) {
@@ -1012,7 +1045,7 @@ async function prepareAgentUndoBatch(
   }
   const batch = createUndoBatch({
     source: "agent",
-    label: `AI 批量操作（${actions.length} 项）`,
+    label,
     destructive: actions.some((action) => action.destructive),
     mutations
   });
@@ -1021,15 +1054,22 @@ async function prepareAgentUndoBatch(
 }
 
 async function executeBookmarkAgentActions(
-  actions: BookmarkAgentActionProposal[]
+  actions: BookmarkAgentActionProposal[],
+  options: { maxActions?: number; label?: string } = {}
 ): Promise<{
   results: BookmarkAgentActionExecutionResult[];
   batchId?: string;
 }> {
-  if (!Array.isArray(actions) || !actions.length || actions.length > 8) {
+  const maxActions = options.maxActions ?? 8;
+  if (
+    !Array.isArray(actions) ||
+    !actions.length ||
+    actions.length > maxActions ||
+    actions.some((action) => action.status !== "pending")
+  ) {
     throw new Error("没有可执行的已确认操作。");
   }
-  let batch = await prepareAgentUndoBatch(actions);
+  let batch = await prepareAgentUndoBatch(actions, options.label);
   const results: BookmarkAgentActionExecutionResult[] = [];
   for (const action of actions) {
     const mutationIndex = batch.mutations.findIndex(
@@ -1897,20 +1937,96 @@ function needsRepresentativeImageRefresh(
   }
 }
 
-async function startLibraryScan(force = false): Promise<LibraryScanStatus> {
-  const hasAi = Boolean((await getAiRuntimeSettings()).apiKey);
+function needsLinkHealthRefresh(
+  resource: ResourceRecord,
+  referenceTime = Date.now()
+): boolean {
+  if (!resource.linkHealth?.checkedAt) return true;
+  const checkedAt = Date.parse(resource.linkHealth.checkedAt);
+  return (
+    !Number.isFinite(checkedAt) ||
+    referenceTime - checkedAt >= LINK_HEALTH_REFRESH_MS
+  );
+}
+
+async function libraryScanCandidates(force = false) {
+  const runtime = await getAiRuntimeSettings();
+  const hasAi = Boolean(runtime.apiKey);
   await importNativeBookmarks();
-  const resources = (await getLocalResources()).filter(
+  const resources = interleaveResourcesByHost(
+    (await getLocalResources()).filter(
+      (resource) =>
+        resource.nativeBookmarkIds.length > 0 &&
+        (force ||
+          needsLinkHealthRefresh(resource) ||
+          !resource.coverSource ||
+          (hasAi &&
+            (resource.aiStatus !== "ready" ||
+              !resource.summary.trim() ||
+              !resource.tags.length ||
+              !resource.aliases?.length)) ||
+          needsRepresentativeImageRefresh(resource))
+    )
+  );
+  const aiResourceCount = resources.filter(
     (resource) =>
-      resource.nativeBookmarkIds.length > 0 &&
+      hasAi &&
       (force ||
-        !resource.coverSource ||
-        (hasAi &&
-          (resource.aiStatus !== "ready" ||
-            !resource.summary.trim() ||
-            !resource.tags.length ||
-            !resource.aliases?.length)) ||
-        needsRepresentativeImageRefresh(resource))
+        resource.aiStatus !== "ready" ||
+        !resource.summary.trim() ||
+        !resource.tags.length ||
+        !resource.aliases?.length)
+  ).length;
+  return { runtime, resources, aiResourceCount };
+}
+
+async function getLibraryScanEstimate(
+  force = false
+): Promise<LibraryScanEstimate> {
+  const { runtime, resources, aiResourceCount } =
+    await libraryScanCandidates(force);
+  const estimate = estimateScanCost(
+    aiResourceCount,
+    runtime.provider,
+    runtime.model,
+    LIBRARY_SCAN_CONCURRENCY
+  );
+  const networkMinutes = resources.length
+    ? Math.max(
+        1,
+        Math.ceil(
+          (resources.length * 4) /
+            (60 * LIBRARY_SCAN_CONCURRENCY)
+        )
+      )
+    : 0;
+  const priceAvailable = estimate.estimatedCostCny !== null;
+  return {
+    total: resources.length,
+    aiResourceCount,
+    concurrency: LIBRARY_SCAN_CONCURRENCY,
+    estimatedMinutes: Math.max(
+      networkMinutes,
+      estimate.estimatedMinutes
+    ),
+    ...(priceAvailable
+      ? { estimatedCostCny: estimate.estimatedCostCny! }
+      : {}),
+    pricingUpdatedAt: estimate.pricingUpdatedAt,
+    providerName: getAiProviderPreset(runtime.provider).name,
+    model: runtime.model,
+    priceAvailable
+  };
+}
+
+async function startLibraryScan(force = false): Promise<LibraryScanStatus> {
+  const { runtime, resources, aiResourceCount } =
+    await libraryScanCandidates(force);
+  const estimate = estimateScanCost(
+    aiResourceCount,
+    runtime.provider,
+    runtime.model,
+    LIBRARY_SCAN_CONCURRENCY
   );
   const timestamp = now();
   const job: StoredLibraryScanJob = {
@@ -1928,7 +2044,22 @@ async function startLibraryScan(force = false): Promise<LibraryScanStatus> {
     errors: [],
     resourceKeys: resources.map((resource) => resource.resourceKey),
     nextIndex: 0,
-    force
+    force,
+    concurrency: LIBRARY_SCAN_CONCURRENCY,
+    estimatedMinutes: estimate.estimatedMinutes,
+    ...(estimate.estimatedCostCny !== null
+      ? { estimatedCostCny: estimate.estimatedCostCny }
+      : {}),
+    actualInputTokens: 0,
+    actualOutputTokens: 0,
+    actualCachedInputTokens: 0,
+    actualCostCny: 0,
+    pricingUpdatedAt: estimate.pricingUpdatedAt,
+    provider: runtime.provider,
+    providerName: getAiProviderPreset(runtime.provider).name,
+    model: runtime.model,
+    actualUsageEstimated: false,
+    usageRecorded: false
   };
   await setStoredLibraryScan(job);
   if (resources.length) {
@@ -1975,38 +2106,271 @@ async function updateLibraryScanState(
   return publicLibraryScan(next);
 }
 
-async function recordScanResult(
-  job: StoredLibraryScanJob,
+interface ScanResourceResult {
+  resource: ResourceRecord;
+  outcome: "succeeded" | "failed" | "skipped";
+  message?: string;
+  usage?: AiTokenUsage;
+}
+
+function removedResourcePlaceholder(resourceKey: string): ResourceRecord {
+  return {
+    resourceKey,
+    canonicalUrl: "",
+    url: "",
+    title: "已移除的书签",
+    userNote: "",
+    summary: "",
+    tags: [],
+    topics: [],
+    contentExcerpt: "",
+    contentHash: "",
+    selectedText: "",
+    author: "",
+    siteName: "",
+    language: "",
+    imageUrl: "",
+    faviconUrl: "",
+    nativeBookmarkIds: [],
+    nativeFolderPath: [],
+    aiStatus: "not_requested",
+    syncStatus: "local",
+    createdAt: now(),
+    updatedAt: now()
+  };
+}
+
+async function scanOneLibraryResource(
   resource: ResourceRecord,
-  outcome: "succeeded" | "failed" | "skipped",
-  message = ""
+  job: StoredLibraryScanJob
+): Promise<ScanResourceResult> {
+  if (isInternalOrSensitiveUrl(resource.url)) {
+    return {
+      resource,
+      outcome: "skipped",
+      message: "内部或受保护网址不会发起网络请求。"
+    };
+  }
+  const runtime = await getAiRuntimeSettings();
+  const needsAi =
+    Boolean(runtime.apiKey) &&
+    (job.force ||
+      resource.aiStatus !== "ready" ||
+      !resource.summary.trim() ||
+      !resource.tags.length ||
+      !resource.aliases?.length);
+  let scannedResource: ResourceRecord = {
+    ...resource,
+    aiStatus: needsAi ? "processing" : resource.aiStatus,
+    updatedAt: now()
+  };
+  await upsertLocalResource(scannedResource);
+  try {
+    const linkHealth = await checkLinkHealth(
+      resource.url,
+      resource.linkHealth
+    );
+    scannedResource = {
+      ...scannedResource,
+      linkHealth,
+      updatedAt: now()
+    };
+    await upsertLocalResource(scannedResource);
+    if (
+      ["dead", "soft_404", "login_required", "temporary"].includes(
+        linkHealth.status
+      )
+    ) {
+      scannedResource = {
+        ...scannedResource,
+        aiStatus: resource.aiStatus,
+        updatedAt: now()
+      };
+      await upsertLocalResource(scannedResource);
+      return { resource: scannedResource, outcome: "succeeded" };
+    }
+
+    const essence = await pageEssenceForResource(resource);
+    const siteBrand = await scanSiteBrand(resource, essence, job.force);
+    const coverRule = matchCoverRule(resource.url);
+    const registryPageImage = resolveRuleAsset(
+      resource.url,
+      "pageImage"
+    );
+    let thumbnailDataUrl = resource.thumbnailDataUrl || "";
+    let representativeImageUrl =
+      coverRule?.skipPageImage || siteBrand?.skipPageImage
+        ? ""
+        : registryPageImage || essence.imageUrl || resource.imageUrl;
+    const commonPageImage =
+      representativeImageUrl &&
+      !registryPageImage &&
+      (await registerPageImageSample(resource, representativeImageUrl));
+    if (commonPageImage) representativeImageUrl = "";
+    const coverSource = commonPageImage
+      ? "category:common-banner"
+      : coverRule?.skipPageImage || siteBrand?.skipPageImage
+        ? `category:${coverRule?.id || "common-banner"}`
+        : registryPageImage
+          ? `registry:${coverRule?.id || "page-image"}`
+          : representativeImageUrl
+            ? "page-metadata"
+            : "category";
+    if (
+      representativeImageUrl &&
+      (!thumbnailDataUrl ||
+        resource.imageUrl !== representativeImageUrl ||
+        job.force)
+    ) {
+      try {
+        thumbnailDataUrl = await cacheRepresentativeImage(
+          representativeImageUrl
+        );
+      } catch {
+        // 原图仍作为备用；个别站点防盗链不应让整条扫描失败。
+      }
+    }
+    scannedResource = {
+      ...scannedResource,
+      imageUrl: representativeImageUrl,
+      faviconUrl: essence.faviconUrl || resource.faviconUrl,
+      coverSource,
+      coverUpdatedAt: now(),
+      ...(thumbnailDataUrl ? { thumbnailDataUrl } : {})
+    };
+    await upsertLocalResource(scannedResource);
+
+    const enrichment = needsAi
+      ? await enrichResourceFromEssenceWithUsage(scannedResource, essence)
+      : null;
+    const enriched = enrichment?.resource || scannedResource;
+    const auth = await getAuthState();
+    const nextResource: ResourceRecord = {
+      ...enriched,
+      categoryCoverId: categoryCoverForResource(enriched),
+      syncStatus: auth.configured ? "pending" : enriched.syncStatus
+    };
+    await upsertLocalResource(nextResource);
+    if (auth.configured) {
+      await enqueueOutbox(nextResource, nextResource.contentExcerpt);
+      void syncPendingIfReady();
+    }
+    return {
+      resource: nextResource,
+      outcome: "succeeded",
+      ...(enrichment ? { usage: enrichment.usage } : {})
+    };
+  } catch (error) {
+    await upsertLocalResource({
+      ...scannedResource,
+      aiStatus: needsAi ? "failed" : scannedResource.aiStatus,
+      updatedAt: now()
+    });
+    return {
+      resource,
+      outcome: "failed",
+      message: errorMessage(error)
+    };
+  }
+}
+
+async function recordScanBatchResults(
+  results: ScanResourceResult[]
 ): Promise<StoredLibraryScanJob> {
+  const job = await getStoredLibraryScan();
   const timestamp = now();
+  const usage = results.reduce<AiTokenUsage>(
+    (total, result) => ({
+      inputTokens: total.inputTokens + (result.usage?.inputTokens || 0),
+      outputTokens: total.outputTokens + (result.usage?.outputTokens || 0),
+      cachedInputTokens:
+        total.cachedInputTokens +
+        (result.usage?.cachedInputTokens || 0),
+      estimated: total.estimated || Boolean(result.usage?.estimated)
+    }),
+    {
+      inputTokens: 0,
+      outputTokens: 0,
+      cachedInputTokens: 0,
+      estimated: false
+    }
+  );
+  const batchCost =
+    job.provider && job.model
+      ? costCnyForUsage(job.provider, job.model, usage) || 0
+      : 0;
+  const nextIndex = Math.min(
+    job.resourceKeys.length,
+    job.nextIndex + results.length
+  );
   const next: StoredLibraryScanJob = {
     ...job,
-    nextIndex: job.nextIndex + 1,
-    processed: job.processed + 1,
-    succeeded: job.succeeded + (outcome === "succeeded" ? 1 : 0),
-    failed: job.failed + (outcome === "failed" ? 1 : 0),
-    skipped: job.skipped + (outcome === "skipped" ? 1 : 0),
+    nextIndex,
+    processed: job.processed + results.length,
+    succeeded:
+      job.succeeded +
+      results.filter((result) => result.outcome === "succeeded").length,
+    failed:
+      job.failed +
+      results.filter((result) => result.outcome === "failed").length,
+    skipped:
+      job.skipped +
+      results.filter((result) => result.outcome === "skipped").length,
+    actualInputTokens: (job.actualInputTokens || 0) + usage.inputTokens,
+    actualOutputTokens:
+      (job.actualOutputTokens || 0) + usage.outputTokens,
+    actualCachedInputTokens:
+      (job.actualCachedInputTokens || 0) + usage.cachedInputTokens,
+    actualCostCny: Number(
+      ((job.actualCostCny || 0) + batchCost).toFixed(4)
+    ),
+    actualUsageEstimated:
+      job.actualUsageEstimated || usage.estimated,
     currentTitle: "",
     updatedAt: timestamp,
-    errors:
-      message && outcome !== "succeeded"
-        ? [
-            ...job.errors,
-            {
-              resourceKey: resource.resourceKey,
-              title: resource.title,
-              message
-            }
-          ].slice(-20)
-        : job.errors
+    errors: [
+      ...job.errors,
+      ...results.flatMap((result) =>
+        result.message && result.outcome !== "succeeded"
+          ? [
+              {
+                resourceKey: result.resource.resourceKey,
+                title: result.resource.title,
+                message: result.message
+              }
+            ]
+          : []
+      )
+    ].slice(-20)
   };
-  if (next.nextIndex >= next.resourceKeys.length) {
+  if (nextIndex >= next.resourceKeys.length && next.state !== "cancelled") {
     next.state = "completed";
     next.completedAt = timestamp;
   }
+  await setStoredLibraryScan(next);
+  return next;
+}
+
+async function finalizeLibraryScanUsage(
+  job: StoredLibraryScanJob
+): Promise<StoredLibraryScanJob> {
+  const totalTokens =
+    (job.actualInputTokens || 0) + (job.actualOutputTokens || 0);
+  if (
+    job.usageRecorded ||
+    !job.provider ||
+    !job.model ||
+    totalTokens === 0
+  ) {
+    return job;
+  }
+  await addScanAiUsage(job.provider, job.model, {
+    inputTokens: job.actualInputTokens || 0,
+    outputTokens: job.actualOutputTokens || 0,
+    cachedInputTokens: job.actualCachedInputTokens || 0,
+    estimated: Boolean(job.actualUsageEstimated)
+  });
+  const next = { ...job, usageRecorded: true, updatedAt: now() };
   await setStoredLibraryScan(next);
   return next;
 }
@@ -2027,153 +2391,45 @@ async function runLibraryScan(): Promise<void> {
           updatedAt: now()
         };
         await setStoredLibraryScan(job);
+        await finalizeLibraryScanUsage(job).catch(() => job);
         break;
       }
 
-      const resourceKey = job.resourceKeys[job.nextIndex];
-      const resource = await getLocalResource(resourceKey);
-      if (!resource || !resource.nativeBookmarkIds.length) {
-        const placeholder: ResourceRecord = {
-          resourceKey,
-          canonicalUrl: "",
-          url: "",
-          title: "已移除的书签",
-          userNote: "",
-          summary: "",
-          tags: [],
-          topics: [],
-          contentExcerpt: "",
-          contentHash: "",
-          selectedText: "",
-          author: "",
-          siteName: "",
-          language: "",
-          imageUrl: "",
-          faviconUrl: "",
-          nativeBookmarkIds: [],
-          nativeFolderPath: [],
-          aiStatus: "not_requested",
-          syncStatus: "local",
-          createdAt: now(),
-          updatedAt: now()
-        };
-        await recordScanResult(job, placeholder, "skipped", "书签已被移除。");
-        continue;
-      }
-
-      job = { ...job, currentTitle: resource.title, updatedAt: now() };
-      await setStoredLibraryScan(job);
-      if (isInternalOrSensitiveUrl(resource.url)) {
-        await recordScanResult(
-          job,
-          resource,
-          "skipped",
-          "内部或受保护网址未发送给 AI。"
-        );
-        continue;
-      }
-
-      const hasAi = Boolean((await getAiRuntimeSettings()).apiKey);
-      const needsAi =
-        hasAi &&
-        (job.force ||
-          resource.aiStatus !== "ready" ||
-          !resource.summary.trim() ||
-          !resource.tags.length ||
-          !resource.aliases?.length);
-      let scannedResource: ResourceRecord = {
-        ...resource,
-        aiStatus: needsAi ? "processing" : resource.aiStatus,
+      const keys = job.resourceKeys.slice(
+        job.nextIndex,
+        job.nextIndex + LIBRARY_SCAN_CONCURRENCY
+      );
+      const resources = await Promise.all(
+        keys.map((resourceKey) => getLocalResource(resourceKey))
+      );
+      job = {
+        ...job,
+        currentTitle:
+          keys.length === 1
+            ? resources[0]?.title || "检查书签"
+            : `并行处理 ${keys.length} 条收藏`,
         updatedAt: now()
       };
-      await upsertLocalResource(scannedResource);
-      try {
-        const essence = await pageEssenceForResource(resource);
-        const siteBrand = await scanSiteBrand(
-          resource,
-          essence,
-          job.force
-        );
-        const coverRule = matchCoverRule(resource.url);
-        const registryPageImage = resolveRuleAsset(
-          resource.url,
-          "pageImage"
-        );
-        let thumbnailDataUrl = resource.thumbnailDataUrl || "";
-        let representativeImageUrl =
-          coverRule?.skipPageImage || siteBrand?.skipPageImage
-            ? ""
-            : registryPageImage ||
-              essence.imageUrl ||
-              resource.imageUrl;
-        const commonPageImage =
-          representativeImageUrl &&
-          !registryPageImage &&
-          (await registerPageImageSample(
-            resource,
-            representativeImageUrl
-          ));
-        if (commonPageImage) representativeImageUrl = "";
-        const coverSource = commonPageImage
-          ? "category:common-banner"
-          : coverRule?.skipPageImage || siteBrand?.skipPageImage
-          ? `category:${coverRule?.id || "common-banner"}`
-          : registryPageImage
-            ? `registry:${coverRule?.id || "page-image"}`
-            : representativeImageUrl
-              ? "page-metadata"
-              : "category";
-        if (
-          representativeImageUrl &&
-          (!thumbnailDataUrl ||
-            resource.imageUrl !== representativeImageUrl ||
-            job.force)
-        ) {
-          try {
-            thumbnailDataUrl = await cacheRepresentativeImage(
-              representativeImageUrl
-            );
-          } catch {
-            // 原图仍会保存为备用；个别站点防盗链不应让整条扫描失败。
+      await setStoredLibraryScan(job);
+      const results = await Promise.all(
+        keys.map(async (resourceKey, index): Promise<ScanResourceResult> => {
+          const resource = resources[index];
+          if (!resource || !resource.nativeBookmarkIds.length) {
+            return {
+              resource: removedResourcePlaceholder(resourceKey),
+              outcome: "skipped",
+              message: "书签已被移除。"
+            };
           }
-        }
-        scannedResource = {
-          ...scannedResource,
-          imageUrl: representativeImageUrl,
-          faviconUrl: essence.faviconUrl || resource.faviconUrl,
-          coverSource,
-          coverUpdatedAt: now(),
-          ...(thumbnailDataUrl ? { thumbnailDataUrl } : {})
-        };
-        await upsertLocalResource(scannedResource);
-
-        const enriched = needsAi
-          ? await enrichResourceFromEssence(scannedResource, essence)
-          : scannedResource;
-        const auth = await getAuthState();
-        const nextResource: ResourceRecord = {
-          ...enriched,
-          categoryCoverId: categoryCoverForResource(enriched),
-          syncStatus: auth.configured ? "pending" : enriched.syncStatus
-        };
-        await upsertLocalResource(nextResource);
-        if (auth.configured) {
-          await enqueueOutbox(nextResource, nextResource.contentExcerpt);
-          void syncPendingIfReady();
-        }
-        await recordScanResult(job, resource, "succeeded");
-      } catch (error) {
-        await upsertLocalResource({
-          ...scannedResource,
-          aiStatus: needsAi ? "failed" : scannedResource.aiStatus,
-          updatedAt: now()
-        });
-        await recordScanResult(
-          job,
-          resource,
-          "failed",
-          errorMessage(error)
-        );
+          return libraryScanRateLimiter.run(resource.url, () =>
+            scanOneLibraryResource(resource, job)
+          );
+        })
+      );
+      job = await recordScanBatchResults(results);
+      if (job.state === "completed") {
+        await finalizeLibraryScanUsage(job).catch(() => job);
+        break;
       }
     }
   } catch (error) {
@@ -2519,7 +2775,13 @@ function buildBookmarkAgentCatalog(
         title: node.title || node.url,
         url: node.url,
         path: parentPath,
-        writable: node.unmodifiable !== "managed"
+        writable: node.unmodifiable !== "managed",
+        ...(typeof node.dateAdded === "number"
+          ? { dateAdded: node.dateAdded }
+          : {}),
+        ...(typeof node.dateLastUsed === "number"
+          ? { dateLastUsed: node.dateLastUsed }
+          : {})
       });
       return;
     }
@@ -2546,6 +2808,33 @@ function buildBookmarkAgentCatalog(
     visit(root, []);
   }
   return catalog;
+}
+
+async function getLibraryInsights() {
+  await importNativeBookmarks();
+  const [resources, tree] = await Promise.all([
+    getLocalResources(),
+    chrome.bookmarks.getTree()
+  ]);
+  return buildLibraryInsights(
+    resources.filter((resource) => resource.nativeBookmarkIds.length > 0),
+    buildBookmarkAgentCatalog(tree)
+  );
+}
+
+async function getFolderSuggestions(
+  capture: import("../lib/types").PageCapture
+) {
+  await importNativeBookmarks();
+  const [resources, folders] = await Promise.all([
+    getLocalResources(),
+    getFolderOptions()
+  ]);
+  return suggestFolders(
+    capture,
+    resources.filter((resource) => resource.nativeBookmarkIds.length > 0),
+    folders
+  );
 }
 
 async function askAgent(
@@ -2638,12 +2927,21 @@ async function handleRequest(request: ExtensionRequest): Promise<unknown> {
       return getFolderOptions();
     case "CAPTURE_ACTIVE_PAGE":
       return captureActivePage();
+    case "GET_FOLDER_SUGGESTIONS":
+      return getFolderSuggestions(request.capture);
     case "SAVE_BOOKMARK":
       return saveBookmark(request.payload);
     case "ASK_BOOKMARK_AGENT":
       return askAgent(request.query, request.history);
     case "EXECUTE_BOOKMARK_AGENT_ACTIONS":
       return executeBookmarkAgentActions(request.actions);
+    case "GET_LIBRARY_INSIGHTS":
+      return getLibraryInsights();
+    case "APPLY_ORGANIZATION_ACTIONS":
+      return executeBookmarkAgentActions(request.actions, {
+        maxActions: 200,
+        label: `整理提案（${request.actions.length} 项）`
+      });
     case "GET_UNDO_SNAPSHOTS":
       return getRecentUndoSnapshots();
     case "UNDO_BOOKMARK_BATCH":
@@ -2666,8 +2964,12 @@ async function handleRequest(request: ExtensionRequest): Promise<unknown> {
       return { deleted: true };
     case "START_LIBRARY_SCAN":
       return startLibraryScan(Boolean(request.force));
+    case "GET_LIBRARY_SCAN_ESTIMATE":
+      return getLibraryScanEstimate(Boolean(request.force));
     case "GET_LIBRARY_SCAN":
       return publicLibraryScan(await getStoredLibraryScan());
+    case "GET_AI_USAGE":
+      return getAiUsageStats();
     case "PAUSE_LIBRARY_SCAN":
       return updateLibraryScanState("paused");
     case "RESUME_LIBRARY_SCAN":

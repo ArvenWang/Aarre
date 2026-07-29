@@ -1,5 +1,6 @@
 import type {
   AiSettingsStatus,
+  AiUsageStats,
   BookmarkAgentActionExecutionResult,
   BookmarkAgentActionProposal,
   AgentConversation,
@@ -16,6 +17,9 @@ import type {
   PendingSaveDraft,
   PageCapture,
   PageSnapshot,
+  FolderSuggestion,
+  LibraryInsights,
+  LibraryScanEstimate,
   LibraryScanStatus,
   ResourceRecord,
   RestoreResult,
@@ -37,6 +41,7 @@ export type ExtensionRequest =
   | { type: "NAVIGATE"; payload: NavigationInput }
   | { type: "GET_FOLDERS" }
   | { type: "CAPTURE_ACTIVE_PAGE" }
+  | { type: "GET_FOLDER_SUGGESTIONS"; capture: PageCapture }
   | { type: "SAVE_BOOKMARK"; payload: SaveBookmarkInput }
   | {
       type: "ASK_BOOKMARK_AGENT";
@@ -45,6 +50,11 @@ export type ExtensionRequest =
     }
   | {
       type: "EXECUTE_BOOKMARK_AGENT_ACTIONS";
+      actions: BookmarkAgentActionProposal[];
+    }
+  | { type: "GET_LIBRARY_INSIGHTS" }
+  | {
+      type: "APPLY_ORGANIZATION_ACTIONS";
       actions: BookmarkAgentActionProposal[];
     }
   | { type: "GET_UNDO_SNAPSHOTS" }
@@ -56,7 +66,9 @@ export type ExtensionRequest =
   | { type: "SAVE_AGENT_CONVERSATION"; conversation: AgentConversation }
   | { type: "DELETE_AGENT_CONVERSATION"; id: string }
   | { type: "START_LIBRARY_SCAN"; force?: boolean }
+  | { type: "GET_LIBRARY_SCAN_ESTIMATE"; force?: boolean }
   | { type: "GET_LIBRARY_SCAN" }
+  | { type: "GET_AI_USAGE" }
   | { type: "PAUSE_LIBRARY_SCAN" }
   | { type: "RESUME_LIBRARY_SCAN" }
   | { type: "CANCEL_LIBRARY_SCAN" }
@@ -98,9 +110,15 @@ export type ResponseDataByRequest = {
   NAVIGATE: { opened: true };
   GET_FOLDERS: NativeFolderOption[];
   CAPTURE_ACTIVE_PAGE: PageCapture;
+  GET_FOLDER_SUGGESTIONS: FolderSuggestion[];
   SAVE_BOOKMARK: SaveBookmarkResult;
   ASK_BOOKMARK_AGENT: BookmarkAgentResponse;
   EXECUTE_BOOKMARK_AGENT_ACTIONS: {
+    results: BookmarkAgentActionExecutionResult[];
+    batchId?: string;
+  };
+  GET_LIBRARY_INSIGHTS: LibraryInsights;
+  APPLY_ORGANIZATION_ACTIONS: {
     results: BookmarkAgentActionExecutionResult[];
     batchId?: string;
   };
@@ -113,7 +131,9 @@ export type ResponseDataByRequest = {
   SAVE_AGENT_CONVERSATION: AgentConversation;
   DELETE_AGENT_CONVERSATION: { deleted: true };
   START_LIBRARY_SCAN: LibraryScanStatus;
+  GET_LIBRARY_SCAN_ESTIMATE: LibraryScanEstimate;
   GET_LIBRARY_SCAN: LibraryScanStatus;
+  GET_AI_USAGE: AiUsageStats;
   PAUSE_LIBRARY_SCAN: LibraryScanStatus;
   RESUME_LIBRARY_SCAN: LibraryScanStatus;
   CANCEL_LIBRARY_SCAN: LibraryScanStatus;
