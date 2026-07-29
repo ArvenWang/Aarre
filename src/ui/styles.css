@@ -82,7 +82,7 @@ a {
 
 .eyebrow {
   margin: 0 0 3px;
-  color: #73766d;
+  color: #62665e;
   font-size: 10px;
   font-weight: 750;
   letter-spacing: 0.14em;
@@ -951,9 +951,9 @@ a {
   padding: 4px 7px;
   border: 1px solid #dadbd3;
   border-radius: 999px;
-  color: #74776f;
+  color: #60645c;
   background: rgba(255, 255, 255, 0.58);
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 750;
 }
 
@@ -978,8 +978,8 @@ a {
 }
 
 .icon-button {
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 38px;
   display: grid;
   place-items: center;
   border: 1px solid transparent;
@@ -1041,12 +1041,12 @@ a {
 }
 
 .omnibox-shell input::placeholder {
-  color: #8c9087;
+  color: #6f746b;
 }
 
 .clear-query {
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  height: 32px;
   border-radius: 8px;
   font-size: 17px;
 }
@@ -1100,7 +1100,7 @@ a {
 
 .bookmark-root-heading {
   width: 100%;
-  min-height: 32px;
+  min-height: 36px;
   padding: 5px 8px;
   display: flex;
   align-items: center;
@@ -1146,8 +1146,8 @@ a {
 }
 
 .bookmark-root-heading small {
-  color: #969990;
-  font-size: 8px;
+  color: #5f635b;
+  font-size: 9px;
 }
 
 .bookmark-row {
@@ -1236,13 +1236,13 @@ a {
 
 .bookmark-copy small {
   margin-top: 2px;
-  color: #8a8e85;
-  font-size: 8px;
+  color: #62675e;
+  font-size: 9px;
 }
 
 .row-menu {
-  width: 29px;
-  height: 29px;
+  width: 32px;
+  height: 32px;
   margin-right: 2px;
   display: grid;
   place-items: center;
@@ -1323,8 +1323,8 @@ a {
 
 .suggestion-copy small {
   margin-top: 3px;
-  color: #8a8d85;
-  font-size: 8px;
+  color: #62675e;
+  font-size: 9px;
 }
 
 .suggestion-open {
@@ -1384,8 +1384,8 @@ a {
 }
 
 .native-footer div {
-  color: #878a82;
-  font-size: 8px;
+  color: #62675e;
+  font-size: 9px;
 }
 
 .native-footer div strong {
@@ -1434,16 +1434,17 @@ a {
 }
 
 .native-account-summary strong {
-  font-size: 8px;
+  font-size: 9px;
 }
 
 .native-account-summary small {
   margin-top: 2px;
-  color: #90938b;
-  font-size: 7px;
+  color: #64685f;
+  font-size: 9px;
 }
 
 .native-footer > button {
+  min-height: 32px;
   padding: 5px 0;
   border: 0;
   color: #46543a;
@@ -1493,8 +1494,8 @@ a {
 }
 
 .dialog-close {
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   border-radius: 9px;
   font-size: 20px;
 }
@@ -1566,8 +1567,8 @@ a {
 
 .native-check small {
   margin-top: 2px;
-  color: #777c72;
-  font-size: 8px;
+  color: #62675e;
+  font-size: 9px;
 }
 
 .dialog-warning {
@@ -1602,6 +1603,44 @@ a {
   font-weight: 700;
 }
 
+.delete-confirmation {
+  max-width: 55%;
+}
+
+.delete-confirmation p {
+  margin: 0 0 7px;
+  color: #84362f;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.danger-button[data-confirming="true"] {
+  padding: 8px 10px;
+  border-radius: 9px;
+  color: #fff;
+  background: #a13d35;
+}
+
 .dialog-loading {
   min-height: 150px;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #416f27;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }

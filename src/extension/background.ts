@@ -11,11 +11,12 @@ import type {
 } from "../lib/messages";
 import { searchLocalResources } from "../lib/search";
 import {
+  completeOutboxItem,
+  deferOutboxItem,
   enqueueOutbox,
   getLocalResource,
   getLocalResources,
   getOutbox,
-  removeOutboxItem,
   upsertLocalResource
 } from "../lib/storage";
 import {
@@ -32,6 +33,7 @@ import type {
   NativeFolderOption,
   NavigationInput,
   NavigationSuggestion,
+  OutboxItem,
   PendingSaveDraft,
   PageCapture,
   ResourceRecord,
@@ -535,20 +537,22 @@ async function findOrCreateNativeBookmark(
 }
 
 async function tryImmediateSync(
-  resource: ResourceRecord,
-  content: string
+  item: OutboxItem
 ): Promise<ResourceRecord> {
   const auth = await getAuthState();
   if (!auth.configured || !auth.signedIn || auth.accountMatches !== true) {
-    return resource;
+    return item.resource;
   }
 
   try {
-    const synced = await syncOneResource(resource, content);
-    await removeOutboxItem(resource.resourceKey);
+    const synced = await syncOneResource(item.resource, item.content);
+    await completeOutboxItem(item);
     return synced;
-  } catch {
-    return (await getLocalResource(resource.resourceKey)) || resource;
+  } catch (error) {
+    await deferOutboxItem(item, errorMessage(error));
+    return (
+      (await getLocalResource(item.resource.resourceKey)) || item.resource
+    );
   }
 }
 
@@ -611,14 +615,11 @@ async function saveBookmark(
   };
 
   await upsertLocalResource(resource);
-  await enqueueOutbox(
+  const queued = await enqueueOutbox(
     resource,
     input.requestAi ? input.capture.content : ""
   );
-  const synced = await tryImmediateSync(
-    resource,
-    input.requestAi ? input.capture.content : ""
-  );
+  const synced = await tryImmediateSync(queued);
 
   return {
     resource: synced,
@@ -950,7 +951,7 @@ async function drainOutbox(maxBatches = 50): Promise<{
     const result = await processOutbox();
     synced += result.synced;
     failed += result.failed;
-    if (result.synced === 0) break;
+    if (result.attempted === 0) break;
   }
 
   return { synced, failed };
@@ -1083,7 +1084,7 @@ async function handleRequest(request: ExtensionRequest): Promise<unknown> {
       return { opened: true };
     case "AUTH_CHANGED":
       try {
-        await processOutbox();
+        await drainOutbox();
         await pullCloudResources();
       } catch {
         // The returned state gives the UI the actionable error boundary.
@@ -1132,7 +1133,9 @@ chrome.runtime.onInstalled.addListener(() => {
       })
     ])
   );
-  void importNativeBookmarks().then(() => syncPendingIfReady());
+  void importNativeBookmarks()
+    .then(() => syncPendingIfReady())
+    .catch(() => undefined);
   void chrome.omnibox.setDefaultSuggestion({
     description:
       "搜索 Chrome 书签、历史记录和标签页，或使用默认搜索引擎"
@@ -1257,13 +1260,15 @@ chrome.bookmarks.onRemoved.addListener((id) => {
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  void importNativeBookmarks().then(() => syncPendingIfReady());
-  void getAuthState().then((auth) => {
+  void (async () => {
+    await importNativeBookmarks();
+    const auth = await getAuthState();
     if (auth.signedIn && auth.accountMatches === true) {
-      void processOutbox();
-      void pullCloudResources();
+      // 先提交本地变更，再拉取云端，避免旧云端数据覆盖待同步状态。
+      await drainOutbox();
+      await pullCloudResources();
     }
-  });
+  })().catch(() => undefined);
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {

@@ -5,9 +5,7 @@ import {
 } from "idb";
 import type { OutboxItem, ResourceRecord } from "./types";
 
-const MAX_METADATA_ONLY_OUTBOX_ITEMS = 2_000;
-const MAX_CONTENT_OUTBOX_ITEMS = 50;
-const MAX_OUTBOX_CONTENT_LENGTH = 30_000;
+const MAX_OUTBOX_CONTENT_LENGTH = 50_000;
 
 interface BookmarkLayerDatabase extends DBSchema {
   resources: {
@@ -78,9 +76,12 @@ export async function mergeLocalResources(
 
   for (const item of incoming) {
     const local = await transaction.store.get(item.resourceKey);
+    const preservePendingLocal =
+      local?.syncStatus === "pending" &&
+      local.updatedAt >= item.updatedAt;
     await transaction.store.put({
-      ...local,
       ...item,
+      ...(preservePendingLocal ? local : {}),
       nativeBookmarkIds:
         local?.nativeBookmarkIds.length && !item.nativeBookmarkIds.length
           ? local.nativeBookmarkIds
@@ -94,37 +95,27 @@ export async function mergeLocalResources(
 
 export async function getOutbox(): Promise<OutboxItem[]> {
   const db = await database();
-  return (await db.getAllFromIndex("outbox", "by-queued-at")).reverse();
+  return db.getAllFromIndex("outbox", "by-queued-at");
 }
 
 export async function enqueueOutbox(
   resource: ResourceRecord,
   content: string
-): Promise<void> {
+): Promise<OutboxItem> {
   const db = await database();
-  await db.put("outbox", {
+  const existing = await db.get("outbox", resource.resourceKey);
+  const nextContent = content
+    ? content.slice(0, MAX_OUTBOX_CONTENT_LENGTH)
+    : existing?.content || "";
+  const nextItem: OutboxItem = {
+    revision: crypto.randomUUID(),
     resource,
-    content: content.slice(0, MAX_OUTBOX_CONTENT_LENGTH),
+    content: nextContent,
     attempts: 0,
-    queuedAt: new Date().toISOString()
-  });
-  await trimOutbox();
-}
-
-export async function updateOutbox(items: OutboxItem[]): Promise<void> {
-  const contentItems = items
-    .filter((item) => item.content.length > 0)
-    .slice(0, MAX_CONTENT_OUTBOX_ITEMS);
-  const metadataItems = items
-    .filter((item) => item.content.length === 0)
-    .slice(0, MAX_METADATA_ONLY_OUTBOX_ITEMS);
-  const db = await database();
-  const transaction = db.transaction("outbox", "readwrite");
-  await transaction.store.clear();
-  for (const item of [...contentItems, ...metadataItems]) {
-    await transaction.store.put(item);
-  }
-  await transaction.done;
+    queuedAt: existing?.queuedAt || new Date().toISOString()
+  };
+  await db.put("outbox", nextItem);
+  return nextItem;
 }
 
 export async function removeOutboxItem(resourceKey: string): Promise<void> {
@@ -132,17 +123,65 @@ export async function removeOutboxItem(resourceKey: string): Promise<void> {
   await db.delete("outbox", resourceKey);
 }
 
-async function trimOutbox(): Promise<void> {
-  const current = await getOutbox();
-  const contentCount = current.filter((item) => item.content.length > 0).length;
-  const metadataCount = current.length - contentCount;
-
-  if (
-    contentCount > MAX_CONTENT_OUTBOX_ITEMS ||
-    metadataCount > MAX_METADATA_ONLY_OUTBOX_ITEMS
-  ) {
-    await updateOutbox(current);
+function sameOutboxRevision(
+  current: OutboxItem,
+  expected: OutboxItem
+): boolean {
+  if (current.revision && expected.revision) {
+    return current.revision === expected.revision;
   }
+
+  return (
+    current.resource.updatedAt === expected.resource.updatedAt &&
+    current.content === expected.content &&
+    current.queuedAt === expected.queuedAt &&
+    current.attempts === expected.attempts
+  );
+}
+
+export async function completeOutboxItem(
+  expected: OutboxItem
+): Promise<boolean> {
+  const db = await database();
+  const transaction = db.transaction("outbox", "readwrite");
+  const current = await transaction.store.get(expected.resource.resourceKey);
+  if (!current || !sameOutboxRevision(current, expected)) {
+    await transaction.done;
+    return false;
+  }
+
+  await transaction.store.delete(expected.resource.resourceKey);
+  await transaction.done;
+  return true;
+}
+
+export async function deferOutboxItem(
+  expected: OutboxItem,
+  error: string,
+  failedAt = new Date()
+): Promise<boolean> {
+  const db = await database();
+  const transaction = db.transaction("outbox", "readwrite");
+  const current = await transaction.store.get(expected.resource.resourceKey);
+  if (!current || !sameOutboxRevision(current, expected)) {
+    await transaction.done;
+    return false;
+  }
+
+  const attempts = current.attempts + 1;
+  const retryDelayMinutes = Math.min(5 * 2 ** (attempts - 1), 6 * 60);
+  await transaction.store.put({
+    ...current,
+    revision: crypto.randomUUID(),
+    attempts,
+    lastAttemptAt: failedAt.toISOString(),
+    nextAttemptAt: new Date(
+      failedAt.getTime() + retryDelayMinutes * 60_000
+    ).toISOString(),
+    lastError: error
+  });
+  await transaction.done;
+  return true;
 }
 
 export const chromeStorageAdapter = {

@@ -113,10 +113,13 @@ export interface ResourceRecord {
 }
 
 export interface OutboxItem {
+  revision: string;
   resource: ResourceRecord;
   content: string;
   attempts: number;
   queuedAt: string;
+  lastAttemptAt?: string;
+  nextAttemptAt?: string;
   lastError?: string;
 }
 

@@ -1,13 +1,14 @@
 import { getAuthState } from "./auth";
 import {
+  completeOutboxItem,
+  deferOutboxItem,
+  getLocalResource,
   getOutbox,
   mergeLocalResources,
-  updateOutbox,
   upsertLocalResource
 } from "./storage";
 import { getSupabase } from "./supabase";
 import type {
-  OutboxItem,
   ResourceRecord,
   SearchResult
 } from "./types";
@@ -80,6 +81,32 @@ function mutableFields(resource: ResourceRecord) {
     native_folder_path: resource.nativeFolderPath,
     updated_at: new Date().toISOString()
   };
+}
+
+async function persistIfCurrent(
+  source: ResourceRecord,
+  result: ResourceRecord
+): Promise<ResourceRecord> {
+  const current = await getLocalResource(source.resourceKey);
+  const mutationFingerprint = (resource: ResourceRecord) =>
+    JSON.stringify([
+      resource.updatedAt,
+      resource.url,
+      resource.title,
+      resource.userNote,
+      resource.contentHash,
+      resource.selectedText,
+      resource.nativeBookmarkIds,
+      resource.nativeFolderPath
+    ]);
+  if (
+    current &&
+    mutationFingerprint(current) !== mutationFingerprint(source)
+  ) {
+    return current;
+  }
+  await upsertLocalResource(result);
+  return result;
 }
 
 async function assertCloudSession() {
@@ -180,11 +207,11 @@ export async function syncOneResource(
 
     if (error) {
       const failed = {
-        ...fromCloudRow(row),
+        ...resource,
         aiStatus: "failed" as const,
-        syncStatus: "synced" as const
+        syncStatus: "pending" as const
       };
-      await upsertLocalResource(failed);
+      await persistIfCurrent(resource, failed);
       throw new Error(`书签已同步，但 AI 处理失败：${error.message}`);
     }
 
@@ -200,8 +227,7 @@ export async function syncOneResource(
     syncStatus: "synced" as const,
     lastSyncedAt: new Date().toISOString()
   };
-  await upsertLocalResource(synced);
-  return synced;
+  return persistIfCurrent(resource, synced);
 }
 
 export async function pullCloudResources(): Promise<ResourceRecord[]> {
@@ -221,32 +247,37 @@ export async function pullCloudResources(): Promise<ResourceRecord[]> {
 }
 
 export async function processOutbox(): Promise<{
+  attempted: number;
   synced: number;
   failed: number;
 }> {
   const outbox = await getOutbox();
-  const batch = outbox.slice(0, 10);
-  const untouched = outbox.slice(10);
+  const timestamp = Date.now();
+  const batch = outbox
+    .filter((item) => {
+      if (!item.nextAttemptAt) return true;
+      const nextAttemptAt = new Date(item.nextAttemptAt).getTime();
+      return !Number.isFinite(nextAttemptAt) || nextAttemptAt <= timestamp;
+    })
+    .slice(0, 10);
   let synced = 0;
   let failed = 0;
-  const remaining: OutboxItem[] = [];
 
   for (const item of batch) {
     try {
       await syncOneResource(item.resource, item.content);
+      await completeOutboxItem(item);
       synced += 1;
     } catch (error) {
-      remaining.push({
-        ...item,
-        attempts: item.attempts + 1,
-        lastError: error instanceof Error ? error.message : "同步失败"
-      });
+      await deferOutboxItem(
+        item,
+        error instanceof Error ? error.message : "同步失败"
+      );
       failed += 1;
     }
   }
 
-  await updateOutbox([...remaining, ...untouched]);
-  return { synced, failed };
+  return { attempted: batch.length, synced, failed };
 }
 
 export async function semanticSearch(

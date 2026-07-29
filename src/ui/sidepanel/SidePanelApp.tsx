@@ -6,6 +6,7 @@ import {
   useState
 } from "react";
 import { signInWithGoogle } from "../../lib/auth";
+import { findBookmarkByUrl } from "../../lib/bookmark-tree";
 import { sendExtensionRequest } from "../../lib/messages";
 import type {
   AppState,
@@ -67,14 +68,6 @@ function captureFromDraft(draft: PendingSaveDraft): PageCapture {
     imageUrl: "",
     faviconUrl: draft.faviconUrl
   };
-}
-
-function nodeContainsUrl(
-  node: NativeBookmarkNode,
-  url: string
-): boolean {
-  if (node.url === url) return true;
-  return Boolean(node.children?.some((child) => nodeContainsUrl(child, url)));
 }
 
 function countBookmarks(node: NativeBookmarkNode): number {
@@ -154,6 +147,7 @@ function BookmarkTree({
               <button
                 type="button"
                 className="bookmark-main"
+                aria-expanded={folder ? isExpanded : undefined}
                 onClick={() =>
                   folder ? onToggle(node.id) : onOpen(node, false)
                 }
@@ -224,11 +218,15 @@ export function SidePanelApp() {
   const [folderId, setFolderId] = useState("");
   const [requestAi, setRequestAi] = useState(true);
   const [captureWarning, setCaptureWarning] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState("");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const searchSequence = useRef(0);
   const knownRootIds = useRef<Set<string>>(new Set());
   const pendingDraftInFlight = useRef(false);
+  const dialogRef = useRef<HTMLElement | null>(null);
+  const busyRef = useRef("");
+  busyRef.current = busy;
 
   const refresh = useCallback(async () => {
     const [nextSnapshot, nextState] = await Promise.all([
@@ -338,17 +336,80 @@ export function SidePanelApp() {
     return () => window.clearTimeout(timer);
   }, [query]);
 
-  const currentSaved = useMemo(
+  useEffect(() => {
+    if (!editor) return;
+    const previousFocus =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const frame = window.requestAnimationFrame(() => {
+      const focusable = dialogRef.current?.querySelector<HTMLElement>(
+        "button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href]"
+      );
+      if (
+        focusable &&
+        !dialogRef.current?.contains(document.activeElement)
+      ) {
+        focusable.focus();
+      }
+    });
+
+    const handleDialogKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !busyRef.current) {
+        event.preventDefault();
+        setEditor(null);
+        setConfirmDeleteId("");
+        return;
+      }
+      if (event.key !== "Tab" || !dialogRef.current) return;
+
+      const focusable = [
+        ...dialogRef.current.querySelectorAll<HTMLElement>(
+          "button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href]"
+        )
+      ];
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleDialogKeyDown);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("keydown", handleDialogKeyDown);
+      previousFocus?.focus();
+    };
+  }, [editor]);
+
+  const currentSavedNode = useMemo(
     () =>
-      Boolean(
-        snapshot &&
-          appState?.activeTab?.url &&
-          (snapshot.roots || [snapshot.root]).some((root) =>
-            nodeContainsUrl(root, appState.activeTab!.url)
+      snapshot && appState?.activeTab?.url
+        ? findBookmarkByUrl(
+            snapshot.roots || [snapshot.root],
+            appState.activeTab.url
           )
-      ),
+        : null,
     [appState, snapshot]
   );
+  const currentWritableSavedNode = useMemo(
+    () =>
+      snapshot && appState?.activeTab?.url
+        ? findBookmarkByUrl(
+            snapshot.roots || [snapshot.root],
+            appState.activeTab.url,
+            true
+          )
+        : null,
+    [appState, snapshot]
+  );
+  const currentSaved = Boolean(currentSavedNode);
 
   async function openNavigation(
     input: { text: string; item?: NavigationSuggestion },
@@ -393,9 +454,13 @@ export function SidePanelApp() {
     await openNavigation({ text: query, item }, false);
   }
 
-  async function startSave(draft?: PendingSaveDraft) {
+  async function startSave(
+    draft?: PendingSaveDraft,
+    existingBookmark?: NativeBookmarkNode
+  ) {
     if (!appState) return;
     setEditor({ kind: "save" });
+    setConfirmDeleteId("");
     setBusy("capture");
     setError("");
     setCaptureWarning("");
@@ -406,7 +471,8 @@ export function SidePanelApp() {
       });
       setFolders(folderOptions);
       setFolderId(
-        snapshot?.primaryRootId ||
+        existingBookmark?.parentId ||
+          snapshot?.primaryRootId ||
           snapshot?.root.id ||
           folderOptions[0]?.id ||
           ""
@@ -415,7 +481,7 @@ export function SidePanelApp() {
       if (draft?.kind === "link") {
         const page = captureFromDraft(draft);
         setCapture(page);
-        setEditTitle(page.title);
+        setEditTitle(existingBookmark?.title || page.title);
         setRequestAi(false);
         setCaptureWarning(
           "这是链接收藏。保存后打开该网页，可继续补充正文摘要和 AI 标签。"
@@ -432,14 +498,16 @@ export function SidePanelApp() {
             }
           : page;
         setCapture(merged);
-        setEditTitle(draft?.title || merged.title);
+        setEditTitle(
+          existingBookmark?.title || draft?.title || merged.title
+        );
         setRequestAi(true);
       } catch {
         const page = draft
           ? captureFromDraft(draft)
           : emptyCapture(appState);
         setCapture(page);
-        setEditTitle(page.title);
+        setEditTitle(existingBookmark?.title || page.title);
         setRequestAi(false);
         setCaptureWarning(
           "此页面受 Chrome 保护，仍可保存原生书签，但不会读取正文。"
@@ -455,6 +523,7 @@ export function SidePanelApp() {
 
   function startEdit(node: NativeBookmarkNode) {
     setEditor({ kind: "bookmark", node });
+    setConfirmDeleteId("");
     setEditTitle(node.title);
     setEditUrl(node.url || "");
     setError("");
@@ -462,6 +531,7 @@ export function SidePanelApp() {
 
   function startCreateFolder(parentId: string) {
     setEditor({ kind: "folder", parentId });
+    setConfirmDeleteId("");
     setEditTitle("");
     setEditUrl("");
     setError("");
@@ -500,6 +570,7 @@ export function SidePanelApp() {
         });
       }
       setEditor(null);
+      setConfirmDeleteId("");
       await refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "保存失败");
@@ -521,6 +592,7 @@ export function SidePanelApp() {
         }
       });
       setEditor(null);
+      setConfirmDeleteId("");
       await refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "删除失败");
@@ -584,7 +656,12 @@ export function SidePanelApp() {
             data-saved={currentSaved}
             title={currentSaved ? "编辑当前页面书签" : "收藏当前页面"}
             aria-label={currentSaved ? "编辑当前页面书签" : "收藏当前页面"}
-            onClick={() => void startSave()}
+            onClick={() =>
+              void startSave(
+                undefined,
+                currentWritableSavedNode || undefined
+              )
+            }
             disabled={!appState?.activeTab?.url}
           >
             {currentSaved ? "★" : "☆"}
@@ -630,6 +707,15 @@ export function SidePanelApp() {
           }}
           placeholder="搜索书签、历史记录或输入网址"
           aria-label="搜索或输入网址"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={Boolean(query && suggestions.length)}
+          aria-controls="navigation-suggestions"
+          aria-activedescendant={
+            selectedIndex >= 0
+              ? `navigation-suggestion-${selectedIndex}`
+              : undefined
+          }
           autoComplete="off"
           autoFocus
         />
@@ -648,7 +734,13 @@ export function SidePanelApp() {
       {error ? (
         <div className="native-error" role="alert">
           <span>{error}</span>
-          <button onClick={() => setError("")}>×</button>
+          <button
+            type="button"
+            aria-label="关闭错误提示"
+            onClick={() => setError("")}
+          >
+            ×
+          </button>
         </div>
       ) : null}
 
@@ -669,10 +761,17 @@ export function SidePanelApp() {
         }}
       >
         {query ? (
-          <div className="suggestion-list">
+          <div
+            className="suggestion-list"
+            id="navigation-suggestions"
+            role="listbox"
+          >
             {suggestions.map((item, index) => (
               <button
                 type="button"
+                role="option"
+                id={`navigation-suggestion-${index}`}
+                aria-selected={index === selectedIndex}
                 className="suggestion-row"
                 data-selected={index === selectedIndex}
                 key={item.id}
@@ -705,6 +804,8 @@ export function SidePanelApp() {
             ))}
             <button
               type="button"
+              role="option"
+              aria-selected="false"
               className="search-provider-row"
               onClick={() =>
                 void openNavigation({ text: query }, false)
@@ -730,6 +831,7 @@ export function SidePanelApp() {
                     <button
                       type="button"
                       className="bookmark-root-heading"
+                      aria-expanded={rootExpanded}
                       onClick={() =>
                         setExpanded((current) => {
                           const next = new Set(current);
@@ -858,10 +960,12 @@ export function SidePanelApp() {
           onMouseDown={(event) => {
             if (event.target === event.currentTarget && !busy) {
               setEditor(null);
+              setConfirmDeleteId("");
             }
           }}
         >
           <section
+            ref={dialogRef}
             className="native-dialog"
             role="dialog"
             aria-modal="true"
@@ -886,7 +990,10 @@ export function SidePanelApp() {
               </div>
               <button
                 className="dialog-close"
-                onClick={() => setEditor(null)}
+                onClick={() => {
+                  setEditor(null);
+                  setConfirmDeleteId("");
+                }}
                 disabled={Boolean(busy)}
                 aria-label="关闭"
               >
@@ -973,18 +1080,40 @@ export function SidePanelApp() {
                 <div className="native-dialog-actions">
                   {editor.kind === "bookmark" &&
                   !editor.node.folderType ? (
-                    <button
-                      type="button"
-                      className="danger-button"
-                      onClick={() => void deleteEditorNode()}
-                      disabled={Boolean(busy)}
-                    >
-                      {busy === "delete"
-                        ? "正在删除…"
-                        : editor.node.url
-                          ? "删除书签"
-                          : "删除整个文件夹"}
-                    </button>
+                    <div className="delete-confirmation">
+                      {confirmDeleteId === editor.node.id ? (
+                        <p role="alert">
+                          {editor.node.url
+                            ? "将从 Chrome 永久删除这个书签。"
+                            : `将删除整个文件夹及其中 ${countBookmarks(editor.node)} 个书签。`}
+                        </p>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="danger-button"
+                        data-confirming={
+                          confirmDeleteId === editor.node.id
+                        }
+                        onClick={() => {
+                          if (confirmDeleteId === editor.node.id) {
+                            void deleteEditorNode();
+                          } else {
+                            setConfirmDeleteId(editor.node.id);
+                          }
+                        }}
+                        disabled={Boolean(busy)}
+                      >
+                        {busy === "delete"
+                          ? "正在删除…"
+                          : confirmDeleteId === editor.node.id
+                            ? editor.node.url
+                              ? "确认删除书签"
+                              : "确认删除整个文件夹"
+                            : editor.node.url
+                              ? "删除书签"
+                              : "删除整个文件夹"}
+                      </button>
+                    </div>
                   ) : (
                     <span />
                   )}
@@ -992,7 +1121,10 @@ export function SidePanelApp() {
                     <button
                       type="button"
                       className="button button-quiet"
-                      onClick={() => setEditor(null)}
+                      onClick={() => {
+                        setEditor(null);
+                        setConfirmDeleteId("");
+                      }}
                       disabled={Boolean(busy)}
                     >
                       取消

@@ -16,7 +16,8 @@ Bookmark Layer 是一个 Chrome 原生书签增强层。它把标题、URL 和�
 - 用户可编辑收藏名称、收藏原因和原生 Chrome 文件夹。
 - 保存时创建或更新真实 Chrome 原生书签。
 - 监听原生书签的新增、改名、移动和删除。
-- 离线保存与有限容量的安全补同步队列。
+- 离线保存与持久补同步队列；元数据更新不会覆盖待同步正文。
+- 同步失败按指数退避重试，不会让失败任务阻塞后续收藏。
 - 使用 Google OAuth 登录，并校验产品账号与当前 Chrome 配置文件账号一致。
 - 通过 Supabase Auth、Postgres RLS 和云端函数同步每个用户的智能信息。
 - 使用 Gemini 生成中文摘要、标签、主题、关键点和适用场景。
@@ -40,7 +41,8 @@ Bookmark Layer 是一个 Chrome 原生书签增强层。它把标题、URL 和�
 要求 Node.js 22 或更高版本。
 
 ```bash
-npm install
+nvm use
+npm ci
 npm run check
 ```
 
@@ -102,6 +104,14 @@ npm run build
 ```
 
 当前自动化覆盖 URL 规范化、跟踪参数清理、本地检索排序、IndexedDB 缓存与队列、正文提取和敏感表单排除。Google OAuth、Chrome Sync、Supabase 和 Gemini 的端到端验证需要真实项目凭据和解压安装后的 Chrome 扩展。
+
+生成交付物前必须先提交全部源码，并运行：
+
+```bash
+npm run package:artifacts
+```
+
+脚本会拒绝覆盖已有版本，并校验 `package.json`、Manifest、ZIP 与解压目录的版本一致性。已有交付物可用 `npm run verify:artifacts` 复核。
 
 ## 已知边界
 

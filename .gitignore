@@ -7,3 +7,4 @@ dist/
 coverage/
 supabase/.temp/
 work/
+outputs/
