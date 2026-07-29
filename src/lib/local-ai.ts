@@ -5,6 +5,9 @@ import {
 import { searchLocalResources } from "./search";
 import type {
   AiProviderId,
+  BookmarkAgentActionProposal,
+  BookmarkAgentActionType,
+  BookmarkAgentCatalog,
   BookmarkAgentTurn,
   BookmarkAgentResponse,
   PageCapture,
@@ -21,6 +24,8 @@ interface BookmarkEnrichment {
 const REQUEST_TIMEOUT_MS = 45_000;
 const MAX_CONTENT_LENGTH = 50_000;
 const MAX_AGENT_CONTEXT_LENGTH = 110_000;
+const MAX_AGENT_ACTION_CONTEXT_LENGTH = 42_000;
+const MAX_AGENT_ACTIONS = 8;
 
 function enrichmentPrompt(
   resource: ResourceRecord,
@@ -342,21 +347,301 @@ function bookmarkContext(
   };
 }
 
+function actionCatalogContext(catalog: BookmarkAgentCatalog): string {
+  const parts: string[] = [];
+  let length = 0;
+  const append = (part: string) => {
+    if (
+      parts.length &&
+      length + part.length + 1 > MAX_AGENT_ACTION_CONTEXT_LENGTH
+    ) {
+      return false;
+    }
+    parts.push(part);
+    length += part.length + 1;
+    return true;
+  };
+
+  for (const folder of catalog.folders) {
+    if (
+      !append(
+        [
+          "[folder]",
+          `id=${folder.id}`,
+          `名称=${folder.title.slice(0, 72)}`,
+          `路径=${folder.path.join("/").slice(0, 120)}`,
+          `可写=${folder.writable ? "是" : "否"}`
+        ].join(" | ")
+      )
+    ) {
+      break;
+    }
+  }
+  for (const bookmark of catalog.bookmarks) {
+    if (
+      !append(
+        [
+          "[bookmark]",
+          `id=${bookmark.id}`,
+          `名称=${bookmark.title.slice(0, 72)}`,
+          `网址=${bookmark.url.slice(0, 120)}`,
+          `文件夹=${bookmark.path.join("/").slice(0, 96)}`,
+          `可写=${bookmark.writable ? "是" : "否"}`
+        ].join(" | ")
+      )
+    ) {
+      break;
+    }
+  }
+  return parts.join("\n");
+}
+
+function cleanActionText(value: unknown, maxLength: number): string {
+  return typeof value === "string"
+    ? value.trim().replace(/\s+/g, " ").slice(0, maxLength)
+    : "";
+}
+
+function safeBookmarkUrl(value: unknown): string {
+  const text = cleanActionText(value, 2_048);
+  try {
+    const parsed = new URL(text);
+    return ["http:", "https:"].includes(parsed.protocol) ? parsed.href : "";
+  } catch {
+    return "";
+  }
+}
+
+function isMutationQuery(query: string): boolean {
+  return /(添加|新建|创建|删除|移除|清理|改名|重命名|修改|更新|移动|create|add|delete|remove|rename|update|move)/i.test(
+    query
+  );
+}
+
+function actionLabel(
+  type: BookmarkAgentActionType,
+  title: string,
+  destination = ""
+): string {
+  switch (type) {
+    case "create_bookmark":
+      return `添加书签「${title}」`;
+    case "create_folder":
+      return `新建文件夹「${title}」`;
+    case "delete_bookmark":
+      return `删除书签「${title}」`;
+    case "delete_folder":
+      return `删除文件夹「${title}」及其中内容`;
+    case "update_bookmark":
+      return `修改书签「${title}」`;
+    case "rename_folder":
+      return `重命名文件夹「${title}」`;
+    case "move_bookmark":
+      return `移动书签「${title}」到「${destination}」`;
+    case "move_folder":
+      return `移动文件夹「${title}」到「${destination}」`;
+  }
+}
+
+function parseAgentActions(
+  value: unknown,
+  catalog: BookmarkAgentCatalog
+): BookmarkAgentActionProposal[] {
+  if (!Array.isArray(value)) return [];
+  const bookmarks = new Map(
+    catalog.bookmarks.map((bookmark) => [bookmark.id, bookmark])
+  );
+  const folders = new Map(
+    catalog.folders.map((folder) => [folder.id, folder])
+  );
+  const actions: BookmarkAgentActionProposal[] = [];
+  const seen = new Set<string>();
+
+  for (const item of value.slice(0, MAX_AGENT_ACTIONS * 2)) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const raw = item as Record<string, unknown>;
+    const type = cleanActionText(raw.type, 40) as BookmarkAgentActionType;
+    const targetId = cleanActionText(raw.target_id, 160);
+    const parentId = cleanActionText(raw.parent_id, 160);
+    const destinationId = cleanActionText(raw.destination_id, 160);
+    const requestedTitle = cleanActionText(raw.title, 200);
+    const requestedUrl = safeBookmarkUrl(raw.url);
+    const bookmark = bookmarks.get(targetId);
+    const folder = folders.get(targetId);
+    const parent = folders.get(parentId);
+    const destination = folders.get(destinationId);
+    const folderMutable =
+      Boolean(folder?.writable) && (folder?.path.length || 0) > 1;
+    let proposal: BookmarkAgentActionProposal | null = null;
+
+    if (type === "create_bookmark" && parent?.writable) {
+      if (requestedTitle && requestedUrl) {
+        proposal = {
+          id: crypto.randomUUID(),
+          type,
+          label: actionLabel(type, requestedTitle),
+          description: `将在「${parent.path.join(" / ")}」中创建 ${requestedUrl}`,
+          destructive: false,
+          status: "pending",
+          parentId: parent.id,
+          title: requestedTitle,
+          url: requestedUrl
+        };
+      }
+    } else if (type === "create_folder" && parent?.writable) {
+      if (requestedTitle) {
+        proposal = {
+          id: crypto.randomUUID(),
+          type,
+          label: actionLabel(type, requestedTitle),
+          description: `将在「${parent.path.join(" / ")}」中创建`,
+          destructive: false,
+          status: "pending",
+          parentId: parent.id,
+          title: requestedTitle
+        };
+      }
+    } else if (type === "delete_bookmark" && bookmark?.writable) {
+      proposal = {
+        id: crypto.randomUUID(),
+        type,
+        label: actionLabel(type, bookmark.title),
+        description: `${bookmark.path.join(" / ")} · ${bookmark.url}`,
+        destructive: true,
+        status: "pending",
+        targetId: bookmark.id,
+        expectedTitle: bookmark.title,
+        expectedUrl: bookmark.url,
+        expectedParentId: bookmark.parentId
+      };
+    } else if (type === "delete_folder" && folderMutable && folder) {
+      proposal = {
+        id: crypto.randomUUID(),
+        type,
+        label: actionLabel(type, folder.title),
+        description: folder.path.join(" / "),
+        destructive: true,
+        status: "pending",
+        targetId: folder.id,
+        expectedTitle: folder.title,
+        expectedParentId: folder.parentId
+      };
+    } else if (type === "update_bookmark" && bookmark?.writable) {
+      const nextTitle = requestedTitle || bookmark.title;
+      const nextUrl = requestedUrl || bookmark.url;
+      if (nextTitle !== bookmark.title || nextUrl !== bookmark.url) {
+        proposal = {
+          id: crypto.randomUUID(),
+          type,
+          label: actionLabel(type, bookmark.title),
+          description: `更新为「${nextTitle}」 · ${nextUrl}`,
+          destructive: false,
+          status: "pending",
+          targetId: bookmark.id,
+          expectedTitle: bookmark.title,
+          expectedUrl: bookmark.url,
+          expectedParentId: bookmark.parentId,
+          title: nextTitle,
+          url: nextUrl
+        };
+      }
+    } else if (type === "rename_folder" && folderMutable && folder) {
+      if (requestedTitle && requestedTitle !== folder.title) {
+        proposal = {
+          id: crypto.randomUUID(),
+          type,
+          label: actionLabel(type, folder.title),
+          description: `新名称：「${requestedTitle}」`,
+          destructive: false,
+          status: "pending",
+          targetId: folder.id,
+          expectedTitle: folder.title,
+          expectedParentId: folder.parentId,
+          title: requestedTitle
+        };
+      }
+    } else if (
+      type === "move_bookmark" &&
+      bookmark?.writable &&
+      destination?.writable &&
+      bookmark.parentId !== destination.id
+    ) {
+      proposal = {
+        id: crypto.randomUUID(),
+        type,
+        label: actionLabel(type, bookmark.title, destination.title),
+        description: destination.path.join(" / "),
+        destructive: false,
+        status: "pending",
+        targetId: bookmark.id,
+        expectedTitle: bookmark.title,
+        expectedUrl: bookmark.url,
+        expectedParentId: bookmark.parentId,
+        destinationId: destination.id
+      };
+    } else if (
+      type === "move_folder" &&
+      folderMutable &&
+      folder &&
+      destination?.writable &&
+      folder.id !== destination.id &&
+      folder.parentId !== destination.id &&
+      !folder.path.every(
+        (segment, index) => destination.path[index] === segment
+      )
+    ) {
+      proposal = {
+        id: crypto.randomUUID(),
+        type,
+        label: actionLabel(type, folder.title, destination.title),
+        description: destination.path.join(" / "),
+        destructive: false,
+        status: "pending",
+        targetId: folder.id,
+        expectedTitle: folder.title,
+        expectedParentId: folder.parentId,
+        destinationId: destination.id
+      };
+    }
+
+    if (!proposal) continue;
+    const key = [
+      proposal.type,
+      proposal.targetId,
+      proposal.parentId,
+      proposal.destinationId,
+      proposal.title,
+      proposal.url
+    ].join("|");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    actions.push(proposal);
+    if (actions.length >= MAX_AGENT_ACTIONS) break;
+  }
+  return actions;
+}
+
 export async function askBookmarkAgent(
   query: string,
   resources: ResourceRecord[],
-  history: BookmarkAgentTurn[] = []
+  history: BookmarkAgentTurn[] = [],
+  actionCatalog: BookmarkAgentCatalog = { bookmarks: [], folders: [] }
 ): Promise<BookmarkAgentResponse> {
   const normalizedQuery = query.trim().slice(0, 1_000);
   if (!normalizedQuery) {
     throw new Error("请先输入你想询问的内容。");
   }
-  if (!resources.length) {
+  if (
+    !resources.length &&
+    !actionCatalog.bookmarks.length &&
+    !actionCatalog.folders.length
+  ) {
     return {
       query: normalizedQuery,
       answer: "你的收藏库还是空的，先收藏一些页面后再来问我。",
       providerName: "",
       sources: [],
+      actions: [],
       catalogSize: 0,
       examinedCount: 0
     };
@@ -381,6 +666,20 @@ export async function askBookmarkAgent(
 只返回一个合法 JSON 对象：
 - answer：回答正文，使用纯文本，不要使用 Markdown 表格
 - source_ids：真正支持回答的收藏 id 数组，最多 5 个；资料不足时返回空数组
+- actions：只有用户明确要求修改 Chrome 书签时才返回操作数组，否则返回空数组；最多 8 项
+
+你不能直接修改 Chrome，也不能声称操作已经完成。涉及写入时只能“准备待确认操作”，必须等用户在 Aarre 界面确认后才会真实执行。
+如果目标不明确，actions 必须为空并向用户追问。不要猜测 id。
+仅允许以下操作结构，并且 id 必须逐字来自“可操作目标”：
+- {"type":"create_bookmark","parent_id":"文件夹 id","title":"名称","url":"http(s) 网址"}
+- {"type":"create_folder","parent_id":"文件夹 id","title":"名称"}
+- {"type":"delete_bookmark","target_id":"书签 id"}
+- {"type":"delete_folder","target_id":"文件夹 id"}
+- {"type":"update_bookmark","target_id":"书签 id","title":"新名称（可选）","url":"新网址（可选）"}
+- {"type":"rename_folder","target_id":"文件夹 id","title":"新名称"}
+- {"type":"move_bookmark","target_id":"书签 id","destination_id":"目标文件夹 id"}
+- {"type":"move_folder","target_id":"文件夹 id","destination_id":"目标文件夹 id"}
+“失效、打不开、404”不能只凭标题或 AI 摘要判断；没有真实链接检测结果时，不得擅自生成批量删除操作。
 
 用户问题：
 ${normalizedQuery}
@@ -389,16 +688,25 @@ ${normalizedQuery}
 ${conversation || "（无）"}
 
 收藏资料：
-${context.text}
+${context.text || "（无）"}
+
+可操作目标：
+${actionCatalogContext(actionCatalog) || "（无）"}
 `.trim();
   const generated = await generateConfiguredJson(prompt);
   const parsed = parseJsonObject(generated.content);
-  const answer =
+  const generatedAnswer =
     typeof parsed.answer === "string" ? parsed.answer.trim() : "";
   const sourceIds = cleanStringArray(parsed.source_ids, 5);
-  if (!answer) {
+  if (!generatedAnswer) {
     throw new Error("AI 没有返回可用回答，请重试。");
   }
+  const actions = parseAgentActions(parsed.actions, actionCatalog);
+  const answer = actions.length
+    ? `我已准备 ${actions.length} 项书签操作，但尚未执行。请核对下方内容后确认。`
+    : isMutationQuery(normalizedQuery)
+      ? "我没有执行任何更改。当前信息不足以形成安全、明确的操作；请指出具体书签或文件夹。若要清理失效链接，需要先做真实链接检测，不能只凭 AI 判断。"
+      : generatedAnswer;
 
   const sources = sourceIds.flatMap((id) => {
     const resource = context.sourceById.get(id);
@@ -419,6 +727,7 @@ ${context.text}
     answer: answer.slice(0, 4_000),
     providerName: generated.providerName,
     sources,
+    actions,
     catalogSize: resources.length,
     examinedCount: context.examinedCount
   };

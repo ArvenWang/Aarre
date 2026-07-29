@@ -10,6 +10,7 @@ import {
   enrichResourceLocally
 } from "../src/lib/local-ai";
 import type {
+  BookmarkAgentCatalog,
   PageCapture,
   ResourceRecord
 } from "../src/lib/types";
@@ -56,6 +57,35 @@ const capture: PageCapture = {
   language: resource.language,
   imageUrl: "",
   faviconUrl: ""
+};
+
+const actionCatalog: BookmarkAgentCatalog = {
+  bookmarks: [
+    {
+      id: "1",
+      parentId: "folder-1",
+      title: resource.title,
+      url: resource.url,
+      path: ["书签栏", "产品"],
+      writable: true
+    }
+  ],
+  folders: [
+    {
+      id: "root-1",
+      parentId: "0",
+      title: "书签栏",
+      path: ["书签栏"],
+      writable: true
+    },
+    {
+      id: "folder-1",
+      parentId: "root-1",
+      title: "产品",
+      path: ["书签栏", "产品"],
+      writable: true
+    }
+  ]
 };
 
 beforeEach(() => {
@@ -253,6 +283,93 @@ describe("local AI enrichment", () => {
     expect(result.sources[0]?.resourceKey).toBe("catalog-30");
     const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
     expect(String(request.body)).toContain("收藏 30");
+  });
+
+  it("prepares a real delete proposal without falsely claiming it already ran", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    answer: "已经帮你删掉了。",
+                    source_ids: [],
+                    actions: [
+                      {
+                        type: "delete_bookmark",
+                        target_id: "1"
+                      }
+                    ]
+                  })
+                }
+              }
+            ]
+          }),
+          { status: 200 }
+        )
+      )
+    );
+
+    const result = await askBookmarkAgent(
+      "删除本地 AI 收藏测试",
+      [resource],
+      [],
+      actionCatalog
+    );
+
+    expect(result.answer).toContain("尚未执行");
+    expect(result.answer).not.toContain("已经帮你删掉");
+    expect(result.actions).toMatchObject([
+      {
+        type: "delete_bookmark",
+        targetId: "1",
+        destructive: true,
+        status: "pending"
+      }
+    ]);
+  });
+
+  it("rejects hallucinated action ids and states that nothing changed", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    answer: "已完成删除。",
+                    source_ids: [],
+                    actions: [
+                      {
+                        type: "delete_bookmark",
+                        target_id: "missing-id"
+                      }
+                    ]
+                  })
+                }
+              }
+            ]
+          }),
+          { status: 200 }
+        )
+      )
+    );
+
+    const result = await askBookmarkAgent(
+      "删除不存在的书签",
+      [resource],
+      [],
+      actionCatalog
+    );
+
+    expect(result.actions).toEqual([]);
+    expect(result.answer).toContain("我没有执行任何更改");
+    expect(result.answer).not.toContain("已完成删除");
   });
 
   it("does not call an AI provider when no key is configured", async () => {

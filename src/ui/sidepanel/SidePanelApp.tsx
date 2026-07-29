@@ -21,6 +21,7 @@ import type {
   AgentChatMessage,
   AgentConversation,
   AppState,
+  BookmarkAgentActionProposal,
   BookmarkBarSnapshot,
   NativeBookmarkNode,
   NativeFolderOption,
@@ -1111,6 +1112,8 @@ interface AgentChatPageProps {
   onBack: () => void;
   onSubmit: (event: React.FormEvent) => void;
   onOpenSource: (url: string) => void;
+  onConfirmActions: (messageId: string) => void;
+  onCancelActions: (messageId: string) => void;
 }
 
 function AgentChatPage({
@@ -1121,7 +1124,9 @@ function AgentChatPage({
   onPromptChange,
   onBack,
   onSubmit,
-  onOpenSource
+  onOpenSource,
+  onConfirmActions,
+  onCancelActions
 }: AgentChatPageProps) {
   const endRef = useRef<HTMLDivElement | null>(null);
 
@@ -1195,6 +1200,68 @@ function AgentChatPage({
                   </button>
                 ))}
               </div>
+            ) : null}
+            {message.actions?.length ? (
+              <section
+                className="agent-action-card"
+                aria-label="待确认的书签操作"
+              >
+                <header>
+                  <strong>
+                    {message.actions.some(
+                      (action) => action.status === "pending"
+                    )
+                      ? "确认后才会修改 Chrome"
+                      : "Chrome 操作结果"}
+                  </strong>
+                  <small>{message.actions.length} 项</small>
+                </header>
+                <ul>
+                  {message.actions.map((action) => (
+                    <li
+                      key={action.id}
+                      data-status={action.status}
+                      data-destructive={action.destructive}
+                    >
+                      <span aria-hidden="true" />
+                      <div>
+                        <strong>{action.label}</strong>
+                        <small>
+                          {action.resultMessage || action.description}
+                        </small>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                {message.actions.some(
+                  (action) => action.status === "pending"
+                ) ? (
+                  <footer>
+                    <button
+                      type="button"
+                      className="button-quiet"
+                      disabled={busy}
+                      onClick={() => onCancelActions(message.id)}
+                    >
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      className={
+                        message.actions.some(
+                          (action) => action.destructive
+                        )
+                          ? "agent-action-confirm agent-action-confirm-danger"
+                          : "agent-action-confirm"
+                      }
+                      disabled={busy}
+                      onClick={() => onConfirmActions(message.id)}
+                    >
+                      {busy ? "正在执行…" : "确认执行"}
+                    </button>
+                  </footer>
+                ) : null}
+              </section>
             ) : null}
           </article>
         ))}
@@ -1739,6 +1806,7 @@ export function SidePanelApp() {
                   ? `${response.providerName} · 已查看 ${response.examinedCount}/${response.catalogSize} 条收藏`
                   : undefined,
                 sources: response.sources,
+                actions: response.actions,
                 status: "complete"
               }
             : message
@@ -1768,6 +1836,162 @@ export function SidePanelApp() {
     } finally {
       setBusy("");
     }
+  }
+
+  async function handleConfirmAgentActions(messageId: string) {
+    if (!activeConversation || busy) return;
+    const sourceMessage = activeConversation.messages.find(
+      (message) => message.id === messageId
+    );
+    const pendingActions = (sourceMessage?.actions || []).filter(
+      (action) => action.status === "pending"
+    );
+    if (!sourceMessage || !pendingActions.length) return;
+
+    const markActions = (
+      actions: BookmarkAgentActionProposal[],
+      status: BookmarkAgentActionProposal["status"],
+      resultMessage = ""
+    ) =>
+      actions.map((action) =>
+        action.status === "pending" || action.status === "executing"
+          ? {
+              ...action,
+              status,
+              ...(resultMessage ? { resultMessage } : {})
+            }
+          : action
+      );
+
+    const executingConversation: AgentConversation = {
+      ...activeConversation,
+      updatedAt: new Date().toISOString(),
+      messages: activeConversation.messages.map((message) =>
+        message.id === messageId
+          ? {
+              ...message,
+              actions: markActions(
+                message.actions || [],
+                "executing"
+              )
+            }
+          : message
+      )
+    };
+    setActiveConversation(executingConversation);
+    setBusy("agent-actions");
+    setError("");
+
+    try {
+      const response = await sendExtensionRequest({
+        type: "EXECUTE_BOOKMARK_AGENT_ACTIONS",
+        actions: pendingActions
+      });
+      const resultById = new Map(
+        response.results.map((result) => [result.actionId, result])
+      );
+      const completedActions = (sourceMessage.actions || []).map(
+        (action) => {
+          const result = resultById.get(action.id);
+          if (!result) return action;
+          return {
+            ...action,
+            status: result.success ? "completed" : "failed",
+            resultMessage: result.message
+          } satisfies BookmarkAgentActionProposal;
+        }
+      );
+      const succeeded = response.results.filter(
+        (result) => result.success
+      ).length;
+      const failed = response.results.length - succeeded;
+      const timestamp = new Date().toISOString();
+      const resultMessage: AgentChatMessage = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content:
+          succeeded > 0
+            ? `已完成 ${succeeded} 项操作，并重新读取 Chrome 书签确认。${failed ? `另有 ${failed} 项未完成，请查看上方原因。` : ""}`
+            : `没有完成任何操作。${response.results[0]?.message ? `原因：${response.results[0].message}` : ""}`,
+        createdAt: timestamp,
+        status: failed && !succeeded ? "failed" : "complete"
+      };
+      const completed: AgentConversation = {
+        ...executingConversation,
+        updatedAt: timestamp,
+        messages: [
+          ...executingConversation.messages.map((message) =>
+            message.id === messageId
+              ? { ...message, actions: completedActions }
+              : message
+          ),
+          resultMessage
+        ]
+      };
+      setActiveConversation(completed);
+      await persistConversation(completed);
+      await refresh();
+    } catch (caught) {
+      const message =
+        caught instanceof Error ? caught.message : "Chrome 操作失败";
+      const timestamp = new Date().toISOString();
+      const failed: AgentConversation = {
+        ...executingConversation,
+        updatedAt: timestamp,
+        messages: [
+          ...executingConversation.messages.map((item) =>
+            item.id === messageId
+              ? {
+                  ...item,
+                  actions: markActions(
+                    item.actions || [],
+                    "failed",
+                    message
+                  )
+                }
+              : item
+          ),
+          {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: `没有完成任何操作。原因：${message}`,
+            createdAt: timestamp,
+            status: "failed"
+          }
+        ]
+      };
+      setActiveConversation(failed);
+      setError(message);
+      await persistConversation(failed).catch(() => undefined);
+    } finally {
+      setBusy("");
+    }
+  }
+
+  function handleCancelAgentActions(messageId: string) {
+    if (!activeConversation || busy) return;
+    const updated: AgentConversation = {
+      ...activeConversation,
+      updatedAt: new Date().toISOString(),
+      messages: activeConversation.messages.map((message) =>
+        message.id === messageId
+          ? {
+              ...message,
+              actions: (message.actions || []).map((action) =>
+                action.status === "pending"
+                  ? {
+                      ...action,
+                      status: "cancelled" as const,
+                      resultMessage: "已取消，没有修改 Chrome。"
+                    }
+                  : action
+              )
+            }
+          : message
+      )
+    };
+    setActiveConversation(updated);
+    void persistConversation(updated);
   }
 
   function handleAgentSubmit(event: React.FormEvent) {
@@ -2059,7 +2283,7 @@ export function SidePanelApp() {
       <AgentChatPage
         conversation={activeConversation}
         prompt={agentPrompt}
-        busy={busy === "agent"}
+        busy={busy === "agent" || busy === "agent-actions"}
         error={error}
         onPromptChange={setAgentPrompt}
         onBack={() => {
@@ -2070,6 +2294,10 @@ export function SidePanelApp() {
         onOpenSource={(url) =>
           void openNavigation({ text: url, url }, true)
         }
+        onConfirmActions={(messageId) =>
+          void handleConfirmAgentActions(messageId)
+        }
+        onCancelActions={handleCancelAgentActions}
       />
     );
   }

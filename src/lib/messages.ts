@@ -1,5 +1,7 @@
 import type {
   AiSettingsStatus,
+  BookmarkAgentActionExecutionResult,
+  BookmarkAgentActionProposal,
   AgentConversation,
   BookmarkAgentTurn,
   SaveAiSettingsInput,
@@ -36,6 +38,10 @@ export type ExtensionRequest =
       type: "ASK_BOOKMARK_AGENT";
       query: string;
       history?: BookmarkAgentTurn[];
+    }
+  | {
+      type: "EXECUTE_BOOKMARK_AGENT_ACTIONS";
+      actions: BookmarkAgentActionProposal[];
     }
   | { type: "GET_LOCAL_RESOURCES" }
   | { type: "GET_AGENT_CONVERSATIONS" }
@@ -85,6 +91,9 @@ export type ResponseDataByRequest = {
   CAPTURE_ACTIVE_PAGE: PageCapture;
   SAVE_BOOKMARK: SaveBookmarkResult;
   ASK_BOOKMARK_AGENT: BookmarkAgentResponse;
+  EXECUTE_BOOKMARK_AGENT_ACTIONS: {
+    results: BookmarkAgentActionExecutionResult[];
+  };
   GET_LOCAL_RESOURCES: ResourceRecord[];
   GET_AGENT_CONVERSATIONS: AgentConversation[];
   SAVE_AGENT_CONVERSATION: AgentConversation;

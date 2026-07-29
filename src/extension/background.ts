@@ -47,6 +47,9 @@ import { createPendingSaveDraft } from "../lib/pending-save";
 import type {
   ActiveTabSummary,
   AppState,
+  BookmarkAgentActionExecutionResult,
+  BookmarkAgentActionProposal,
+  BookmarkAgentCatalog,
   BookmarkBarSnapshot,
   ImportResult,
   LibraryScanStatus,
@@ -571,6 +574,278 @@ async function deleteNativeBookmark(input: {
     await chrome.bookmarks.remove(input.id);
   }
   return { deleted: true };
+}
+
+function validateAgentBookmarkUrl(value: string | undefined): string {
+  const text = value?.trim() || "";
+  try {
+    const parsed = new URL(text);
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      throw new Error("unsupported protocol");
+    }
+    return parsed.href;
+  } catch {
+    throw new Error("AI 操作中的书签网址无效，未执行任何写入。");
+  }
+}
+
+async function createNativeBookmarkFromAgent(input: {
+  parentId: string;
+  title: string;
+  url: string;
+}): Promise<NativeBookmarkNode> {
+  const title = input.title.trim();
+  if (!title) {
+    throw new Error("书签名称不能为空。");
+  }
+  const url = validateAgentBookmarkUrl(input.url);
+  const [parent] = await chrome.bookmarks.get(input.parentId);
+  if (
+    !parent ||
+    parent.url ||
+    parent.unmodifiable === "managed"
+  ) {
+    throw new Error("目标文件夹不可写入。");
+  }
+  const created = await chrome.bookmarks.create({
+    parentId: parent.id,
+    title: title.slice(0, 200),
+    url
+  });
+  const [verified] = await chrome.bookmarks.get(created.id);
+  if (!verified?.url || verified.url !== url) {
+    throw new Error("Chrome 没有保存这个书签，请重试。");
+  }
+  return serializeBookmarkNode(verified);
+}
+
+async function getAgentActionTarget(
+  id: string | undefined,
+  kind: "bookmark" | "folder"
+): Promise<chrome.bookmarks.BookmarkTreeNode> {
+  if (!id) {
+    throw new Error("AI 操作缺少明确目标，未执行。");
+  }
+  const [node] = await chrome.bookmarks.get(id);
+  if (
+    !node ||
+    node.unmodifiable === "managed" ||
+    (kind === "bookmark" ? !node.url : Boolean(node.url)) ||
+    (kind === "folder" && Boolean(node.folderType))
+  ) {
+    throw new Error("目标已不存在或不可修改，请刷新后重新确认。");
+  }
+  return node;
+}
+
+function verifyAgentActionTargetUnchanged(
+  action: BookmarkAgentActionProposal,
+  node: chrome.bookmarks.BookmarkTreeNode
+): void {
+  if (
+    (action.expectedTitle !== undefined &&
+      node.title !== action.expectedTitle) ||
+    (action.expectedUrl !== undefined &&
+      node.url !== action.expectedUrl) ||
+    (action.expectedParentId !== undefined &&
+      node.parentId !== action.expectedParentId)
+  ) {
+    throw new Error(
+      "目标在确认前已发生变化。为避免误操作，本次没有执行，请重新发起请求。"
+    );
+  }
+}
+
+async function verifyAgentActionTargetMissing(id: string): Promise<void> {
+  let exists = false;
+  try {
+    exists = Boolean((await chrome.bookmarks.get(id))[0]);
+  } catch {
+    exists = false;
+  }
+  if (exists) {
+    throw new Error("Chrome 仍返回这个项目，删除未完成。");
+  }
+}
+
+async function executeBookmarkAgentAction(
+  action: BookmarkAgentActionProposal
+): Promise<BookmarkAgentActionExecutionResult> {
+  if (!action.id || action.status !== "pending") {
+    throw new Error("这项操作已经处理或状态无效。");
+  }
+
+  switch (action.type) {
+    case "create_bookmark": {
+      if (!action.parentId || !action.title || !action.url) {
+        throw new Error("添加书签所需信息不完整。");
+      }
+      const created = await createNativeBookmarkFromAgent({
+        parentId: action.parentId,
+        title: action.title,
+        url: action.url
+      });
+      return {
+        actionId: action.id,
+        success: true,
+        message: `已创建书签「${created.title}」，并从 Chrome 重新读取确认。`
+      };
+    }
+    case "create_folder": {
+      if (!action.parentId || !action.title) {
+        throw new Error("新建文件夹所需信息不完整。");
+      }
+      const created = await createNativeFolder({
+        parentId: action.parentId,
+        title: action.title
+      });
+      const [verified] = await chrome.bookmarks.get(created.id);
+      if (!verified || verified.url) {
+        throw new Error("Chrome 没有保存这个文件夹，请重试。");
+      }
+      return {
+        actionId: action.id,
+        success: true,
+        message: `已创建文件夹「${verified.title}」，并从 Chrome 重新读取确认。`
+      };
+    }
+    case "delete_bookmark": {
+      const target = await getAgentActionTarget(
+        action.targetId,
+        "bookmark"
+      );
+      verifyAgentActionTargetUnchanged(action, target);
+      await deleteNativeBookmark({
+        id: target.id,
+        recursive: false
+      });
+      await verifyAgentActionTargetMissing(target.id);
+      return {
+        actionId: action.id,
+        success: true,
+        message: `已从 Chrome 删除书签「${target.title || target.url}」。`
+      };
+    }
+    case "delete_folder": {
+      const target = await getAgentActionTarget(
+        action.targetId,
+        "folder"
+      );
+      verifyAgentActionTargetUnchanged(action, target);
+      const count = countBookmarkNodes(target).bookmarkCount;
+      await deleteNativeBookmark({
+        id: target.id,
+        recursive: true
+      });
+      await verifyAgentActionTargetMissing(target.id);
+      return {
+        actionId: action.id,
+        success: true,
+        message: `已从 Chrome 删除文件夹「${target.title}」及其中 ${count} 个书签。`
+      };
+    }
+    case "update_bookmark": {
+      const target = await getAgentActionTarget(
+        action.targetId,
+        "bookmark"
+      );
+      verifyAgentActionTargetUnchanged(action, target);
+      const updated = await updateNativeBookmark({
+        id: target.id,
+        title: action.title || target.title,
+        url: validateAgentBookmarkUrl(action.url || target.url)
+      });
+      const [verified] = await chrome.bookmarks.get(updated.id);
+      if (
+        !verified ||
+        verified.title !== updated.title ||
+        verified.url !== updated.url
+      ) {
+        throw new Error("Chrome 返回的书签与修改结果不一致。");
+      }
+      return {
+        actionId: action.id,
+        success: true,
+        message: `已修改书签「${verified.title}」，并从 Chrome 重新读取确认。`
+      };
+    }
+    case "rename_folder": {
+      const target = await getAgentActionTarget(
+        action.targetId,
+        "folder"
+      );
+      verifyAgentActionTargetUnchanged(action, target);
+      const updated = await updateNativeBookmark({
+        id: target.id,
+        title: action.title || ""
+      });
+      const [verified] = await chrome.bookmarks.get(updated.id);
+      if (!verified || verified.title !== updated.title) {
+        throw new Error("Chrome 返回的文件夹名称与修改结果不一致。");
+      }
+      return {
+        actionId: action.id,
+        success: true,
+        message: `已将文件夹重命名为「${verified.title}」。`
+      };
+    }
+    case "move_bookmark":
+    case "move_folder": {
+      const target = await getAgentActionTarget(
+        action.targetId,
+        action.type === "move_bookmark" ? "bookmark" : "folder"
+      );
+      verifyAgentActionTargetUnchanged(action, target);
+      if (!action.destinationId) {
+        throw new Error("移动操作缺少目标文件夹。");
+      }
+      const [destination] = await chrome.bookmarks.get(
+        action.destinationId
+      );
+      if (
+        !destination ||
+        destination.url ||
+        destination.unmodifiable === "managed"
+      ) {
+        throw new Error("目标文件夹已不存在或不可写入。");
+      }
+      const moved = await moveNativeBookmark({
+        id: target.id,
+        parentId: destination.id
+      });
+      const [verified] = await chrome.bookmarks.get(moved.id);
+      if (!verified || verified.parentId !== destination.id) {
+        throw new Error("Chrome 返回的位置与移动结果不一致。");
+      }
+      return {
+        actionId: action.id,
+        success: true,
+        message: `已将「${verified.title}」移动到「${destination.title}」。`
+      };
+    }
+  }
+}
+
+async function executeBookmarkAgentActions(
+  actions: BookmarkAgentActionProposal[]
+): Promise<{ results: BookmarkAgentActionExecutionResult[] }> {
+  if (!Array.isArray(actions) || !actions.length || actions.length > 8) {
+    throw new Error("没有可执行的已确认操作。");
+  }
+  const results: BookmarkAgentActionExecutionResult[] = [];
+  for (const action of actions) {
+    try {
+      results.push(await executeBookmarkAgentAction(action));
+    } catch (error) {
+      results.push({
+        actionId: action?.id || "",
+        success: false,
+        message: errorMessage(error)
+      });
+    }
+  }
+  await importNativeBookmarks();
+  return { results };
 }
 
 async function folderPathForId(folderId: string): Promise<string[]> {
@@ -1575,15 +1850,71 @@ async function getResources(query = "", semantic = false) {
   return searchLocalResources(linked, query);
 }
 
+function buildBookmarkAgentCatalog(
+  tree: chrome.bookmarks.BookmarkTreeNode[]
+): BookmarkAgentCatalog {
+  const catalog: BookmarkAgentCatalog = {
+    bookmarks: [],
+    folders: []
+  };
+
+  function visit(
+    node: chrome.bookmarks.BookmarkTreeNode,
+    parentPath: string[]
+  ) {
+    if (node.url) {
+      catalog.bookmarks.push({
+        id: node.id,
+        parentId: node.parentId || "",
+        title: node.title || node.url,
+        url: node.url,
+        path: parentPath,
+        writable: node.unmodifiable !== "managed"
+      });
+      return;
+    }
+
+    const isBrowserRoot = node.id === "0";
+    const path = isBrowserRoot
+      ? parentPath
+      : [...parentPath, node.title || "未命名文件夹"];
+    if (!isBrowserRoot) {
+      catalog.folders.push({
+        id: node.id,
+        parentId: node.parentId,
+        title: node.title || "未命名文件夹",
+        path,
+        writable: node.unmodifiable !== "managed"
+      });
+    }
+    for (const child of node.children || []) {
+      visit(child, path);
+    }
+  }
+
+  for (const root of tree) {
+    visit(root, []);
+  }
+  return catalog;
+}
+
 async function askAgent(
   query: string,
   history: import("../lib/types").BookmarkAgentTurn[] = []
 ) {
   await importNativeBookmarks();
-  const resources = (await getLocalResources()).filter(
-    (resource) => resource.nativeBookmarkIds.length > 0
+  const [resources, tree] = await Promise.all([
+    getLocalResources(),
+    chrome.bookmarks.getTree()
+  ]);
+  return askBookmarkAgent(
+    query,
+    resources.filter(
+      (resource) => resource.nativeBookmarkIds.length > 0
+    ),
+    history,
+    buildBookmarkAgentCatalog(tree)
   );
-  return askBookmarkAgent(query, resources, history);
 }
 
 async function indexNativeBookmark(
@@ -1661,6 +1992,8 @@ async function handleRequest(request: ExtensionRequest): Promise<unknown> {
       return saveBookmark(request.payload);
     case "ASK_BOOKMARK_AGENT":
       return askAgent(request.query, request.history);
+    case "EXECUTE_BOOKMARK_AGENT_ACTIONS":
+      return executeBookmarkAgentActions(request.actions);
     case "GET_LOCAL_RESOURCES":
       await importNativeBookmarks();
       return (await getLocalResources()).filter(

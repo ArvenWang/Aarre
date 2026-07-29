@@ -204,11 +204,75 @@ export interface BookmarkAgentSource {
   faviconUrl: string;
 }
 
+export type BookmarkAgentActionType =
+  | "create_bookmark"
+  | "create_folder"
+  | "delete_bookmark"
+  | "delete_folder"
+  | "update_bookmark"
+  | "rename_folder"
+  | "move_bookmark"
+  | "move_folder";
+
+export type BookmarkAgentActionStatus =
+  | "pending"
+  | "executing"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export interface BookmarkAgentCatalogBookmark {
+  id: string;
+  parentId: string;
+  title: string;
+  url: string;
+  path: string[];
+  writable: boolean;
+}
+
+export interface BookmarkAgentCatalogFolder {
+  id: string;
+  parentId?: string;
+  title: string;
+  path: string[];
+  writable: boolean;
+}
+
+export interface BookmarkAgentCatalog {
+  bookmarks: BookmarkAgentCatalogBookmark[];
+  folders: BookmarkAgentCatalogFolder[];
+}
+
+export interface BookmarkAgentActionProposal {
+  id: string;
+  type: BookmarkAgentActionType;
+  label: string;
+  description: string;
+  destructive: boolean;
+  status: BookmarkAgentActionStatus;
+  targetId?: string;
+  parentId?: string;
+  destinationId?: string;
+  expectedTitle?: string;
+  expectedUrl?: string;
+  expectedParentId?: string;
+  title?: string;
+  url?: string;
+  resultMessage?: string;
+}
+
+export interface BookmarkAgentActionExecutionResult {
+  actionId: string;
+  success: boolean;
+  message: string;
+}
+
 export interface BookmarkAgentResponse {
   query: string;
   answer: string;
   providerName: string;
   sources: BookmarkAgentSource[];
+  actions: BookmarkAgentActionProposal[];
   catalogSize: number;
   examinedCount: number;
 }
@@ -225,6 +289,7 @@ export interface AgentChatMessage {
   createdAt: string;
   providerName?: string;
   sources?: BookmarkAgentSource[];
+  actions?: BookmarkAgentActionProposal[];
   status?: "sending" | "complete" | "failed";
 }
 

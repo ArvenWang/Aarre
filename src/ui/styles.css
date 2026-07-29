@@ -4078,6 +4078,119 @@ a:focus-visible {
   font-size: 7px;
 }
 
+.agent-action-card {
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--ink) 9%, transparent);
+  border-radius: 12px;
+  background: #fafbfc;
+}
+
+.agent-action-card > header,
+.agent-action-card > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.agent-action-card > header strong {
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.agent-action-card > header small {
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.agent-action-card ul {
+  margin: 9px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 7px;
+  list-style: none;
+}
+
+.agent-action-card li {
+  min-width: 0;
+  padding: 8px;
+  display: grid;
+  grid-template-columns: 7px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  border-radius: 9px;
+  background: var(--component);
+}
+
+.agent-action-card li > span {
+  width: 7px;
+  height: 7px;
+  margin-top: 3px;
+  border-radius: 999px;
+  background: #7b7e85;
+}
+
+.agent-action-card li[data-destructive="true"] > span,
+.agent-action-card li[data-status="failed"] > span {
+  background: var(--danger);
+}
+
+.agent-action-card li[data-status="completed"] > span {
+  background: var(--success);
+}
+
+.agent-action-card li[data-status="cancelled"] {
+  opacity: 0.62;
+}
+
+.agent-action-card li strong,
+.agent-action-card li small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.agent-action-card li strong {
+  font-size: 9px;
+  font-weight: 620;
+  line-height: 1.4;
+}
+
+.agent-action-card li small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 7.5px;
+  line-height: 1.45;
+}
+
+.agent-action-card > footer {
+  margin-top: 10px;
+  justify-content: flex-end;
+}
+
+.agent-action-card > footer button {
+  min-height: 30px;
+  padding: 6px 11px;
+  border: 0;
+  border-radius: 9px;
+  font-size: 9px;
+}
+
+.agent-action-confirm {
+  color: #fff;
+  background: var(--ink);
+}
+
+.agent-action-confirm-danger {
+  background: var(--danger);
+}
+
+.agent-action-card > footer button:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
 .agent-thread-error {
   margin: -5px 0 18px;
   padding: 9px 10px;
@@ -4222,40 +4335,19 @@ a:focus-visible {
   top: 0;
   z-index: 7;
   overflow: hidden;
-  background: transparent;
-}
-
-.bookmark-row[data-folder="true"][data-expanded="true"]::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  border-radius: inherit;
-  background: rgba(255, 255, 255, 0.68);
-  backdrop-filter: blur(14px) saturate(1.14);
-  -webkit-backdrop-filter: blur(14px) saturate(1.14);
-  pointer-events: none;
-}
-
-.bookmark-row[data-folder="true"][data-expanded="true"] > * {
-  position: relative;
-  z-index: 1;
+  background: #fff;
+  box-shadow: inset 0 -1px rgba(36, 36, 36, 0.045);
 }
 
 .bookmark-row[data-folder="true"]:hover,
 .bookmark-row[data-folder="true"]:focus-within {
   border-color: transparent;
-  background: color-mix(in srgb, var(--ink) 6%, white);
+  background: #f6f7fa;
 }
 
 .bookmark-row[data-folder="true"][data-expanded="true"]:hover,
 .bookmark-row[data-folder="true"][data-expanded="true"]:focus-within {
-  background: transparent;
-}
-
-.bookmark-row[data-folder="true"][data-expanded="true"]:hover::before,
-.bookmark-row[data-folder="true"][data-expanded="true"]:focus-within::before {
-  background: rgba(246, 247, 250, 0.72);
+  background: #f6f7fa;
 }
 
 .bookmark-row:not([data-folder="true"]) {
