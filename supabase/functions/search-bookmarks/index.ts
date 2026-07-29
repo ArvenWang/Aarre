@@ -19,10 +19,20 @@ Deno.serve(async (request) => {
 
   try {
     const { supabase } = await authenticatedClient(request);
+    const geminiApiKey =
+      request.headers.get("x-bookmark-layer-gemini-key")?.trim() || undefined;
+    if (
+      geminiApiKey &&
+      (geminiApiKey.length < 16 || geminiApiKey.length > 512)
+    ) {
+      return jsonResponse({ error: "Invalid Gemini API key" }, 400);
+    }
     const body = requestSchema.parse(await request.json());
     const embedding = await embedWithGemini(
       body.query,
-      "RETRIEVAL_QUERY"
+      "RETRIEVAL_QUERY",
+      undefined,
+      geminiApiKey
     );
 
     const { data, error } = await supabase.rpc("match_resources", {

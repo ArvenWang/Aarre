@@ -62,7 +62,7 @@ export async function signInWithGoogle(): Promise<AuthState> {
   const chromeProfileEmail = await getChromeProfileEmail();
   if (!chromeProfileEmail) {
     throw new Error(
-      "请先在当前 Chrome 配置文件中登录 Google 账号，再连接 Bookmark Layer。"
+      "请先在当前 Chrome 配置文件中登录 Google 账号，再连接 Aarre。"
     );
   }
 

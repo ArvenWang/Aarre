@@ -1,7 +1,7 @@
 export const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-bookmark-layer-gemini-key, x-bookmark-layer-ai-provider, x-bookmark-layer-ai-model, x-bookmark-layer-ai-key",
   "Access-Control-Allow-Methods": "POST, OPTIONS"
 };
 

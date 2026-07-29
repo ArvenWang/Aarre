@@ -8,3 +8,5 @@ coverage/
 supabase/.temp/
 work/
 outputs/
+.playwright-cli/
+output/playwright/

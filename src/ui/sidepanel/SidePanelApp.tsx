@@ -1,28 +1,722 @@
 import {
   useCallback,
   useEffect,
+  useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState
 } from "react";
-import { signInWithGoogle } from "../../lib/auth";
+import { signInWithGoogle, signOut } from "../../lib/auth";
 import { findBookmarkByUrl } from "../../lib/bookmark-tree";
 import { sendExtensionRequest } from "../../lib/messages";
+import { canonicalizeUrl } from "../../lib/url";
+import {
+  AI_PROVIDER_PRESETS,
+  getAiProviderPreset
+} from "../../lib/settings";
 import type {
+  AiProviderId,
+  AiSettingsStatus,
+  AgentChatMessage,
+  AgentConversation,
   AppState,
   BookmarkBarSnapshot,
   NativeBookmarkNode,
   NativeFolderOption,
-  NavigationSuggestion,
   PendingSaveDraft,
-  PageCapture
+  PageCapture,
+  ResourceRecord
 } from "../../lib/types";
+import {
+  ArrowLeftIcon,
+  ArrowUpIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  CloseIcon,
+  EllipsisIcon,
+  FolderIcon,
+  HistoryIcon,
+  PlusIcon,
+  SettingsIcon,
+  StarIcon
+} from "../components/Icons";
+import { SiteIcon } from "../components/SiteIcon";
+import { SiteThumbnail } from "../components/SiteThumbnail";
 
 type EditorState =
-  | { kind: "bookmark"; node: NativeBookmarkNode }
+  | {
+      kind: "bookmark";
+      node: NativeBookmarkNode;
+      resourceKey?: string;
+    }
   | { kind: "folder"; parentId: string }
   | { kind: "save" }
   | null;
+
+function resourceForUrl(
+  resourceByUrl: Map<string, ResourceRecord>,
+  url: string
+): ResourceRecord | undefined {
+  const direct = resourceByUrl.get(url);
+  if (direct) return direct;
+  try {
+    return resourceByUrl.get(canonicalizeUrl(url));
+  } catch {
+    return undefined;
+  }
+}
+
+function parseEditableTags(value: string): string[] {
+  return value
+    .split(/[,，;；\n]+/)
+    .map((tag) => tag.trim().replace(/^#+\s*/, "").slice(0, 40))
+    .filter(Boolean);
+}
+
+function mergeEditableTags(
+  current: string[],
+  value: string
+): string[] {
+  const seen = new Set(
+    current.map((tag) => tag.toLocaleLowerCase())
+  );
+  const next = [...current];
+  for (const tag of parseEditableTags(value)) {
+    const key = tag.toLocaleLowerCase();
+    if (seen.has(key) || next.length >= 16) continue;
+    seen.add(key);
+    next.push(tag);
+  }
+  return next;
+}
+
+interface FolderSelectProps {
+  options: NativeFolderOption[];
+  value: string;
+  onChange: (value: string) => void;
+}
+
+function FolderSelect({
+  options,
+  value,
+  onChange
+}: FolderSelectProps) {
+  const listboxId = useId();
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const selectedIndex = Math.max(
+    0,
+    options.findIndex((option) => option.id === value)
+  );
+  const selected = options[selectedIndex];
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(selectedIndex);
+
+  useEffect(() => {
+    setActiveIndex(selectedIndex);
+  }, [selectedIndex]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleOutsidePointer = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        !rootRef.current?.contains(event.target)
+      ) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", handleOutsidePointer);
+    return () =>
+      document.removeEventListener("pointerdown", handleOutsidePointer);
+  }, [open]);
+
+  function focusOption(index: number) {
+    const next = Math.max(0, Math.min(index, options.length - 1));
+    setActiveIndex(next);
+    window.requestAnimationFrame(() => optionRefs.current[next]?.focus());
+  }
+
+  function openMenu(index = selectedIndex) {
+    if (!options.length) return;
+    setOpen(true);
+    focusOption(index);
+  }
+
+  function selectOption(index: number) {
+    const option = options[index];
+    if (!option) return;
+    onChange(option.id);
+    setOpen(false);
+    window.requestAnimationFrame(() => triggerRef.current?.focus());
+  }
+
+  function handleKeyDown(event: React.KeyboardEvent) {
+    if (!open) {
+      if (
+        event.key === "ArrowDown" ||
+        event.key === "ArrowUp" ||
+        event.key === "Enter" ||
+        event.key === " "
+      ) {
+        event.preventDefault();
+        openMenu(
+          event.key === "ArrowUp" ? options.length - 1 : selectedIndex
+        );
+      }
+      return;
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setOpen(false);
+      triggerRef.current?.focus();
+      return;
+    }
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      focusOption((activeIndex + 1) % options.length);
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      focusOption((activeIndex - 1 + options.length) % options.length);
+      return;
+    }
+    if (event.key === "Home" || event.key === "End") {
+      event.preventDefault();
+      focusOption(event.key === "Home" ? 0 : options.length - 1);
+      return;
+    }
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      selectOption(activeIndex);
+    }
+  }
+
+  return (
+    <div
+      ref={rootRef}
+      className="folder-select"
+      data-open={open}
+      onKeyDown={handleKeyDown}
+    >
+      <button
+        ref={triggerRef}
+        type="button"
+        className="folder-select-trigger"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={listboxId}
+        onClick={() => (open ? setOpen(false) : openMenu())}
+      >
+        <span>{selected?.name || "选择文件夹"}</span>
+        <ChevronDownIcon />
+      </button>
+      {open ? (
+        <div
+          id={listboxId}
+          className="folder-select-popover"
+          role="listbox"
+          aria-label="文件夹"
+        >
+          {options.map((option, index) => (
+            <button
+              key={option.id}
+              ref={(element) => {
+                optionRefs.current[index] = element;
+              }}
+              type="button"
+              role="option"
+              aria-selected={option.id === value}
+              tabIndex={index === activeIndex ? 0 : -1}
+              className="folder-select-option"
+              data-active={index === activeIndex}
+              style={{
+                "--folder-depth": option.depth
+              } as React.CSSProperties}
+              onPointerMove={() => setActiveIndex(index)}
+              onClick={() => selectOption(index)}
+            >
+              <FolderIcon />
+              <span>{option.name}</span>
+              {option.id === value ? <span aria-hidden="true">✓</span> : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+interface SettingsPageProps {
+  appState: AppState | null;
+  onAppStateChange: (state: AppState) => void;
+  onClose: () => void;
+}
+
+function SettingsPage({
+  appState,
+  onAppStateChange,
+  onClose
+}: SettingsPageProps) {
+  const [settings, setSettings] = useState<AiSettingsStatus | null>(null);
+  const [provider, setProvider] = useState<AiProviderId>("gemini");
+  const [model, setModel] = useState(
+    getAiProviderPreset("gemini").defaultModel
+  );
+  const [apiKey, setApiKey] = useState("");
+  const [action, setAction] = useState("");
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const backButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    backButtonRef.current?.focus();
+    void sendExtensionRequest({ type: "GET_AI_SETTINGS" })
+      .then((next) => {
+        setSettings(next);
+        setProvider(next.provider);
+        setModel(next.model);
+      })
+      .catch((caught) =>
+        setError(
+          caught instanceof Error ? caught.message : "无法读取 AI 设置"
+        )
+      );
+  }, []);
+
+  useEffect(() => {
+    if (appState?.libraryScan.state !== "running") return;
+    const timer = window.setInterval(() => {
+      void sendExtensionRequest({ type: "GET_APP_STATE" })
+        .then(onAppStateChange)
+        .catch(() => undefined);
+    }, 1_000);
+    return () => window.clearInterval(timer);
+  }, [appState?.libraryScan.state, onAppStateChange]);
+
+  async function saveApiSettings() {
+    if (!model.trim() || action) return;
+    setAction("save-key");
+    setError("");
+    setMessage("");
+    try {
+      const next = await sendExtensionRequest({
+        type: "SAVE_AI_SETTINGS",
+        payload: {
+          provider,
+          model: model.trim(),
+          apiKey: apiKey.trim() || undefined
+        }
+      });
+      setSettings(next);
+      setProvider(next.provider);
+      setModel(next.model);
+      setApiKey("");
+      setMessage(`${next.providerName} 已验证并保存。`);
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "API Key 保存失败"
+      );
+    } finally {
+      setAction("");
+    }
+  }
+
+  async function handleLogin() {
+    if (action) return;
+    setAction("login");
+    setError("");
+    setMessage("");
+    try {
+      await signInWithGoogle();
+      const state = await sendExtensionRequest({ type: "AUTH_CHANGED" });
+      onAppStateChange(state);
+      setMessage("Google 账号已连接。");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "登录失败");
+    } finally {
+      setAction("");
+    }
+  }
+
+  async function handleSignOut() {
+    if (action) return;
+    setAction("logout");
+    setError("");
+    setMessage("");
+    try {
+      await signOut();
+      const state = await sendExtensionRequest({ type: "GET_APP_STATE" });
+      onAppStateChange(state);
+      setMessage("已退出 Google 账号。");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "退出失败");
+    } finally {
+      setAction("");
+    }
+  }
+
+  async function handleLibraryScan(
+    intent: "start" | "pause" | "resume" | "cancel"
+  ) {
+    if (action) return;
+    setAction(`scan-${intent}`);
+    setError("");
+    setMessage("");
+    try {
+      if (intent === "start") {
+        const permissionApi = chrome.permissions;
+        const granted = permissionApi?.request
+          ? await permissionApi.request({
+              origins: ["http://*/*", "https://*/*"]
+            })
+          : true;
+        if (!granted) {
+          throw new Error(
+            "需要网页读取权限，才能为整个书签目录提取代表图、简介和标签。"
+          );
+        }
+        await sendExtensionRequest({
+          type: "START_LIBRARY_SCAN",
+          force: false
+        });
+      } else {
+        await sendExtensionRequest({
+          type:
+            intent === "pause"
+              ? "PAUSE_LIBRARY_SCAN"
+              : intent === "resume"
+                ? "RESUME_LIBRARY_SCAN"
+                : "CANCEL_LIBRARY_SCAN"
+        });
+      }
+      const state = await sendExtensionRequest({ type: "GET_APP_STATE" });
+      onAppStateChange(state);
+      setMessage(
+        intent === "start"
+          ? "全目录扫描已开始，可以关闭设置页，任务会继续运行。"
+          : intent === "pause"
+            ? "扫描已暂停。"
+            : intent === "resume"
+              ? "扫描已继续。"
+              : "扫描已取消。"
+      );
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "扫描操作失败");
+    } finally {
+      setAction("");
+    }
+  }
+
+  const accountName =
+    appState?.auth.userName ||
+    appState?.auth.userEmail ||
+    appState?.auth.chromeProfileEmail ||
+    "尚未连接";
+  const providerPreset = getAiProviderPreset(provider);
+  const providerConfigured = Boolean(
+    settings?.configuredProviders.includes(provider)
+  );
+  const canSaveProvider =
+    Boolean(model.trim()) &&
+    (Boolean(apiKey.trim()) || providerConfigured);
+
+  return (
+    <main className="native-panel native-settings-panel">
+      <header className="settings-page-header">
+        <button
+          ref={backButtonRef}
+          type="button"
+          className="icon-button settings-back-button"
+          aria-label="返回我的书签"
+          title="返回"
+          onClick={onClose}
+        >
+          <ArrowLeftIcon />
+        </button>
+        <div>
+          <h1>设置</h1>
+        </div>
+      </header>
+
+      <section className="settings-page-content">
+        {error ? (
+          <div className="settings-notice" data-tone="error" role="alert">
+            {error}
+          </div>
+        ) : null}
+        {message ? (
+          <div className="settings-notice" data-tone="success" role="status">
+            {message}
+          </div>
+        ) : null}
+
+        <section className="settings-section" aria-labelledby="ai-settings-title">
+          <div className="settings-section-heading">
+            <div>
+              <h2 id="ai-settings-title">AI 服务</h2>
+              <p>用于生成书签摘要和标签，增强本地检索。</p>
+            </div>
+            <span
+              className="settings-status"
+              data-active={providerConfigured}
+            >
+              {providerConfigured ? "已配置" : "需要 API Key"}
+            </span>
+          </div>
+
+          <div
+            className="settings-provider-tabs"
+            role="radiogroup"
+            aria-label="AI 服务商"
+          >
+            {AI_PROVIDER_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                role="radio"
+                aria-checked={provider === preset.id}
+                className="settings-provider-tab"
+                data-active={provider === preset.id}
+                onClick={() => {
+                  setProvider(preset.id);
+                  setModel(
+                    settings?.providerModels[preset.id] ||
+                      preset.defaultModel
+                  );
+                  setApiKey("");
+                  setError("");
+                  setMessage("");
+                }}
+              >
+                {preset.name}
+              </button>
+            ))}
+          </div>
+          <p className="settings-provider-help">
+            {providerPreset.description}
+            {settings?.provider === provider &&
+            settings.apiKeyConfigured &&
+            settings.apiKeySuffix
+              ? ` 当前 Key：•••• ${settings.apiKeySuffix}`
+              : ""}
+          </p>
+
+          <label className="settings-field">
+            <span>模型</span>
+            <input
+              type="text"
+              value={model}
+              onChange={(event) => setModel(event.target.value)}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder={providerPreset.defaultModel}
+            />
+          </label>
+
+          <label className="settings-field">
+            <span>API Key</span>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(event) => setApiKey(event.target.value)}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder={
+                providerConfigured
+                  ? "输入新的 Key 可替换当前配置"
+                  : providerPreset.apiKeyPlaceholder
+              }
+            />
+          </label>
+          <div className="settings-field-footer">
+            <p>
+              Key 仅保存在这个 Chrome 配置文件中；调用时由扩展直接发送到所选 AI 服务商。
+            </p>
+            <button
+              type="button"
+              className="button button-dark button-small"
+              disabled={!canSaveProvider || Boolean(action)}
+              onClick={() => void saveApiSettings()}
+            >
+              {action === "save-key"
+                ? "正在验证…"
+                : "验证并保存"}
+            </button>
+          </div>
+        </section>
+
+        <section
+          className="settings-section settings-scan-section"
+          aria-labelledby="library-scan-title"
+        >
+          <div className="settings-section-heading">
+            <div>
+              <h2 id="library-scan-title">全目录扫描</h2>
+              <p>
+                逐个读取可访问网页，补充代表图、简介、标签和主题。
+              </p>
+            </div>
+            <span
+              className="settings-status"
+              data-active={
+                appState?.libraryScan.state === "running" ||
+                appState?.libraryScan.state === "completed"
+              }
+            >
+              {appState?.libraryScan.state === "running"
+                ? "扫描中"
+                : appState?.libraryScan.state === "paused"
+                  ? "已暂停"
+                  : appState?.libraryScan.state === "completed"
+                    ? "已完成"
+                    : "未开始"}
+            </span>
+          </div>
+          <div className="settings-scan-progress">
+            <div>
+              <strong>
+                {appState?.aiReadyResourceCount ?? 0}
+                <span> / {appState?.localResourceCount ?? 0}</span>
+              </strong>
+              <small>已具备 AI 元数据</small>
+            </div>
+            <progress
+              max={Math.max(1, appState?.libraryScan.total || 1)}
+              value={appState?.libraryScan.processed || 0}
+              aria-label="全目录扫描进度"
+            />
+            {appState?.libraryScan.currentTitle ? (
+              <p title={appState.libraryScan.currentTitle}>
+                正在处理：{appState.libraryScan.currentTitle}
+              </p>
+            ) : null}
+            {appState?.libraryScan.total ? (
+              <p>
+                本次 {appState.libraryScan.processed}/
+                {appState.libraryScan.total} · 成功{" "}
+                {appState.libraryScan.succeeded} · 跳过{" "}
+                {appState.libraryScan.skipped} · 失败{" "}
+                {appState.libraryScan.failed}
+              </p>
+            ) : null}
+          </div>
+          <p className="settings-scan-privacy">
+            代表图会压缩后只保存在本机；简介和标签会产生所选 AI 服务商的调用费用。内部网址、局域网和受保护地址不会发送给 AI。
+          </p>
+          <div className="settings-scan-actions">
+            {appState?.libraryScan.state === "running" ? (
+              <button
+                type="button"
+                className="button button-quiet button-small"
+                disabled={Boolean(action)}
+                onClick={() => void handleLibraryScan("pause")}
+              >
+                暂停
+              </button>
+            ) : appState?.libraryScan.state === "paused" ? (
+              <>
+                <button
+                  type="button"
+                  className="button button-quiet button-small"
+                  disabled={Boolean(action)}
+                  onClick={() => void handleLibraryScan("cancel")}
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  className="button button-dark button-small"
+                  disabled={Boolean(action)}
+                  onClick={() => void handleLibraryScan("resume")}
+                >
+                  继续扫描
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="button button-dark button-small"
+                disabled={
+                  Boolean(action) ||
+                  !settings?.apiKeyConfigured ||
+                  !appState?.localResourceCount
+                }
+                onClick={() => void handleLibraryScan("start")}
+              >
+                {action === "scan-start"
+                  ? "正在启动…"
+                  : appState?.aiReadyResourceCount ===
+                    appState?.localResourceCount &&
+                    Boolean(appState?.localResourceCount)
+                    ? "检查并补全"
+                    : "扫描全部书签"}
+              </button>
+            )}
+          </div>
+        </section>
+
+        <section
+          className="settings-section"
+          aria-labelledby="account-settings-title"
+        >
+          <div className="settings-section-heading">
+            <div>
+              <h2 id="account-settings-title">Google 账号</h2>
+              <p>可选，用于跨设备同步和云端备份。</p>
+            </div>
+          </div>
+          <div className="settings-account-row">
+            {appState?.auth.userAvatarUrl ? (
+              <img src={appState.auth.userAvatarUrl} alt="" />
+            ) : (
+              <span className="settings-account-avatar">
+                {accountName.slice(0, 1).toUpperCase()}
+              </span>
+            )}
+            <div>
+              <strong>{accountName}</strong>
+              <small>
+                {!appState?.auth.configured
+                  ? "云端登录尚未配置"
+                  : appState.auth.signedIn
+                    ? appState.auth.accountMatches === false
+                      ? "与当前 Chrome 账号不一致"
+                      : "已连接"
+                    : "未登录"}
+              </small>
+            </div>
+            {appState?.auth.configured ? (
+              <button
+                type="button"
+                className="button button-quiet button-small"
+                disabled={Boolean(action)}
+                onClick={() =>
+                  void (appState.auth.signedIn
+                    ? handleSignOut()
+                    : handleLogin())
+                }
+              >
+                {action === "login"
+                  ? "登录中…"
+                  : action === "logout"
+                    ? "退出中…"
+                    : appState.auth.signedIn
+                      ? "退出"
+                      : "登录"}
+              </button>
+            ) : null}
+          </div>
+        </section>
+
+      </section>
+    </main>
+  );
+}
 
 function hostFromUrl(url: string): string {
   try {
@@ -78,19 +772,17 @@ function countBookmarks(node: NativeBookmarkNode): number {
   );
 }
 
-function kindIcon(kind: NavigationSuggestion["kind"]): string {
-  if (kind === "bookmark") return "★";
-  if (kind === "tab") return "▣";
-  return "↺";
-}
-
 interface TreeProps {
   nodes: NativeBookmarkNode[];
+  resourceByUrl: Map<string, ResourceRecord>;
   depth?: number;
   expanded: Set<string>;
   onToggle: (id: string) => void;
   onOpen: (node: NativeBookmarkNode, newTab: boolean) => void;
   onEdit: (node: NativeBookmarkNode) => void;
+  draggedId: string;
+  onDragStart: (id: string) => void;
+  onDragEnd: () => void;
   onMove: (
     id: string,
     parentId: string,
@@ -100,23 +792,118 @@ interface TreeProps {
 
 function BookmarkTree({
   nodes,
+  resourceByUrl,
   depth = 0,
   expanded,
   onToggle,
   onOpen,
   onEdit,
+  draggedId,
+  onDragStart,
+  onDragEnd,
   onMove
 }: TreeProps) {
+  const [orderedNodes, setOrderedNodes] = useState(nodes);
+  const nodeElements = useRef(new Map<string, HTMLDivElement>());
+  const previousPositions = useRef<Map<string, number> | null>(null);
+  const lastHoverTarget = useRef("");
+  const activeDragId = useRef("");
+
+  useEffect(() => {
+    setOrderedNodes(nodes);
+  }, [nodes]);
+
+  useLayoutEffect(() => {
+    const positions = previousPositions.current;
+    previousPositions.current = null;
+    if (
+      !positions ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      return;
+    }
+
+    for (const node of orderedNodes) {
+      const element = nodeElements.current.get(node.id);
+      const previousTop = positions.get(node.id);
+      if (!element || previousTop === undefined) continue;
+      const deltaY = previousTop - element.getBoundingClientRect().top;
+      if (Math.abs(deltaY) < 1) continue;
+      element.getAnimations().forEach((animation) => animation.cancel());
+      element.animate(
+        [
+          { transform: `translateY(${deltaY}px)` },
+          { transform: "translateY(0)" }
+        ],
+        {
+          duration: 240,
+          easing: "cubic-bezier(0.22, 1, 0.36, 1)"
+        }
+      );
+    }
+  }, [orderedNodes]);
+
+  function capturePositions(): Map<string, number> {
+    return new Map(
+      orderedNodes.flatMap((node) => {
+        const element = nodeElements.current.get(node.id);
+        return element
+          ? [[node.id, element.getBoundingClientRect().top] as const]
+          : [];
+      })
+    );
+  }
+
+  function moveDraggedNode(targetId: string) {
+    const sourceId = activeDragId.current || draggedId;
+    if (!sourceId || sourceId === targetId) return;
+    const sourceIndex = orderedNodes.findIndex(
+      (item) => item.id === sourceId
+    );
+    const targetIndex = orderedNodes.findIndex(
+      (item) => item.id === targetId
+    );
+    if (sourceIndex < 0 || targetIndex < 0) return;
+    const hoverKey = `${sourceId}:${targetId}`;
+    if (lastHoverTarget.current === hoverKey) return;
+
+    const next = [...orderedNodes];
+    const [moved] = next.splice(sourceIndex, 1);
+    next.splice(targetIndex, 0, moved);
+    previousPositions.current = capturePositions();
+    lastHoverTarget.current = hoverKey;
+    setOrderedNodes(next);
+  }
+
   return (
-    <>
-      {nodes.map((node) => {
+    <div className="bookmark-tree-level">
+      {orderedNodes.map((node) => {
         const folder = !node.url;
         const isExpanded = expanded.has(node.id);
+        const metadata = node.url
+          ? resourceForUrl(resourceByUrl, node.url)
+          : undefined;
         return (
-          <div className="bookmark-node" key={node.id}>
+          <div
+            className="bookmark-node"
+            key={node.id}
+            ref={(element) => {
+              if (element) nodeElements.current.set(node.id, element);
+              else nodeElements.current.delete(node.id);
+            }}
+          >
             <div
               className="bookmark-row"
               data-folder={folder}
+              data-expanded={folder ? isExpanded : undefined}
+              data-analysis={
+                folder
+                  ? undefined
+                  : metadata?.aiStatus === "ready"
+                    ? "ready"
+                    : "pending"
+              }
+              data-dragging={draggedId === node.id}
               draggable={!node.unmodifiable}
               style={{ "--tree-depth": depth } as React.CSSProperties}
               onDragStart={(event) => {
@@ -125,18 +912,38 @@ function BookmarkTree({
                   "application/x-bookmark-layer-id",
                   node.id
                 );
+                activeDragId.current = node.id;
+                onDragStart(node.id);
+              }}
+              onDragEnd={() => {
+                activeDragId.current = "";
+                lastHoverTarget.current = "";
+                onDragEnd();
               }}
               onDragOver={(event) => {
                 event.preventDefault();
                 event.dataTransfer.dropEffect = "move";
+                moveDraggedNode(node.id);
               }}
               onDrop={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
                 const id = event.dataTransfer.getData(
                   "application/x-bookmark-layer-id"
-                );
+                ) || activeDragId.current;
                 if (!id || id === node.id) return;
+                const reorderedIndex = orderedNodes.findIndex(
+                  (item) => item.id === id
+                );
+                if (reorderedIndex >= 0) {
+                  void onMove(
+                    id,
+                    node.parentId || "",
+                    reorderedIndex
+                  );
+                  onDragEnd();
+                  return;
+                }
                 void onMove(
                   id,
                   folder ? node.id : node.parentId || "",
@@ -159,12 +966,28 @@ function BookmarkTree({
                 }}
                 title={node.url || node.title}
               >
-                <span className="tree-chevron" data-visible={folder}>
-                  {folder ? (isExpanded ? "⌄" : "›") : ""}
+                <span
+                  className="tree-chevron"
+                  data-visible={folder}
+                  data-expanded={isExpanded}
+                >
+                  {folder ? <ChevronRightIcon /> : null}
                 </span>
-                <span className="tree-icon" data-folder={folder}>
-                  {folder ? (isExpanded ? "▾" : "▸") : "↗"}
-                </span>
+                {folder ? (
+                  <span className="tree-icon" data-folder="true">
+                    <FolderIcon />
+                  </span>
+                ) : (
+                  <SiteThumbnail
+                    url={node.url || ""}
+                    imageUrl={
+                      metadata?.thumbnailDataUrl || metadata?.imageUrl
+                    }
+                    faviconUrl={metadata?.faviconUrl}
+                    label={node.title}
+                    className="bookmark-thumbnail"
+                  />
+                )}
                 <span className="bookmark-copy">
                   <strong>{node.title || "未命名"}</strong>
                   {node.url ? <small>{hostFromUrl(node.url)}</small> : null}
@@ -179,40 +1002,299 @@ function BookmarkTree({
                   title="编辑"
                   onClick={() => onEdit(node)}
                 >
-                  •••
+                  <EllipsisIcon />
                 </button>
               ) : null}
             </div>
 
-            {folder && isExpanded && node.children?.length ? (
-              <BookmarkTree
-                nodes={node.children}
-                depth={depth + 1}
-                expanded={expanded}
-                onToggle={onToggle}
-                onOpen={onOpen}
-                onEdit={onEdit}
-                onMove={onMove}
-              />
+            {folder && node.children?.length ? (
+              <div
+                className="folder-children"
+                data-expanded={isExpanded}
+                aria-hidden={!isExpanded}
+                inert={!isExpanded}
+              >
+                <div className="folder-children-inner">
+                  <BookmarkTree
+                    nodes={node.children}
+                    resourceByUrl={resourceByUrl}
+                    depth={depth + 1}
+                    expanded={expanded}
+                    onToggle={onToggle}
+                    onOpen={onOpen}
+                    onEdit={onEdit}
+                    draggedId={draggedId}
+                    onDragStart={onDragStart}
+                    onDragEnd={onDragEnd}
+                    onMove={onMove}
+                  />
+                </div>
+              </div>
             ) : null}
           </div>
         );
       })}
-    </>
+    </div>
+  );
+}
+
+interface AgentComposerProps {
+  value: string;
+  busy: boolean;
+  placeholder?: string;
+  onChange: (value: string) => void;
+  onSubmit: (event: React.FormEvent) => void;
+}
+
+function AgentComposer({
+  value,
+  busy,
+  placeholder = "询问你的收藏…",
+  onChange,
+  onSubmit
+}: AgentComposerProps) {
+  return (
+    <form
+      className="agent-composer"
+      onSubmit={(event) => onSubmit(event)}
+    >
+      <textarea
+        id="bookmark-agent-prompt"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (
+            event.key === "Enter" &&
+            !event.shiftKey &&
+            !event.nativeEvent.isComposing
+          ) {
+            event.preventDefault();
+            event.currentTarget.form?.requestSubmit();
+          }
+        }}
+        placeholder={placeholder}
+        rows={2}
+        aria-label={placeholder}
+      />
+      <div className="agent-composer-toolbar">
+        <button
+          type="submit"
+          className="agent-send-button"
+          aria-label="发送给 Aarre"
+          title="发送"
+          disabled={!value.trim() || busy}
+        >
+          <ArrowUpIcon />
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function conversationDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
+}
+
+interface AgentChatPageProps {
+  conversation: AgentConversation;
+  prompt: string;
+  busy: boolean;
+  error: string;
+  onPromptChange: (value: string) => void;
+  onBack: () => void;
+  onSubmit: (event: React.FormEvent) => void;
+  onOpenSource: (url: string) => void;
+}
+
+function AgentChatPage({
+  conversation,
+  prompt,
+  busy,
+  error,
+  onPromptChange,
+  onBack,
+  onSubmit,
+  onOpenSource
+}: AgentChatPageProps) {
+  const endRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({
+      block: "end",
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth"
+    });
+  }, [conversation.messages.length]);
+
+  return (
+    <main className="native-panel agent-chat-panel">
+      <header className="agent-page-header">
+        <button
+          type="button"
+          className="icon-button"
+          aria-label="返回收藏列表"
+          title="返回"
+          onClick={onBack}
+        >
+          <ArrowLeftIcon />
+        </button>
+        <div>
+          <h1>收藏对话</h1>
+        </div>
+      </header>
+      <section className="agent-thread" aria-live="polite">
+        {conversation.messages.map((message) => (
+          <article
+            key={message.id}
+            className="agent-message"
+            data-role={message.role}
+            data-status={message.status || "complete"}
+          >
+            <div className="agent-message-copy">
+              {message.status === "sending" ? (
+                <div className="agent-thinking">
+                  <span />
+                  <span />
+                  <span />
+                  正在理解全部收藏…
+                </div>
+              ) : (
+                <p>{message.content}</p>
+              )}
+              {message.providerName ? (
+                <small>{message.providerName}</small>
+              ) : null}
+            </div>
+            {message.sources?.length ? (
+              <div className="agent-message-sources">
+                <span>相关收藏</span>
+                {message.sources.map((source) => (
+                  <button
+                    type="button"
+                    key={source.resourceKey}
+                    onClick={() => onOpenSource(source.url)}
+                  >
+                    <SiteIcon
+                      url={source.url}
+                      faviconUrl={source.faviconUrl}
+                      label={source.siteName || source.title}
+                      size={26}
+                    />
+                    <span>
+                      <strong>{source.title}</strong>
+                      <small>{hostFromUrl(source.url)}</small>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </article>
+        ))}
+        {error ? (
+          <div className="agent-thread-error" role="alert">
+            {error}
+          </div>
+        ) : null}
+        <div ref={endRef} />
+      </section>
+      <AgentComposer
+        value={prompt}
+        busy={busy}
+        placeholder="继续询问…"
+        onChange={onPromptChange}
+        onSubmit={onSubmit}
+      />
+    </main>
+  );
+}
+
+interface AgentHistoryPageProps {
+  conversations: AgentConversation[];
+  onBack: () => void;
+  onOpen: (conversation: AgentConversation) => void;
+}
+
+function AgentHistoryPage({
+  conversations,
+  onBack,
+  onOpen
+}: AgentHistoryPageProps) {
+  return (
+    <main className="native-panel agent-history-panel">
+      <header className="agent-page-header">
+        <button
+          type="button"
+          className="icon-button"
+          aria-label="返回收藏列表"
+          title="返回"
+          onClick={onBack}
+        >
+          <ArrowLeftIcon />
+        </button>
+        <div>
+          <h1>历史会话</h1>
+        </div>
+      </header>
+      <section className="agent-history-list">
+        {conversations.length ? (
+          conversations.map((conversation) => {
+            const preview = [...conversation.messages]
+              .reverse()
+              .find((message) => message.role === "assistant")?.content;
+            return (
+              <button
+                type="button"
+                key={conversation.id}
+                onClick={() => onOpen(conversation)}
+              >
+                <span>
+                  <strong>{conversation.title}</strong>
+                  <time>{conversationDate(conversation.updatedAt)}</time>
+                </span>
+                <small>{preview || "尚未生成回答"}</small>
+                <ChevronRightIcon />
+              </button>
+            );
+          })
+        ) : (
+          <div className="agent-history-empty">
+            <HistoryIcon />
+            <strong>还没有历史会话</strong>
+            <p>在收藏列表底部提问后，会话会自动保存在这里。</p>
+          </div>
+        )}
+      </section>
+    </main>
   );
 }
 
 export function SidePanelApp() {
   const [snapshot, setSnapshot] = useState<BookmarkBarSnapshot | null>(null);
   const [appState, setAppState] = useState<AppState | null>(null);
+  const [resources, setResources] = useState<ResourceRecord[]>([]);
   const [folders, setFolders] = useState<NativeFolderOption[]>([]);
-  const [query, setQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<NavigationSuggestion[]>([]);
-  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [agentPrompt, setAgentPrompt] = useState("");
+  const [panelView, setPanelView] = useState<
+    "library" | "settings" | "chat" | "history"
+  >("library");
+  const [conversations, setConversations] = useState<AgentConversation[]>([]);
+  const [activeConversation, setActiveConversation] =
+    useState<AgentConversation | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [draggedId, setDraggedId] = useState("");
   const [editor, setEditor] = useState<EditorState>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editUrl, setEditUrl] = useState("");
+  const [editTags, setEditTags] = useState<string[]>([]);
+  const [editTagInput, setEditTagInput] = useState("");
   const [capture, setCapture] = useState<PageCapture | null>(null);
   const [note, setNote] = useState("");
   const [folderId, setFolderId] = useState("");
@@ -221,39 +1303,106 @@ export function SidePanelApp() {
   const [confirmDeleteId, setConfirmDeleteId] = useState("");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
-  const searchSequence = useRef(0);
-  const knownRootIds = useRef<Set<string>>(new Set());
+  const [notice, setNotice] = useState("");
+  const [scrollThumb, setScrollThumb] = useState({
+    scrollable: false,
+    visible: false,
+    height: 36,
+    offset: 10,
+    atEnd: false
+  });
   const pendingDraftInFlight = useRef(false);
   const dialogRef = useRef<HTMLElement | null>(null);
+  const contentRef = useRef<HTMLElement | null>(null);
+  const scrollHideTimer = useRef<number | undefined>(undefined);
+  const scrollDrag = useRef<{
+    pointerId: number;
+    startY: number;
+    startScrollTop: number;
+  } | null>(null);
   const busyRef = useRef("");
   busyRef.current = busy;
 
+  const syncScrollThumb = useCallback((show = false) => {
+    const content = contentRef.current;
+    if (!content) return;
+    const maxScroll = Math.max(0, content.scrollHeight - content.clientHeight);
+    const trackHeight = Math.max(0, content.clientHeight - 20);
+    const height =
+      maxScroll > 0
+        ? Math.max(
+            36,
+            trackHeight * (content.clientHeight / content.scrollHeight)
+          )
+        : trackHeight;
+    const maxOffset = Math.max(0, trackHeight - height);
+    const offset =
+      10 + (maxScroll > 0 ? (content.scrollTop / maxScroll) * maxOffset : 0);
+    setScrollThumb((current) => ({
+      scrollable: maxScroll > 1,
+      visible: maxScroll > 1 && (show || current.visible),
+      height,
+      offset,
+      atEnd:
+        maxScroll <= 1 || content.scrollTop >= maxScroll - 1
+    }));
+  }, []);
+
+  const scheduleScrollThumbHide = useCallback(() => {
+    if (scrollHideTimer.current !== undefined) {
+      window.clearTimeout(scrollHideTimer.current);
+    }
+    scrollHideTimer.current = window.setTimeout(() => {
+      setScrollThumb((current) => ({
+        ...current,
+        visible: false
+      }));
+    }, 900);
+  }, []);
+
+  const revealScrollThumb = useCallback(() => {
+    syncScrollThumb(true);
+    scheduleScrollThumbHide();
+  }, [scheduleScrollThumbHide, syncScrollThumb]);
+
   const refresh = useCallback(async () => {
+    const nextResources = await sendExtensionRequest({
+      type: "GET_LOCAL_RESOURCES"
+    });
     const [nextSnapshot, nextState] = await Promise.all([
       sendExtensionRequest({ type: "GET_BOOKMARK_BAR" }),
       sendExtensionRequest({ type: "GET_APP_STATE" })
     ]);
     setSnapshot(nextSnapshot);
     setAppState(nextState);
-    setExpanded((current) => {
-      const next = new Set(current);
-      for (const root of nextSnapshot.roots || [nextSnapshot.root]) {
-        if (!knownRootIds.current.has(root.id)) {
-          next.add(root.id);
-          knownRootIds.current.add(root.id);
-        }
-      }
-      return next;
+    setResources(nextResources);
+  }, []);
+
+  const loadConversations = useCallback(async () => {
+    const next = await sendExtensionRequest({
+      type: "GET_AGENT_CONVERSATIONS"
     });
+    const nextConversations = Array.isArray(next) ? next : [];
+    setConversations(nextConversations);
+    return nextConversations;
   }, []);
 
   useEffect(() => {
     void refresh().catch((caught) => {
       setError(caught instanceof Error ? caught.message : "书签栏读取失败");
     });
+    void loadConversations().catch((caught) => {
+      setError(
+        caught instanceof Error ? caught.message : "历史会话读取失败"
+      );
+    });
 
     const handleChange = () => {
-      void refresh();
+      void refresh().catch((caught) => {
+        setError(
+          caught instanceof Error ? caught.message : "书签栏刷新失败"
+        );
+      });
     };
     chrome.bookmarks.onCreated.addListener(handleChange);
     chrome.bookmarks.onChanged.addListener(handleChange);
@@ -267,7 +1416,72 @@ export function SidePanelApp() {
       chrome.bookmarks.onRemoved.removeListener(handleChange);
       chrome.bookmarks.onChildrenReordered.removeListener(handleChange);
     };
-  }, [refresh]);
+  }, [loadConversations, refresh]);
+
+  useEffect(() => {
+    const handleScanUpdate = (message: {
+      type?: string;
+      status?: AppState["libraryScan"];
+    }) => {
+      if (
+        message.type !== "LIBRARY_SCAN_UPDATED" ||
+        !message.status
+      ) {
+        return;
+      }
+      void sendExtensionRequest({ type: "GET_LOCAL_RESOURCES" })
+        .then((nextResources) => {
+          const safeResources = Array.isArray(nextResources)
+            ? nextResources
+            : [];
+          setResources(safeResources);
+          setAppState((current) =>
+            current
+              ? {
+                  ...current,
+                  libraryScan: message.status!,
+                  aiReadyResourceCount: safeResources.filter(
+                    (resource) =>
+                      resource.aiStatus === "ready" &&
+                      Boolean(resource.summary) &&
+                      resource.tags.length > 0
+                  ).length
+                }
+              : current
+          );
+        })
+        .catch(() => undefined);
+    };
+    chrome.runtime.onMessage.addListener(handleScanUpdate);
+    return () =>
+      chrome.runtime.onMessage.removeListener(handleScanUpdate);
+  }, []);
+
+  useEffect(() => {
+    const content = contentRef.current;
+    if (!content) return;
+    const resizeObserver = new ResizeObserver(() => syncScrollThumb());
+    resizeObserver.observe(content);
+    const mutationObserver = new MutationObserver(() => {
+      window.requestAnimationFrame(() => syncScrollThumb());
+    });
+    mutationObserver.observe(content, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["data-expanded"]
+    });
+    const frame = window.requestAnimationFrame(() => syncScrollThumb());
+
+    return () => {
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+      window.cancelAnimationFrame(frame);
+      if (scrollHideTimer.current !== undefined) {
+        window.clearTimeout(scrollHideTimer.current);
+      }
+    };
+  }, [panelView, syncScrollThumb]);
 
   useEffect(() => {
     const tabId = appState?.activeTab?.id;
@@ -310,31 +1524,6 @@ export function SidePanelApp() {
       chrome.runtime.onMessage.removeListener(handlePendingSave);
     };
   }, [appState?.activeTab?.id]);
-
-  useEffect(() => {
-    const current = ++searchSequence.current;
-    setSuggestions([]);
-    setSelectedIndex(-1);
-    if (!query.trim()) {
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      void sendExtensionRequest({
-        type: "GET_NAVIGATION_SUGGESTIONS",
-        query
-      })
-        .then((items) => {
-          if (current !== searchSequence.current) return;
-          setSuggestions(items);
-          setSelectedIndex(items.length ? 0 : -1);
-        })
-        .catch((caught) => {
-          if (current !== searchSequence.current) return;
-          setError(caught instanceof Error ? caught.message : "搜索失败");
-        });
-    }, 120);
-    return () => window.clearTimeout(timer);
-  }, [query]);
 
   useEffect(() => {
     if (!editor) return;
@@ -410,9 +1599,48 @@ export function SidePanelApp() {
     [appState, snapshot]
   );
   const currentSaved = Boolean(currentSavedNode);
+  const visibleBookmarkNodes = useMemo(() => {
+    if (!snapshot) return [];
+    const roots = snapshot.roots?.length
+      ? snapshot.roots
+      : [snapshot.root];
+    const primaryRoot =
+      roots.find((root) => root.id === snapshot.primaryRootId) ||
+      snapshot.root;
+
+    return roots.flatMap((root) =>
+      root.id === primaryRoot.id
+        ? root.children || []
+        : [{ ...root, unmodifiable: true }]
+    );
+  }, [snapshot]);
+  const hasVisibleFolders = visibleBookmarkNodes.some(
+    (node) => !node.url
+  );
+  const resourceByUrl = useMemo(() => {
+    const map = new Map<string, ResourceRecord>();
+    for (const resource of Array.isArray(resources) ? resources : []) {
+      map.set(resource.url, resource);
+      map.set(resource.canonicalUrl, resource);
+    }
+    return map;
+  }, [resources]);
+  const editorResource = useMemo(() => {
+    if (editor?.kind !== "bookmark" || !editor.node.url) {
+      return undefined;
+    }
+    return (
+      (editor.resourceKey
+        ? resources.find(
+            (resource) => resource.resourceKey === editor.resourceKey
+          )
+        : undefined) ||
+      resourceForUrl(resourceByUrl, editor.node.url)
+    );
+  }, [editor, resourceByUrl, resources]);
 
   async function openNavigation(
-    input: { text: string; item?: NavigationSuggestion },
+    input: { text: string; url?: string },
     newTab = false
   ) {
     setError("");
@@ -421,37 +1649,143 @@ export function SidePanelApp() {
         type: "NAVIGATE",
         payload: {
           text: input.text,
-          url: input.item?.url,
-          tabId: input.item?.tabId,
-          windowId: input.item?.windowId,
+          url: input.url,
           disposition: newTab ? "new" : "current"
         }
       });
-      setQuery("");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "无法打开");
     }
   }
 
-  async function handleLogin() {
-    setBusy("login");
+  async function persistConversation(conversation: AgentConversation) {
+    const saved = await sendExtensionRequest({
+      type: "SAVE_AGENT_CONVERSATION",
+      conversation
+    });
+    setConversations((current) => [
+      saved,
+      ...current.filter((item) => item.id !== saved.id)
+    ]);
+    return saved;
+  }
+
+  async function runAgentTurn(
+    conversation: AgentConversation,
+    query: string
+  ) {
+    if (!query || busy) return;
+    const timestamp = new Date().toISOString();
+    const userMessage: AgentChatMessage = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content: query,
+      createdAt: timestamp,
+      status: "complete"
+    };
+    const pendingMessage: AgentChatMessage = {
+      id: crypto.randomUUID(),
+      role: "assistant",
+      content: "",
+      createdAt: timestamp,
+      status: "sending"
+    };
+    const pendingConversation: AgentConversation = {
+      ...conversation,
+      title:
+        conversation.messages.length > 0
+          ? conversation.title
+          : query.slice(0, 36),
+      updatedAt: timestamp,
+      messages: [
+        ...conversation.messages,
+        userMessage,
+        pendingMessage
+      ]
+    };
+    setActiveConversation(pendingConversation);
+    setPanelView("chat");
+    setAgentPrompt("");
+    setBusy("agent");
     setError("");
+    setNotice("");
+
     try {
-      await signInWithGoogle();
-      await sendExtensionRequest({ type: "AUTH_CHANGED" });
-      await refresh();
+      await persistConversation(pendingConversation);
+      const response = await sendExtensionRequest({
+        type: "ASK_BOOKMARK_AGENT",
+        query,
+        history: conversation.messages
+          .filter(
+            (message) =>
+              message.status !== "sending" &&
+              Boolean(message.content.trim())
+          )
+          .slice(-10)
+          .map((message) => ({
+            role: message.role,
+            content: message.content
+          }))
+      });
+      const completed: AgentConversation = {
+        ...pendingConversation,
+        updatedAt: new Date().toISOString(),
+        messages: pendingConversation.messages.map((message) =>
+          message.id === pendingMessage.id
+            ? {
+                ...message,
+                content: response.answer,
+                providerName: response.providerName
+                  ? `${response.providerName} · 已查看 ${response.examinedCount}/${response.catalogSize} 条收藏`
+                  : undefined,
+                sources: response.sources,
+                status: "complete"
+              }
+            : message
+        )
+      };
+      setActiveConversation(completed);
+      await persistConversation(completed);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Google 登录失败");
+      const message =
+        caught instanceof Error ? caught.message : "AI 暂时无法回答";
+      const failed: AgentConversation = {
+        ...pendingConversation,
+        updatedAt: new Date().toISOString(),
+        messages: pendingConversation.messages.map((item) =>
+          item.id === pendingMessage.id
+            ? {
+                ...item,
+                content: `这次没有完成：${message}`,
+                status: "failed"
+              }
+            : item
+        )
+      };
+      setActiveConversation(failed);
+      setError(message);
+      await persistConversation(failed).catch(() => undefined);
     } finally {
       setBusy("");
     }
   }
 
-  async function handleSearchSubmit(event: React.FormEvent) {
+  function handleAgentSubmit(event: React.FormEvent) {
     event.preventDefault();
-    const item =
-      selectedIndex >= 0 ? suggestions[selectedIndex] : undefined;
-    await openNavigation({ text: query, item }, false);
+    const query = agentPrompt.trim();
+    if (!query || busy) return;
+    const timestamp = new Date().toISOString();
+    const conversation =
+      panelView === "chat" && activeConversation
+        ? activeConversation
+        : {
+            id: crypto.randomUUID(),
+            title: query.slice(0, 36),
+            createdAt: timestamp,
+            updatedAt: timestamp,
+            messages: []
+          };
+    void runAgentTurn(conversation, query);
   }
 
   async function startSave(
@@ -522,10 +1856,19 @@ export function SidePanelApp() {
   }
 
   function startEdit(node: NativeBookmarkNode) {
-    setEditor({ kind: "bookmark", node });
+    const resource = node.url
+      ? resourceForUrl(resourceByUrl, node.url)
+      : undefined;
+    setEditor({
+      kind: "bookmark",
+      node,
+      ...(resource ? { resourceKey: resource.resourceKey } : {})
+    });
     setConfirmDeleteId("");
     setEditTitle(node.title);
     setEditUrl(node.url || "");
+    setEditTags(resource?.tags || []);
+    setEditTagInput("");
     setError("");
   }
 
@@ -534,13 +1877,22 @@ export function SidePanelApp() {
     setConfirmDeleteId("");
     setEditTitle("");
     setEditUrl("");
+    setEditTags([]);
+    setEditTagInput("");
     setError("");
+  }
+
+  function addEditTags(value = editTagInput) {
+    if (!parseEditableTags(value).length) return;
+    setEditTags((current) => mergeEditableTags(current, value));
+    setEditTagInput("");
   }
 
   async function saveEditor() {
     if (!editor) return;
     setBusy("save");
     setError("");
+    setNotice("");
     try {
       if (editor.kind === "folder") {
         await sendExtensionRequest({
@@ -548,6 +1900,15 @@ export function SidePanelApp() {
           payload: { parentId: editor.parentId, title: editTitle }
         });
       } else if (editor.kind === "bookmark") {
+        if (editor.resourceKey) {
+          await sendExtensionRequest({
+            type: "UPDATE_RESOURCE_TAGS",
+            payload: {
+              resourceKey: editor.resourceKey,
+              tags: mergeEditableTags(editTags, editTagInput)
+            }
+          });
+        }
         await sendExtensionRequest({
           type: "UPDATE_NATIVE_BOOKMARK",
           payload: {
@@ -558,7 +1919,7 @@ export function SidePanelApp() {
         });
       } else {
         if (!capture) throw new Error("当前页面尚未读取完成。");
-        await sendExtensionRequest({
+        const result = await sendExtensionRequest({
           type: "SAVE_BOOKMARK",
           payload: {
             capture,
@@ -568,6 +1929,9 @@ export function SidePanelApp() {
             requestAi
           }
         });
+        if (result.aiWarning) {
+          setNotice(result.aiWarning);
+        }
       }
       setEditor(null);
       setConfirmDeleteId("");
@@ -619,20 +1983,102 @@ export function SidePanelApp() {
     }
   }
 
+  function handleContentScroll() {
+    revealScrollThumb();
+  }
+
+  function handleScrollThumbPointerDown(
+    event: React.PointerEvent<HTMLDivElement>
+  ) {
+    const content = contentRef.current;
+    if (!content) return;
+    if (scrollHideTimer.current !== undefined) {
+      window.clearTimeout(scrollHideTimer.current);
+    }
+    scrollDrag.current = {
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      startScrollTop: content.scrollTop
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    syncScrollThumb(true);
+  }
+
+  function handleScrollThumbPointerMove(
+    event: React.PointerEvent<HTMLDivElement>
+  ) {
+    const content = contentRef.current;
+    const drag = scrollDrag.current;
+    if (!content || !drag || drag.pointerId !== event.pointerId) return;
+    const maxScroll = Math.max(0, content.scrollHeight - content.clientHeight);
+    const trackHeight = Math.max(0, content.clientHeight - 20);
+    const maxThumbTravel = Math.max(1, trackHeight - scrollThumb.height);
+    content.scrollTop =
+      drag.startScrollTop +
+      (event.clientY - drag.startY) * (maxScroll / maxThumbTravel);
+  }
+
+  function handleScrollThumbPointerEnd(
+    event: React.PointerEvent<HTMLDivElement>
+  ) {
+    if (scrollDrag.current?.pointerId !== event.pointerId) return;
+    scrollDrag.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    scheduleScrollThumbHide();
+  }
+
+  if (panelView === "settings") {
+    return (
+      <SettingsPage
+        appState={appState}
+        onAppStateChange={setAppState}
+        onClose={() => setPanelView("library")}
+      />
+    );
+  }
+
+  if (panelView === "history") {
+    return (
+      <AgentHistoryPage
+        conversations={conversations}
+        onBack={() => setPanelView("library")}
+        onOpen={(conversation) => {
+          setActiveConversation(conversation);
+          setAgentPrompt("");
+          setError("");
+          setPanelView("chat");
+        }}
+      />
+    );
+  }
+
+  if (panelView === "chat" && activeConversation) {
+    return (
+      <AgentChatPage
+        conversation={activeConversation}
+        prompt={agentPrompt}
+        busy={busy === "agent"}
+        error={error}
+        onPromptChange={setAgentPrompt}
+        onBack={() => {
+          setError("");
+          setPanelView("library");
+        }}
+        onSubmit={handleAgentSubmit}
+        onOpenSource={(url) =>
+          void openNavigation({ text: url, url }, true)
+        }
+      />
+    );
+  }
+
   return (
     <main className="native-panel">
       <header className="native-header">
-        <div>
-          <p className="eyebrow">CHROME BOOKMARKS</p>
-          <div className="native-title-row">
-            <h1>书签栏</h1>
-            <span
-              className="native-sync"
-              data-syncing={snapshot?.syncing === true}
-            >
-              {snapshot?.syncing === true ? "Chrome 同步" : "Chrome 数据源"}
-            </span>
-          </div>
+        <div className="native-title-row">
+          <h1>我的书签</h1>
         </div>
         <div className="native-actions">
           <button
@@ -648,7 +2094,7 @@ export function SidePanelApp() {
             }
             disabled={!snapshot}
           >
-            ＋
+            <PlusIcon />
           </button>
           <button
             type="button"
@@ -664,72 +2110,31 @@ export function SidePanelApp() {
             }
             disabled={!appState?.activeTab?.url}
           >
-            {currentSaved ? "★" : "☆"}
+            <StarIcon filled={currentSaved} />
+          </button>
+          <button
+            type="button"
+            className="icon-button history-button"
+            title="历史会话"
+            aria-label="打开历史会话"
+            onClick={() => {
+              void loadConversations();
+              setPanelView("history");
+            }}
+          >
+            <HistoryIcon />
+          </button>
+          <button
+            type="button"
+            className="icon-button settings-button"
+            title="设置"
+            aria-label="打开设置"
+            onClick={() => setPanelView("settings")}
+          >
+            <SettingsIcon />
           </button>
         </div>
       </header>
-
-      <form
-        className="omnibox-shell"
-        onSubmit={(event) => void handleSearchSubmit(event)}
-      >
-        <span className="omnibox-icon" aria-hidden="true">
-          ⌕
-        </span>
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "ArrowDown") {
-              event.preventDefault();
-              setSelectedIndex((value) =>
-                Math.min(value + 1, suggestions.length - 1)
-              );
-            }
-            if (event.key === "ArrowUp") {
-              event.preventDefault();
-              setSelectedIndex((value) => Math.max(value - 1, 0));
-            }
-            if (event.key === "Escape") {
-              setQuery("");
-            }
-            if (
-              event.key === "Enter" &&
-              (event.metaKey || event.ctrlKey || event.altKey)
-            ) {
-              event.preventDefault();
-              const item =
-                selectedIndex >= 0
-                  ? suggestions[selectedIndex]
-                  : undefined;
-              void openNavigation({ text: query, item }, true);
-            }
-          }}
-          placeholder="搜索书签、历史记录或输入网址"
-          aria-label="搜索或输入网址"
-          role="combobox"
-          aria-autocomplete="list"
-          aria-expanded={Boolean(query && suggestions.length)}
-          aria-controls="navigation-suggestions"
-          aria-activedescendant={
-            selectedIndex >= 0
-              ? `navigation-suggestion-${selectedIndex}`
-              : undefined
-          }
-          autoComplete="off"
-          autoFocus
-        />
-        {query ? (
-          <button
-            type="button"
-            className="clear-query"
-            aria-label="清除"
-            onClick={() => setQuery("")}
-          >
-            ×
-          </button>
-        ) : null}
-      </form>
 
       {error ? (
         <div className="native-error" role="alert">
@@ -739,220 +2144,130 @@ export function SidePanelApp() {
             aria-label="关闭错误提示"
             onClick={() => setError("")}
           >
-            ×
+            <CloseIcon />
+          </button>
+        </div>
+      ) : null}
+      {notice && !error ? (
+        <div className="native-notice" role="status">
+          <span>{notice}</span>
+          <button
+            type="button"
+            aria-label="关闭提示"
+            onClick={() => setNotice("")}
+          >
+            <CloseIcon />
           </button>
         </div>
       ) : null}
 
-      <section
-        className="native-content"
-        aria-label={query ? "地址栏建议" : "Chrome 书签栏"}
-        onDragOver={(event) => event.preventDefault()}
-        onDrop={(event) => {
-          const id = event.dataTransfer.getData(
-            "application/x-bookmark-layer-id"
-          );
-          if (id && snapshot) {
-            void moveNode(
-              id,
-              snapshot.primaryRootId || snapshot.root.id
-            );
-          }
-        }}
+      <div
+        className="native-content-frame"
+        data-has-folders={hasVisibleFolders}
+        data-at-end={scrollThumb.atEnd}
       >
-        {query ? (
-          <div
-            className="suggestion-list"
-            id="navigation-suggestions"
-            role="listbox"
-          >
-            {suggestions.map((item, index) => (
-              <button
-                type="button"
-                role="option"
-                id={`navigation-suggestion-${index}`}
-                aria-selected={index === selectedIndex}
-                className="suggestion-row"
-                data-selected={index === selectedIndex}
-                key={item.id}
-                onMouseEnter={() => setSelectedIndex(index)}
-                onClick={() =>
-                  void openNavigation({ text: query, item }, false)
-                }
-                onAuxClick={(event) => {
-                  if (event.button === 1) {
-                    event.preventDefault();
-                    void openNavigation({ text: query, item }, true);
-                  }
-                }}
-              >
-                <span
-                  className="suggestion-kind"
-                  data-kind={item.kind}
-                  aria-hidden="true"
-                >
-                  {kindIcon(item.kind)}
-                </span>
-                <span className="suggestion-copy">
-                  <strong>{item.title}</strong>
-                  <small>{item.subtitle}</small>
-                </span>
-                <span className="suggestion-open" aria-hidden="true">
-                  ↗
-                </span>
-              </button>
-            ))}
-            <button
-              type="button"
-              role="option"
-              aria-selected="false"
-              className="search-provider-row"
-              onClick={() =>
-                void openNavigation({ text: query }, false)
-              }
-            >
-              <span className="suggestion-kind">G</span>
-              <span className="suggestion-copy">
-                <strong>使用 Chrome 默认搜索引擎搜索</strong>
-                <small>{query}</small>
-              </span>
-              <span>↵</span>
-            </button>
-          </div>
-        ) : snapshot ? (
-          (snapshot.roots || [snapshot.root]).some(
-            (root) => root.children?.length
-          ) ? (
-            <div className="bookmark-roots">
-              {(snapshot.roots || [snapshot.root]).map((root) => {
-                const rootExpanded = expanded.has(root.id);
-                return (
-                  <section className="bookmark-root" key={root.id}>
-                    <button
-                      type="button"
-                      className="bookmark-root-heading"
-                      aria-expanded={rootExpanded}
-                      onClick={() =>
-                        setExpanded((current) => {
-                          const next = new Set(current);
-                          if (next.has(root.id)) next.delete(root.id);
-                          else next.add(root.id);
-                          return next;
-                        })
-                      }
-                      onDragOver={(event) => event.preventDefault()}
-                      onDrop={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        const id = event.dataTransfer.getData(
-                          "application/x-bookmark-layer-id"
-                        );
-                        if (id) void moveNode(id, root.id);
-                      }}
-                    >
-                      <span>{rootExpanded ? "⌄" : "›"}</span>
-                      <strong>{root.title}</strong>
-                      {root.syncing ? <em>Google</em> : null}
-                      <small>{countBookmarks(root)}</small>
-                    </button>
-                    {rootExpanded && root.children?.length ? (
-                      <BookmarkTree
-                        nodes={root.children}
-                        expanded={expanded}
-                        onToggle={(id) =>
-                          setExpanded((current) => {
-                            const next = new Set(current);
-                            if (next.has(id)) next.delete(id);
-                            else next.add(id);
-                            return next;
-                          })
-                        }
-                        onOpen={(node, newTab) =>
-                          void openNavigation(
-                            {
-                              text: node.url || "",
-                              item: node.url
-                                ? {
-                                    id: `bookmark:${node.id}`,
-                                    kind: "bookmark",
-                                    title: node.title,
-                                    url: node.url,
-                                    subtitle: ""
-                                  }
-                                : undefined
-                            },
-                            newTab
-                          )
-                        }
-                        onEdit={startEdit}
-                        onMove={moveNode}
-                      />
-                    ) : null}
-                  </section>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="native-empty">
-              <span>☆</span>
-              <strong>Chrome 书签还是空的</strong>
-              <p>点击右上角星标，或使用 Chrome 自带星标开始收藏。</p>
-            </div>
-          )
-        ) : (
-          <div className="native-loading">正在读取 Chrome 书签栏…</div>
-        )}
-      </section>
-
-      <footer className="native-footer">
-        <div className="native-account-summary">
-          {appState?.auth.userAvatarUrl ? (
-            <img src={appState.auth.userAvatarUrl} alt="" />
-          ) : (
-            <span className="native-account-avatar">
-              {(appState?.auth.userEmail ||
-                appState?.auth.chromeProfileEmail ||
-                "G")
-                .slice(0, 1)
-                .toUpperCase()}
-            </span>
-          )}
-          <span>
-            <strong>
-              {!appState?.auth.configured
-                ? "账号服务待连接"
-                : appState.auth.signedIn
-                  ? appState.auth.userName || appState.auth.userEmail
-                  : "使用 Google 登录"}
-            </strong>
-            <small>
-              {appState?.auth.signedIn
-                ? appState.pendingSyncCount
-                  ? `${appState.pendingSyncCount} 条等待同步`
-                  : "AI 信息已自动同步"
-                : `${snapshot?.bookmarkCount ?? 0} 个 Chrome 原生书签`}
-            </small>
-          </span>
-        </div>
-        {appState?.auth.configured && !appState.auth.signedIn ? (
-          <button
-            type="button"
-            onClick={() => void handleLogin()}
-            disabled={Boolean(busy)}
-          >
-            {busy === "login" ? "登录中…" : "Google 登录"}
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() =>
-              void sendExtensionRequest({ type: "OPEN_MANAGER" })
+        <section
+          id="bookmark-list"
+          ref={contentRef}
+          className="native-content"
+          data-has-folders={hasVisibleFolders}
+          aria-label="Chrome 书签栏"
+          onScroll={handleContentScroll}
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => {
+            const id = event.dataTransfer.getData(
+              "application/x-bookmark-layer-id"
+            );
+            if (id && snapshot) {
+              void moveNode(
+                id,
+                snapshot.primaryRootId || snapshot.root.id
+              );
             }
-          >
-            智能管理 <span>→</span>
-          </button>
-        )}
-      </footer>
+          }}
+        >
+          {snapshot ? (
+            visibleBookmarkNodes.length ? (
+              <BookmarkTree
+                nodes={visibleBookmarkNodes}
+                resourceByUrl={resourceByUrl}
+                expanded={expanded}
+                onToggle={(id) =>
+                  setExpanded((current) => {
+                    const next = new Set(current);
+                    if (next.has(id)) next.delete(id);
+                    else next.add(id);
+                    return next;
+                  })
+                }
+                onOpen={(node, newTab) =>
+                  void openNavigation(
+                    {
+                      text: node.url || "",
+                      url: node.url
+                    },
+                    newTab
+                  )
+                }
+                onEdit={startEdit}
+                draggedId={draggedId}
+                onDragStart={setDraggedId}
+                onDragEnd={() => setDraggedId("")}
+                onMove={moveNode}
+              />
+            ) : (
+              <div className="native-empty">
+                <span>
+                  <StarIcon />
+                </span>
+                <strong>Chrome 书签还是空的</strong>
+                <p>点击右上角星标，或使用 Chrome 自带星标开始收藏。</p>
+              </div>
+            )
+          ) : (
+            <div className="native-loading">正在读取 Chrome 书签栏…</div>
+          )}
+        </section>
+        {scrollThumb.scrollable ? (
+          <div
+            className="native-scroll-thumb"
+            data-visible={scrollThumb.visible}
+            style={{
+              height: `${scrollThumb.height}px`,
+              transform: `translateY(${scrollThumb.offset}px)`
+            }}
+            role="scrollbar"
+            aria-controls="bookmark-list"
+            aria-orientation="vertical"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={
+              contentRef.current
+                ? Math.round(
+                    (contentRef.current.scrollTop /
+                      Math.max(
+                        1,
+                        contentRef.current.scrollHeight -
+                          contentRef.current.clientHeight
+                      )) *
+                      100
+                  )
+                : 0
+            }
+            onPointerDown={handleScrollThumbPointerDown}
+            onPointerMove={handleScrollThumbPointerMove}
+            onPointerUp={handleScrollThumbPointerEnd}
+            onPointerCancel={handleScrollThumbPointerEnd}
+          />
+        ) : null}
+      </div>
+
+      <AgentComposer
+        value={agentPrompt}
+        busy={Boolean(busy)}
+        onChange={setAgentPrompt}
+        onSubmit={handleAgentSubmit}
+      />
 
       {editor ? (
         <div
@@ -966,18 +2281,17 @@ export function SidePanelApp() {
         >
           <section
             ref={dialogRef}
-            className="native-dialog"
+            className={`native-dialog ${
+              editor.kind === "bookmark" && editor.node.url
+                ? "bookmark-detail-dialog"
+                : ""
+            }`}
             role="dialog"
             aria-modal="true"
             aria-labelledby="native-dialog-title"
           >
             <div className="native-dialog-heading">
               <div>
-                <p className="eyebrow">
-                  {editor.kind === "save"
-                    ? "SAVE TO CHROME"
-                    : "EDIT CHROME BOOKMARK"}
-                </p>
                 <h2 id="native-dialog-title">
                   {editor.kind === "save"
                     ? "收藏当前页面"
@@ -997,7 +2311,7 @@ export function SidePanelApp() {
                 disabled={Boolean(busy)}
                 aria-label="关闭"
               >
-                ×
+                <CloseIcon />
               </button>
             </div>
 
@@ -1018,31 +2332,131 @@ export function SidePanelApp() {
                 </label>
 
                 {editor.kind === "bookmark" && editor.node.url ? (
-                  <label className="native-field">
-                    <span>网址</span>
-                    <input
-                      value={editUrl}
-                      onChange={(event) => setEditUrl(event.target.value)}
-                    />
-                  </label>
+                  <>
+                    <label className="native-field">
+                      <span>网址</span>
+                      <input
+                        value={editUrl}
+                        onChange={(event) => setEditUrl(event.target.value)}
+                      />
+                    </label>
+
+                    <section
+                      className="bookmark-analysis"
+                      aria-labelledby="bookmark-analysis-title"
+                    >
+                      <header>
+                        <div>
+                          <strong id="bookmark-analysis-title">
+                            AI 分析
+                          </strong>
+                          <small>
+                            主题是 AI 归纳的内容方向；标签是用于查找和整理的关键词，可以自行修改。
+                          </small>
+                        </div>
+                        {editorResource?.aiStatus !== "ready" ? (
+                          <span data-tone="pending">
+                            {editorResource?.aiStatus === "processing"
+                              ? "分析中"
+                              : "待分析"}
+                          </span>
+                        ) : null}
+                      </header>
+
+                      <div className="analysis-copy">
+                        <p>
+                          {editorResource?.summary ||
+                            "这个书签还没有生成简介。连接 AI 后，可在设置中启动全目录扫描。"}
+                        </p>
+                      </div>
+
+                      <div className="analysis-topics">
+                        <span>主题</span>
+                        {editorResource?.topics.length ? (
+                          <div>
+                            {editorResource.topics.map((topic) => (
+                              <em key={topic}>{topic}</em>
+                            ))}
+                          </div>
+                        ) : (
+                          <p>尚未识别主题</p>
+                        )}
+                      </div>
+
+                      <div className="analysis-tags">
+                        <div className="analysis-tags-heading">
+                          <span>标签</span>
+                        </div>
+                        <div
+                          className="editable-tag-list"
+                          aria-label="当前标签"
+                        >
+                          {editTags.length ? (
+                            editTags.map((tag) => (
+                              <span key={tag}>
+                                {tag}
+                                <button
+                                  type="button"
+                                  aria-label={`移除标签 ${tag}`}
+                                  onClick={() =>
+                                    setEditTags((current) =>
+                                      current.filter(
+                                        (item) => item !== tag
+                                      )
+                                    )
+                                  }
+                                >
+                                  <CloseIcon />
+                                </button>
+                              </span>
+                            ))
+                          ) : (
+                            <small>还没有标签</small>
+                          )}
+                        </div>
+                        <div className="tag-entry">
+                          <input
+                            value={editTagInput}
+                            onChange={(event) =>
+                              setEditTagInput(event.target.value)
+                            }
+                            onKeyDown={(event) => {
+                              if (
+                                event.key === "Enter" ||
+                                event.key === "," ||
+                                event.key === "，"
+                              ) {
+                                event.preventDefault();
+                                addEditTags();
+                              }
+                            }}
+                            maxLength={120}
+                            aria-label="添加标签"
+                            placeholder="输入标签，按回车添加"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => addEditTags()}
+                            disabled={!editTagInput.trim()}
+                          >
+                            添加
+                          </button>
+                        </div>
+                      </div>
+                    </section>
+                  </>
                 ) : null}
 
                 {editor.kind === "save" ? (
                   <>
-                    <label className="native-field">
-                      <span>Chrome 文件夹</span>
-                      <select
+                    <div className="native-field">
+                      <span>文件夹</span>
+                      <FolderSelect
+                        options={folders}
                         value={folderId}
-                        onChange={(event) => setFolderId(event.target.value)}
-                      >
-                        {folders.map((folder) => (
-                          <option key={folder.id} value={folder.id}>
-                            {"　".repeat(folder.depth)}
-                            {folder.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                        onChange={setFolderId}
+                      />
+                    </div>
                     <label className="native-field">
                       <span>备注（智能增强层）</span>
                       <textarea
@@ -1065,9 +2479,7 @@ export function SidePanelApp() {
                       <span>
                         <strong>生成摘要与标签</strong>
                         <small>
-                          {appState?.auth.signedIn
-                            ? "保存后自动理解正文并建立语义索引。"
-                            : "Chrome 书签会先保存；登录后自动补充 AI 信息。"}
+                          保存后由设置中选择的 AI 服务处理；不需要连接云端。
                         </small>
                       </span>
                     </label>
@@ -1079,74 +2491,91 @@ export function SidePanelApp() {
 
                 <div className="native-dialog-actions">
                   {editor.kind === "bookmark" &&
-                  !editor.node.folderType ? (
-                    <div className="delete-confirmation">
-                      {confirmDeleteId === editor.node.id ? (
-                        <p role="alert">
-                          {editor.node.url
-                            ? "将从 Chrome 永久删除这个书签。"
-                            : `将删除整个文件夹及其中 ${countBookmarks(editor.node)} 个书签。`}
-                        </p>
-                      ) : null}
-                      <button
-                        type="button"
-                        className="danger-button"
-                        data-confirming={
-                          confirmDeleteId === editor.node.id
-                        }
-                        onClick={() => {
-                          if (confirmDeleteId === editor.node.id) {
-                            void deleteEditorNode();
-                          } else {
-                            setConfirmDeleteId(editor.node.id);
-                          }
-                        }}
-                        disabled={Boolean(busy)}
-                      >
-                        {busy === "delete"
-                          ? "正在删除…"
-                          : confirmDeleteId === editor.node.id
-                            ? editor.node.url
-                              ? "确认删除书签"
-                              : "确认删除整个文件夹"
-                            : editor.node.url
-                              ? "删除书签"
-                              : "删除整个文件夹"}
-                      </button>
+                  !editor.node.folderType &&
+                  confirmDeleteId === editor.node.id ? (
+                    <div
+                      className="delete-confirmation"
+                      role="group"
+                      aria-label="确认删除"
+                    >
+                      <p role="alert">
+                        {editor.node.url
+                          ? "将从 Chrome 永久删除这个书签，此操作无法撤销。"
+                          : `将永久删除整个文件夹及其中 ${countBookmarks(editor.node)} 个书签，此操作无法撤销。`}
+                      </p>
+                      <div>
+                        <button
+                          type="button"
+                          className="button button-quiet"
+                          onClick={() => setConfirmDeleteId("")}
+                          disabled={Boolean(busy)}
+                        >
+                          取消
+                        </button>
+                        <button
+                          type="button"
+                          className="danger-button"
+                          data-confirming="true"
+                          onClick={() => void deleteEditorNode()}
+                          disabled={Boolean(busy)}
+                        >
+                          {busy === "delete"
+                            ? "正在删除…"
+                            : "确认"}
+                        </button>
+                      </div>
                     </div>
                   ) : (
-                    <span />
+                    <>
+                      {editor.kind === "bookmark" &&
+                      !editor.node.folderType ? (
+                        <button
+                          type="button"
+                          className="danger-button"
+                          onClick={() =>
+                            setConfirmDeleteId(editor.node.id)
+                          }
+                          disabled={Boolean(busy)}
+                        >
+                          {editor.node.url
+                            ? "删除书签"
+                            : "删除整个文件夹"}
+                        </button>
+                      ) : (
+                        <span />
+                      )}
+                      <div>
+                        <button
+                          type="button"
+                          className="button button-quiet"
+                          onClick={() => {
+                            setEditor(null);
+                            setConfirmDeleteId("");
+                          }}
+                          disabled={Boolean(busy)}
+                        >
+                          取消
+                        </button>
+                        <button
+                          type="button"
+                          className="button button-dark"
+                          onClick={() => void saveEditor()}
+                          disabled={
+                            Boolean(busy) ||
+                            !editTitle.trim() ||
+                            (editor.kind === "save" &&
+                              (!capture || !folderId))
+                          }
+                        >
+                          {busy === "save"
+                            ? "正在保存…"
+                            : editor.kind === "save"
+                              ? "保存到 Chrome"
+                              : "保存"}
+                        </button>
+                      </div>
+                    </>
                   )}
-                  <div>
-                    <button
-                      type="button"
-                      className="button button-quiet"
-                      onClick={() => {
-                        setEditor(null);
-                        setConfirmDeleteId("");
-                      }}
-                      disabled={Boolean(busy)}
-                    >
-                      取消
-                    </button>
-                    <button
-                      type="button"
-                      className="button button-dark"
-                      onClick={() => void saveEditor()}
-                      disabled={
-                        Boolean(busy) ||
-                        !editTitle.trim() ||
-                        (editor.kind === "save" &&
-                          (!capture || !folderId))
-                      }
-                    >
-                      {busy === "save"
-                        ? "正在保存…"
-                        : editor.kind === "save"
-                          ? "保存到 Chrome"
-                          : "保存"}
-                    </button>
-                  </div>
                 </div>
               </>
             )}

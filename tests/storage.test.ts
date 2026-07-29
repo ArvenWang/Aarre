@@ -8,6 +8,7 @@ import {
   getLocalResources,
   getOutbox,
   mergeLocalResources,
+  normalizeResourceRecord,
   removeOutboxItem,
   upsertLocalResource
 } from "../src/lib/storage";
@@ -45,6 +46,39 @@ function resource(
 }
 
 describe("IndexedDB storage", () => {
+  it("fills AI metadata arrays missing from legacy bookmark records", () => {
+    const normalized = normalizeResourceRecord({
+      resourceKey: "legacy",
+      url: "https://example.com/legacy",
+      title: "Legacy bookmark",
+      createdAt: "2026-07-29T00:00:00.000Z",
+      updatedAt: "2026-07-29T00:00:00.000Z"
+    });
+
+    expect(normalized).toMatchObject({
+      resourceKey: "legacy",
+      summary: "",
+      tags: [],
+      topics: [],
+      nativeBookmarkIds: [],
+      nativeFolderPath: [],
+      aiStatus: "not_requested",
+      syncStatus: "local"
+    });
+  });
+
+  it("preserves a locally cached representative image", () => {
+    const normalized = normalizeResourceRecord({
+      resourceKey: "cover",
+      url: "https://example.com/cover",
+      thumbnailDataUrl: "data:image/webp;base64,AAAA"
+    });
+
+    expect(normalized.thumbnailDataUrl).toBe(
+      "data:image/webp;base64,AAAA"
+    );
+  });
+
   it("upserts resources and returns newest first", async () => {
     await upsertLocalResource(
       resource("storage-a", {
@@ -81,6 +115,27 @@ describe("IndexedDB storage", () => {
     const merged = await getLocalResource("storage-merge");
     expect(merged?.summary).toBe("Cloud summary");
     expect(merged?.nativeBookmarkIds).toEqual(["chrome-id-1"]);
+  });
+
+  it("keeps the local representative image when cloud metadata is merged", async () => {
+    await upsertLocalResource(
+      resource("storage-local-cover", {
+        thumbnailDataUrl: "data:image/webp;base64,LOCAL",
+        updatedAt: "2026-07-29T00:00:00.000Z"
+      })
+    );
+
+    await mergeLocalResources([
+      resource("storage-local-cover", {
+        summary: "Cloud summary",
+        syncStatus: "synced",
+        updatedAt: "2026-07-29T01:00:00.000Z"
+      })
+    ]);
+
+    expect(
+      (await getLocalResource("storage-local-cover"))?.thumbnailDataUrl
+    ).toBe("data:image/webp;base64,LOCAL");
   });
 
   it("does not overwrite newer pending local changes with stale cloud rows", async () => {

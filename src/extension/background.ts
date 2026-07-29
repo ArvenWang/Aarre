@@ -5,11 +5,31 @@ import {
   semanticSearch,
   syncOneResource
 } from "../lib/cloud";
+import {
+  askBookmarkAgent,
+  enrichResourceFromEssence,
+  enrichResourceLocally
+} from "../lib/local-ai";
+import {
+  deleteAgentConversation,
+  getAgentConversations,
+  saveAgentConversation
+} from "../lib/conversations";
+import {
+  extractPageEssenceFromHtml,
+  isInternalOrSensitiveUrl
+} from "../lib/page-essence";
+import { cacheRepresentativeImage } from "../lib/thumbnail";
 import type {
   ExtensionRequest,
   ExtensionResponse
 } from "../lib/messages";
 import { searchLocalResources } from "../lib/search";
+import {
+  getAiSettingsStatus,
+  getAiRuntimeSettings,
+  saveAiSettings
+} from "../lib/settings";
 import {
   completeOutboxItem,
   deferOutboxItem,
@@ -29,6 +49,7 @@ import type {
   AppState,
   BookmarkBarSnapshot,
   ImportResult,
+  LibraryScanStatus,
   NativeBookmarkNode,
   NativeFolderOption,
   NavigationInput,
@@ -51,9 +72,80 @@ import {
 const CONTEXT_MENU_PAGE_ID = "bookmark-layer-save-page";
 const CONTEXT_MENU_LINK_ID = "bookmark-layer-save-link";
 const PENDING_SAVE_PREFIX = "pending-save:";
+const LIBRARY_SCAN_KEY = "aarre:library-scan";
+const LIBRARY_SCAN_ALARM = "aarre-library-scan";
+const MAX_SCAN_HTML_BYTES = 600_000;
 const internalBookmarkIds = new Set<string>();
 const internalBookmarkTargets = new Set<string>();
 const pendingSaveDrafts = new Map<number, PendingSaveDraft>();
+let libraryScanRunning = false;
+
+interface StoredLibraryScanJob extends LibraryScanStatus {
+  resourceKeys: string[];
+  nextIndex: number;
+  force: boolean;
+}
+
+function emptyLibraryScan(): StoredLibraryScanJob {
+  return {
+    id: "",
+    state: "idle",
+    total: 0,
+    processed: 0,
+    succeeded: 0,
+    failed: 0,
+    skipped: 0,
+    currentTitle: "",
+    errors: [],
+    resourceKeys: [],
+    nextIndex: 0,
+    force: false
+  };
+}
+
+function publicLibraryScan(
+  job: StoredLibraryScanJob
+): LibraryScanStatus {
+  const {
+    resourceKeys: _resourceKeys,
+    nextIndex: _nextIndex,
+    force: _force,
+    ...status
+  } = job;
+  return status;
+}
+
+async function getStoredLibraryScan(): Promise<StoredLibraryScanJob> {
+  const stored = (await chrome.storage.local.get(LIBRARY_SCAN_KEY))[
+    LIBRARY_SCAN_KEY
+  ];
+  if (!stored || typeof stored !== "object") {
+    return emptyLibraryScan();
+  }
+  const value = stored as Partial<StoredLibraryScanJob>;
+  return {
+    ...emptyLibraryScan(),
+    ...value,
+    errors: Array.isArray(value.errors) ? value.errors.slice(-20) : [],
+    resourceKeys: Array.isArray(value.resourceKeys)
+      ? value.resourceKeys.filter(
+          (item): item is string => typeof item === "string"
+        )
+      : []
+  };
+}
+
+async function setStoredLibraryScan(
+  job: StoredLibraryScanJob
+): Promise<void> {
+  await chrome.storage.local.set({ [LIBRARY_SCAN_KEY]: job });
+  void chrome.runtime
+    .sendMessage({
+      type: "LIBRARY_SCAN_UPDATED",
+      status: publicLibraryScan(job)
+    })
+    .catch(() => undefined);
+}
 
 function bookmarkTarget(parentId: string, url: string): string {
   return `${parentId}\n${url}`;
@@ -395,6 +487,41 @@ async function updateNativeBookmark(input: {
   return serializeBookmarkNode(updated);
 }
 
+function normalizeUserTags(tags: string[]): string[] {
+  return [
+    ...new Set(
+      tags
+        .map((tag) => tag.trim().replace(/^#+\s*/, ""))
+        .filter(Boolean)
+        .map((tag) => tag.slice(0, 40))
+    )
+  ].slice(0, 16);
+}
+
+async function updateResourceTags(input: {
+  resourceKey: string;
+  tags: string[];
+}): Promise<ResourceRecord> {
+  const resource = await getLocalResource(input.resourceKey);
+  if (!resource) {
+    throw new Error("没有找到这个书签的智能信息，请刷新后再试。");
+  }
+  const auth = await getAuthState();
+  const next: ResourceRecord = {
+    ...resource,
+    tags: normalizeUserTags(input.tags),
+    tagsSource: "user",
+    syncStatus: auth.configured ? "pending" : "local",
+    updatedAt: now()
+  };
+  await upsertLocalResource(next);
+  if (auth.configured) {
+    await enqueueOutbox(next, "");
+    void syncPendingIfReady();
+  }
+  return next;
+}
+
 async function createNativeFolder(input: {
   parentId: string;
   title: string;
@@ -563,6 +690,21 @@ async function syncPendingIfReady(): Promise<void> {
     auth.signedIn &&
     auth.accountMatches === true
   ) {
+    const local = await getLocalResources();
+    for (const resource of local) {
+      if (
+        resource.syncStatus !== "local" ||
+        !resource.nativeBookmarkIds.length
+      ) {
+        continue;
+      }
+      const pending = {
+        ...resource,
+        syncStatus: "pending" as const
+      };
+      await upsertLocalResource(pending);
+      await enqueueOutbox(pending, "");
+    }
     await drainOutbox();
   }
 }
@@ -570,6 +712,7 @@ async function syncPendingIfReady(): Promise<void> {
 async function saveBookmark(
   input: SaveBookmarkInput
 ): Promise<SaveBookmarkResult> {
+  const auth = await getAuthState();
   const { bookmark, created } = await findOrCreateNativeBookmark(input);
   const canonicalUrl = canonicalizeUrl(
     input.capture.url,
@@ -582,7 +725,7 @@ async function saveBookmark(
   const contentChanged =
     Boolean(existing?.contentHash) && existing?.contentHash !== contentHash;
 
-  const resource: ResourceRecord = {
+  let resource: ResourceRecord = {
     resourceKey,
     canonicalUrl,
     url: input.capture.url,
@@ -590,6 +733,7 @@ async function saveBookmark(
     userNote: input.userNote.trim(),
     summary: existing?.summary || "",
     tags: existing?.tags || [],
+    tagsSource: existing?.tagsSource,
     topics: existing?.topics || [],
     contentExcerpt: input.capture.excerpt,
     contentHash,
@@ -598,6 +742,9 @@ async function saveBookmark(
     siteName: input.capture.siteName,
     language: input.capture.language,
     imageUrl: input.capture.imageUrl,
+    ...(existing?.thumbnailDataUrl
+      ? { thumbnailDataUrl: existing.thumbnailDataUrl }
+      : {}),
     faviconUrl: input.capture.faviconUrl,
     nativeBookmarkIds: [
       ...new Set([...(existing?.nativeBookmarkIds || []), bookmark.id])
@@ -608,23 +755,56 @@ async function saveBookmark(
         ? "ready"
         : "pending"
       : existing?.aiStatus || "not_requested",
-    syncStatus: "pending",
+    syncStatus: auth.configured ? "pending" : "local",
     createdAt: existing?.createdAt || timestamp,
     updatedAt: timestamp,
     lastSyncedAt: existing?.lastSyncedAt
   };
 
+  let aiWarning: string | undefined;
+  const needsAi =
+    input.requestAi &&
+    !(existing?.aiStatus === "ready" && !contentChanged);
+  if (needsAi) {
+    const aiSettings = await getAiRuntimeSettings();
+    if (aiSettings.apiKey) {
+      try {
+        resource = await enrichResourceLocally(resource, input.capture);
+      } catch (error) {
+        aiWarning = errorMessage(error);
+        resource = {
+          ...resource,
+          aiStatus: "failed",
+          updatedAt: now()
+        };
+      }
+    } else {
+      aiWarning = `书签已保存。请先在设置中填写 ${aiSettings.provider === "gemini" ? "Gemini" : aiSettings.provider === "openai" ? "OpenAI" : "DeepSeek"} API Key，再生成摘要与标签。`;
+      resource = {
+        ...resource,
+        aiStatus: "unavailable",
+        updatedAt: now()
+      };
+    }
+  }
+
   await upsertLocalResource(resource);
-  const queued = await enqueueOutbox(
-    resource,
-    input.requestAi ? input.capture.content : ""
-  );
-  const synced = await tryImmediateSync(queued);
+  let synced = resource;
+  if (auth.configured) {
+    const queued = await enqueueOutbox(
+      resource,
+      input.requestAi && resource.aiStatus === "pending"
+        ? input.capture.content
+        : ""
+    );
+    synced = await tryImmediateSync(queued);
+  }
 
   return {
     resource: synced,
     nativeBookmarkCreated: created,
-    cloudSyncAttempted: synced.syncStatus === "synced"
+    cloudSyncAttempted: synced.syncStatus === "synced",
+    aiWarning
   };
 }
 
@@ -640,7 +820,7 @@ function flashActionBadge(
   setTimeout(() => {
     void chrome.action.setBadgeText({ text: "", tabId });
     void chrome.action.setTitle({
-      title: "打开 Bookmark Layer",
+      title: "打开 Aarre",
       tabId
     });
   }, 2_000);
@@ -702,19 +882,410 @@ async function consumePendingSaveDraft(
   return draft;
 }
 
+async function readLimitedText(
+  response: Response,
+  maxBytes = MAX_SCAN_HTML_BYTES
+): Promise<string> {
+  if (!response.body) {
+    return (await response.text()).slice(0, maxBytes);
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let size = 0;
+  let result = "";
+  try {
+    while (size < maxBytes) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const remaining = maxBytes - size;
+      const chunk = value.byteLength > remaining
+        ? value.slice(0, remaining)
+        : value;
+      size += chunk.byteLength;
+      result += decoder.decode(chunk, { stream: true });
+      if (chunk.byteLength < value.byteLength) break;
+    }
+    result += decoder.decode();
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+  return result;
+}
+
+async function pageEssenceForResource(resource: ResourceRecord) {
+  try {
+    const response = await fetch(resource.url, {
+      credentials: "omit",
+      redirect: "follow",
+      headers: {
+        Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.2"
+      },
+      signal: AbortSignal.timeout(15_000)
+    });
+    const contentType = response.headers.get("content-type") || "";
+    if (
+      !response.ok ||
+      (!contentType.includes("text/html") &&
+        !contentType.includes("application/xhtml+xml"))
+    ) {
+      return extractPageEssenceFromHtml("", resource.url);
+    }
+    return extractPageEssenceFromHtml(
+      await readLimitedText(response),
+      response.url || resource.url
+    );
+  } catch {
+    // 登录墙、失效链接或网络失败时，仍允许 AI 基于名称、URL 和文件夹做保守补全。
+    return extractPageEssenceFromHtml("", resource.url);
+  }
+}
+
+async function scheduleLibraryScan(): Promise<void> {
+  await chrome.alarms.create(LIBRARY_SCAN_ALARM, {
+    delayInMinutes: 0.1,
+    periodInMinutes: 0.5
+  });
+}
+
+function needsRepresentativeImageRefresh(
+  resource: ResourceRecord
+): boolean {
+  if (!resource.thumbnailDataUrl) {
+    return true;
+  }
+  try {
+    const pageUrl = new URL(resource.url);
+    const pathParts = pageUrl.pathname.split("/").filter(Boolean);
+    const reservedGitHubPaths = new Set([
+      "about",
+      "apps",
+      "collections",
+      "codespaces",
+      "enterprise",
+      "events",
+      "explore",
+      "features",
+      "issues",
+      "login",
+      "marketplace",
+      "new",
+      "notifications",
+      "orgs",
+      "organizations",
+      "pricing",
+      "search",
+      "settings",
+      "signup",
+      "site",
+      "sponsors",
+      "topics",
+      "users"
+    ]);
+    const isGitHubRepository =
+      (pageUrl.hostname === "github.com" ||
+        pageUrl.hostname === "www.github.com") &&
+      pathParts.length >= 2 &&
+      !reservedGitHubPaths.has(pathParts[0]?.toLowerCase() || "");
+    return (
+      isGitHubRepository &&
+      !resource.imageUrl.includes("opengraph.githubassets.com/")
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function startLibraryScan(force = false): Promise<LibraryScanStatus> {
+  const runtime = await getAiRuntimeSettings();
+  if (!runtime.apiKey) {
+    throw new Error("请先在设置中配置并验证一个 AI API Key。");
+  }
+  await importNativeBookmarks();
+  const resources = (await getLocalResources()).filter(
+    (resource) =>
+      resource.nativeBookmarkIds.length > 0 &&
+      (force ||
+        resource.aiStatus !== "ready" ||
+        !resource.summary.trim() ||
+        !resource.tags.length ||
+        needsRepresentativeImageRefresh(resource))
+  );
+  const timestamp = now();
+  const job: StoredLibraryScanJob = {
+    id: crypto.randomUUID(),
+    state: resources.length ? "running" : "completed",
+    total: resources.length,
+    processed: 0,
+    succeeded: 0,
+    failed: 0,
+    skipped: 0,
+    currentTitle: "",
+    startedAt: timestamp,
+    updatedAt: timestamp,
+    completedAt: resources.length ? undefined : timestamp,
+    errors: [],
+    resourceKeys: resources.map((resource) => resource.resourceKey),
+    nextIndex: 0,
+    force
+  };
+  await setStoredLibraryScan(job);
+  if (resources.length) {
+    await scheduleLibraryScan();
+    void runLibraryScan();
+  }
+  return publicLibraryScan(job);
+}
+
+async function updateLibraryScanState(
+  state: "paused" | "running" | "cancelled"
+): Promise<LibraryScanStatus> {
+  const job = await getStoredLibraryScan();
+  if (!job.id) {
+    throw new Error("当前没有全目录扫描任务。");
+  }
+  if (
+    state === "running" &&
+    !["paused", "failed"].includes(job.state)
+  ) {
+    return publicLibraryScan(job);
+  }
+  if (
+    state !== "running" &&
+    !["running", "paused"].includes(job.state)
+  ) {
+    return publicLibraryScan(job);
+  }
+  const timestamp = now();
+  const next: StoredLibraryScanJob = {
+    ...job,
+    state,
+    currentTitle: state === "running" ? job.currentTitle : "",
+    updatedAt: timestamp,
+    completedAt: state === "cancelled" ? timestamp : job.completedAt
+  };
+  await setStoredLibraryScan(next);
+  if (state === "running") {
+    await scheduleLibraryScan();
+    void runLibraryScan();
+  } else if (state === "cancelled") {
+    await chrome.alarms.clear(LIBRARY_SCAN_ALARM);
+  }
+  return publicLibraryScan(next);
+}
+
+async function recordScanResult(
+  job: StoredLibraryScanJob,
+  resource: ResourceRecord,
+  outcome: "succeeded" | "failed" | "skipped",
+  message = ""
+): Promise<StoredLibraryScanJob> {
+  const timestamp = now();
+  const next: StoredLibraryScanJob = {
+    ...job,
+    nextIndex: job.nextIndex + 1,
+    processed: job.processed + 1,
+    succeeded: job.succeeded + (outcome === "succeeded" ? 1 : 0),
+    failed: job.failed + (outcome === "failed" ? 1 : 0),
+    skipped: job.skipped + (outcome === "skipped" ? 1 : 0),
+    currentTitle: "",
+    updatedAt: timestamp,
+    errors:
+      message && outcome !== "succeeded"
+        ? [
+            ...job.errors,
+            {
+              resourceKey: resource.resourceKey,
+              title: resource.title,
+              message
+            }
+          ].slice(-20)
+        : job.errors
+  };
+  if (next.nextIndex >= next.resourceKeys.length) {
+    next.state = "completed";
+    next.completedAt = timestamp;
+  }
+  await setStoredLibraryScan(next);
+  return next;
+}
+
+async function runLibraryScan(): Promise<void> {
+  if (libraryScanRunning) return;
+  libraryScanRunning = true;
+  try {
+    while (true) {
+      let job = await getStoredLibraryScan();
+      if (job.state !== "running") break;
+      if (job.nextIndex >= job.resourceKeys.length) {
+        job = {
+          ...job,
+          state: "completed",
+          currentTitle: "",
+          completedAt: now(),
+          updatedAt: now()
+        };
+        await setStoredLibraryScan(job);
+        break;
+      }
+
+      const resourceKey = job.resourceKeys[job.nextIndex];
+      const resource = await getLocalResource(resourceKey);
+      if (!resource || !resource.nativeBookmarkIds.length) {
+        const placeholder: ResourceRecord = {
+          resourceKey,
+          canonicalUrl: "",
+          url: "",
+          title: "已移除的书签",
+          userNote: "",
+          summary: "",
+          tags: [],
+          topics: [],
+          contentExcerpt: "",
+          contentHash: "",
+          selectedText: "",
+          author: "",
+          siteName: "",
+          language: "",
+          imageUrl: "",
+          faviconUrl: "",
+          nativeBookmarkIds: [],
+          nativeFolderPath: [],
+          aiStatus: "not_requested",
+          syncStatus: "local",
+          createdAt: now(),
+          updatedAt: now()
+        };
+        await recordScanResult(job, placeholder, "skipped", "书签已被移除。");
+        continue;
+      }
+
+      job = { ...job, currentTitle: resource.title, updatedAt: now() };
+      await setStoredLibraryScan(job);
+      if (isInternalOrSensitiveUrl(resource.url)) {
+        await recordScanResult(
+          job,
+          resource,
+          "skipped",
+          "内部或受保护网址未发送给 AI。"
+        );
+        continue;
+      }
+
+      const needsAi =
+        job.force ||
+        resource.aiStatus !== "ready" ||
+        !resource.summary.trim() ||
+        !resource.tags.length;
+      let scannedResource: ResourceRecord = {
+        ...resource,
+        aiStatus: needsAi ? "processing" : resource.aiStatus,
+        updatedAt: now()
+      };
+      await upsertLocalResource(scannedResource);
+      try {
+        const essence = await pageEssenceForResource(resource);
+        let thumbnailDataUrl = resource.thumbnailDataUrl || "";
+        const refreshRepresentativeImage =
+          needsRepresentativeImageRefresh(resource);
+        const representativeImageUrl =
+          essence.imageUrl || resource.imageUrl;
+        if (
+          representativeImageUrl &&
+          (refreshRepresentativeImage || job.force)
+        ) {
+          try {
+            thumbnailDataUrl = await cacheRepresentativeImage(
+              representativeImageUrl
+            );
+          } catch {
+            // 原图仍会保存为备用；个别站点防盗链不应让整条扫描失败。
+          }
+        }
+        scannedResource = {
+          ...scannedResource,
+          imageUrl: representativeImageUrl,
+          faviconUrl: essence.faviconUrl || resource.faviconUrl,
+          ...(thumbnailDataUrl ? { thumbnailDataUrl } : {})
+        };
+        await upsertLocalResource(scannedResource);
+
+        const enriched = needsAi
+          ? await enrichResourceFromEssence(scannedResource, essence)
+          : scannedResource;
+        const auth = await getAuthState();
+        const nextResource: ResourceRecord = {
+          ...enriched,
+          syncStatus: auth.configured ? "pending" : enriched.syncStatus
+        };
+        await upsertLocalResource(nextResource);
+        if (auth.configured) {
+          await enqueueOutbox(nextResource, nextResource.contentExcerpt);
+          void syncPendingIfReady();
+        }
+        await recordScanResult(job, resource, "succeeded");
+      } catch (error) {
+        await upsertLocalResource({
+          ...scannedResource,
+          aiStatus: needsAi ? "failed" : scannedResource.aiStatus,
+          updatedAt: now()
+        });
+        await recordScanResult(
+          job,
+          resource,
+          "failed",
+          errorMessage(error)
+        );
+      }
+    }
+  } catch (error) {
+    const job = await getStoredLibraryScan();
+    await setStoredLibraryScan({
+      ...job,
+      state: "failed",
+      currentTitle: "",
+      updatedAt: now(),
+      errors: [
+        ...job.errors,
+        {
+          resourceKey: "",
+          title: "扫描任务",
+          message: errorMessage(error)
+        }
+      ].slice(-20)
+    });
+  } finally {
+    libraryScanRunning = false;
+    const job = await getStoredLibraryScan();
+    if (job.state !== "running") {
+      await chrome.alarms.clear(LIBRARY_SCAN_ALARM);
+    }
+  }
+}
+
 async function getAppState(): Promise<AppState> {
-  const [auth, tab, resources, outbox] = await Promise.all([
+  const [auth, tab, resources, outbox, scan] = await Promise.all([
     getAuthState(),
     getActiveTabSummary(),
     getLocalResources(),
-    getOutbox()
+    getOutbox(),
+    getStoredLibraryScan()
   ]);
+  const linkedResources = resources.filter(
+    (resource) => resource.nativeBookmarkIds.length > 0
+  );
 
   return {
     auth,
     activeTab: tab,
-    localResourceCount: resources.length,
-    pendingSyncCount: outbox.length
+    localResourceCount: linkedResources.length,
+    aiReadyResourceCount: linkedResources.filter(
+      (resource) =>
+        resource.aiStatus === "ready" &&
+        Boolean(resource.summary) &&
+        resource.tags.length > 0
+    ).length,
+    pendingSyncCount: auth.configured ? outbox.length : 0,
+    libraryScan: publicLibraryScan(scan)
   };
 }
 
@@ -736,6 +1307,7 @@ function walkBookmarkTree(
 }
 
 async function importNativeBookmarks(): Promise<ImportResult> {
+  const auth = await getAuthState();
   const tree = await chrome.bookmarks.getTree();
   const native: Array<{
     node: chrome.bookmarks.BookmarkTreeNode;
@@ -791,6 +1363,7 @@ async function importNativeBookmarks(): Promise<ImportResult> {
       userNote: existing?.userNote || "",
       summary: existing?.summary || "",
       tags: existing?.tags || [],
+      tagsSource: existing?.tagsSource,
       topics: existing?.topics || [],
       contentExcerpt: existing?.contentExcerpt || "",
       contentHash: existing?.contentHash || "",
@@ -800,12 +1373,17 @@ async function importNativeBookmarks(): Promise<ImportResult> {
         existing?.siteName || new URL(primary.node.url!).hostname,
       language: existing?.language || "",
       imageUrl: existing?.imageUrl || "",
+      ...(existing?.thumbnailDataUrl
+        ? { thumbnailDataUrl: existing.thumbnailDataUrl }
+        : {}),
       faviconUrl: existing?.faviconUrl || "",
       nativeBookmarkIds,
       nativeFolderPath: primary.path,
       aiStatus: existing?.aiStatus || "not_requested",
       syncStatus: baseChanged
-        ? "pending"
+        ? auth.configured
+          ? "pending"
+          : "local"
         : existing?.syncStatus || "local",
       createdAt:
         existing?.createdAt ||
@@ -817,7 +1395,7 @@ async function importNativeBookmarks(): Promise<ImportResult> {
     };
 
     await upsertLocalResource(resource);
-    if (baseChanged) {
+    if (baseChanged && auth.configured) {
       await enqueueOutbox(resource, "");
     }
     if (existing) alreadyKnown += group.length;
@@ -997,6 +1575,17 @@ async function getResources(query = "", semantic = false) {
   return searchLocalResources(linked, query);
 }
 
+async function askAgent(
+  query: string,
+  history: import("../lib/types").BookmarkAgentTurn[] = []
+) {
+  await importNativeBookmarks();
+  const resources = (await getLocalResources()).filter(
+    (resource) => resource.nativeBookmarkIds.length > 0
+  );
+  return askBookmarkAgent(query, resources, history);
+}
+
 async function indexNativeBookmark(
   id: string,
   node: chrome.bookmarks.BookmarkTreeNode
@@ -1006,6 +1595,7 @@ async function indexNativeBookmark(
   }
 
   const resourceKey = await resourceKeyForUrl(node.url);
+  const auth = await getAuthState();
   const existing = await getLocalResource(resourceKey);
   const timestamp = now();
   const resource: ResourceRecord = {
@@ -1016,6 +1606,7 @@ async function indexNativeBookmark(
     userNote: existing?.userNote || "",
     summary: existing?.summary || "",
     tags: existing?.tags || [],
+    tagsSource: existing?.tagsSource,
     topics: existing?.topics || [],
     contentExcerpt: existing?.contentExcerpt || "",
     contentHash: existing?.contentHash || "",
@@ -1024,27 +1615,36 @@ async function indexNativeBookmark(
     siteName: existing?.siteName || new URL(node.url).hostname,
     language: existing?.language || "",
     imageUrl: existing?.imageUrl || "",
+    ...(existing?.thumbnailDataUrl
+      ? { thumbnailDataUrl: existing.thumbnailDataUrl }
+      : {}),
     faviconUrl: existing?.faviconUrl || "",
     nativeBookmarkIds: [
       ...new Set([...(existing?.nativeBookmarkIds || []), id])
     ],
     nativeFolderPath: await folderPathForId(node.parentId || ""),
     aiStatus: existing?.aiStatus || "not_requested",
-    syncStatus: "pending",
+    syncStatus: auth.configured ? "pending" : "local",
     createdAt: existing?.createdAt || timestamp,
     updatedAt: timestamp,
     lastSyncedAt: existing?.lastSyncedAt
   };
 
   await upsertLocalResource(resource);
-  await enqueueOutbox(resource, "");
-  void syncPendingIfReady();
+  if (auth.configured) {
+    await enqueueOutbox(resource, "");
+    void syncPendingIfReady();
+  }
 }
 
 async function handleRequest(request: ExtensionRequest): Promise<unknown> {
   switch (request.type) {
     case "GET_APP_STATE":
       return getAppState();
+    case "GET_AI_SETTINGS":
+      return getAiSettingsStatus();
+    case "SAVE_AI_SETTINGS":
+      return saveAiSettings(request.payload);
     case "GET_BOOKMARK_BAR":
       return getBookmarkBarSnapshot();
     case "GET_PENDING_SAVE":
@@ -1059,6 +1659,30 @@ async function handleRequest(request: ExtensionRequest): Promise<unknown> {
       return captureActivePage();
     case "SAVE_BOOKMARK":
       return saveBookmark(request.payload);
+    case "ASK_BOOKMARK_AGENT":
+      return askAgent(request.query, request.history);
+    case "GET_LOCAL_RESOURCES":
+      await importNativeBookmarks();
+      return (await getLocalResources()).filter(
+        (resource) => resource.nativeBookmarkIds.length > 0
+      );
+    case "GET_AGENT_CONVERSATIONS":
+      return getAgentConversations();
+    case "SAVE_AGENT_CONVERSATION":
+      return saveAgentConversation(request.conversation);
+    case "DELETE_AGENT_CONVERSATION":
+      await deleteAgentConversation(request.id);
+      return { deleted: true };
+    case "START_LIBRARY_SCAN":
+      return startLibraryScan(Boolean(request.force));
+    case "GET_LIBRARY_SCAN":
+      return publicLibraryScan(await getStoredLibraryScan());
+    case "PAUSE_LIBRARY_SCAN":
+      return updateLibraryScanState("paused");
+    case "RESUME_LIBRARY_SCAN":
+      return updateLibraryScanState("running");
+    case "CANCEL_LIBRARY_SCAN":
+      return updateLibraryScanState("cancelled");
     case "GET_RESOURCES":
       return getResources(request.query, request.semantic);
     case "SYNC_NOW":
@@ -1069,6 +1693,8 @@ async function handleRequest(request: ExtensionRequest): Promise<unknown> {
       return restoreMissingNativeBookmarks();
     case "UPDATE_NATIVE_BOOKMARK":
       return updateNativeBookmark(request.payload);
+    case "UPDATE_RESOURCE_TAGS":
+      return updateResourceTags(request.payload);
     case "CREATE_NATIVE_FOLDER":
       return createNativeFolder(request.payload);
     case "MOVE_NATIVE_BOOKMARK":
@@ -1084,7 +1710,7 @@ async function handleRequest(request: ExtensionRequest): Promise<unknown> {
       return { opened: true };
     case "AUTH_CHANGED":
       try {
-        await drainOutbox();
+        await syncPendingIfReady();
         await pullCloudResources();
       } catch {
         // The returned state gives the UI the actionable error boundary.
@@ -1136,6 +1762,12 @@ chrome.runtime.onInstalled.addListener(() => {
   void importNativeBookmarks()
     .then(() => syncPendingIfReady())
     .catch(() => undefined);
+  void getStoredLibraryScan().then((scan) => {
+    if (scan.state === "running") {
+      void scheduleLibraryScan();
+      void runLibraryScan();
+    }
+  });
   void chrome.omnibox.setDefaultSuggestion({
     description:
       "搜索 Chrome 书签、历史记录和标签页，或使用默认搜索引擎"
@@ -1265,8 +1897,13 @@ chrome.runtime.onStartup.addListener(() => {
     const auth = await getAuthState();
     if (auth.signedIn && auth.accountMatches === true) {
       // 先提交本地变更，再拉取云端，避免旧云端数据覆盖待同步状态。
-      await drainOutbox();
+      await syncPendingIfReady();
       await pullCloudResources();
+    }
+    const scan = await getStoredLibraryScan();
+    if (scan.state === "running") {
+      await scheduleLibraryScan();
+      void runLibraryScan();
     }
   })().catch(() => undefined);
 });
@@ -1274,5 +1911,7 @@ chrome.runtime.onStartup.addListener(() => {
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "bookmark-layer-sync") {
     void syncPendingIfReady();
+  } else if (alarm.name === LIBRARY_SCAN_ALARM) {
+    void runLibraryScan();
   }
 });

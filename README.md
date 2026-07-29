@@ -1,8 +1,6 @@
-# Bookmark Layer
+# Aarre
 
-Bookmark Layer 是一个 Chrome 原生书签增强层。它把标题、URL 和文件夹写入真实的 Chrome 书签，同时将网页正文理解、摘要、标签、语义索引等扩展信息同步到用户自己的产品账户。
-
-当前名称是开发期工作名，正式品牌尚未确定。
+Aarre 是一个 Chrome 原生书签增强层。它把标题、URL 和文件夹写入真实的 Chrome 书签，并在本地保存网页摘要、标签等智能信息；云端账号与跨设备备份是可选能力。
 
 ## 已实现的关键闭环
 
@@ -16,12 +14,15 @@ Bookmark Layer 是一个 Chrome 原生书签增强层。它把标题、URL 和�
 - 用户可编辑收藏名称、收藏原因和原生 Chrome 文件夹。
 - 保存时创建或更新真实 Chrome 原生书签。
 - 监听原生书签的新增、改名、移动和删除。
-- 离线保存与持久补同步队列；元数据更新不会覆盖待同步正文。
+- 无云端账号时完整支持本地保存与检索；配置云端后再启用持久补同步队列。
 - 同步失败按指数退避重试，不会让失败任务阻塞后续收藏。
 - 使用 Google OAuth 登录，并校验产品账号与当前 Chrome 配置文件账号一致。
-- 通过 Supabase Auth、Postgres RLS 和云端函数同步每个用户的智能信息。
-- 使用 Gemini 生成中文摘要、标签、主题、关键点和适用场景。
-- 使用 Gemini Embedding 与 pgvector 完成语义搜索。
+- 可选通过 Supabase Auth、Postgres RLS 和云端函数同步每个用户的智能信息。
+- 支持扩展使用用户提供的 API Key 直接调用 Gemini、OpenAI、DeepSeek，生成中文摘要、标签和主题；三家服务均要求配置自己的 Key，处理发生在所选 AI 服务商，不要求先配置 Supabase。
+- 设置页提供显式启动的全目录 AI 扫描：在用户授权网页读取权限后，逐条提取网页描述、标题、首段与路径信息，补全旧书签的简介、标签和主题；任务可暂停、恢复和取消。
+- 收藏列表直接展示名称、AI 简介、标签和完整 URL；尚未扫描的项目会明确显示待处理状态。
+- 底部 Agent 使用全目录紧凑索引和最近会话上下文回答，不再只截取少量关键词结果；发送后进入独立会话页，真实历史会话保存在当前 Chrome 配置中。
+- 配置云端后可使用 Gemini Embedding 与 pgvector 语义搜索；未配置时使用本地摘要与标签检索。
 - 现有 Chrome 书签自动进入本地智能索引，无需手动导入；不会因此在后台批量打开网页或读取正文。
 - 原生书签始终以 Chrome 为唯一事实来源，智能层不会用云端副本覆盖 Chrome 的标题、URL 或文件夹结构。
 
@@ -30,11 +31,12 @@ Bookmark Layer 是一个 Chrome 原生书签增强层。它把标题、URL 和�
 | 数据 | 真实来源 | 同步方式 |
 | --- | --- | --- |
 | 标题、URL、文件夹 | Chrome 原生书签 | Chrome Sync |
-| 收藏原因、摘要、标签、正文索引 | Bookmark Layer | Supabase |
-| AI 模型密钥 | Supabase Edge Function Secret | 不进入扩展 |
-| 未同步内容 | 当前 Chrome 配置文件本地 | 登录或恢复网络后补同步 |
+| 收藏原因、摘要、标签 | Aarre | 当前 Chrome 配置文件本地；可选同步到 Supabase |
+| Agent 历史会话 | Aarre | 当前 Chrome 配置文件本地 |
+| AI 模型密钥 | 当前 Chrome 配置文件 | 由扩展直接发送给用户选择的 AI 服务商 |
+| 待同步内容 | 当前 Chrome 配置文件本地 | 仅在配置 Supabase 后启用补同步 |
 
-统一输入框只在用户输入时查询 Chrome History API 生成本机联想，不会把完整浏览历史写入产品数据库。网页正文只在用户主动收藏时读取，且只有勾选 AI 处理时才进入云端处理队列。
+统一输入框只在用户输入时查询 Chrome History API 生成本机联想，不会把完整浏览历史写入产品数据库。单页收藏只在用户主动收藏且勾选 AI 处理时读取正文。全目录扫描必须由用户在设置页明确启动并授权网页读取；扫描不携带站点 Cookie，内部、局域网和受保护地址不会发送给 AI。未配置云端时不会创建云端同步任务。
 
 ## 本地开发
 
@@ -48,7 +50,9 @@ npm run check
 
 生产构建输出在 `dist/`。在 `chrome://extensions` 打开开发者模式，选择“加载已解压的扩展程序”，然后选择 `dist/`。
 
-## 配置 Supabase 与 Google 登录
+## 可选：配置 Supabase 与 Google 登录
+
+只使用 Chrome 原生书签、本地摘要标签和 DeepSeek / OpenAI / Gemini BYOK 时，可以跳过本节。
 
 ### 1. 创建 Supabase 项目
 
@@ -93,7 +97,7 @@ supabase functions deploy enrich-bookmark
 supabase functions deploy search-bookmarks
 ```
 
-模型密钥必须只保存在 Supabase Secret 中，禁止写入 `.env.local` 或扩展包。
+内置模型密钥必须只保存在 Supabase Secret 中，禁止写入 `.env.local` 或扩展包。用户也可在扩展设置页配置 Gemini、OpenAI 或 DeepSeek Key；BYOK 只保存在当前 Chrome 配置的本地存储中，并由扩展直接调用相应服务商。
 
 ## 验证
 
@@ -103,7 +107,7 @@ npm run test
 npm run build
 ```
 
-当前自动化覆盖 URL 规范化、跟踪参数清理、本地检索排序、IndexedDB 缓存与队列、正文提取和敏感表单排除。Google OAuth、Chrome Sync、Supabase 和 Gemini 的端到端验证需要真实项目凭据和解压安装后的 Chrome 扩展。
+当前自动化覆盖 URL 规范化、跟踪参数清理、本地检索排序、IndexedDB 缓存与队列、正文提取、敏感表单排除、页面精华提取、Agent 全目录上下文、会话持久化、AI 服务商设置和 DeepSeek 本地直连。Google OAuth、Chrome Sync、Supabase 与真实批量 AI 请求的端到端验证需要真实项目凭据和解压安装后的 Chrome 扩展。
 
 生成交付物前必须先提交全部源码，并运行：
 
@@ -119,7 +123,7 @@ npm run package:artifacts
 - 扩展不能接管 Chrome 地址栏内部实现；当前覆盖书签、历史记录、已打开标签页、网址直达和默认搜索引擎，无法复制 Chrome 未公开的计算器、站点搜索快捷词等内部能力。
 - 扩展不能替用户开启 Chrome Sync；它会优先显示 Chrome 标记为账号同步的书签栏，实际同步开关仍由 Chrome 设置控制。
 - Chrome 内部页、Chrome Web Store 等受保护页面不能读取正文。
-- 旧书签会自动出现在侧边栏和关键词索引中；需要再次访问并主动收藏，才能获得正文级 AI 理解。
+- 旧书签会自动出现在侧边栏；配置 AI 后可在设置页启动全目录扫描。失效链接、登录墙和内部地址可能只能生成保守摘要，或被隐私规则跳过。
 - Chrome 移动端不能运行扩展；原生书签仍可由 Chrome Sync 到手机，智能管理端后续需要 Web/PWA。
 - 当前删除原生书签只移除本机绑定，云端记录保留，以避免同步延迟导致误删；正式删除与回收站策略仍需补充。
 

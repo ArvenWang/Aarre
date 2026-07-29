@@ -1,6 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Bookmark Layer",
+  "name": "Aarre",
+  "short_name": "Aarre",
   "description": "保留 Chrome 原生书签，同步网页上下文，并用 AI 帮你重新找到真正需要的内容。",
   "version": "0.2.3",
   "minimum_chrome_version": "134",
@@ -9,6 +10,7 @@
     "alarms",
     "bookmarks",
     "contextMenus",
+    "favicon",
     "identity",
     "identity.email",
     "history",
@@ -19,12 +21,21 @@
     "tabs",
     "unlimitedStorage"
   ],
+  "host_permissions": [
+    "https://generativelanguage.googleapis.com/*",
+    "https://api.openai.com/*",
+    "https://api.deepseek.com/*"
+  ],
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
   "background": {
     "service_worker": "background.js",
     "type": "module"
   },
   "action": {
-    "default_title": "打开 Bookmark Layer"
+    "default_title": "打开 Aarre"
   },
   "side_panel": {
     "default_path": "sidepanel.html"

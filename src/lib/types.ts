@@ -94,6 +94,7 @@ export interface ResourceRecord {
   userNote: string;
   summary: string;
   tags: string[];
+  tagsSource?: "ai" | "user";
   topics: string[];
   contentExcerpt: string;
   contentHash: string;
@@ -102,6 +103,8 @@ export interface ResourceRecord {
   siteName: string;
   language: string;
   imageUrl: string;
+  /** 代表图的本地 WebP 缓存，不上传云端，避免列表受站点防盗链影响。 */
+  thumbnailDataUrl?: string;
   faviconUrl: string;
   nativeBookmarkIds: string[];
   nativeFolderPath: string[];
@@ -146,7 +149,36 @@ export interface AppState {
   auth: AuthState;
   activeTab: ActiveTabSummary | null;
   localResourceCount: number;
+  aiReadyResourceCount: number;
   pendingSyncCount: number;
+  libraryScan: LibraryScanStatus;
+}
+
+export type AiProviderId = "gemini" | "openai" | "deepseek";
+
+export interface AiProviderPreset {
+  id: AiProviderId;
+  name: string;
+  defaultModel: string;
+  description: string;
+  apiKeyPlaceholder: string;
+}
+
+export interface AiSettingsStatus {
+  provider: AiProviderId;
+  providerName: string;
+  model: string;
+  apiKeyConfigured: boolean;
+  apiKeySuffix?: string;
+  configuredProviders: AiProviderId[];
+  providerModels: Record<AiProviderId, string>;
+  usingBuiltInService: boolean;
+}
+
+export interface SaveAiSettingsInput {
+  provider: AiProviderId;
+  model: string;
+  apiKey?: string;
 }
 
 export interface SaveBookmarkInput {
@@ -161,6 +193,89 @@ export interface SaveBookmarkResult {
   resource: ResourceRecord;
   nativeBookmarkCreated: boolean;
   cloudSyncAttempted: boolean;
+  aiWarning?: string;
+}
+
+export interface BookmarkAgentSource {
+  resourceKey: string;
+  title: string;
+  url: string;
+  siteName: string;
+  faviconUrl: string;
+}
+
+export interface BookmarkAgentResponse {
+  query: string;
+  answer: string;
+  providerName: string;
+  sources: BookmarkAgentSource[];
+  catalogSize: number;
+  examinedCount: number;
+}
+
+export interface BookmarkAgentTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface AgentChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: string;
+  providerName?: string;
+  sources?: BookmarkAgentSource[];
+  status?: "sending" | "complete" | "failed";
+}
+
+export interface AgentConversation {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  messages: AgentChatMessage[];
+}
+
+export type LibraryScanState =
+  | "idle"
+  | "running"
+  | "paused"
+  | "completed"
+  | "cancelled"
+  | "failed";
+
+export interface LibraryScanError {
+  resourceKey: string;
+  title: string;
+  message: string;
+}
+
+export interface LibraryScanStatus {
+  id: string;
+  state: LibraryScanState;
+  total: number;
+  processed: number;
+  succeeded: number;
+  failed: number;
+  skipped: number;
+  currentTitle: string;
+  startedAt?: string;
+  updatedAt?: string;
+  completedAt?: string;
+  errors: LibraryScanError[];
+}
+
+export interface PageEssence {
+  description: string;
+  siteName: string;
+  imageUrl: string;
+  faviconUrl: string;
+  keywords: string[];
+  ogType: string;
+  h1: string;
+  h2: string[];
+  firstParagraph: string;
+  pathTokens: string[];
 }
 
 export interface ImportResult {

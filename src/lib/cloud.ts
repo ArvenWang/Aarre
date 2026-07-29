@@ -8,6 +8,7 @@ import {
   upsertLocalResource
 } from "./storage";
 import { getSupabase } from "./supabase";
+import { getAiRuntimeSettings } from "./settings";
 import type {
   ResourceRecord,
   SearchResult
@@ -21,6 +22,7 @@ interface CloudResourceRow {
   user_note: string | null;
   summary: string | null;
   tags: string[] | null;
+  tags_source?: "ai" | "user" | null;
   topics: string[] | null;
   content_excerpt: string | null;
   content_hash: string | null;
@@ -45,6 +47,7 @@ function fromCloudRow(row: CloudResourceRow): ResourceRecord {
     userNote: row.user_note || "",
     summary: row.summary || "",
     tags: row.tags || [],
+    tagsSource: row.tags_source === "user" ? "user" : "ai",
     topics: row.topics || [],
     contentExcerpt: row.content_excerpt || "",
     contentHash: row.content_hash || "",
@@ -70,6 +73,10 @@ function mutableFields(resource: ResourceRecord) {
     url: resource.url,
     title: resource.title,
     user_note: resource.userNote,
+    summary: resource.summary,
+    tags: resource.tags,
+    tags_source: resource.tagsSource || "ai",
+    topics: resource.topics,
     content_excerpt: resource.contentExcerpt,
     content_hash: resource.contentHash,
     selected_text: resource.selectedText,
@@ -79,6 +86,7 @@ function mutableFields(resource: ResourceRecord) {
     image_url: resource.imageUrl,
     favicon_url: resource.faviconUrl,
     native_folder_path: resource.nativeFolderPath,
+    ai_status: resource.aiStatus,
     updated_at: new Date().toISOString()
   };
 }
@@ -94,6 +102,8 @@ async function persistIfCurrent(
       resource.url,
       resource.title,
       resource.userNote,
+      resource.tags,
+      resource.tagsSource,
       resource.contentHash,
       resource.selectedText,
       resource.nativeBookmarkIds,
@@ -131,6 +141,28 @@ async function assertCloudSession() {
   return {
     supabase,
     user: data.session.user
+  };
+}
+
+async function aiHeaders(
+  purpose: "generation" | "embedding"
+): Promise<Record<string, string> | undefined> {
+  const settings = await getAiRuntimeSettings();
+  if (purpose === "embedding") {
+    return settings.provider === "gemini" && settings.apiKey
+      ? { "x-bookmark-layer-gemini-key": settings.apiKey }
+      : undefined;
+  }
+
+  return {
+    "x-bookmark-layer-ai-provider": settings.provider,
+    "x-bookmark-layer-ai-model": settings.model,
+    ...(settings.apiKey
+      ? { "x-bookmark-layer-ai-key": settings.apiKey }
+      : {}),
+    ...(settings.provider === "gemini" && settings.apiKey
+      ? { "x-bookmark-layer-gemini-key": settings.apiKey }
+      : {})
   };
 }
 
@@ -196,6 +228,7 @@ export async function syncOneResource(
     const { data, error } = await supabase.functions.invoke(
       "enrich-bookmark",
       {
+        headers: await aiHeaders("generation"),
         body: {
           resource_key: resource.resourceKey,
           content,
@@ -285,6 +318,7 @@ export async function semanticSearch(
 ): Promise<SearchResult[]> {
   const { supabase } = await assertCloudSession();
   const { data, error } = await supabase.functions.invoke("search-bookmarks", {
+    headers: await aiHeaders("embedding"),
     body: { query, limit: 20 }
   });
 

@@ -24,7 +24,10 @@ if (
   const manifestPath = new URL("../dist/manifest.json", import.meta.url);
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   manifest.host_permissions = [
-    `${new URL(configuredSupabaseUrl).origin}/*`
+    ...new Set([
+      ...(manifest.host_permissions || []),
+      `${new URL(configuredSupabaseUrl).origin}/*`
+    ])
   ];
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 }

@@ -6,6 +6,14 @@ import type {
   ResourceRecord,
   SearchResult
 } from "../../lib/types";
+import {
+  BookmarkIcon,
+  RefreshIcon,
+  SearchIcon
+} from "../components/Icons";
+import { SiteIcon } from "../components/SiteIcon";
+
+type LibraryFilter = "all" | "ready" | "pending";
 
 function asSearchResults(
   items: ResourceRecord[] | SearchResult[]
@@ -36,6 +44,7 @@ export function ManagerApp() {
   const [appState, setAppState] = useState<AppState | null>(null);
   const [query, setQuery] = useState(initialQuery);
   const [semantic, setSemantic] = useState(true);
+  const [filter, setFilter] = useState<LibraryFilter>("all");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [action, setAction] = useState("");
@@ -90,6 +99,16 @@ export function ManagerApp() {
       results.filter((item) => item.resource.aiStatus === "ready").length,
     [results]
   );
+  const pendingCount = results.length - readyCount;
+  const visibleResults = useMemo(() => {
+    if (filter === "ready") {
+      return results.filter((item) => item.resource.aiStatus === "ready");
+    }
+    if (filter === "pending") {
+      return results.filter((item) => item.resource.aiStatus !== "ready");
+    }
+    return results;
+  }, [filter, results]);
 
   async function handleSearch(event: React.FormEvent) {
     event.preventDefault();
@@ -134,10 +153,12 @@ export function ManagerApp() {
     <main className="manager-shell">
       <header className="manager-header">
         <div className="manager-brand">
-          <div className="brand-mark">✦</div>
+          <div className="brand-mark">
+            <BookmarkIcon />
+          </div>
           <div>
-            <div className="eyebrow">BOOKMARK LAYER</div>
-            <strong>你的收藏库</strong>
+            <div className="eyebrow">AARRE</div>
+            <strong>收藏智能层</strong>
           </div>
         </div>
 
@@ -187,15 +208,14 @@ export function ManagerApp() {
 
       <section className="manager-hero">
         <div>
-          <p className="eyebrow">RECALL WHAT MATTERS</p>
-          <h1>描述你正在寻找的东西。</h1>
+          <h1>我的收藏</h1>
           <p>
-            不需要记住网页标题。输入用途、场景或曾经看到的观点。
+            保留 Chrome 原生书签，并补充摘要、标签和语义检索。
           </p>
         </div>
 
         <form className="search-box" onSubmit={handleSearch}>
-          <span aria-hidden="true">⌕</span>
+          <SearchIcon aria-hidden="true" />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -219,7 +239,7 @@ export function ManagerApp() {
             disabled={!appState?.auth.signedIn}
           />
           <span>
-            AI 语义搜索
+            云端向量搜索
             {!appState?.auth.signedIn ? "（登录后可用）" : ""}
           </span>
         </label>
@@ -245,18 +265,39 @@ export function ManagerApp() {
       ) : null}
 
       <section className="library-toolbar">
-        <div>
-          <h2>{query ? "搜索结果" : "全部收藏"}</h2>
+        <div className="library-filter-group">
+          <div className="library-tabs" role="tablist" aria-label="收藏状态">
+            {(
+              [
+                ["all", "全部", results.length],
+                ["ready", "已理解", readyCount],
+                ["pending", "待处理", pendingCount]
+              ] as const
+            ).map(([value, label, count]) => (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={filter === value}
+                data-active={filter === value}
+                key={value}
+                onClick={() => setFilter(value)}
+              >
+                {label}
+                <span>{count}</span>
+              </button>
+            ))}
+          </div>
           <p>
-            直接读取 Chrome 原生书签 · {results.length} 条内容 · {readyCount} 条已完成 AI 理解
+            {query ? `“${query}”的搜索结果` : "直接读取 Chrome 原生书签"}
           </p>
         </div>
         <div className="toolbar-actions">
           <button
-            className="button button-dark"
+            className="button button-quiet refresh-button"
             onClick={() => void refresh()}
             disabled={Boolean(action)}
           >
+            <RefreshIcon />
             刷新
           </button>
         </div>
@@ -266,17 +307,18 @@ export function ManagerApp() {
 
       {loading ? (
         <div className="empty-state">正在读取你的收藏库…</div>
-      ) : results.length ? (
+      ) : visibleResults.length ? (
         <section className="resource-grid">
-          {results.map(({ resource, score, matchReason }) => (
+          {visibleResults.map(({ resource, score, matchReason }) => (
             <article className="resource-card" key={resource.resourceKey}>
               <div className="resource-topline">
                 <div className="resource-source">
-                  {resource.faviconUrl ? (
-                    <img src={resource.faviconUrl} alt="" />
-                  ) : (
-                    <span className="favicon-fallback">↗</span>
-                  )}
+                  <SiteIcon
+                    url={resource.url}
+                    faviconUrl={resource.faviconUrl}
+                    label={resource.siteName || hostFromUrl(resource.url)}
+                    size={32}
+                  />
                   <span>{resource.siteName || hostFromUrl(resource.url)}</span>
                 </div>
                 <span className="resource-date">
@@ -320,7 +362,9 @@ export function ManagerApp() {
                 >
                   {resource.syncStatus === "synced"
                     ? "云端已同步"
-                    : "本地待同步"}
+                    : resource.syncStatus === "local"
+                      ? "仅保存在本机"
+                      : "等待云端同步"}
                 </span>
                 {typeof score === "number" ? (
                   <span className="score-pill">
@@ -334,11 +378,21 @@ export function ManagerApp() {
         </section>
       ) : (
         <div className="empty-state">
-          <strong>{query ? "没有找到匹配内容" : "收藏库还是空的"}</strong>
+          <strong>
+            {results.length
+              ? filter === "ready"
+                ? "还没有已完成理解的收藏"
+                : "没有待处理的收藏"
+              : query
+                ? "没有找到匹配内容"
+                : "收藏库还是空的"}
+          </strong>
           <p>
-            {query
-              ? "换一种描述，或关闭 AI 语义搜索后使用关键词。"
-              : "Chrome 书签栏中的内容会自动出现在这里，无需导入。"}
+            {results.length
+              ? "切换到“全部”查看当前收藏。"
+              : query
+                ? "换一种描述，或关闭云端向量搜索后使用关键词。"
+                : "Chrome 书签栏中的内容会自动出现在这里，无需导入。"}
           </p>
         </div>
       )}
