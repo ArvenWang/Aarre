@@ -27,7 +27,8 @@ import type {
   NativeFolderOption,
   PendingSaveDraft,
   PageCapture,
-  ResourceRecord
+  ResourceRecord,
+  UndoSnapshotBatch
 } from "../../lib/types";
 import {
   ArrowLeftIcon,
@@ -272,6 +273,7 @@ function SettingsPage({
   const [action, setAction] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [undoBatches, setUndoBatches] = useState<UndoSnapshotBatch[]>([]);
   const backButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
@@ -285,6 +287,13 @@ function SettingsPage({
       .catch((caught) =>
         setError(
           caught instanceof Error ? caught.message : "无法读取 AI 设置"
+        )
+      );
+    void sendExtensionRequest({ type: "GET_UNDO_SNAPSHOTS" })
+      .then(setUndoBatches)
+      .catch((caught) =>
+        setError(
+          caught instanceof Error ? caught.message : "无法读取最近的更改"
         )
       );
   }, []);
@@ -408,6 +417,31 @@ function SettingsPage({
       );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "扫描操作失败");
+    } finally {
+      setAction("");
+    }
+  }
+
+  async function handleUndoBatch(batchId: string) {
+    if (action) return;
+    setAction(`undo-${batchId}`);
+    setError("");
+    setMessage("");
+    try {
+      const result = await sendExtensionRequest({
+        type: "UNDO_BOOKMARK_BATCH",
+        batchId
+      });
+      setUndoBatches((current) =>
+        current.filter((batch) => batch.batchId !== batchId)
+      );
+      setMessage(
+        result.failed
+          ? `已恢复 ${result.restored} 项，${result.failed} 项需要手动处理。`
+          : `已撤销 ${result.restored} 项更改。`
+      );
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "撤销失败");
     } finally {
       setAction("");
     }
@@ -659,6 +693,43 @@ function SettingsPage({
               </button>
             )}
           </div>
+        </section>
+
+        <section
+          className="settings-section"
+          aria-labelledby="recent-changes-title"
+        >
+          <div className="settings-section-heading">
+            <div>
+              <h2 id="recent-changes-title">最近的更改</h2>
+              <p>保留 30 天。恢复后 Chrome 会分配新的书签 ID，智能信息仍按网址自动关联。</p>
+            </div>
+          </div>
+          {undoBatches.length ? (
+            <div className="settings-change-list">
+              {undoBatches.slice(0, 12).map((batch) => (
+                <article key={batch.batchId} data-destructive={batch.destructive}>
+                  <div>
+                    <strong>{batch.label}</strong>
+                    <small>
+                      {conversationDate(batch.createdAt)}
+                      {batch.destructive ? " · 回收站" : ""}
+                    </small>
+                  </div>
+                  <button
+                    type="button"
+                    className="button button-quiet button-small"
+                    disabled={Boolean(action)}
+                    onClick={() => void handleUndoBatch(batch.batchId)}
+                  >
+                    {action === `undo-${batch.batchId}` ? "恢复中…" : "撤销"}
+                  </button>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="settings-empty-state">最近没有可撤销的更改。</p>
+          )}
         </section>
 
         <section
@@ -1114,6 +1185,7 @@ interface AgentChatPageProps {
   onOpenSource: (url: string) => void;
   onConfirmActions: (messageId: string) => void;
   onCancelActions: (messageId: string) => void;
+  onUndoBatch: (messageId: string, batchId: string) => void;
 }
 
 function AgentChatPage({
@@ -1126,7 +1198,8 @@ function AgentChatPage({
   onSubmit,
   onOpenSource,
   onConfirmActions,
-  onCancelActions
+  onCancelActions,
+  onUndoBatch
 }: AgentChatPageProps) {
   const endRef = useRef<HTMLDivElement | null>(null);
 
@@ -1262,6 +1335,16 @@ function AgentChatPage({
                   </footer>
                 ) : null}
               </section>
+            ) : null}
+            {message.undoBatchId ? (
+              <button
+                type="button"
+                className="agent-undo-button"
+                disabled={busy}
+                onClick={() => onUndoBatch(message.id, message.undoBatchId || "")}
+              >
+                {busy ? "正在恢复…" : "撤销这批操作"}
+              </button>
             ) : null}
           </article>
         ))}
@@ -1914,6 +1997,7 @@ export function SidePanelApp() {
             ? `已完成 ${succeeded} 项操作，并重新读取 Chrome 书签确认。${failed ? `另有 ${failed} 项未完成，请查看上方原因。` : ""}`
             : `没有完成任何操作。${response.results[0]?.message ? `原因：${response.results[0].message}` : ""}`,
         createdAt: timestamp,
+        ...(response.batchId ? { undoBatchId: response.batchId } : {}),
         status: failed && !succeeded ? "failed" : "complete"
       };
       const completed: AgentConversation = {
@@ -1992,6 +2076,38 @@ export function SidePanelApp() {
     };
     setActiveConversation(updated);
     void persistConversation(updated);
+  }
+
+  async function handleUndoAgentBatch(messageId: string, batchId: string) {
+    if (!activeConversation || busy || !batchId) return;
+    setBusy("agent-actions");
+    setError("");
+    try {
+      const result = await sendExtensionRequest({
+        type: "UNDO_BOOKMARK_BATCH",
+        batchId
+      });
+      const updated: AgentConversation = {
+        ...activeConversation,
+        updatedAt: new Date().toISOString(),
+        messages: activeConversation.messages.map((message) =>
+          message.id === messageId
+            ? {
+                ...message,
+                content: `${message.content}\n${result.failed ? `已恢复 ${result.restored} 项，${result.failed} 项需要手动处理。` : `已撤销 ${result.restored} 项更改。`}`,
+                undoBatchId: undefined
+              }
+            : message
+        )
+      };
+      setActiveConversation(updated);
+      await persistConversation(updated);
+      await refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "撤销失败");
+    } finally {
+      setBusy("");
+    }
   }
 
   function handleAgentSubmit(event: React.FormEvent) {
@@ -2298,6 +2414,9 @@ export function SidePanelApp() {
           void handleConfirmAgentActions(messageId)
         }
         onCancelActions={handleCancelAgentActions}
+        onUndoBatch={(messageId, batchId) =>
+          void handleUndoAgentBatch(messageId, batchId)
+        }
       />
     );
   }

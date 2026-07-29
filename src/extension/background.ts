@@ -20,6 +20,12 @@ import {
   isInternalOrSensitiveUrl
 } from "../lib/page-essence";
 import { cacheRepresentativeImage } from "../lib/thumbnail";
+import {
+  createUndoBatch,
+  snapshotCreatedMutation,
+  snapshotNodeMutation,
+  undoBookmarkBatch
+} from "../lib/bookmark-undo";
 import type {
   ExtensionRequest,
   ExtensionResponse
@@ -32,11 +38,16 @@ import {
 } from "../lib/settings";
 import {
   completeOutboxItem,
+  cleanupExpiredUndoSnapshots,
   deferOutboxItem,
+  deleteUndoSnapshot,
   enqueueOutbox,
   getLocalResource,
   getLocalResources,
   getOutbox,
+  getUndoSnapshot,
+  getUndoSnapshots,
+  putUndoSnapshot,
   upsertLocalResource
 } from "../lib/storage";
 import {
@@ -63,7 +74,9 @@ import type {
   ResourceRecord,
   RestoreResult,
   SaveBookmarkInput,
-  SaveBookmarkResult
+  SaveBookmarkResult,
+  UndoMutation,
+  UndoSnapshotBatch
 } from "../lib/types";
 import {
   canonicalizeUrl,
@@ -175,6 +188,57 @@ function hostFromUrl(url: string): string {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "发生未知错误。";
+}
+
+async function runProtectedBookmarkMutation<T>(input: {
+  label: string;
+  destructive: boolean;
+  mutation: UndoMutation;
+  perform: () => Promise<T>;
+  createdNodeId?: (result: T) => string | undefined;
+}): Promise<T> {
+  const batch = createUndoBatch({
+    source: "manual",
+    label: input.label,
+    destructive: input.destructive,
+    mutations: [{ ...input.mutation, applied: true }]
+  });
+  await putUndoSnapshot(batch);
+
+  let result: T;
+  try {
+    result = await input.perform();
+  } catch (error) {
+    await deleteUndoSnapshot(batch.batchId).catch(() => undefined);
+    throw error;
+  }
+
+  const createdNodeId = input.createdNodeId?.(result);
+  const ready: UndoSnapshotBatch = {
+    ...batch,
+    status: "ready",
+    mutations: batch.mutations.map((mutation) => ({
+      ...mutation,
+      ...(createdNodeId ? { createdNodeId } : {})
+    }))
+  };
+  try {
+    await putUndoSnapshot(ready);
+  } catch {
+    const rolledBack = await undoBookmarkBatch(
+      ready,
+      defaultFolderId
+    ).catch(() => null);
+    if (rolledBack) {
+      await putUndoSnapshot(rolledBack.batch).catch(() => undefined);
+    }
+    throw new Error(
+      rolledBack?.failed
+        ? "撤销记录写入失败，且自动回滚未完全成功。请立即查看“最近的更改”。"
+        : "撤销记录写入失败，本次修改已自动回滚，没有保留不可撤销的写入。"
+    );
+  }
+  return result;
 }
 
 async function activeTab(): Promise<chrome.tabs.Tab | null> {
@@ -472,7 +536,7 @@ async function updateNativeBookmark(input: {
   id: string;
   title: string;
   url?: string;
-}): Promise<NativeBookmarkNode> {
+}, skipUndo = false): Promise<NativeBookmarkNode> {
   const title = input.title.trim();
   if (!title) {
     throw new Error("名称不能为空。");
@@ -481,13 +545,27 @@ async function updateNativeBookmark(input: {
   if (!current || current.unmodifiable === "managed") {
     throw new Error("这个书签由 Chrome 或组织管理，无法修改。");
   }
-  const updated = await chrome.bookmarks.update(input.id, {
-    title,
-    ...(current.url && input.url?.trim()
-      ? { url: input.url.trim() }
-      : {})
+  const perform = async () =>
+    serializeBookmarkNode(
+      await chrome.bookmarks.update(input.id, {
+        title,
+        ...(current.url && input.url?.trim()
+          ? { url: input.url.trim() }
+          : {})
+      })
+    );
+  if (skipUndo) return perform();
+  const mutation = await snapshotNodeMutation({
+    nodeId: input.id,
+    kind: "restore_update",
+    label: `修改“${current.title || current.url}”`
   });
-  return serializeBookmarkNode(updated);
+  return runProtectedBookmarkMutation({
+    label: mutation.label,
+    destructive: false,
+    mutation,
+    perform
+  });
 }
 
 function normalizeUserTags(tags: string[]): string[] {
@@ -528,7 +606,7 @@ async function updateResourceTags(input: {
 async function createNativeFolder(input: {
   parentId: string;
   title: string;
-}): Promise<NativeBookmarkNode> {
+}, skipUndo = false): Promise<NativeBookmarkNode> {
   const title = input.title.trim();
   if (!title) {
     throw new Error("文件夹名称不能为空。");
@@ -537,43 +615,86 @@ async function createNativeFolder(input: {
   if (!parent || parent.url || parent.unmodifiable === "managed") {
     throw new Error("目标文件夹不可写入。");
   }
-  return serializeBookmarkNode(
-    await chrome.bookmarks.create({ parentId: input.parentId, title })
-  );
+  const perform = async () =>
+    serializeBookmarkNode(
+      await chrome.bookmarks.create({ parentId: input.parentId, title })
+    );
+  if (skipUndo) return perform();
+  const mutation = await snapshotCreatedMutation({
+    parentId: input.parentId,
+    label: `创建文件夹“${title}”`,
+    title
+  });
+  return runProtectedBookmarkMutation({
+    label: mutation.label,
+    destructive: false,
+    mutation,
+    perform,
+    createdNodeId: (node) => node.id
+  });
 }
 
 async function moveNativeBookmark(input: {
   id: string;
   parentId: string;
   index?: number;
-}): Promise<NativeBookmarkNode> {
+}, skipUndo = false): Promise<NativeBookmarkNode> {
   if (input.id === input.parentId) {
     throw new Error("不能把文件夹移动到自身。");
   }
-  return serializeBookmarkNode(
-    await chrome.bookmarks.move(input.id, {
-      parentId: input.parentId,
-      index: input.index
-    })
-  );
+  const perform = async () =>
+    serializeBookmarkNode(
+      await chrome.bookmarks.move(input.id, {
+        parentId: input.parentId,
+        index: input.index
+      })
+    );
+  if (skipUndo) return perform();
+  const mutation = await snapshotNodeMutation({
+    nodeId: input.id,
+    kind: "restore_move",
+    label: "移动书签或文件夹"
+  });
+  mutation.label = `移动“${mutation.node?.title || "书签"}”`;
+  return runProtectedBookmarkMutation({
+    label: mutation.label,
+    destructive: false,
+    mutation,
+    perform
+  });
 }
 
 async function deleteNativeBookmark(input: {
   id: string;
   recursive: boolean;
-}): Promise<{ deleted: true }> {
+}, skipUndo = false): Promise<{ deleted: true }> {
   const [node] = await chrome.bookmarks.get(input.id);
   if (!node || node.unmodifiable === "managed" || node.folderType) {
     throw new Error("这个项目由 Chrome 管理，无法删除。");
   }
-  if (node.url) {
-    await chrome.bookmarks.remove(input.id);
-  } else if (input.recursive) {
-    await chrome.bookmarks.removeTree(input.id);
-  } else {
-    await chrome.bookmarks.remove(input.id);
-  }
-  return { deleted: true };
+  const perform = async () => {
+    if (node.url) {
+      await chrome.bookmarks.remove(input.id);
+    } else if (input.recursive) {
+      await chrome.bookmarks.removeTree(input.id);
+    } else {
+      await chrome.bookmarks.remove(input.id);
+    }
+    return { deleted: true as const };
+  };
+  if (skipUndo) return perform();
+  const mutation = await snapshotNodeMutation({
+    nodeId: input.id,
+    kind: "restore_subtree",
+    label: `删除“${node.title || node.url}”`,
+    destructive: true
+  });
+  return runProtectedBookmarkMutation({
+    label: mutation.label,
+    destructive: true,
+    mutation,
+    perform
+  });
 }
 
 function validateAgentBookmarkUrl(value: string | undefined): string {
@@ -688,7 +809,8 @@ async function executeBookmarkAgentAction(
       return {
         actionId: action.id,
         success: true,
-        message: `已创建书签「${created.title}」，并从 Chrome 重新读取确认。`
+        message: `已创建书签「${created.title}」，并从 Chrome 重新读取确认。`,
+        createdNodeId: created.id
       };
     }
     case "create_folder": {
@@ -698,7 +820,7 @@ async function executeBookmarkAgentAction(
       const created = await createNativeFolder({
         parentId: action.parentId,
         title: action.title
-      });
+      }, true);
       const [verified] = await chrome.bookmarks.get(created.id);
       if (!verified || verified.url) {
         throw new Error("Chrome 没有保存这个文件夹，请重试。");
@@ -706,7 +828,8 @@ async function executeBookmarkAgentAction(
       return {
         actionId: action.id,
         success: true,
-        message: `已创建文件夹「${verified.title}」，并从 Chrome 重新读取确认。`
+        message: `已创建文件夹「${verified.title}」，并从 Chrome 重新读取确认。`,
+        createdNodeId: verified.id
       };
     }
     case "delete_bookmark": {
@@ -718,7 +841,7 @@ async function executeBookmarkAgentAction(
       await deleteNativeBookmark({
         id: target.id,
         recursive: false
-      });
+      }, true);
       await verifyAgentActionTargetMissing(target.id);
       return {
         actionId: action.id,
@@ -736,7 +859,7 @@ async function executeBookmarkAgentAction(
       await deleteNativeBookmark({
         id: target.id,
         recursive: true
-      });
+      }, true);
       await verifyAgentActionTargetMissing(target.id);
       return {
         actionId: action.id,
@@ -754,7 +877,7 @@ async function executeBookmarkAgentAction(
         id: target.id,
         title: action.title || target.title,
         url: validateAgentBookmarkUrl(action.url || target.url)
-      });
+      }, true);
       const [verified] = await chrome.bookmarks.get(updated.id);
       if (
         !verified ||
@@ -778,7 +901,7 @@ async function executeBookmarkAgentAction(
       const updated = await updateNativeBookmark({
         id: target.id,
         title: action.title || ""
-      });
+      }, true);
       const [verified] = await chrome.bookmarks.get(updated.id);
       if (!verified || verified.title !== updated.title) {
         throw new Error("Chrome 返回的文件夹名称与修改结果不一致。");
@@ -812,7 +935,7 @@ async function executeBookmarkAgentAction(
       const moved = await moveNativeBookmark({
         id: target.id,
         parentId: destination.id
-      });
+      }, true);
       const [verified] = await chrome.bookmarks.get(moved.id);
       if (!verified || verified.parentId !== destination.id) {
         throw new Error("Chrome 返回的位置与移动结果不一致。");
@@ -826,26 +949,143 @@ async function executeBookmarkAgentAction(
   }
 }
 
+async function prepareAgentUndoBatch(
+  actions: BookmarkAgentActionProposal[]
+): Promise<UndoSnapshotBatch> {
+  const mutations: UndoMutation[] = [];
+  for (const action of actions) {
+    if (action.type === "create_bookmark" || action.type === "create_folder") {
+      if (!action.parentId || !action.title) {
+        throw new Error("AI 操作缺少创建目标，无法建立撤销快照。");
+      }
+      mutations.push(
+        await snapshotCreatedMutation({
+          parentId: action.parentId,
+          actionId: action.id,
+          label: action.label,
+          title: action.title,
+          url: action.type === "create_bookmark" ? action.url : undefined,
+          destructive: action.destructive
+        })
+      );
+      continue;
+    }
+    if (!action.targetId) {
+      throw new Error("AI 操作缺少明确目标，无法建立撤销快照。");
+    }
+    mutations.push(
+      await snapshotNodeMutation({
+        nodeId: action.targetId,
+        actionId: action.id,
+        kind:
+          action.type === "delete_bookmark" || action.type === "delete_folder"
+            ? "restore_subtree"
+            : action.type === "move_bookmark" || action.type === "move_folder"
+              ? "restore_move"
+              : "restore_update",
+        label: action.label,
+        destructive: action.destructive
+      })
+    );
+  }
+  const batch = createUndoBatch({
+    source: "agent",
+    label: `AI 批量操作（${actions.length} 项）`,
+    destructive: actions.some((action) => action.destructive),
+    mutations
+  });
+  await putUndoSnapshot(batch);
+  return batch;
+}
+
 async function executeBookmarkAgentActions(
   actions: BookmarkAgentActionProposal[]
-): Promise<{ results: BookmarkAgentActionExecutionResult[] }> {
+): Promise<{
+  results: BookmarkAgentActionExecutionResult[];
+  batchId?: string;
+}> {
   if (!Array.isArray(actions) || !actions.length || actions.length > 8) {
     throw new Error("没有可执行的已确认操作。");
   }
+  let batch = await prepareAgentUndoBatch(actions);
   const results: BookmarkAgentActionExecutionResult[] = [];
   for (const action of actions) {
+    const mutationIndex = batch.mutations.findIndex(
+      (mutation) => mutation.actionId === action.id
+    );
+    let executed = false;
+    let executionResult: BookmarkAgentActionExecutionResult | null = null;
     try {
-      results.push(await executeBookmarkAgentAction(action));
+      if (mutationIndex < 0) {
+        throw new Error("这项操作没有对应的撤销快照，已拒绝执行。");
+      }
+      batch.mutations[mutationIndex] = {
+        ...batch.mutations[mutationIndex],
+        applied: true
+      };
+      await putUndoSnapshot(batch);
+      executionResult = await executeBookmarkAgentAction(action);
+      executed = true;
+      if (executionResult.createdNodeId) {
+        batch.mutations[mutationIndex] = {
+          ...batch.mutations[mutationIndex],
+          createdNodeId: executionResult.createdNodeId
+        };
+      }
+      await putUndoSnapshot(batch);
+      results.push(executionResult);
     } catch (error) {
-      results.push({
-        actionId: action?.id || "",
-        success: false,
-        message: errorMessage(error)
-      });
+      if (mutationIndex >= 0 && !executed) {
+        batch.mutations[mutationIndex] = {
+          ...batch.mutations[mutationIndex],
+          applied: false
+        };
+        await putUndoSnapshot(batch).catch(() => undefined);
+      }
+      results.push(
+        executed && executionResult
+          ? {
+              ...executionResult,
+              message: `${executionResult.message} 撤销记录的状态更新失败，但执行前快照仍保留。`
+            }
+          : {
+              actionId: action?.id || "",
+              success: false,
+              message: errorMessage(error)
+            }
+      );
     }
   }
+  const succeeded = results.filter((result) => result.success).length;
+  if (succeeded) {
+    batch = { ...batch, status: "ready" };
+    await putUndoSnapshot(batch);
+  } else {
+    await deleteUndoSnapshot(batch.batchId);
+  }
   await importNativeBookmarks();
-  return { results };
+  return {
+    results,
+    ...(succeeded ? { batchId: batch.batchId } : {})
+  };
+}
+
+async function getRecentUndoSnapshots(): Promise<UndoSnapshotBatch[]> {
+  await cleanupExpiredUndoSnapshots();
+  return (await getUndoSnapshots()).filter(
+    (batch) => batch.status !== "undone"
+  );
+}
+
+async function undoStoredBookmarkBatch(batchId: string) {
+  const batch = await getUndoSnapshot(batchId);
+  if (!batch) {
+    throw new Error("没有找到这批更改，可能已超过 30 天保留期。");
+  }
+  const result = await undoBookmarkBatch(batch, defaultFolderId);
+  await putUndoSnapshot(result.batch);
+  await importNativeBookmarks();
+  return result;
 }
 
 async function folderPathForId(folderId: string): Promise<string[]> {
@@ -895,20 +1135,32 @@ async function findOrCreateNativeBookmark(
 
   if (existing) {
     if (existing.title !== input.title) {
-      const target = bookmarkTarget(folderId, input.capture.url);
-      internalBookmarkIds.add(existing.id);
-      internalBookmarkTargets.add(target);
-      let updated: chrome.bookmarks.BookmarkTreeNode;
-      try {
-        updated = await chrome.bookmarks.update(existing.id, {
-          title: input.title
-        });
-      } catch (error) {
-        internalBookmarkIds.delete(existing.id);
-        internalBookmarkTargets.delete(target);
-        throw error;
-      }
-      releaseInternalBookmarkWrite(existing.id, target);
+      const mutation = await snapshotNodeMutation({
+        nodeId: existing.id,
+        kind: "restore_update",
+        label: `更新书签“${existing.title || existing.url}”`
+      });
+      const updated = await runProtectedBookmarkMutation({
+        label: mutation.label,
+        destructive: false,
+        mutation,
+        perform: async () => {
+          const target = bookmarkTarget(folderId, input.capture.url);
+          internalBookmarkIds.add(existing.id);
+          internalBookmarkTargets.add(target);
+          try {
+            const result = await chrome.bookmarks.update(existing.id, {
+              title: input.title
+            });
+            releaseInternalBookmarkWrite(existing.id, target);
+            return result;
+          } catch (error) {
+            internalBookmarkIds.delete(existing.id);
+            internalBookmarkTargets.delete(target);
+            throw error;
+          }
+        }
+      });
       return {
         bookmark: updated,
         created: false
@@ -917,21 +1169,35 @@ async function findOrCreateNativeBookmark(
     return { bookmark: existing, created: false };
   }
 
-  const target = bookmarkTarget(folderId, input.capture.url);
-  internalBookmarkTargets.add(target);
-  let created: chrome.bookmarks.BookmarkTreeNode;
-  try {
-    created = await chrome.bookmarks.create({
-      parentId: folderId,
-      title: input.title,
-      url: input.capture.url
-    });
-  } catch (error) {
-    internalBookmarkTargets.delete(target);
-    throw error;
-  }
-  internalBookmarkIds.add(created.id);
-  releaseInternalBookmarkWrite(created.id, target);
+  const mutation = await snapshotCreatedMutation({
+    parentId: folderId,
+    label: `收藏“${input.title}”`,
+    title: input.title,
+    url: input.capture.url
+  });
+  const created = await runProtectedBookmarkMutation({
+    label: mutation.label,
+    destructive: false,
+    mutation,
+    perform: async () => {
+      const target = bookmarkTarget(folderId, input.capture.url);
+      internalBookmarkTargets.add(target);
+      try {
+        const result = await chrome.bookmarks.create({
+          parentId: folderId,
+          title: input.title,
+          url: input.capture.url
+        });
+        internalBookmarkIds.add(result.id);
+        releaseInternalBookmarkWrite(result.id, target);
+        return result;
+      } catch (error) {
+        internalBookmarkTargets.delete(target);
+        throw error;
+      }
+    },
+    createdNodeId: (node) => node.id
+  });
   return {
     bookmark: created,
     created: true
@@ -1994,6 +2260,10 @@ async function handleRequest(request: ExtensionRequest): Promise<unknown> {
       return askAgent(request.query, request.history);
     case "EXECUTE_BOOKMARK_AGENT_ACTIONS":
       return executeBookmarkAgentActions(request.actions);
+    case "GET_UNDO_SNAPSHOTS":
+      return getRecentUndoSnapshots();
+    case "UNDO_BOOKMARK_BATCH":
+      return undoStoredBookmarkBatch(request.batchId);
     case "GET_LOCAL_RESOURCES":
       await importNativeBookmarks();
       return (await getLocalResources()).filter(
@@ -2068,6 +2338,7 @@ chrome.runtime.onMessage.addListener(
 );
 
 chrome.runtime.onInstalled.addListener(() => {
+  void cleanupExpiredUndoSnapshots();
   void chrome.storage.local.setAccessLevel({
     accessLevel: "TRUSTED_CONTEXTS"
   });
@@ -2226,6 +2497,7 @@ chrome.bookmarks.onRemoved.addListener((id) => {
 
 chrome.runtime.onStartup.addListener(() => {
   void (async () => {
+    await cleanupExpiredUndoSnapshots();
     await importNativeBookmarks();
     const auth = await getAuthState();
     if (auth.signedIn && auth.accountMatches === true) {

@@ -22,7 +22,7 @@ import dataCloudCover from "../../../design-assets/bookmark-covers/taxonomy-pilo
 import designCreationCover from "../../../design-assets/bookmark-covers/taxonomy-pilot/design-creation-v1.png";
 import developmentSoftwareCover from "../../../design-assets/bookmark-covers/taxonomy-pilot/development-software-v1.png";
 import documentationApiCover from "../../../design-assets/bookmark-covers/taxonomy-pilot/documentation-api-v3.png";
-import educationScienceCover from "../../../design-assets/bookmark-covers/taxonomy-pilot/education-science-v2.png";
+import educationScienceCover from "../../../design-assets/bookmark-covers/taxonomy-pilot/education-science-v3.png";
 import entertainmentCultureCover from "../../../design-assets/bookmark-covers/taxonomy-pilot/entertainment-culture-v2.png";
 import eventTicketCover from "../../../design-assets/bookmark-covers/taxonomy-pilot/event-ticket-v1.png";
 import financeInvestingCover from "../../../design-assets/bookmark-covers/taxonomy-pilot/finance-investing-v3.png";
@@ -700,6 +700,7 @@ export function installSidePanelPreview() {
         history?: Array<{ role: "user" | "assistant"; content: string }>;
         force?: boolean;
         id?: string;
+        batchId?: string;
         conversation?: AgentConversation;
         actions?: BookmarkAgentActionProposal[];
         payload?: {
@@ -726,6 +727,27 @@ export function installSidePanelPreview() {
             return { ok: true, data: structuredClone(previewResources) };
           case "GET_AGENT_CONVERSATIONS":
             return { ok: true, data: structuredClone(previewConversations) };
+          case "GET_UNDO_SNAPSHOTS":
+            return { ok: true, data: [] };
+          case "UNDO_BOOKMARK_BATCH":
+            return {
+              ok: true,
+              data: {
+                batch: {
+                  batchId: request.batchId || "preview-undo",
+                  source: "agent",
+                  label: "预览撤销",
+                  destructive: false,
+                  createdAt: new Date().toISOString(),
+                  expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+                  status: "undone",
+                  mutations: []
+                },
+                restored: 1,
+                failed: 0,
+                messages: ["已撤销预览操作。"]
+              }
+            };
           case "SAVE_AGENT_CONVERSATION":
             if (!request.conversation) {
               return { ok: false, error: "会话内容无效。" };
@@ -872,7 +894,10 @@ export function installSidePanelPreview() {
                 };
               }
             });
-            return { ok: true, data: { results } };
+            return {
+              ok: true,
+              data: { results, batchId: "preview-agent-undo" }
+            };
           }
           case "GET_LIBRARY_SCAN":
             return {

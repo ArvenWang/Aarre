@@ -265,6 +265,50 @@ export interface BookmarkAgentActionExecutionResult {
   actionId: string;
   success: boolean;
   message: string;
+  createdNodeId?: string;
+}
+
+export type UndoMutationKind =
+  | "remove_created"
+  | "restore_subtree"
+  | "restore_update"
+  | "restore_move";
+
+export interface UndoMutation {
+  id: string;
+  actionId?: string;
+  kind: UndoMutationKind;
+  label: string;
+  destructive: boolean;
+  applied: boolean;
+  node?: NativeBookmarkNode;
+  parentId?: string;
+  beforeChildIds?: string[];
+  expectedTitle?: string;
+  expectedUrl?: string;
+  createdNodeId?: string;
+}
+
+export type UndoSnapshotStatus = "pending" | "ready" | "undone" | "partial";
+
+export interface UndoSnapshotBatch {
+  batchId: string;
+  source: "agent" | "manual";
+  label: string;
+  destructive: boolean;
+  createdAt: string;
+  expiresAt: string;
+  status: UndoSnapshotStatus;
+  mutations: UndoMutation[];
+  resultMessages?: string[];
+  undoneAt?: string;
+}
+
+export interface UndoBatchResult {
+  batch: UndoSnapshotBatch;
+  restored: number;
+  failed: number;
+  messages: string[];
 }
 
 export interface BookmarkAgentResponse {
@@ -290,6 +334,7 @@ export interface AgentChatMessage {
   providerName?: string;
   sources?: BookmarkAgentSource[];
   actions?: BookmarkAgentActionProposal[];
+  undoBatchId?: string;
   status?: "sending" | "complete" | "failed";
 }
 

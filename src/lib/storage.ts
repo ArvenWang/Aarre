@@ -3,7 +3,11 @@ import {
   type DBSchema,
   type IDBPDatabase
 } from "idb";
-import type { OutboxItem, ResourceRecord } from "./types";
+import type {
+  OutboxItem,
+  ResourceRecord,
+  UndoSnapshotBatch
+} from "./types";
 
 const MAX_OUTBOX_CONTENT_LENGTH = 50_000;
 
@@ -20,6 +24,13 @@ interface BookmarkLayerDatabase extends DBSchema {
     value: OutboxItem;
     indexes: {
       "by-queued-at": string;
+    };
+  };
+  undoSnapshots: {
+    key: string;
+    value: UndoSnapshotBatch;
+    indexes: {
+      "by-created-at": string;
     };
   };
 }
@@ -121,23 +132,73 @@ function database(): Promise<IDBPDatabase<BookmarkLayerDatabase>> {
   if (!databasePromise) {
     databasePromise = openDB<BookmarkLayerDatabase>(
       "bookmark-layer",
-      1,
+      2,
       {
-        upgrade(db) {
-          const resources = db.createObjectStore("resources", {
-            keyPath: "resourceKey"
-          });
-          resources.createIndex("by-updated-at", "updatedAt");
+        upgrade(db, oldVersion) {
+          if (oldVersion < 1) {
+            const resources = db.createObjectStore("resources", {
+              keyPath: "resourceKey"
+            });
+            resources.createIndex("by-updated-at", "updatedAt");
 
-          const outbox = db.createObjectStore("outbox", {
-            keyPath: "resource.resourceKey"
-          });
-          outbox.createIndex("by-queued-at", "queuedAt");
+            const outbox = db.createObjectStore("outbox", {
+              keyPath: "resource.resourceKey"
+            });
+            outbox.createIndex("by-queued-at", "queuedAt");
+          }
+          if (oldVersion < 2) {
+            const undoSnapshots = db.createObjectStore("undoSnapshots", {
+              keyPath: "batchId"
+            });
+            undoSnapshots.createIndex("by-created-at", "createdAt");
+          }
         }
       }
     );
   }
   return databasePromise;
+}
+
+export async function putUndoSnapshot(
+  batch: UndoSnapshotBatch
+): Promise<void> {
+  const db = await database();
+  await db.put("undoSnapshots", batch);
+}
+
+export async function getUndoSnapshot(
+  batchId: string
+): Promise<UndoSnapshotBatch | undefined> {
+  const db = await database();
+  return db.get("undoSnapshots", batchId);
+}
+
+export async function getUndoSnapshots(): Promise<UndoSnapshotBatch[]> {
+  const db = await database();
+  return (await db.getAllFromIndex("undoSnapshots", "by-created-at")).reverse();
+}
+
+export async function deleteUndoSnapshot(batchId: string): Promise<void> {
+  const db = await database();
+  await db.delete("undoSnapshots", batchId);
+}
+
+export async function cleanupExpiredUndoSnapshots(
+  at = new Date()
+): Promise<number> {
+  const db = await database();
+  const transaction = db.transaction("undoSnapshots", "readwrite");
+  let removed = 0;
+  let cursor = await transaction.store.openCursor();
+  while (cursor) {
+    if (Date.parse(cursor.value.expiresAt) <= at.getTime()) {
+      await cursor.delete();
+      removed += 1;
+    }
+    cursor = await cursor.continue();
+  }
+  await transaction.done;
+  return removed;
 }
 
 export async function getLocalResources(): Promise<ResourceRecord[]> {

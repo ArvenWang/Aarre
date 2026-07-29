@@ -69,7 +69,7 @@ uneven proportions, mild asymmetry and generous breathing room.
 | 艺术创作 | `art-creation-v2.png` | fig `#C46686` | 调色盘的一处颜料逸出为自由笔触 |
 | 商业与创业 | `business-startup-v1.png` | clay `#D97757` | 店铺屋顶的一角折成起飞的纸飞机 |
 | 工作与效率 | `work-productivity-v1.png` | cactus `#BCD1CA` | 清单最后一行在纸外完成勾选 |
-| 教育与科学 | `education-science-v2.png` | heather `#CBCADB` | 实验烧瓶的瓶颈转化为铅笔 |
+| 教育与科学 | `education-science-v3.png` | heather `#CBCADB` | 显微镜在焦点处发现一颗小火花 |
 | 财经与投资 | `finance-investing-v3.png` | olive `#788C5D` | 手掌托住硬币，边缘长出一片叶子 |
 | 新闻与社会 | `news-society-v1.png` | sky `#6A9BCC` | 报纸一角打开成公共对话气泡 |
 | 健康与医疗 | `health-medical-v2.png` | coral `#EBCECE` | 心形脉冲末端长出一片叶子 |
@@ -94,20 +94,20 @@ uneven proportions, mild asymmetry and generous breathing room.
 
 - 40 张基准图均为 `1254 × 1254`、sRGB、不透明 PNG。
 - 每张图最终仅包含三个精确颜色：近黑、象牙白和对应强调色。
-- 当前活动基准对应 40 张 `384 × 384`、无透明通道的 lossless WebP，合计 `880,546` 字节（约 `0.84 MiB`）。`webp-384/` 另保留 7 张被替换的旧版本，因此目录内共有 47 个文件；生产接入应只使用表格列出的当前版本。
+- 当前活动基准对应 40 张 `384 × 384`、无透明通道的 lossless WebP，合计 `883,134` 字节（约 `0.84 MiB`）。`webp-384/` 另保留 8 张被替换的旧版本，因此目录内共有 48 个文件；生产接入应只使用表格列出的当前版本。
 - 完整标注总览为 `preview-complete-40-contact-sheet.png`。
 - 真实 `48 × 48` 总览为 `preview-complete-40-48px.png`；40 张均保留可识别主体。
 - 本地开发预览地址：`http://127.0.0.1:4173/sidepanel.html?preview=1`。
 - `src/ui/sidepanel/preview.ts` 将 40 张封面绑定到 40 个真实公开网站示例，并置于本地预览列表最上方。
 - 浏览器在 `433 × 909` 与 `390 × 844` 两种侧栏尺寸完成逐段滚动检查：40 张均从 `1254 × 1254` 源图加载并以 `48 × 48` 显示，无破图、无横向溢出，控制台和页面错误均为 0。
 - 文件夹展开、收起和密集列表滚动通过真实鼠标交互检查。
-- 页面截图为 `preview-local-40-top.png`、`preview-local-40-middle.png`、`preview-local-40-bottom.png`、`preview-local-40-narrow-top.png` 和 `preview-local-40-narrow-bottom.png`。
+- 本轮七张重绘后的页面截图为 `preview-local-40-redo-top.png`、`preview-local-40-redo-middle.png`、`preview-local-40-redo-lower.png`、`preview-local-40-redo-bottom.png`、`preview-local-40-redo-narrow-top.png` 和 `preview-local-40-redo-narrow-bottom.png`。
 - `npm run check` 通过：13 个测试文件、54 个测试、类型检查和生产构建全部成功。
 - 正式 `dist/` 中没有 `taxonomy-pilot`、40 类预览数据或分类封面引用。
 
 ## 归档与生产边界
 
 - 用户选中的旅行图为 `travel-places-v3-suitcase.png`；其余五个旅行方案仍保留作过程记录，不进入当前 40 类预览。
-- 被替换的旧版本继续保留用于版本对比；当前基准以表格中的版本号为准。文档与 API、财经与投资已更新到 `v3`；职位与招聘、作品集与画廊、艺术创作、教育与科学、娱乐与文化已更新到 `v2`。
+- 被替换的旧版本继续保留用于版本对比；当前基准以表格中的版本号为准。文档与 API、财经与投资、教育与科学已更新到 `v3`；职位与招聘、作品集与画廊、艺术创作、娱乐与文化已更新到 `v2`。
 - 过度抽象、仅剩点线关系，以及文档与 API 的两张复杂连接中间稿没有复制进工作区。
 - 当前 40 张已经达到新版 PRD 的“40 类、一类一张”资产上限；3–6 个变体的旧建议已撤销，`384 × 384` WebP 也已导出。进入生产还需要接入真实封面选择管线，并由显示层按域名哈希做轻微明度偏移；不能把本次开发预览接入误报为生产管线已经完成。

@@ -3556,6 +3556,54 @@ a:focus-visible {
   background: var(--success-soft);
 }
 
+.settings-change-list {
+  margin-top: 12px;
+  display: grid;
+  gap: 7px;
+}
+
+.settings-change-list article {
+  padding: 9px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-radius: 10px;
+  background: var(--component);
+}
+
+.settings-change-list article[data-destructive="true"] {
+  background: var(--danger-soft);
+}
+
+.settings-change-list article > div {
+  min-width: 0;
+}
+
+.settings-change-list strong,
+.settings-change-list small {
+  display: block;
+}
+
+.settings-change-list strong {
+  overflow: hidden;
+  font-size: 9px;
+  font-weight: 620;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-change-list small,
+.settings-empty-state {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.settings-empty-state {
+  margin-bottom: 0;
+}
+
 .settings-provider-tabs {
   margin-top: 14px;
   padding: 3px;
@@ -4187,6 +4235,22 @@ a:focus-visible {
 }
 
 .agent-action-card > footer button:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.agent-undo-button {
+  margin-top: 8px;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  border-radius: 9px;
+  color: var(--ink);
+  background: #fff;
+  font-size: 8.5px;
+  font-weight: 620;
+}
+
+.agent-undo-button:disabled {
   cursor: wait;
   opacity: 0.58;
 }

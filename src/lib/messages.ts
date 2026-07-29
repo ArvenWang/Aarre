@@ -20,7 +20,9 @@ import type {
   RestoreResult,
   SaveBookmarkInput,
   SaveBookmarkResult,
-  SearchResult
+  SearchResult,
+  UndoBatchResult,
+  UndoSnapshotBatch
 } from "./types";
 
 export type ExtensionRequest =
@@ -43,6 +45,8 @@ export type ExtensionRequest =
       type: "EXECUTE_BOOKMARK_AGENT_ACTIONS";
       actions: BookmarkAgentActionProposal[];
     }
+  | { type: "GET_UNDO_SNAPSHOTS" }
+  | { type: "UNDO_BOOKMARK_BATCH"; batchId: string }
   | { type: "GET_LOCAL_RESOURCES" }
   | { type: "GET_AGENT_CONVERSATIONS" }
   | { type: "SAVE_AGENT_CONVERSATION"; conversation: AgentConversation }
@@ -93,7 +97,10 @@ export type ResponseDataByRequest = {
   ASK_BOOKMARK_AGENT: BookmarkAgentResponse;
   EXECUTE_BOOKMARK_AGENT_ACTIONS: {
     results: BookmarkAgentActionExecutionResult[];
+    batchId?: string;
   };
+  GET_UNDO_SNAPSHOTS: UndoSnapshotBatch[];
+  UNDO_BOOKMARK_BATCH: UndoBatchResult;
   GET_LOCAL_RESOURCES: ResourceRecord[];
   GET_AGENT_CONVERSATIONS: AgentConversation[];
   SAVE_AGENT_CONVERSATION: AgentConversation;

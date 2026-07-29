@@ -2,13 +2,18 @@ import "fake-indexeddb/auto";
 import { describe, expect, it } from "vitest";
 import {
   completeOutboxItem,
+  cleanupExpiredUndoSnapshots,
+  deleteUndoSnapshot,
   deferOutboxItem,
   enqueueOutbox,
   getLocalResource,
   getLocalResources,
   getOutbox,
+  getUndoSnapshot,
+  getUndoSnapshots,
   mergeLocalResources,
   normalizeResourceRecord,
+  putUndoSnapshot,
   removeOutboxItem,
   upsertLocalResource
 } from "../src/lib/storage";
@@ -268,5 +273,36 @@ describe("IndexedDB storage", () => {
     for (const key of keys) {
       await removeOutboxItem(key);
     }
+  });
+
+  it("stores undo batches and removes them after the 30 day retention window", async () => {
+    const activeBatch = {
+      batchId: "undo-active",
+      source: "manual" as const,
+      label: "移动书签",
+      destructive: false,
+      createdAt: "2026-07-29T00:00:00.000Z",
+      expiresAt: "2026-08-28T00:00:00.000Z",
+      status: "ready" as const,
+      mutations: []
+    };
+    const expiredBatch = {
+      ...activeBatch,
+      batchId: "undo-expired",
+      expiresAt: "2026-07-30T00:00:00.000Z"
+    };
+    await putUndoSnapshot(activeBatch);
+    await putUndoSnapshot(expiredBatch);
+
+    expect((await getUndoSnapshot(activeBatch.batchId))?.label).toBe("移动书签");
+    expect(
+      (await getUndoSnapshots()).map((batch) => batch.batchId)
+    ).toEqual(expect.arrayContaining(["undo-active", "undo-expired"]));
+    expect(
+      await cleanupExpiredUndoSnapshots(new Date("2026-08-01T00:00:00.000Z"))
+    ).toBe(1);
+    expect(await getUndoSnapshot("undo-expired")).toBeUndefined();
+
+    await deleteUndoSnapshot(activeBatch.batchId);
   });
 });
