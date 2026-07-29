@@ -5,6 +5,7 @@ import {
 } from "idb";
 import type {
   OutboxItem,
+  PageSnapshot,
   ResourceRecord,
   SiteBrandRecord,
   UndoSnapshotBatch
@@ -39,6 +40,13 @@ interface BookmarkLayerDatabase extends DBSchema {
     value: SiteBrandRecord;
     indexes: {
       "by-updated-at": string;
+    };
+  };
+  pageSnapshots: {
+    key: string;
+    value: PageSnapshot;
+    indexes: {
+      "by-captured-at": string;
     };
   };
 }
@@ -155,7 +163,7 @@ function database(): Promise<IDBPDatabase<BookmarkLayerDatabase>> {
   if (!databasePromise) {
     databasePromise = openDB<BookmarkLayerDatabase>(
       "bookmark-layer",
-      3,
+      4,
       {
         upgrade(db, oldVersion) {
           if (oldVersion < 1) {
@@ -180,6 +188,12 @@ function database(): Promise<IDBPDatabase<BookmarkLayerDatabase>> {
               keyPath: "host"
             });
             siteBrands.createIndex("by-updated-at", "updatedAt");
+          }
+          if (oldVersion < 4) {
+            const pageSnapshots = db.createObjectStore("pageSnapshots", {
+              keyPath: "canonicalUrl"
+            });
+            pageSnapshots.createIndex("by-captured-at", "capturedAt");
           }
         }
       }
@@ -244,6 +258,37 @@ export async function getSiteBrand(
 export async function getSiteBrands(): Promise<SiteBrandRecord[]> {
   const db = await database();
   return db.getAll("siteBrands");
+}
+
+export async function putPageSnapshot(
+  snapshot: PageSnapshot,
+  maxSnapshots = 2_000
+): Promise<void> {
+  const db = await database();
+  await db.put("pageSnapshots", snapshot);
+  const count = await db.count("pageSnapshots");
+  if (count <= maxSnapshots) return;
+  const transaction = db.transaction("pageSnapshots", "readwrite");
+  let remaining = count - maxSnapshots;
+  let cursor = await transaction.store.index("by-captured-at").openCursor();
+  while (cursor && remaining > 0) {
+    await cursor.delete();
+    remaining -= 1;
+    cursor = await cursor.continue();
+  }
+  await transaction.done;
+}
+
+export async function getPageSnapshot(
+  canonicalUrl: string
+): Promise<PageSnapshot | undefined> {
+  const db = await database();
+  return db.get("pageSnapshots", canonicalUrl);
+}
+
+export async function countPageSnapshots(): Promise<number> {
+  const db = await database();
+  return db.count("pageSnapshots");
 }
 
 export async function putUndoSnapshot(

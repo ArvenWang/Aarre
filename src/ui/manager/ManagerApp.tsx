@@ -317,6 +317,21 @@ export function ManagerApp() {
         </div>
         <div className="toolbar-actions">
           <button
+            className="button button-quiet"
+            onClick={() =>
+              void sendExtensionRequest({ type: "OPEN_SIDE_PANEL" }).catch(
+                (caught) =>
+                  setError(
+                    caught instanceof Error
+                      ? caught.message
+                      : "无法打开侧边栏"
+                  )
+              )
+            }
+          >
+            返回侧边栏
+          </button>
+          <button
             className="button button-quiet refresh-button"
             onClick={() => void refresh()}
             disabled={Boolean(action)}

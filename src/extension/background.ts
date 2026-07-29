@@ -30,6 +30,11 @@ import {
   resolveRuleAsset
 } from "../lib/cover-registry";
 import {
+  createPageSnapshot,
+  isSnapshotSensitiveUrl
+} from "../lib/page-snapshot";
+import { getDisplaySettings } from "../lib/display-settings";
+import {
   createUndoBatch,
   snapshotCreatedMutation,
   snapshotNodeMutation,
@@ -54,11 +59,13 @@ import {
   getLocalResource,
   getLocalResources,
   getOutbox,
+  getPageSnapshot,
   getSiteBrand,
   getSiteBrands,
   getUndoSnapshot,
   getUndoSnapshots,
   putUndoSnapshot,
+  putPageSnapshot,
   putSiteBrand,
   upsertLocalResource
 } from "../lib/storage";
@@ -108,6 +115,7 @@ const MAX_SCAN_HTML_BYTES = 600_000;
 const internalBookmarkIds = new Set<string>();
 const internalBookmarkTargets = new Set<string>();
 const pendingSaveDrafts = new Map<number, PendingSaveDraft>();
+const pageSnapshotTimers = new Map<number, number>();
 let libraryScanRunning = false;
 
 interface StoredLibraryScanJob extends LibraryScanStatus {
@@ -1134,6 +1142,81 @@ async function captureActivePage(): Promise<PageCapture> {
   };
 }
 
+function clearPageSnapshotTimers(exceptTabId?: number) {
+  for (const [tabId, timer] of pageSnapshotTimers) {
+    if (tabId === exceptTabId) continue;
+    globalThis.clearTimeout(timer);
+    pageSnapshotTimers.delete(tabId);
+  }
+}
+
+async function capturePageSnapshotForTab(
+  tab: chrome.tabs.Tab
+): Promise<void> {
+  if (
+    typeof tab.id !== "number" ||
+    typeof tab.windowId !== "number" ||
+    !tab.url ||
+    !tab.active ||
+    tab.incognito ||
+    !isSupportedPageUrl(tab.url)
+  ) {
+    return;
+  }
+  const settings = await getDisplaySettings();
+  if (
+    !settings.pageSnapshotsEnabled ||
+    isSnapshotSensitiveUrl(tab.url, settings.snapshotExcludedHosts)
+  ) {
+    return;
+  }
+  const canonicalUrl = canonicalizeUrl(tab.url);
+  const resourceKey = await resourceKeyForUrl(canonicalUrl);
+  const resource = await getLocalResource(resourceKey);
+  if (!resource?.nativeBookmarkIds.length) return;
+
+  const focusedWindow = await chrome.windows.getLastFocused();
+  if (focusedWindow.id !== tab.windowId) return;
+  const [active] = await chrome.tabs.query({
+    active: true,
+    windowId: tab.windowId
+  });
+  if (active?.id !== tab.id || active.url !== tab.url || active.incognito) {
+    return;
+  }
+
+  const pngDataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
+    format: "png"
+  });
+  const capturedAt = now();
+  const snapshot = await createPageSnapshot(
+    canonicalUrl,
+    pngDataUrl,
+    capturedAt
+  );
+  await putPageSnapshot(snapshot);
+  await upsertLocalResource({
+    ...resource,
+    snapshotAt: capturedAt,
+    updatedAt: resource.updatedAt
+  });
+}
+
+function schedulePageSnapshotForTab(
+  tab: chrome.tabs.Tab,
+  delay = 5_000
+) {
+  if (typeof tab.id !== "number") return;
+  clearPageSnapshotTimers(tab.id);
+  const existing = pageSnapshotTimers.get(tab.id);
+  if (existing !== undefined) globalThis.clearTimeout(existing);
+  const timer = globalThis.setTimeout(() => {
+    pageSnapshotTimers.delete(tab.id!);
+    void capturePageSnapshotForTab(tab).catch(() => undefined);
+  }, delay) as unknown as number;
+  pageSnapshotTimers.set(tab.id, timer);
+}
+
 async function findOrCreateNativeBookmark(
   input: SaveBookmarkInput
 ): Promise<{ bookmark: chrome.bookmarks.BookmarkTreeNode; created: boolean }> {
@@ -1353,6 +1436,13 @@ async function saveBookmark(
     categoryCoverId: categoryCoverForResource(resource)
   };
   await upsertLocalResource(resource);
+  void activeTab()
+    .then((tab) => {
+      if (tab?.url && canonicalizeUrl(tab.url) === canonicalUrl) {
+        schedulePageSnapshotForTab(tab, 0);
+      }
+    })
+    .catch(() => undefined);
   let synced = resource;
   if (auth.configured) {
     const queued = await enqueueOutbox(
@@ -2565,6 +2655,8 @@ async function handleRequest(request: ExtensionRequest): Promise<unknown> {
       );
     case "GET_SITE_BRANDS":
       return getSiteBrands();
+    case "GET_PAGE_SNAPSHOT":
+      return (await getPageSnapshot(request.canonicalUrl)) || null;
     case "GET_AGENT_CONVERSATIONS":
       return getAgentConversations();
     case "SAVE_AGENT_CONVERSATION":
@@ -2607,6 +2699,14 @@ async function handleRequest(request: ExtensionRequest): Promise<unknown> {
         )
       });
       return { opened: true };
+    case "OPEN_SIDE_PANEL": {
+      const currentWindow = await chrome.windows.getCurrent();
+      if (typeof currentWindow.id !== "number") {
+        throw new Error("无法确定当前 Chrome 窗口。");
+      }
+      await chrome.sidePanel.open({ windowId: currentWindow.id });
+      return { opened: true };
+    }
     case "AUTH_CHANGED":
       try {
         await syncPendingIfReady();
@@ -2737,6 +2837,39 @@ chrome.omnibox.onInputEntered.addListener((text, disposition) => {
     disposition:
       disposition === "currentTab" ? "current" : "new"
   });
+});
+
+chrome.tabs.onUpdated.addListener((_tabId, changeInfo, tab) => {
+  if (changeInfo.status === "complete" && tab.active) {
+    schedulePageSnapshotForTab(tab);
+  }
+});
+
+chrome.tabs.onActivated.addListener(({ tabId }) => {
+  clearPageSnapshotTimers();
+  void chrome.tabs
+    .get(tabId)
+    .then((tab) => {
+      if (tab.status === "complete") schedulePageSnapshotForTab(tab);
+    })
+    .catch(() => undefined);
+});
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  const timer = pageSnapshotTimers.get(tabId);
+  if (timer !== undefined) globalThis.clearTimeout(timer);
+  pageSnapshotTimers.delete(tabId);
+});
+
+chrome.windows.onFocusChanged.addListener((windowId) => {
+  clearPageSnapshotTimers();
+  if (windowId === chrome.windows.WINDOW_ID_NONE) return;
+  void chrome.tabs
+    .query({ active: true, windowId })
+    .then(([tab]) => {
+      if (tab?.status === "complete") schedulePageSnapshotForTab(tab);
+    })
+    .catch(() => undefined);
 });
 
 chrome.bookmarks.onCreated.addListener((id, node) => {

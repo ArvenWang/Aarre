@@ -31,6 +31,15 @@ import {
   saveDisplaySettings,
   type ListCoverStyle
 } from "../../lib/display-settings";
+import {
+  getSidepanelState,
+  saveSidepanelState
+} from "../../lib/sidepanel-state";
+import {
+  completeOnboarding,
+  getOnboardingState,
+  restartOnboarding
+} from "../../lib/onboarding";
 import type {
   AiProviderId,
   AiSettingsStatus,
@@ -43,6 +52,7 @@ import type {
   NativeFolderOption,
   PendingSaveDraft,
   PageCapture,
+  PageSnapshot,
   ResourceRecord,
   SiteBrandRecord,
   UndoSnapshotBatch
@@ -54,6 +64,7 @@ import {
   ChevronRightIcon,
   CloseIcon,
   EllipsisIcon,
+  ExternalLinkIcon,
   FolderIcon,
   HistoryIcon,
   PlusIcon,
@@ -286,10 +297,263 @@ function FolderSelect({
   );
 }
 
+interface OnboardingPageProps {
+  resourceCount: number;
+  initialAiConfigured: boolean;
+  onComplete: (skipped: boolean, aiConfigured: boolean) => void;
+}
+
+function OnboardingPage({
+  resourceCount,
+  initialAiConfigured,
+  onComplete
+}: OnboardingPageProps) {
+  const [step, setStep] = useState(0);
+  const [provider, setProvider] = useState<AiProviderId>("gemini");
+  const preset = getAiProviderPreset(provider);
+  const [models, setModels] = useState<Record<AiProviderId, string>>({
+    gemini: getAiProviderPreset("gemini").defaultModel,
+    openai: getAiProviderPreset("openai").defaultModel,
+    deepseek: getAiProviderPreset("deepseek").defaultModel
+  });
+  const [apiKey, setApiKey] = useState("");
+  const [configured, setConfigured] = useState(initialAiConfigured);
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+  const estimatedMinutes = Math.max(1, Math.ceil(resourceCount / 60));
+  const estimatedCostLow = (resourceCount * 0.0015).toFixed(1);
+  const estimatedCostHigh = (resourceCount * 0.004).toFixed(1);
+
+  async function saveProvider() {
+    if (!apiKey.trim() || busy) return;
+    setBusy("provider");
+    setError("");
+    try {
+      await sendExtensionRequest({
+        type: "SAVE_AI_SETTINGS",
+        payload: {
+          provider,
+          model: models[provider],
+          apiKey: apiKey.trim()
+        }
+      });
+      setConfigured(true);
+      setApiKey("");
+      setStep(2);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "API Key 验证失败");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function finish(skipped: boolean, scan: boolean) {
+    if (busy) return;
+    setBusy(scan ? "scan" : "finish");
+    setError("");
+    try {
+      if (scan) {
+        const granted = chrome.permissions?.request
+          ? await chrome.permissions.request({
+              origins: ["http://*/*", "https://*/*"]
+            })
+          : true;
+        if (!granted) {
+          throw new Error("未获得网页读取权限，尚未开始扫描。");
+        }
+        await sendExtensionRequest({
+          type: "START_LIBRARY_SCAN",
+          force: false
+        });
+      }
+      await completeOnboarding(skipped);
+      onComplete(skipped, configured);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "引导操作失败");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  return (
+    <main className="native-panel onboarding-panel">
+      <header>
+        <span className="eyebrow">AARRE · {step + 1}/3</span>
+        <button
+          type="button"
+          className="text-button"
+          disabled={Boolean(busy)}
+          onClick={() => void finish(true, false)}
+        >
+          跳过引导
+        </button>
+      </header>
+      <section className="onboarding-card">
+        {step === 0 ? (
+          <>
+            <div className="onboarding-mark">
+              <StarIcon filled />
+            </div>
+            <h1>你的 Chrome 书签，原样保留</h1>
+            <p>
+              Aarre 直接读取你已有的 Chrome 原生书签，不需要导入，也不会偷偷移动或删除。Chrome
+              始终是唯一事实来源。
+            </p>
+            <div className="onboarding-facts">
+              <span>已发现 {resourceCount.toLocaleString("zh-CN")} 条书签</span>
+              <span>所有写操作先确认，并可在 30 天内撤销</span>
+              <span>
+                常访问的网站会在本机自动积累真实预览快照，越用越完整
+              </span>
+            </div>
+            <button
+              type="button"
+              className="button button-dark"
+              onClick={() => setStep(1)}
+            >
+              继续
+            </button>
+          </>
+        ) : step === 1 ? (
+          <>
+            <h1>连接你自己的 AI 服务</h1>
+            <p>
+              API Key 只保存在当前 Chrome 配置文件中，扩展直接调用服务商；Aarre
+              不经手你的 Key。
+            </p>
+            <div
+              className="settings-provider-tabs"
+              role="radiogroup"
+              aria-label="AI 服务商"
+            >
+              {AI_PROVIDER_PRESETS.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={provider === item.id}
+                  data-active={provider === item.id}
+                  className="settings-provider-tab"
+                  onClick={() => setProvider(item.id)}
+                >
+                  {item.name}
+                </button>
+              ))}
+            </div>
+            <label className="settings-field">
+              <span>模型</span>
+              <input
+                value={models[provider]}
+                onChange={(event) =>
+                  setModels((current) => ({
+                    ...current,
+                    [provider]: event.target.value
+                  }))
+                }
+              />
+            </label>
+            <label className="settings-field">
+              <span>{preset.name} API Key</span>
+              <input
+                type="password"
+                value={apiKey}
+                autoComplete="off"
+                placeholder={preset.apiKeyPlaceholder}
+                onChange={(event) => setApiKey(event.target.value)}
+              />
+            </label>
+            {error ? (
+              <div className="settings-notice" data-tone="error">
+                {error}
+              </div>
+            ) : null}
+            <div className="onboarding-actions">
+              <button
+                type="button"
+                className="button button-quiet"
+                disabled={Boolean(busy)}
+                onClick={() => setStep(2)}
+              >
+                先跳过，只管理书签
+              </button>
+              <button
+                type="button"
+                className="button button-dark"
+                disabled={
+                  (!configured && !apiKey.trim()) ||
+                  !models[provider].trim() ||
+                  Boolean(busy)
+                }
+                onClick={() =>
+                  configured && !apiKey.trim()
+                    ? setStep(2)
+                    : void saveProvider()
+                }
+              >
+                {busy === "provider"
+                  ? "正在验证…"
+                  : configured && !apiKey.trim()
+                    ? "使用现有配置继续"
+                    : "验证并继续"}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <h1>让收藏变得可搜索</h1>
+            <p>
+              扫描会为公开网页补充清晰站点标识与页面封面
+              {configured ? "，并生成摘要、标签和检索别名" : ""}。
+            </p>
+            <div className="onboarding-estimate">
+              <strong>{resourceCount.toLocaleString("zh-CN")} 条</strong>
+              <span>预计约 {estimatedMinutes} 分钟</span>
+              {configured ? (
+                <span>
+                  AI 费用粗估 ¥{estimatedCostLow}–{estimatedCostHigh}
+                </span>
+              ) : (
+                <span>未连接 AI，本轮不会产生 AI 费用</span>
+              )}
+            </div>
+            <p className="onboarding-privacy">
+              费用取决于服务商、模型和网页长度，以服务商账单为准。内网、银行、支付和医疗站点不请求；页面快照只保存在本机，默认开启且可在设置中关闭。
+            </p>
+            {error ? (
+              <div className="settings-notice" data-tone="error">
+                {error}
+              </div>
+            ) : null}
+            <div className="onboarding-actions">
+              <button
+                type="button"
+                className="button button-quiet"
+                disabled={Boolean(busy)}
+                onClick={() => void finish(false, false)}
+              >
+                以后再说
+              </button>
+              <button
+                type="button"
+                className="button button-dark"
+                disabled={!resourceCount || Boolean(busy)}
+                onClick={() => void finish(false, true)}
+              >
+                {busy === "scan" ? "正在启动…" : "现在扫描"}
+              </button>
+            </div>
+          </>
+        )}
+      </section>
+    </main>
+  );
+}
+
 interface SettingsPageProps {
   appState: AppState | null;
   listCoverStyle: ListCoverStyle;
   onListCoverStyleChange: (style: ListCoverStyle) => void;
+  onRestartOnboarding: () => void;
   onAppStateChange: (state: AppState) => void;
   onClose: () => void;
 }
@@ -298,6 +562,7 @@ function SettingsPage({
   appState,
   listCoverStyle,
   onListCoverStyleChange,
+  onRestartOnboarding,
   onAppStateChange,
   onClose
 }: SettingsPageProps) {
@@ -310,6 +575,8 @@ function SettingsPage({
   const [action, setAction] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [snapshotsEnabled, setSnapshotsEnabled] = useState(true);
+  const [snapshotExcludedHosts, setSnapshotExcludedHosts] = useState("");
   const [undoBatches, setUndoBatches] = useState<UndoSnapshotBatch[]>([]);
   const backButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -333,6 +600,12 @@ function SettingsPage({
           caught instanceof Error ? caught.message : "无法读取最近的更改"
         )
       );
+    void getDisplaySettings().then((display) => {
+      setSnapshotsEnabled(display.pageSnapshotsEnabled);
+      setSnapshotExcludedHosts(
+        display.snapshotExcludedHosts.join("\n")
+      );
+    });
   }, []);
 
   useEffect(() => {
@@ -500,6 +773,49 @@ function SettingsPage({
       );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "封面设置保存失败");
+    } finally {
+      setAction("");
+    }
+  }
+
+  async function saveSnapshotSettings(
+    nextEnabled = snapshotsEnabled,
+    requestCapturePermission = false
+  ) {
+    if (action) return;
+    setAction("snapshot-settings");
+    setError("");
+    try {
+      if (
+        nextEnabled &&
+        requestCapturePermission &&
+        chrome.permissions?.request
+      ) {
+        const granted = await chrome.permissions.request({
+          origins: ["http://*/*", "https://*/*"]
+        });
+        if (!granted) {
+          throw new Error(
+            "需要网页访问权限才能自动积累预览快照；设置没有更改。"
+          );
+        }
+      }
+      const next = await saveDisplaySettings({
+        pageSnapshotsEnabled: nextEnabled,
+        snapshotExcludedHosts: snapshotExcludedHosts
+          .split(/[\n,，;；\s]+/)
+          .map((host) => host.trim())
+          .filter(Boolean)
+      });
+      setSnapshotsEnabled(next.pageSnapshotsEnabled);
+      setSnapshotExcludedHosts(next.snapshotExcludedHosts.join("\n"));
+      setMessage(
+        next.pageSnapshotsEnabled
+          ? "页面快照采集已开启，仅保存于本机。"
+          : "页面快照采集已关闭，不会产生新快照。"
+      );
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "快照设置保存失败");
     } finally {
       setAction("");
     }
@@ -686,6 +1002,59 @@ function SettingsPage({
         </section>
 
         <section
+          className="settings-section"
+          aria-labelledby="snapshot-settings-title"
+        >
+          <div className="settings-section-heading">
+            <div>
+              <h2 id="snapshot-settings-title">页面预览快照</h2>
+              <p>
+                已收藏网页在前台停留 5 秒后保存真实快照；只存在本机，绝不参与同步。
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={snapshotsEnabled}
+              className="settings-snapshot-switch"
+              data-active={snapshotsEnabled}
+              disabled={Boolean(action)}
+              onClick={() => {
+                const next = !snapshotsEnabled;
+                void saveSnapshotSettings(next, next);
+              }}
+            >
+              <span />
+              {snapshotsEnabled ? "已开启" : "已关闭"}
+            </button>
+          </div>
+          <label className="settings-field">
+            <span>额外不采集的域名（每行一个）</span>
+            <textarea
+              rows={3}
+              value={snapshotExcludedHosts}
+              placeholder={"work.example.com\nprivate.example.org"}
+              onChange={(event) =>
+                setSnapshotExcludedHosts(event.target.value)
+              }
+            />
+          </label>
+          <div className="settings-field-footer">
+            <p>
+              内网、银行、支付和医疗站点已内置排除；无痕窗口始终不采集。
+            </p>
+            <button
+              type="button"
+              className="button button-quiet button-small"
+              disabled={Boolean(action)}
+              onClick={() => void saveSnapshotSettings()}
+            >
+              保存排除清单
+            </button>
+          </div>
+        </section>
+
+        <section
           className="settings-section settings-scan-section"
           aria-labelledby="library-scan-title"
         >
@@ -833,6 +1202,21 @@ function SettingsPage({
           )}
         </section>
 
+        <section className="settings-section settings-onboarding-section">
+          <div>
+            <h2>首次使用引导</h2>
+            <p>重新查看 Chrome 书签、AI 服务和本地快照的使用说明。</p>
+          </div>
+          <button
+            type="button"
+            className="button button-quiet button-small"
+            disabled={Boolean(action)}
+            onClick={onRestartOnboarding}
+          >
+            重新查看引导
+          </button>
+        </section>
+
         <section
           className="settings-section"
           aria-labelledby="account-settings-title"
@@ -950,6 +1334,11 @@ interface TreeProps {
   resourceByUrl: Map<string, ResourceRecord>;
   siteBrandByHost: Map<string, SiteBrandRecord>;
   coverStyle: ListCoverStyle;
+  onPreviewIntent: (
+    node: NativeBookmarkNode,
+    rect: DOMRect
+  ) => void;
+  onPreviewLeave: () => void;
   depth?: number;
   expanded: Set<string>;
   onToggle: (id: string) => void;
@@ -970,6 +1359,8 @@ function BookmarkTree({
   resourceByUrl,
   siteBrandByHost,
   coverStyle,
+  onPreviewIntent,
+  onPreviewLeave,
   depth = 0,
   expanded,
   onToggle,
@@ -985,6 +1376,44 @@ function BookmarkTree({
   const previousPositions = useRef<Map<string, number> | null>(null);
   const lastHoverTarget = useRef("");
   const activeDragId = useRef("");
+  const previewTimer = useRef<number | undefined>(undefined);
+  const pointerSample = useRef<{
+    x: number;
+    y: number;
+    at: number;
+  } | null>(null);
+
+  useEffect(
+    () => () => {
+      if (previewTimer.current !== undefined) {
+        window.clearTimeout(previewTimer.current);
+      }
+    },
+    []
+  );
+
+  function armPreview(
+    node: NativeBookmarkNode,
+    target: HTMLElement
+  ) {
+    if (!node.url) return;
+    if (previewTimer.current !== undefined) {
+      window.clearTimeout(previewTimer.current);
+    }
+    previewTimer.current = window.setTimeout(() => {
+      previewTimer.current = undefined;
+      onPreviewIntent(node, target.getBoundingClientRect());
+    }, 400);
+  }
+
+  function cancelPreview() {
+    if (previewTimer.current !== undefined) {
+      window.clearTimeout(previewTimer.current);
+      previewTimer.current = undefined;
+    }
+    pointerSample.current = null;
+    onPreviewLeave();
+  }
 
   useEffect(() => {
     setOrderedNodes(nodes);
@@ -1127,6 +1556,38 @@ function BookmarkTree({
                   folder ? undefined : node.index
                 );
               }}
+              onPointerEnter={(event) => {
+                if (folder) return;
+                pointerSample.current = {
+                  x: event.clientX,
+                  y: event.clientY,
+                  at: performance.now()
+                };
+                armPreview(node, event.currentTarget);
+              }}
+              onPointerMove={(event) => {
+                if (folder) return;
+                const nowAt = performance.now();
+                const previous = pointerSample.current;
+                pointerSample.current = {
+                  x: event.clientX,
+                  y: event.clientY,
+                  at: nowAt
+                };
+                if (!previous) return;
+                const elapsed = Math.max(1, nowAt - previous.at);
+                const distance = Math.hypot(
+                  event.clientX - previous.x,
+                  event.clientY - previous.y
+                );
+                if (distance / elapsed > 0.65) {
+                  armPreview(node, event.currentTarget);
+                  onPreviewLeave();
+                } else if (previewTimer.current === undefined) {
+                  armPreview(node, event.currentTarget);
+                }
+              }}
+              onPointerLeave={cancelPreview}
             >
               <button
                 type="button"
@@ -1139,6 +1600,20 @@ function BookmarkTree({
                   if (!folder && event.button === 1) {
                     event.preventDefault();
                     onOpen(node, true);
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (folder) return;
+                  if (event.key.toLocaleLowerCase() === "p") {
+                    event.preventDefault();
+                    onPreviewIntent(
+                      node,
+                      event.currentTarget
+                        .closest(".bookmark-row")!
+                        .getBoundingClientRect()
+                    );
+                  } else if (event.key === "Escape") {
+                    onPreviewLeave();
                   }
                 }}
                 title={node.url || node.title}
@@ -1211,6 +1686,8 @@ function BookmarkTree({
                     onDragStart={onDragStart}
                     onDragEnd={onDragEnd}
                     onMove={onMove}
+                    onPreviewIntent={onPreviewIntent}
+                    onPreviewLeave={onPreviewLeave}
                   />
                 </div>
               </div>
@@ -1222,21 +1699,173 @@ function BookmarkTree({
   );
 }
 
+interface BookmarkPreviewCardProps {
+  node: NativeBookmarkNode;
+  resource?: ResourceRecord;
+  siteBrand?: SiteBrandRecord;
+  snapshot: PageSnapshot | null;
+  flip: boolean;
+  offset: number;
+  onKeepOpen: () => void;
+  onLeave: () => void;
+  onClose: () => void;
+}
+
+function relativeSnapshotDate(value: string): string {
+  const days = Math.max(
+    0,
+    Math.floor((Date.now() - Date.parse(value)) / 86_400_000)
+  );
+  if (days === 0) return "今天";
+  if (days === 1) return "昨天";
+  return `${days} 天前`;
+}
+
+function fullDate(value?: string | number): string {
+  if (!value) return "暂无记录";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "暂无记录";
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "short",
+    day: "numeric"
+  }).format(date);
+}
+
+function BookmarkPreviewCard({
+  node,
+  resource,
+  siteBrand,
+  snapshot,
+  flip,
+  offset,
+  onKeepOpen,
+  onLeave,
+  onClose
+}: BookmarkPreviewCardProps) {
+  return (
+    <aside
+      className="bookmark-preview-card"
+      data-flip={flip}
+      style={
+        flip
+          ? {
+              bottom: offset,
+              maxHeight: `calc(100vh - ${offset + 12}px)`
+            }
+          : {
+              top: offset,
+              maxHeight: `calc(100vh - ${offset + 12}px)`
+            }
+      }
+      aria-label={`${node.title} 的预览`}
+      onPointerEnter={onKeepOpen}
+      onPointerLeave={onLeave}
+    >
+      {snapshot ? (
+        <div className="bookmark-preview-visual">
+          <img src={snapshot.imageDataUrl} alt="" />
+          <span>
+            快照 · {relativeSnapshotDate(snapshot.capturedAt)}
+            {Date.now() - Date.parse(snapshot.capturedAt) >
+            90 * 86_400_000
+              ? " · 可能已过期"
+              : ""}
+          </span>
+        </div>
+      ) : null}
+      <div className="bookmark-preview-info">
+        <header>
+          <div>
+            <SiteThumbnail
+              url={node.url || ""}
+              brandImageUrl={siteBrand?.iconDataUrl}
+              categoryCoverId={resource?.categoryCoverId}
+              label={resource?.siteName || hostFromUrl(node.url || "")}
+              className="bookmark-preview-site"
+            />
+            <span>
+              <strong>
+                {resource?.siteName || hostFromUrl(node.url || "")}
+              </strong>
+              <small>{hostFromUrl(node.url || "")}</small>
+            </span>
+          </div>
+          <button
+            type="button"
+            aria-label="关闭预览"
+            onClick={onClose}
+          >
+            <CloseIcon />
+          </button>
+        </header>
+        <h2>{node.title || "未命名"}</h2>
+        <p>
+          {resource?.summary ||
+            resource?.contentExcerpt ||
+            "这条收藏还没有 AI 摘要。你仍可根据完整标题、站点和文件夹位置确认内容。"}
+        </p>
+        {resource?.tags.length ? (
+          <div className="bookmark-preview-tags">
+            {resource.tags.map((tag) => (
+              <span key={tag}>{tag}</span>
+            ))}
+          </div>
+        ) : null}
+        <dl>
+          <div>
+            <dt>文件夹</dt>
+            <dd>
+              {resource?.nativeFolderPath.join(" / ") || "Chrome 书签"}
+            </dd>
+          </div>
+          <div>
+            <dt>收藏时间</dt>
+            <dd>{fullDate(node.dateAdded)}</dd>
+          </div>
+          <div>
+            <dt>上次打开</dt>
+            <dd>{fullDate(node.dateLastUsed)}</dd>
+          </div>
+        </dl>
+        <small className="bookmark-preview-key">按 P 打开预览 · Esc 关闭</small>
+      </div>
+    </aside>
+  );
+}
+
 interface AgentComposerProps {
   value: string;
   busy: boolean;
+  configured?: boolean;
   placeholder?: string;
   onChange: (value: string) => void;
   onSubmit: (event: React.FormEvent) => void;
+  onConfigure?: () => void;
 }
 
 function AgentComposer({
   value,
   busy,
+  configured = true,
   placeholder = "询问你的收藏…",
   onChange,
-  onSubmit
+  onSubmit,
+  onConfigure
 }: AgentComposerProps) {
+  if (!configured) {
+    return (
+      <div className="agent-composer agent-composer-setup">
+        <button type="button" onClick={onConfigure}>
+          <span>
+            <strong>配置 AI 后可以直接问你的收藏</strong>
+            <small>选择服务商并填写自己的 API Key</small>
+          </span>
+          <ChevronRightIcon />
+        </button>
+      </div>
+    );
+  }
   return (
     <form
       className="agent-composer"
@@ -1482,13 +2111,37 @@ interface AgentHistoryPageProps {
   conversations: AgentConversation[];
   onBack: () => void;
   onOpen: (conversation: AgentConversation) => void;
+  onDelete: (id: string) => Promise<void>;
+  onRename: (
+    conversation: AgentConversation,
+    title: string
+  ) => Promise<void>;
 }
 
 function AgentHistoryPage({
   conversations,
   onBack,
-  onOpen
+  onOpen,
+  onDelete,
+  onRename
 }: AgentHistoryPageProps) {
+  const [editingId, setEditingId] = useState("");
+  const [editingTitle, setEditingTitle] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState("");
+  const [busyId, setBusyId] = useState("");
+
+  async function saveTitle(conversation: AgentConversation) {
+    const title = editingTitle.trim();
+    if (!title || busyId) return;
+    setBusyId(conversation.id);
+    try {
+      await onRename(conversation, title);
+      setEditingId("");
+    } finally {
+      setBusyId("");
+    }
+  }
+
   return (
     <main className="native-panel agent-history-panel">
       <header className="agent-page-header">
@@ -1512,18 +2165,87 @@ function AgentHistoryPage({
               .reverse()
               .find((message) => message.role === "assistant")?.content;
             return (
-              <button
-                type="button"
-                key={conversation.id}
-                onClick={() => onOpen(conversation)}
-              >
-                <span>
-                  <strong>{conversation.title}</strong>
-                  <time>{conversationDate(conversation.updatedAt)}</time>
-                </span>
-                <small>{preview || "尚未生成回答"}</small>
-                <ChevronRightIcon />
-              </button>
+              <article key={conversation.id}>
+                {editingId === conversation.id ? (
+                  <form
+                    className="agent-history-rename"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void saveTitle(conversation);
+                    }}
+                  >
+                    <input
+                      autoFocus
+                      value={editingTitle}
+                      maxLength={80}
+                      aria-label="会话名称"
+                      onChange={(event) =>
+                        setEditingTitle(event.target.value)
+                      }
+                    />
+                    <button
+                      type="button"
+                      disabled={Boolean(busyId)}
+                      onClick={() => setEditingId("")}
+                    >
+                      取消
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={!editingTitle.trim() || Boolean(busyId)}
+                    >
+                      保存
+                    </button>
+                  </form>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="agent-history-open"
+                      onClick={() => onOpen(conversation)}
+                    >
+                      <span>
+                        <strong>{conversation.title}</strong>
+                        <time>{conversationDate(conversation.updatedAt)}</time>
+                      </span>
+                      <small>{preview || "尚未生成回答"}</small>
+                      <ChevronRightIcon />
+                    </button>
+                    <div className="agent-history-actions">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingId(conversation.id);
+                          setEditingTitle(conversation.title);
+                          setConfirmDeleteId("");
+                        }}
+                      >
+                        改名
+                      </button>
+                      <button
+                        type="button"
+                        data-danger={confirmDeleteId === conversation.id}
+                        disabled={busyId === conversation.id}
+                        onClick={() => {
+                          if (confirmDeleteId !== conversation.id) {
+                            setConfirmDeleteId(conversation.id);
+                            return;
+                          }
+                          setBusyId(conversation.id);
+                          void onDelete(conversation.id).finally(() => {
+                            setBusyId("");
+                            setConfirmDeleteId("");
+                          });
+                        }}
+                      >
+                        {confirmDeleteId === conversation.id
+                          ? "确认删除"
+                          : "删除"}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </article>
             );
           })
         ) : (
@@ -1533,6 +2255,9 @@ function AgentHistoryPage({
             <p>在收藏列表底部提问后，会话会自动保存在这里。</p>
           </div>
         )}
+        <p className="agent-history-limit">
+          最多保留 50 个会话；超出后自动移除最久未使用的会话。
+        </p>
       </section>
     </main>
   );
@@ -1545,6 +2270,10 @@ export function SidePanelApp() {
   const [siteBrands, setSiteBrands] = useState<SiteBrandRecord[]>([]);
   const [listCoverStyle, setListCoverStyle] =
     useState<ListCoverStyle>("site");
+  const [aiConfigured, setAiConfigured] = useState(false);
+  const [onboardingVisible, setOnboardingVisible] = useState<
+    boolean | null
+  >(null);
   const [folders, setFolders] = useState<NativeFolderOption[]>([]);
   const [agentPrompt, setAgentPrompt] = useState("");
   const [panelView, setPanelView] = useState<
@@ -1558,6 +2287,13 @@ export function SidePanelApp() {
   const [librarySearchMode, setLibrarySearchMode] = useState<
     "tree" | "ranked"
   >("tree");
+  const [bookmarkPreview, setBookmarkPreview] = useState<{
+    node: NativeBookmarkNode;
+    flip: boolean;
+    offset: number;
+  } | null>(null);
+  const [previewSnapshot, setPreviewSnapshot] =
+    useState<PageSnapshot | null>(null);
   const [draggedId, setDraggedId] = useState("");
   const [editor, setEditor] = useState<EditorState>(null);
   const [editTitle, setEditTitle] = useState("");
@@ -1581,6 +2317,10 @@ export function SidePanelApp() {
     atEnd: false
   });
   const pendingDraftInFlight = useRef(false);
+  const persistentStateLoaded = useRef(false);
+  const scrollSaveTimer = useRef<number | undefined>(undefined);
+  const previewCloseTimer = useRef<number | undefined>(undefined);
+  const previewCanonicalUrl = useRef("");
   const librarySearchSnapshot = useRef<{
     expanded: Set<string>;
     scrollTop: number;
@@ -1642,15 +2382,18 @@ export function SidePanelApp() {
     const nextResources = await sendExtensionRequest({
       type: "GET_LOCAL_RESOURCES"
     });
-    const [nextSnapshot, nextState, nextSiteBrands] = await Promise.all([
+    const [nextSnapshot, nextState, nextSiteBrands, nextAiSettings] =
+      await Promise.all([
       sendExtensionRequest({ type: "GET_BOOKMARK_BAR" }),
       sendExtensionRequest({ type: "GET_APP_STATE" }),
-      sendExtensionRequest({ type: "GET_SITE_BRANDS" })
+      sendExtensionRequest({ type: "GET_SITE_BRANDS" }),
+      sendExtensionRequest({ type: "GET_AI_SETTINGS" })
     ]);
     setSnapshot(nextSnapshot);
     setAppState(nextState);
     setResources(nextResources);
     setSiteBrands(nextSiteBrands);
+    setAiConfigured(nextAiSettings.apiKeyConfigured);
   }, []);
 
   const loadConversations = useCallback(async () => {
@@ -1662,10 +2405,63 @@ export function SidePanelApp() {
     return nextConversations;
   }, []);
 
+  const deleteConversation = useCallback(async (id: string) => {
+    await sendExtensionRequest({
+      type: "DELETE_AGENT_CONVERSATION",
+      id
+    });
+    setConversations((current) =>
+      current.filter((conversation) => conversation.id !== id)
+    );
+    setActiveConversation((current) =>
+      current?.id === id ? null : current
+    );
+  }, []);
+
+  const renameConversation = useCallback(
+    async (conversation: AgentConversation, title: string) => {
+      const saved = await sendExtensionRequest({
+        type: "SAVE_AGENT_CONVERSATION",
+        conversation: {
+          ...conversation,
+          title,
+          updatedAt: new Date().toISOString()
+        }
+      });
+      setConversations((current) =>
+        [saved, ...current.filter((item) => item.id !== saved.id)].slice(
+          0,
+          50
+        )
+      );
+      setActiveConversation((current) =>
+        current?.id === saved.id ? saved : current
+      );
+    },
+    []
+  );
+
   useEffect(() => {
-    void getDisplaySettings()
-      .then((settings) => setListCoverStyle(settings.listCoverStyle))
-      .catch(() => undefined);
+    void Promise.all([
+      getDisplaySettings(),
+      getSidepanelState(),
+      getOnboardingState()
+    ])
+      .then(([display, persisted, onboarding]) => {
+        setListCoverStyle(display.listCoverStyle);
+        setExpanded(new Set(persisted.expandedFolderIds));
+        setOnboardingVisible(!onboarding.completed);
+        window.requestAnimationFrame(() => {
+          if (contentRef.current) {
+            contentRef.current.scrollTop = persisted.scrollTop;
+          }
+          persistentStateLoaded.current = true;
+        });
+      })
+      .catch(() => {
+        persistentStateLoaded.current = true;
+        setOnboardingVisible(false);
+      });
     void refresh().catch((caught) => {
       setError(caught instanceof Error ? caught.message : "书签栏读取失败");
     });
@@ -1762,8 +2558,53 @@ export function SidePanelApp() {
       if (scrollHideTimer.current !== undefined) {
         window.clearTimeout(scrollHideTimer.current);
       }
+      if (scrollSaveTimer.current !== undefined) {
+        window.clearTimeout(scrollSaveTimer.current);
+      }
+      if (previewCloseTimer.current !== undefined) {
+        window.clearTimeout(previewCloseTimer.current);
+      }
     };
   }, [panelView, syncScrollThumb]);
+
+  useEffect(() => {
+    if (!persistentStateLoaded.current) return;
+    void saveSidepanelState({
+      expandedFolderIds: [...expanded],
+      scrollTop: contentRef.current?.scrollTop || 0
+    });
+  }, [expanded]);
+
+  useEffect(() => {
+    if (
+      panelView !== "library" ||
+      onboardingVisible !== false ||
+      !persistentStateLoaded.current
+    ) {
+      return;
+    }
+    void getSidepanelState().then((persisted) => {
+      window.requestAnimationFrame(() => {
+        if (contentRef.current) {
+          contentRef.current.scrollTop = persisted.scrollTop;
+          syncScrollThumb();
+        }
+      });
+    });
+  }, [onboardingVisible, panelView, syncScrollThumb]);
+
+  useEffect(() => {
+    if (!bookmarkPreview) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setBookmarkPreview(null);
+        setPreviewSnapshot(null);
+        previewCanonicalUrl.current = "";
+      }
+    };
+    document.addEventListener("keydown", close);
+    return () => document.removeEventListener("keydown", close);
+  }, [bookmarkPreview]);
 
   useEffect(() => {
     const tabId = appState?.activeTab?.id;
@@ -1986,6 +2827,59 @@ export function SidePanelApp() {
       resourceForUrl(resourceByUrl, editor.node.url)
     );
   }, [editor, resourceByUrl, resources]);
+
+  function keepBookmarkPreviewOpen() {
+    if (previewCloseTimer.current !== undefined) {
+      window.clearTimeout(previewCloseTimer.current);
+      previewCloseTimer.current = undefined;
+    }
+  }
+
+  function closeBookmarkPreview() {
+    if (previewCloseTimer.current !== undefined) {
+      window.clearTimeout(previewCloseTimer.current);
+    }
+    previewCloseTimer.current = window.setTimeout(() => {
+      setBookmarkPreview(null);
+      setPreviewSnapshot(null);
+      previewCanonicalUrl.current = "";
+      previewCloseTimer.current = undefined;
+    }, 200);
+  }
+
+  function showBookmarkPreview(
+    node: NativeBookmarkNode,
+    rect: DOMRect
+  ) {
+    if (!node.url) return;
+    keepBookmarkPreviewOpen();
+    const flip = rect.top > window.innerHeight * 0.54;
+    setBookmarkPreview({
+      node,
+      flip,
+      offset: flip
+        ? Math.max(12, window.innerHeight - rect.bottom)
+        : Math.max(12, rect.top - 6)
+    });
+    setPreviewSnapshot(null);
+    let canonicalUrl = "";
+    try {
+      canonicalUrl = canonicalizeUrl(node.url);
+    } catch {
+      return;
+    }
+    previewCanonicalUrl.current = canonicalUrl;
+    void sendExtensionRequest({
+      type: "GET_PAGE_SNAPSHOT",
+      canonicalUrl
+    })
+      .then((next) => {
+        if (previewCanonicalUrl.current === canonicalUrl) {
+          setPreviewSnapshot(next);
+        }
+      })
+      .catch(() => undefined);
+  }
 
   async function openNavigation(
     input: { text: string; url?: string },
@@ -2561,6 +3455,16 @@ export function SidePanelApp() {
 
   function handleContentScroll() {
     revealScrollThumb();
+    if (!persistentStateLoaded.current) return;
+    if (scrollSaveTimer.current !== undefined) {
+      window.clearTimeout(scrollSaveTimer.current);
+    }
+    scrollSaveTimer.current = window.setTimeout(() => {
+      void saveSidepanelState({
+        expandedFolderIds: [...expanded],
+        scrollTop: contentRef.current?.scrollTop || 0
+      });
+    }, 180);
   }
 
   function handleScrollThumbPointerDown(
@@ -2605,12 +3509,42 @@ export function SidePanelApp() {
     scheduleScrollThumbHide();
   }
 
+  if (onboardingVisible === null) {
+    return (
+      <main className="native-panel">
+        <div className="native-loading">正在准备 Aarre…</div>
+      </main>
+    );
+  }
+
+  if (onboardingVisible) {
+    return (
+      <OnboardingPage
+        resourceCount={
+          snapshot?.bookmarkCount || appState?.localResourceCount || 0
+        }
+        initialAiConfigured={aiConfigured}
+        onComplete={(_skipped, configured) => {
+          if (configured) setAiConfigured(true);
+          setOnboardingVisible(false);
+          void refresh();
+        }}
+      />
+    );
+  }
+
   if (panelView === "settings") {
     return (
       <SettingsPage
         appState={appState}
         listCoverStyle={listCoverStyle}
         onListCoverStyleChange={setListCoverStyle}
+        onRestartOnboarding={() => {
+          void restartOnboarding().then(() => {
+            setPanelView("library");
+            setOnboardingVisible(true);
+          });
+        }}
         onAppStateChange={setAppState}
         onClose={() => setPanelView("library")}
       />
@@ -2621,6 +3555,8 @@ export function SidePanelApp() {
     return (
       <AgentHistoryPage
         conversations={conversations}
+        onDelete={deleteConversation}
+        onRename={renameConversation}
         onBack={() => setPanelView("library")}
         onOpen={(conversation) => {
           setActiveConversation(conversation);
@@ -2711,6 +3647,17 @@ export function SidePanelApp() {
           </button>
           <button
             type="button"
+            className="icon-button"
+            title="打开批量整理工作台"
+            aria-label="打开批量整理工作台"
+            onClick={() =>
+              void sendExtensionRequest({ type: "OPEN_MANAGER" })
+            }
+          >
+            <ExternalLinkIcon />
+          </button>
+          <button
+            type="button"
             className="icon-button settings-button"
             title="设置"
             aria-label="打开设置"
@@ -2719,6 +3666,26 @@ export function SidePanelApp() {
             <SettingsIcon />
           </button>
         </div>
+        {appState?.libraryScan.state === "running" ? (
+          <button
+            type="button"
+            className="library-scan-indicator"
+            aria-label={`扫描进度 ${appState.libraryScan.processed}/${appState.libraryScan.total}`}
+            onClick={() => setPanelView("settings")}
+          >
+            <span
+              style={{
+                width: `${
+                  appState.libraryScan.total
+                    ? (appState.libraryScan.processed /
+                        appState.libraryScan.total) *
+                      100
+                    : 0
+                }%`
+              }}
+            />
+          </button>
+        ) : null}
       </header>
 
       <form
@@ -2762,13 +3729,32 @@ export function SidePanelApp() {
       {error ? (
         <div className="native-error" role="alert">
           <span>{error}</span>
-          <button
-            type="button"
-            aria-label="关闭错误提示"
-            onClick={() => setError("")}
-          >
-            <CloseIcon />
-          </button>
+          <div>
+            {!snapshot ? (
+              <button
+                type="button"
+                className="native-error-retry"
+                onClick={() =>
+                  void refresh().catch((caught) =>
+                    setError(
+                      caught instanceof Error
+                        ? caught.message
+                        : "重新读取失败"
+                    )
+                  )
+                }
+              >
+                重试
+              </button>
+            ) : null}
+            <button
+              type="button"
+              aria-label="关闭错误提示"
+              onClick={() => setError("")}
+            >
+              <CloseIcon />
+            </button>
+          </div>
         </div>
       ) : null}
       {notice && !error ? (
@@ -2916,6 +3902,8 @@ export function SidePanelApp() {
                 resourceByUrl={resourceByUrl}
                 siteBrandByHost={siteBrandByHost}
                 coverStyle={listCoverStyle}
+                onPreviewIntent={showBookmarkPreview}
+                onPreviewLeave={closeBookmarkPreview}
                 expanded={visibleExpanded}
                 onToggle={(id) =>
                   setExpanded((current) => {
@@ -3003,11 +3991,45 @@ export function SidePanelApp() {
         ) : null}
       </div>
 
+      {bookmarkPreview ? (
+        <BookmarkPreviewCard
+          node={bookmarkPreview.node}
+          resource={
+            bookmarkPreview.node.url
+              ? resourceForUrl(
+                  resourceByUrl,
+                  bookmarkPreview.node.url
+                )
+              : undefined
+          }
+          siteBrand={
+            bookmarkPreview.node.url
+              ? siteBrandForUrl(
+                  siteBrandByHost,
+                  bookmarkPreview.node.url
+                )
+              : undefined
+          }
+          snapshot={previewSnapshot}
+          flip={bookmarkPreview.flip}
+          offset={bookmarkPreview.offset}
+          onKeepOpen={keepBookmarkPreviewOpen}
+          onLeave={closeBookmarkPreview}
+          onClose={() => {
+            setBookmarkPreview(null);
+            setPreviewSnapshot(null);
+            previewCanonicalUrl.current = "";
+          }}
+        />
+      ) : null}
+
       <AgentComposer
         value={agentPrompt}
         busy={Boolean(busy)}
+        configured={aiConfigured}
         onChange={setAgentPrompt}
         onSubmit={handleAgentSubmit}
+        onConfigure={() => setPanelView("settings")}
       />
 
       {editor ? (

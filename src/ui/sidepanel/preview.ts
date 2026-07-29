@@ -692,6 +692,13 @@ function executePreviewAgentAction(
 }
 
 export function installSidePanelPreview() {
+  const previewStorage: Record<string, unknown> = {
+    "aarre:onboarding:v1": {
+      completed: true,
+      skipped: false,
+      completedAt: new Date().toISOString()
+    }
+  };
   const previewChrome = {
     runtime: {
       getURL(path: string) {
@@ -709,6 +716,7 @@ export function installSidePanelPreview() {
         force?: boolean;
         id?: string;
         batchId?: string;
+        canonicalUrl?: string;
         conversation?: AgentConversation;
         actions?: BookmarkAgentActionProposal[];
         payload?: {
@@ -733,6 +741,10 @@ export function installSidePanelPreview() {
             return { ok: true, data: previewState };
           case "GET_LOCAL_RESOURCES":
             return { ok: true, data: structuredClone(previewResources) };
+          case "GET_SITE_BRANDS":
+            return { ok: true, data: [] };
+          case "GET_PAGE_SNAPSHOT":
+            return { ok: true, data: null };
           case "GET_AGENT_CONVERSATIONS":
             return { ok: true, data: structuredClone(previewConversations) };
           case "GET_UNDO_SNAPSHOTS":
@@ -1047,6 +1059,19 @@ export function installSidePanelPreview() {
     permissions: {
       async request() {
         return true;
+      }
+    },
+    storage: {
+      local: {
+        async get(key: string) {
+          return { [key]: previewStorage[key] };
+        },
+        async set(values: Record<string, unknown>) {
+          Object.assign(previewStorage, values);
+        },
+        async remove(key: string) {
+          delete previewStorage[key];
+        }
       }
     }
   };

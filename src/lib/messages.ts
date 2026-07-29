@@ -15,6 +15,7 @@ import type {
   NavigationSuggestion,
   PendingSaveDraft,
   PageCapture,
+  PageSnapshot,
   LibraryScanStatus,
   ResourceRecord,
   RestoreResult,
@@ -50,6 +51,7 @@ export type ExtensionRequest =
   | { type: "UNDO_BOOKMARK_BATCH"; batchId: string }
   | { type: "GET_LOCAL_RESOURCES" }
   | { type: "GET_SITE_BRANDS" }
+  | { type: "GET_PAGE_SNAPSHOT"; canonicalUrl: string }
   | { type: "GET_AGENT_CONVERSATIONS" }
   | { type: "SAVE_AGENT_CONVERSATION"; conversation: AgentConversation }
   | { type: "DELETE_AGENT_CONVERSATION"; id: string }
@@ -83,6 +85,7 @@ export type ExtensionRequest =
       payload: { id: string; recursive: boolean };
     }
   | { type: "OPEN_MANAGER"; query?: string }
+  | { type: "OPEN_SIDE_PANEL" }
   | { type: "AUTH_CHANGED" };
 
 export type ResponseDataByRequest = {
@@ -105,6 +108,7 @@ export type ResponseDataByRequest = {
   UNDO_BOOKMARK_BATCH: UndoBatchResult;
   GET_LOCAL_RESOURCES: ResourceRecord[];
   GET_SITE_BRANDS: SiteBrandRecord[];
+  GET_PAGE_SNAPSHOT: PageSnapshot | null;
   GET_AGENT_CONVERSATIONS: AgentConversation[];
   SAVE_AGENT_CONVERSATION: AgentConversation;
   DELETE_AGENT_CONVERSATION: { deleted: true };
@@ -123,6 +127,7 @@ export type ResponseDataByRequest = {
   MOVE_NATIVE_BOOKMARK: NativeBookmarkNode;
   DELETE_NATIVE_BOOKMARK: { deleted: true };
   OPEN_MANAGER: { opened: true };
+  OPEN_SIDE_PANEL: { opened: true };
   AUTH_CHANGED: AppState;
 };
 

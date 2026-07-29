@@ -71,4 +71,24 @@ describe("agent conversations", () => {
     await deleteAgentConversation("one");
     expect(await getAgentConversations()).toEqual([]);
   });
+
+  it("keeps the 50 most recently updated conversations", async () => {
+    for (let index = 0; index < 51; index += 1) {
+      await saveAgentConversation(
+        conversation(
+          `conversation-${index}`,
+          new Date(
+            Date.UTC(2026, 6, 29, 0, index)
+          ).toISOString()
+        )
+      );
+    }
+
+    const saved = await getAgentConversations();
+    expect(saved).toHaveLength(50);
+    expect(saved[0]?.id).toBe("conversation-50");
+    expect(
+      saved.some((item) => item.id === "conversation-0")
+    ).toBe(false);
+  });
 });

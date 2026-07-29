@@ -2,6 +2,7 @@ import "fake-indexeddb/auto";
 import { describe, expect, it } from "vitest";
 import {
   completeOutboxItem,
+  countPageSnapshots,
   cleanupExpiredUndoSnapshots,
   deleteUndoSnapshot,
   deferOutboxItem,
@@ -9,6 +10,7 @@ import {
   getLocalResource,
   getLocalResources,
   getOutbox,
+  getPageSnapshot,
   getSiteBrand,
   getSiteBrands,
   getUndoSnapshot,
@@ -17,6 +19,7 @@ import {
   normalizeResourceRecord,
   putUndoSnapshot,
   putSiteBrand,
+  putPageSnapshot,
   removeOutboxItem,
   upsertLocalResource
 } from "../src/lib/storage";
@@ -107,6 +110,25 @@ describe("IndexedDB storage", () => {
         (brand) => brand.host === "docs.example.com"
       )
     ).toBe(true);
+  });
+
+  it("evicts the oldest page snapshot above the local capacity", async () => {
+    for (const [index, day] of [1, 2, 3].entries()) {
+      await putPageSnapshot(
+        {
+          canonicalUrl: `https://snapshot.example/${index}`,
+          imageDataUrl: `data:image/webp;base64,${index}`,
+          capturedAt: `2026-07-0${day}T00:00:00.000Z`,
+          width: 680,
+          height: 425
+        },
+        2
+      );
+    }
+    expect(await countPageSnapshots()).toBe(2);
+    expect(
+      await getPageSnapshot("https://snapshot.example/0")
+    ).toBeUndefined();
   });
 
   it("upserts resources and returns newest first", async () => {

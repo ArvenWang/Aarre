@@ -148,6 +148,14 @@ export interface SiteBrandRecord {
   updatedAt: string;
 }
 
+export interface PageSnapshot {
+  canonicalUrl: string;
+  imageDataUrl: string;
+  capturedAt: string;
+  width: number;
+  height: number;
+}
+
 export interface OutboxItem {
   revision: string;
   resource: ResourceRecord;
