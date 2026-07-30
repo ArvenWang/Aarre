@@ -1947,7 +1947,7 @@ interface BookmarkPreviewCardProps {
   offset: number;
 }
 
-function BookmarkPreviewCard({
+export function BookmarkPreviewCard({
   snapshot,
   flip,
   offset
@@ -1973,6 +1973,28 @@ function BookmarkPreviewCard({
         <img src={snapshot.imageDataUrl} alt="" />
       </div>
     </aside>
+  );
+}
+
+interface BookmarkPreviewLayerProps {
+  snapshot: PageSnapshot | null;
+  placement: {
+    flip: boolean;
+    offset: number;
+  } | null;
+}
+
+export function BookmarkPreviewLayer({
+  snapshot,
+  placement
+}: BookmarkPreviewLayerProps) {
+  if (!snapshot || !placement) return null;
+  return (
+    <BookmarkPreviewCard
+      snapshot={snapshot}
+      flip={placement.flip}
+      offset={placement.offset}
+    />
   );
 }
 
@@ -4424,13 +4446,10 @@ export function SidePanelApp() {
         ) : null}
       </div>
 
-      {bookmarkPreview && previewSnapshot ? (
-        <BookmarkPreviewCard
-          snapshot={previewSnapshot}
-          flip={bookmarkPreview.flip}
-          offset={bookmarkPreview.offset}
-        />
-      ) : null}
+      <BookmarkPreviewLayer
+        snapshot={previewSnapshot}
+        placement={bookmarkPreview}
+      />
 
       <AgentComposer
         value={agentPrompt}

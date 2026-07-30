@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   DomainRateLimiter,
-  interleaveResourcesByHost
+  interleaveResourcesByHost,
+  runConcurrentTasks
 } from "../src/lib/scan-scheduler";
 import type { ResourceRecord } from "../src/lib/types";
 
@@ -33,6 +34,57 @@ function resource(id: string, host: string): ResourceRecord {
 }
 
 describe("scan scheduler", () => {
+  it("caps the pipeline at four workers and continues after one task fails", async () => {
+    type PipelineResult = {
+      index: number;
+      status: "succeeded" | "failed";
+      message?: string;
+    };
+    let active = 0;
+    let maximumActive = 0;
+    const started: number[] = [];
+    const completed: number[] = [];
+
+    const results = await runConcurrentTasks<number, PipelineResult>(
+      Array.from({ length: 10 }, (_, index) => index),
+      async (index) => {
+        active += 1;
+        maximumActive = Math.max(maximumActive, active);
+        started.push(index);
+        try {
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          if (index === 2) throw new Error("isolated failure");
+          completed.push(index);
+          return { index, status: "succeeded" };
+        } finally {
+          active -= 1;
+        }
+      },
+      {
+        concurrency: 4,
+        onError: (error, index) => ({
+          index,
+          status: "failed",
+          message:
+            error instanceof Error ? error.message : "unknown error"
+        })
+      }
+    );
+
+    expect(maximumActive).toBe(4);
+    expect(started).toHaveLength(10);
+    expect(completed).toContain(9);
+    expect(results).toHaveLength(10);
+    expect(results[2]).toEqual({
+      index: 2,
+      status: "failed",
+      message: "isolated failure"
+    });
+    expect(results.filter((result) => result.status === "succeeded")).toHaveLength(
+      9
+    );
+  });
+
   it("round-robins domains before returning to the same host", () => {
     const ordered = interleaveResourcesByHost([
       resource("a1", "a.example.com"),

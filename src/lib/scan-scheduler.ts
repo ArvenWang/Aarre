@@ -32,6 +32,46 @@ export function interleaveResourcesByHost(
   return ordered;
 }
 
+export async function runConcurrentTasks<Item, Result>(
+  items: Item[],
+  worker: (item: Item, index: number) => Promise<Result>,
+  options: {
+    concurrency: number;
+    onError: (
+      error: unknown,
+      item: Item,
+      index: number
+    ) => Result | Promise<Result>;
+  }
+): Promise<Result[]> {
+  if (!items.length) return [];
+  const concurrency = Math.max(
+    1,
+    Math.min(items.length, Math.floor(options.concurrency) || 1)
+  );
+  const results = new Array<Result>(items.length);
+  let nextIndex = 0;
+
+  const runner = async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      const item = items[index] as Item;
+      try {
+        results[index] = await worker(item, index);
+      } catch (error) {
+        // 单条书签失败只能记入该条结果，不能中断剩余扫描。
+        results[index] = await options.onError(error, item, index);
+      }
+    }
+  };
+
+  await Promise.all(
+    Array.from({ length: concurrency }, () => runner())
+  );
+  return results;
+}
+
 export class DomainRateLimiter {
   private readonly queues = new Map<string, Promise<void>>();
   private readonly lastFinishedAt = new Map<string, number>();

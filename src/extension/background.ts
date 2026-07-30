@@ -50,6 +50,10 @@ import {
   snapshotNodeMutation,
   undoBookmarkBatch
 } from "../lib/bookmark-undo";
+import {
+  executeProtectedBookmarkMutation,
+  type ProtectedBookmarkMutationInput
+} from "../lib/protected-bookmark-mutation";
 import type {
   ExtensionRequest,
   ExtensionResponse
@@ -72,7 +76,8 @@ import {
 import { checkLinkHealth } from "../lib/link-health";
 import {
   DomainRateLimiter,
-  interleaveResourcesByHost
+  interleaveResourcesByHost,
+  runConcurrentTasks
 } from "../lib/scan-scheduler";
 import {
   completeOutboxItem,
@@ -272,59 +277,18 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "发生未知错误。";
 }
 
-async function runProtectedBookmarkMutation<T>(input: {
-  label: string;
-  destructive: boolean;
-  mutation: UndoMutation;
-  perform: () => Promise<T>;
-  createdNodeId?: (result: T) => string | undefined;
-}): Promise<T> {
-  const batch = createUndoBatch({
-    source: "manual",
-    label: input.label,
-    destructive: input.destructive,
-    mutations: [{ ...input.mutation, applied: true }]
-  });
-  await putUndoSnapshot(batch);
-
-  let result: T;
-  try {
-    result = await input.perform();
-  } catch (error) {
-    await deleteUndoSnapshot(batch.batchId).catch(() => undefined);
-    throw error;
-  }
-
-  const createdNodeId = input.createdNodeId?.(result);
-  const ready: UndoSnapshotBatch = {
-    ...batch,
-    status: "ready",
-    mutations: batch.mutations.map((mutation) => ({
-      ...mutation,
-      ...(createdNodeId ? { createdNodeId } : {})
-    }))
-  };
-  try {
-    await putUndoSnapshot(ready);
-  } catch {
-    const rolledBack = await undoBookmarkBatch(
-      ready,
-      defaultFolderId,
-      {
+async function runProtectedBookmarkMutation<T>(
+  input: ProtectedBookmarkMutationInput<T>
+): Promise<T> {
+  return executeProtectedBookmarkMutation(input, {
+    putSnapshot: putUndoSnapshot,
+    deleteSnapshot: deleteUndoSnapshot,
+    rollback: (batch) =>
+      undoBookmarkBatch(batch, defaultFolderId, {
         onBeforeRemove: markInternalBookmarkRemoval,
         onAfterRemove: releaseInternalBookmarkRemoval
-      }
-    ).catch(() => null);
-    if (rolledBack) {
-      await putUndoSnapshot(rolledBack.batch).catch(() => undefined);
-    }
-    throw new Error(
-      rolledBack?.failed
-        ? "撤销记录写入失败，且自动回滚未完全成功。请立即查看“最近的更改”。"
-        : "撤销记录写入失败，本次修改已自动回滚，没有保留不可撤销的写入。"
-    );
-  }
-  return result;
+      })
+  });
 }
 
 async function activeTab(): Promise<chrome.tabs.Tab | null> {
@@ -2492,8 +2456,12 @@ async function runLibraryScan(): Promise<void> {
         updatedAt: now()
       };
       await setStoredLibraryScan(job);
-      const results = await Promise.all(
-        keys.map(async (resourceKey, index): Promise<ScanResourceResult> => {
+      const results = await runConcurrentTasks<
+        string,
+        ScanResourceResult
+      >(
+        keys,
+        async (resourceKey, index): Promise<ScanResourceResult> => {
           const resource = resources[index];
           if (!resource || !resource.nativeBookmarkIds.length) {
             return {
@@ -2505,7 +2473,17 @@ async function runLibraryScan(): Promise<void> {
           return libraryScanRateLimiter.run(resource.url, () =>
             scanOneLibraryResource(resource, job)
           );
-        })
+        },
+        {
+          concurrency: LIBRARY_SCAN_CONCURRENCY,
+          onError: (error, resourceKey, index) => ({
+            resource:
+              resources[index] ||
+              removedResourcePlaceholder(resourceKey),
+            outcome: "failed",
+            message: errorMessage(error)
+          })
+        }
       );
       job = await recordScanBatchResults(results);
       if (job.state === "completed") {
