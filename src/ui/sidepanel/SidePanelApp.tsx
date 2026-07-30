@@ -15,9 +15,9 @@ import {
   filterBookmarkTree
 } from "../../lib/bookmark-search";
 import {
-  findBookmarkByUrl,
   visibleBookmarkRootChildren
 } from "../../lib/bookmark-tree";
+import { buildBookmarkSaveState } from "../../lib/bookmark-save-state";
 import { registrableHost } from "../../lib/cover-registry";
 import { sendExtensionRequest } from "../../lib/messages";
 import { pendingSaveReadyTabId } from "../../lib/pending-save";
@@ -40,6 +40,7 @@ import {
 } from "../../lib/settings";
 import {
   getDisplaySettings,
+  requestPageSnapshotPermission,
   saveDisplaySettings,
   type ListCoverStyle
 } from "../../lib/display-settings";
@@ -61,6 +62,8 @@ import type {
   AppState,
   BookmarkAgentActionProposal,
   BookmarkBarSnapshot,
+  BookmarkSaveMatch,
+  BookmarkSaveState,
   FolderSuggestion,
   LibraryScanEstimate,
   NativeBookmarkNode,
@@ -138,6 +141,10 @@ function parseEditableTags(value: string): string[] {
     .filter(Boolean);
 }
 
+function bookmarkMatchLocation(match: BookmarkSaveMatch): string {
+  return match.folderPath.filter(Boolean).join(" / ") || "Chrome 书签";
+}
+
 function mergeEditableTags(
   current: string[],
   value: string
@@ -192,12 +199,14 @@ interface FolderSelectProps {
   options: NativeFolderOption[];
   value: string;
   onChange: (value: string) => void;
+  disabled?: boolean;
 }
 
 function FolderSelect({
   options,
   value,
-  onChange
+  onChange,
+  disabled = false
 }: FolderSelectProps) {
   const listboxId = useId();
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -308,7 +317,7 @@ function FolderSelect({
         aria-expanded={open}
         aria-controls={listboxId}
         onClick={() => (open ? setOpen(false) : openMenu())}
-        disabled={!options.length}
+        disabled={disabled || !options.length}
       >
         <span>
           {selected?.name ||
@@ -408,11 +417,7 @@ function OnboardingPage({
     setError("");
     try {
       if (scan) {
-        const granted = chrome.permissions?.request
-          ? await chrome.permissions.request({
-              origins: ["http://*/*", "https://*/*"]
-            })
-          : true;
+        const granted = await requestPageSnapshotPermission();
         if (!granted) {
           throw new Error("未获得网页读取权限，尚未开始扫描。");
         }
@@ -458,7 +463,7 @@ function OnboardingPage({
               <span>已发现 {resourceCount.toLocaleString("zh-CN")} 条书签</span>
               <span>所有写操作先确认，并可在 30 天内撤销</span>
               <span>
-                常访问的网站会在本机自动积累真实预览快照，越用越完整
+                新收藏和正常打开的缺图旧收藏会在本机补齐真实预览快照
               </span>
             </div>
             <button
@@ -572,7 +577,7 @@ function OnboardingPage({
               )}
             </div>
             <p className="onboarding-privacy">
-              费用取决于服务商、模型和网页长度，以服务商账单为准。内网、银行、支付和医疗站点不请求；页面快照只保存在本机，默认开启且可在设置中关闭。
+              费用取决于服务商、模型和网页长度，以服务商账单为准。内网、银行、支付和医疗站点不处理；新收藏或正常打开的缺图旧收藏会生成页面快照，已有截图最多每 7 天静默刷新一次，并且只保存在本机。
             </p>
             {error ? (
               <div className="settings-notice" data-tone="error">
@@ -759,13 +764,8 @@ function SettingsPage({
           );
           return;
         }
-        const permissionApi = chrome.permissions;
         await saveDisplaySettings({ scanCostLimitCny });
-        const granted = permissionApi?.request
-          ? await permissionApi.request({
-              origins: ["http://*/*", "https://*/*"]
-            })
-          : true;
+        const granted = await requestPageSnapshotPermission();
         if (!granted) {
           throw new Error(
             "需要网页读取权限，才能为整个书签目录提取代表图、简介和标签。"
@@ -2436,6 +2436,7 @@ export function SidePanelApp() {
     useState(false);
   const [listCoverStyle, setListCoverStyle] =
     useState<ListCoverStyle>("site");
+  const [pageSnapshotsEnabled, setPageSnapshotsEnabled] = useState(true);
   const [aiConfigured, setAiConfigured] = useState(false);
   const [onboardingVisible, setOnboardingVisible] = useState<
     boolean | null
@@ -2473,9 +2474,17 @@ export function SidePanelApp() {
   const [editTags, setEditTags] = useState<string[]>([]);
   const [editTagInput, setEditTagInput] = useState("");
   const [capture, setCapture] = useState<PageCapture | null>(null);
+  const [captureSourceTabId, setCaptureSourceTabId] = useState<
+    number | undefined
+  >();
   const [note, setNote] = useState("");
   const [folderId, setFolderId] = useState("");
-  const [requestAi, setRequestAi] = useState(true);
+  const [bookmarkSaveState, setBookmarkSaveState] =
+    useState<BookmarkSaveState | null>(null);
+  const [saveDisposition, setSaveDisposition] = useState<
+    "reuse" | "new" | ""
+  >("");
+  const [selectedBookmarkId, setSelectedBookmarkId] = useState("");
   const [captureWarning, setCaptureWarning] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState("");
   const [busy, setBusy] = useState("");
@@ -2643,6 +2652,7 @@ export function SidePanelApp() {
     ])
       .then(([display, persisted, onboarding]) => {
         setListCoverStyle(display.listCoverStyle);
+        setPageSnapshotsEnabled(display.pageSnapshotsEnabled);
         setExpanded(new Set(persisted.expandedFolderIds));
         setOnboardingVisible(!onboarding.completed);
         window.requestAnimationFrame(() => {
@@ -2921,28 +2931,27 @@ export function SidePanelApp() {
     };
   }, [editor]);
 
-  const currentSavedNode = useMemo(
-    () =>
-      snapshot && appState?.activeTab?.url
-        ? findBookmarkByUrl(
-            snapshot.roots || [snapshot.root],
-            appState.activeTab.url
-          )
-        : null,
-    [appState, snapshot]
+  const currentPageSaveState = useMemo(() => {
+    if (!snapshot || !appState?.activeTab?.url) return null;
+    try {
+      return buildBookmarkSaveState(
+        snapshot.roots || [snapshot.root],
+        appState.activeTab.url
+      );
+    } catch {
+      return null;
+    }
+  }, [appState, snapshot]);
+  const currentSaved = Boolean(
+    currentPageSaveState && currentPageSaveState.status !== "none"
   );
-  const currentWritableSavedNode = useMemo(
+  const selectedSaveMatch = useMemo(
     () =>
-      snapshot && appState?.activeTab?.url
-        ? findBookmarkByUrl(
-            snapshot.roots || [snapshot.root],
-            appState.activeTab.url,
-            true
-          )
-        : null,
-    [appState, snapshot]
+      bookmarkSaveState?.matches.find(
+        (match) => match.id === selectedBookmarkId
+      ),
+    [bookmarkSaveState, selectedBookmarkId]
   );
-  const currentSaved = Boolean(currentSavedNode);
   const bookmarkRoots = useMemo(() => {
     if (!snapshot) return [];
     return visibleBookmarkRootChildren(snapshot);
@@ -3146,6 +3155,10 @@ export function SidePanelApp() {
   ) {
     setError("");
     try {
+      if (input.url && pageSnapshotsEnabled) {
+        // 由用户点击直接发起权限请求；拒绝后仍然照常打开网页。
+        await requestPageSnapshotPermission().catch(() => false);
+      }
       await sendExtensionRequest({
         type: "NAVIGATE",
         payload: {
@@ -3521,10 +3534,7 @@ export function SidePanelApp() {
     setLibrarySearchMode("tree");
   }
 
-  async function startSave(
-    draft?: PendingSaveDraft,
-    existingBookmark?: NativeBookmarkNode
-  ) {
+  async function startSave(draft?: PendingSaveDraft) {
     if (!appState) return;
     dismissBookmarkPreviewImmediately();
     setEditor({ kind: "save" });
@@ -3532,25 +3542,53 @@ export function SidePanelApp() {
     setBusy("capture");
     setError("");
     setCaptureWarning("");
+    setCaptureSourceTabId(draft?.tabId || appState.activeTab?.id);
     setFolderSuggestions([]);
     setNote("");
+    setBookmarkSaveState(null);
+    setSaveDisposition("");
+    setSelectedBookmarkId("");
     try {
-      const folderOptions = await sendExtensionRequest({
-        type: "GET_FOLDERS"
-      });
+      const targetUrl =
+        draft?.url || appState.activeTab?.url || "";
+      const [folderOptions, saveState] = await Promise.all([
+        sendExtensionRequest({ type: "GET_FOLDERS" }),
+        sendExtensionRequest({
+          type: "GET_BOOKMARK_SAVE_STATE",
+          url: targetUrl
+        })
+      ]);
+      setBookmarkSaveState(saveState);
+      const initialMatch =
+        (saveState.status === "exact" ||
+        saveState.status === "readonly"
+          ? saveState.matches[0]
+          : undefined);
+      const existingResource = resourceForUrl(
+        resourceByUrl,
+        targetUrl
+      );
+      setNote(existingResource?.userNote || "");
+      setSelectedBookmarkId(initialMatch?.id || "");
+      setSaveDisposition(
+        saveState.status === "none"
+          ? "new"
+          : initialMatch
+            ? "reuse"
+            : ""
+      );
       setFolders(folderOptions);
       setFolderId(
         initialSaveFolderId(
           folderOptions,
-          existingBookmark?.parentId
+          initialMatch?.parentId
         )
       );
 
       if (draft?.kind === "link") {
         const page = captureFromDraft(draft);
         setCapture(page);
-        setEditTitle(existingBookmark?.title || page.title);
-        setRequestAi(false);
+        setEditTitle(initialMatch?.title || page.title);
         setFolderSuggestions(
           await sendExtensionRequest({
             type: "GET_FOLDER_SUGGESTIONS",
@@ -3574,9 +3612,8 @@ export function SidePanelApp() {
           : page;
         setCapture(merged);
         setEditTitle(
-          existingBookmark?.title || draft?.title || merged.title
+          initialMatch?.title || draft?.title || merged.title
         );
-        setRequestAi(true);
         setFolderSuggestions(
           await sendExtensionRequest({
             type: "GET_FOLDER_SUGGESTIONS",
@@ -3588,8 +3625,7 @@ export function SidePanelApp() {
           ? captureFromDraft(draft)
           : emptyCapture(appState);
         setCapture(page);
-        setEditTitle(existingBookmark?.title || page.title);
-        setRequestAi(false);
+        setEditTitle(initialMatch?.title || page.title);
         setFolderSuggestions(
           await sendExtensionRequest({
             type: "GET_FOLDER_SUGGESTIONS",
@@ -3674,18 +3710,39 @@ export function SidePanelApp() {
         });
       } else {
         if (!capture) throw new Error("当前页面尚未读取完成。");
+        if (pageSnapshotsEnabled) {
+          await requestPageSnapshotPermission().catch(() => false);
+        }
         const result = await sendExtensionRequest({
           type: "SAVE_BOOKMARK",
           payload: {
             capture,
+            ...(typeof captureSourceTabId === "number"
+              ? { sourceTabId: captureSourceTabId }
+              : {}),
             title: editTitle,
             userNote: note,
             folderId,
-            requestAi
+            requestAi: true,
+            ...(saveDisposition === "reuse" && selectedBookmarkId
+              ? { existingBookmarkId: selectedBookmarkId }
+              : {}),
+            ...(saveDisposition === "new" &&
+            bookmarkSaveState?.status !== "none"
+              ? { createSeparate: true }
+              : {}),
+            ...(saveDisposition === "reuse" &&
+            bookmarkSaveState?.matches.find(
+              (match) => match.id === selectedBookmarkId
+            )?.matchKind === "canonical"
+              ? { confirmedCanonicalReuse: true }
+              : {})
           }
         });
         if (result.aiWarning) {
           setNotice(result.aiWarning);
+        } else if (result.enhancementPending) {
+          setNotice("收藏已保存，Aarre 正在后台补全摘要、标签和封面。");
         }
       }
       setEditor(null);
@@ -3913,13 +3970,10 @@ export function SidePanelApp() {
             type="button"
             className="icon-button star-button"
             data-saved={currentSaved}
-            title={currentSaved ? "编辑当前页面书签" : "收藏当前页面"}
-            aria-label={currentSaved ? "编辑当前页面书签" : "收藏当前页面"}
+            title={currentSaved ? "管理当前页面收藏" : "添加到收藏"}
+            aria-label={currentSaved ? "管理当前页面收藏" : "添加到收藏"}
             onClick={() =>
-              void startSave(
-                undefined,
-                currentWritableSavedNode || undefined
-              )
+              void startSave()
             }
             disabled={!appState?.activeTab?.url}
           >
@@ -4447,7 +4501,9 @@ export function SidePanelApp() {
               <div>
                 <h2 id="native-dialog-title">
                   {editor.kind === "save"
-                    ? "收藏当前页面"
+                    ? bookmarkSaveState?.status === "none"
+                      ? "添加到收藏"
+                      : "管理此收藏"
                     : editor.kind === "folder"
                       ? "新建文件夹"
                       : editor.node.url
@@ -4481,6 +4537,11 @@ export function SidePanelApp() {
                     onChange={(event) => setEditTitle(event.target.value)}
                     maxLength={240}
                     autoFocus
+                    disabled={
+                      editor.kind === "save" &&
+                      saveDisposition === "reuse" &&
+                      Boolean(selectedSaveMatch?.unmodifiable)
+                    }
                   />
                 </label>
 
@@ -4602,14 +4663,95 @@ export function SidePanelApp() {
 
                 {editor.kind === "save" ? (
                   <>
+                    {bookmarkSaveState?.status === "exact" ? (
+                      <div className="save-state-note" role="status">
+                        <strong>此页面已经收藏</strong>
+                        <span>
+                          保存后会更新原记录，不会创建重复收藏。
+                        </span>
+                      </div>
+                    ) : null}
+                    {bookmarkSaveState?.status === "readonly" ? (
+                      <div className="save-state-note" role="status">
+                        <strong>这是受管理的 Chrome 收藏</strong>
+                        <span>
+                          Aarre 只更新摘要、标签和封面，不改动名称与文件夹。
+                        </span>
+                      </div>
+                    ) : null}
+                    {bookmarkSaveState &&
+                    ["canonical", "multiple"].includes(
+                      bookmarkSaveState.status
+                    ) ? (
+                      <fieldset className="save-match-picker">
+                        <legend>
+                          {bookmarkSaveState.status === "multiple"
+                            ? "发现多条相同收藏，请选择"
+                            : "发现可能相同的收藏，请确认"}
+                        </legend>
+                        {bookmarkSaveState.matches.map((match) => (
+                          <label key={match.id}>
+                            <input
+                              type="radio"
+                              name="save-target"
+                              checked={
+                                saveDisposition === "reuse" &&
+                                selectedBookmarkId === match.id
+                              }
+                              onChange={() => {
+                                setSaveDisposition("reuse");
+                                setSelectedBookmarkId(match.id);
+                                setFolderId(match.parentId);
+                                setEditTitle(match.title);
+                              }}
+                            />
+                            <span>
+                              <strong>{match.title}</strong>
+                              <small>
+                                {bookmarkMatchLocation(match)}
+                                {match.unmodifiable
+                                  ? " · 受 Chrome 管理"
+                                  : ""}
+                              </small>
+                            </span>
+                          </label>
+                        ))}
+                        <label>
+                          <input
+                            type="radio"
+                            name="save-target"
+                            checked={saveDisposition === "new"}
+                            onChange={() => {
+                              setSaveDisposition("new");
+                              setSelectedBookmarkId("");
+                              setEditTitle(
+                                capture?.title || editTitle
+                              );
+                            }}
+                          />
+                          <span>
+                            <strong>另存为一条新收藏</strong>
+                            <small>仅在你明确需要两个副本时使用</small>
+                          </span>
+                        </label>
+                      </fieldset>
+                    ) : null}
                     <div className="native-field">
                       <span>文件夹</span>
-                      <FolderSelect
-                        options={folders}
-                        value={folderId}
-                        onChange={setFolderId}
-                      />
-                      {folderSuggestions.length ? (
+                      {saveDisposition === "reuse" &&
+                      selectedSaveMatch?.unmodifiable ? (
+                        <div className="readonly-folder-value">
+                          {bookmarkMatchLocation(selectedSaveMatch)}
+                        </div>
+                      ) : (
+                        <FolderSelect
+                          options={folders}
+                          value={folderId}
+                          onChange={setFolderId}
+                        />
+                      )}
+                      {folderSuggestions.length &&
+                      !selectedSaveMatch?.unmodifiable ? (
                         <div
                           className="folder-suggestions"
                           aria-label="推荐文件夹"
@@ -4646,22 +4788,15 @@ export function SidePanelApp() {
                         placeholder="可选。记录你保存它的原因。"
                       />
                     </label>
-                    <label className="native-check">
-                      <input
-                        type="checkbox"
-                        checked={requestAi}
-                        onChange={(event) =>
-                          setRequestAi(event.target.checked)
-                        }
-                        disabled={!capture?.content}
-                      />
+                    <div className="native-check smart-layer-required">
+                      <span aria-hidden="true">✓</span>
                       <span>
-                        <strong>生成摘要与标签</strong>
+                        <strong>自动完成智能增强</strong>
                         <small>
-                          保存后由设置中选择的 AI 服务处理；不需要连接云端。
+                          Aarre 会生成 AI 摘要与标签，并在网页加载稳定后补齐封面截图。暂时失败的任务会保留并重试。
                         </small>
                       </span>
-                    </label>
+                    </div>
                     {captureWarning ? (
                       <p className="dialog-warning">{captureWarning}</p>
                     ) : null}
@@ -4743,13 +4878,17 @@ export function SidePanelApp() {
                             Boolean(busy) ||
                             !editTitle.trim() ||
                             (editor.kind === "save" &&
-                              (!capture || !folderId))
+                              (!capture ||
+                                !folderId ||
+                                !saveDisposition))
                           }
                         >
                           {busy === "save"
                             ? "正在保存…"
                             : editor.kind === "save"
-                              ? "保存到 Chrome"
+                              ? saveDisposition === "reuse"
+                                ? "更新收藏"
+                                : "添加到 Chrome"
                               : "保存"}
                         </button>
                       </div>

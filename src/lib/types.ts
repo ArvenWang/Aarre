@@ -54,6 +54,21 @@ export interface NativeBookmarkNode {
   children?: NativeBookmarkNode[];
 }
 
+export interface BookmarkSaveMatch {
+  id: string;
+  parentId: string;
+  title: string;
+  url: string;
+  folderPath: string[];
+  unmodifiable: boolean;
+  matchKind: "exact" | "canonical";
+}
+
+export interface BookmarkSaveState {
+  status: "none" | "exact" | "canonical" | "multiple" | "readonly";
+  matches: BookmarkSaveMatch[];
+}
+
 export interface BookmarkBarSnapshot {
   root: NativeBookmarkNode;
   roots: NativeBookmarkNode[];
@@ -110,6 +125,8 @@ export interface ResourceRecord {
   coverUpdatedAt?: string;
   categoryCoverId?: string;
   snapshotAt?: string;
+  enhancementBlockReason?: "privacy";
+  enhancementBlockMessage?: string;
   linkHealth?: LinkHealthRecord;
   faviconUrl: string;
   nativeBookmarkIds: string[];
@@ -273,10 +290,15 @@ export interface SaveAiSettingsInput {
 
 export interface SaveBookmarkInput {
   capture: PageCapture;
+  /** 发起收藏时的真实网页标签页。不能在保存结束后重新猜测活动标签页。 */
+  sourceTabId?: number;
   title: string;
   userNote: string;
   folderId: string;
-  requestAi: boolean;
+  requestAi: true;
+  existingBookmarkId?: string;
+  createSeparate?: boolean;
+  confirmedCanonicalReuse?: boolean;
 }
 
 export interface SaveBookmarkResult {
@@ -284,6 +306,24 @@ export interface SaveBookmarkResult {
   nativeBookmarkCreated: boolean;
   cloudSyncAttempted: boolean;
   aiWarning?: string;
+  enhancementPending: boolean;
+}
+
+export interface UpdateBookmarkDetailsInput {
+  bookmarkId: string;
+  resourceKey: string;
+  title: string;
+  url: string;
+  parentId: string;
+  tags: string[];
+  tagsChanged: boolean;
+  userNote: string;
+}
+
+export interface UpdateBookmarkDetailsResult {
+  bookmark: NativeBookmarkNode;
+  resource: ResourceRecord;
+  urlChanged: boolean;
 }
 
 export interface BookmarkAgentSource {

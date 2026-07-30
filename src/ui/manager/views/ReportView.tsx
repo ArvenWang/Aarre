@@ -2,12 +2,14 @@ import type {
   KnowledgeDashboard,
   LibraryReport
 } from "../../../lib/types";
+import { ResourceLink } from "../components/ResourceLink";
 
 interface ReportViewProps {
   dashboard: KnowledgeDashboard | null;
   period: "week" | "month";
   onPeriodChange: (period: "week" | "month") => void;
   onOpenOrganize: () => void;
+  onOpenResource: (url: string) => void;
 }
 
 function reportMetrics(report: LibraryReport) {
@@ -45,7 +47,8 @@ export function ReportView({
   dashboard,
   period,
   onPeriodChange,
-  onOpenOrganize
+  onOpenOrganize,
+  onOpenResource
 }: ReportViewProps) {
   if (!dashboard) {
     return (
@@ -191,15 +194,14 @@ export function ReportView({
         {report.resurfacing.length ? (
           <div>
             {report.resurfacing.slice(0, 3).map((item) => (
-              <a
+              <ResourceLink
                 key={item.resourceKey}
-                href={item.url}
-                target="_blank"
-                rel="noreferrer"
+                url={item.url}
+                onOpenResource={onOpenResource}
               >
                 <strong>{item.title}</strong>
                 <small>{item.reason}</small>
-              </a>
+              </ResourceLink>
             ))}
           </div>
         ) : (

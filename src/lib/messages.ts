@@ -9,6 +9,7 @@ import type {
   AppState,
   BookmarkAgentResponse,
   BookmarkBarSnapshot,
+  BookmarkSaveState,
   ImportResult,
   NativeFolderOption,
   NativeBookmarkNode,
@@ -30,6 +31,8 @@ import type {
   SaveBookmarkResult,
   SearchResult,
   SiteBrandRecord,
+  UpdateBookmarkDetailsInput,
+  UpdateBookmarkDetailsResult,
   UndoBatchResult,
   UndoSnapshotBatch
 } from "./types";
@@ -40,6 +43,7 @@ export type ExtensionRequest =
   | { type: "SAVE_AI_SETTINGS"; payload: SaveAiSettingsInput }
   | { type: "GET_BOOKMARK_BAR" }
   | { type: "GET_PENDING_SAVE"; tabId?: number }
+  | { type: "GET_BOOKMARK_SAVE_STATE"; url: string }
   | { type: "GET_NAVIGATION_SUGGESTIONS"; query: string }
   | { type: "NAVIGATE"; payload: NavigationInput }
   | { type: "GET_FOLDERS" }
@@ -92,6 +96,10 @@ export type ExtensionRequest =
       payload: { resourceKey: string; tags: string[] };
     }
   | {
+      type: "UPDATE_BOOKMARK_DETAILS";
+      payload: UpdateBookmarkDetailsInput;
+    }
+  | {
       type: "CREATE_NATIVE_FOLDER";
       payload: { parentId: string; title: string };
     }
@@ -117,6 +125,7 @@ export type ResponseDataByRequest = {
   SAVE_AI_SETTINGS: AiSettingsStatus;
   GET_BOOKMARK_BAR: BookmarkBarSnapshot;
   GET_PENDING_SAVE: PendingSaveDraft | null;
+  GET_BOOKMARK_SAVE_STATE: BookmarkSaveState;
   GET_NAVIGATION_SUGGESTIONS: NavigationSuggestion[];
   NAVIGATE: { opened: true };
   GET_FOLDERS: NativeFolderOption[];
@@ -158,6 +167,7 @@ export type ResponseDataByRequest = {
   RESTORE_MISSING_NATIVE_BOOKMARKS: RestoreResult;
   UPDATE_NATIVE_BOOKMARK: NativeBookmarkNode;
   UPDATE_RESOURCE_TAGS: ResourceRecord;
+  UPDATE_BOOKMARK_DETAILS: UpdateBookmarkDetailsResult;
   CREATE_NATIVE_FOLDER: NativeBookmarkNode;
   MOVE_NATIVE_BOOKMARK: NativeBookmarkNode;
   DELETE_NATIVE_BOOKMARK: { deleted: true };

@@ -12,6 +12,7 @@ import type {
   SiteBrandRecord
 } from "../../lib/types";
 import { categoryCoverForResource } from "../../lib/cover-registry";
+import { canonicalizeUrl } from "../../lib/url";
 import aiAutomationCover from "../../../design-assets/bookmark-covers/taxonomy-pilot/ai-automation-v1.png";
 import artCreationCover from "../../../design-assets/bookmark-covers/taxonomy-pilot/art-creation-v2.png";
 import audioPodcastCover from "../../../design-assets/bookmark-covers/taxonomy-pilot/audio-podcast-v1.png";
@@ -648,6 +649,19 @@ function movePreviewNode(
   return source.node;
 }
 
+function removePreviewNode(id: string): NativeBookmarkNode | null {
+  const source = findPreviewNode(id);
+  if (!source) return null;
+  const children = source.parent.children || [];
+  const index = children.findIndex((node) => node.id === id);
+  if (index < 0) return null;
+  children.splice(index, 1);
+  children.forEach((node, nodeIndex) => {
+    node.index = nodeIndex;
+  });
+  return source.node;
+}
+
 function executePreviewAgentAction(
   action: BookmarkAgentActionProposal
 ): BookmarkAgentActionExecutionResult {
@@ -756,8 +770,11 @@ export function installSidePanelPreview() {
           folderId?: string;
           title?: string;
           url?: string;
+          bookmarkId?: string;
           resourceKey?: string;
           tags?: string[];
+          tagsChanged?: boolean;
+          userNote?: string;
           provider?: AiProviderId;
           model?: string;
           apiKey?: string;
@@ -770,13 +787,22 @@ export function installSidePanelPreview() {
           case "AUTH_CHANGED":
             return { ok: true, data: previewState };
           case "GET_LOCAL_RESOURCES":
-            return { ok: true, data: structuredClone(previewResources) };
+            return {
+              ok: true,
+              data: structuredClone(
+                previewResources.filter(
+                  (resource) => resource.nativeBookmarkIds.length
+                )
+              )
+            };
           case "GET_RESOURCES":
             return {
               ok: true,
-              data: structuredClone(previewResources).map((resource) => ({
-                resource
-              }))
+              data: structuredClone(
+                previewResources.filter(
+                  (resource) => resource.nativeBookmarkIds.length
+                )
+              ).map((resource) => ({ resource }))
             };
           case "GET_LIBRARY_INSIGHTS":
             return {
@@ -1418,6 +1444,98 @@ export function installSidePanelPreview() {
               ok: true,
               data: structuredClone(match.node)
             };
+          }
+          case "UPDATE_BOOKMARK_DETAILS": {
+            const bookmarkId = request.payload?.bookmarkId || "";
+            const match = findPreviewNode(bookmarkId);
+            const resource = previewResources.find(
+              (item) =>
+                item.resourceKey === request.payload?.resourceKey &&
+                item.nativeBookmarkIds.includes(bookmarkId)
+            );
+            if (!match || !resource) {
+              return { ok: false, error: "没有找到这条预览收藏。" };
+            }
+            const previousUrl = match.node.url || resource.url;
+            const previousTags = [...resource.tags];
+            const previousTagsSource = resource.tagsSource;
+            match.node.title = request.payload?.title || match.node.title;
+            match.node.url = request.payload?.url || previousUrl;
+            const requestedParentId =
+              request.payload?.parentId || match.node.parentId || "";
+            const moved =
+              requestedParentId &&
+              requestedParentId !== match.node.parentId
+                ? movePreviewNode(bookmarkId, requestedParentId)
+                : match.node;
+            if (!moved) {
+              return { ok: false, error: "无法移动这条预览收藏。" };
+            }
+            const bookmarkUrlChanged = match.node.url !== previousUrl;
+            const resourceIdentityChanged =
+              bookmarkUrlChanged &&
+              ![
+                resource.url,
+                resource.canonicalUrl,
+                ...(resource.aliases || [])
+              ].some((candidate) => {
+                try {
+                  return (
+                    canonicalizeUrl(candidate) ===
+                    canonicalizeUrl(match.node.url || previousUrl)
+                  );
+                } catch {
+                  return false;
+                }
+              });
+            resource.title = match.node.title;
+            resource.url = match.node.url || resource.url;
+            resource.userNote = request.payload?.userNote || "";
+            if (request.payload?.tagsChanged) {
+              resource.tags = request.payload.tags || [];
+              resource.tagsSource = resource.tags.length
+                ? "user"
+                : undefined;
+            }
+            resource.updatedAt = new Date().toISOString();
+            if (resourceIdentityChanged) {
+              resource.canonicalUrl = resource.url;
+              resource.summary = "";
+              resource.topics = [];
+              resource.snapshotAt = undefined;
+              resource.aiStatus = "pending";
+              if (!request.payload?.tagsChanged) {
+                resource.tags =
+                  previousTagsSource === "user" ? previousTags : [];
+                resource.tagsSource = resource.tags.length
+                  ? "user"
+                  : undefined;
+              }
+            }
+            return {
+              ok: true,
+              data: {
+                bookmark: structuredClone(moved),
+                resource: structuredClone(resource),
+                urlChanged: resourceIdentityChanged
+              }
+            };
+          }
+          case "DELETE_NATIVE_BOOKMARK": {
+            const id = request.payload?.id || "";
+            if (!removePreviewNode(id)) {
+              return { ok: false, error: "没有找到这条预览收藏。" };
+            }
+            const resource = previewResources.find((item) =>
+              item.nativeBookmarkIds.includes(id)
+            );
+            if (resource) {
+              resource.nativeBookmarkIds =
+                resource.nativeBookmarkIds.filter(
+                  (bookmarkId) => bookmarkId !== id
+                );
+            }
+            return { ok: true, data: { deleted: true } };
           }
           case "SAVE_BOOKMARK": {
             const destination =

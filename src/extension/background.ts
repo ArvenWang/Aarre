@@ -1,7 +1,7 @@
 import { getAuthState } from "../lib/auth";
 import {
   processOutbox,
-  pullCloudResources,
+  pullCloudResources as pullCloudResourcesFromCloud,
   syncOneResource
 } from "../lib/cloud";
 import {
@@ -39,9 +39,38 @@ import {
 } from "../lib/cover-registry";
 import {
   createPageSnapshot,
+  isLoadedSnapshotTab,
+  isPageSnapshotStale,
   isSnapshotSensitiveUrl,
-  matchesSnapshotTargetUrl
+  matchesSnapshotTargetUrl,
+  mergePageSnapshotSchedule,
+  showSnapshotUpdatedToastInDocument,
+  waitForStablePageInDocument
 } from "../lib/page-snapshot";
+import {
+  bookmarkPageMenuPresentation,
+  buildBookmarkSaveState
+} from "../lib/bookmark-save-state";
+import {
+  bookmarkEditTags,
+  bookmarkUrlEditPlan,
+  rehomeResourceAfterBookmarkUrlChange,
+  runBookmarkEditRecoverySteps
+} from "../lib/bookmark-edit";
+import {
+  acceptsSnapshotNavigationCommit,
+  completeEnhancementPart,
+  deferEnhancementJob,
+  isEnhancementJobDue,
+  mergeEnhancementJob,
+  snapshotCapturePolicy,
+  updateAiProgress,
+  updateSnapshotProgress,
+  type AiEnhancementProgress,
+  type BookmarkEnhancementJob,
+  type BookmarkEnhancementPart,
+  type SnapshotEnhancementProgress
+} from "../lib/bookmark-enhancement";
 import { getDisplaySettings } from "../lib/display-settings";
 import {
   createRemovedNodeUndoBatch,
@@ -83,6 +112,8 @@ import {
   completeOutboxItem,
   cleanupExpiredUndoSnapshots,
   deferOutboxItem,
+  deleteLocalResource,
+  deletePageSnapshot,
   deleteUndoSnapshot,
   enqueueOutbox,
   getLocalResource,
@@ -96,7 +127,8 @@ import {
   putUndoSnapshot,
   putPageSnapshot,
   putSiteBrand,
-  upsertLocalResource
+  removeOutboxItem,
+  upsertLocalResource as persistLocalResource
 } from "../lib/storage";
 import {
   matchesNavigationText,
@@ -122,6 +154,7 @@ import type {
   BookmarkAgentActionProposal,
   BookmarkAgentCatalog,
   BookmarkBarSnapshot,
+  BookmarkSaveState,
   ImportResult,
   LibraryScanStatus,
   LibraryScanEstimate,
@@ -138,6 +171,8 @@ import type {
   SaveBookmarkResult,
   SiteBrandRecord,
   SiteIconCandidate,
+  UpdateBookmarkDetailsInput,
+  UpdateBookmarkDetailsResult,
   UndoMutation,
   UndoSnapshotBatch
 } from "../lib/types";
@@ -153,14 +188,41 @@ const CONTEXT_MENU_LINK_ID = "bookmark-layer-save-link";
 const PENDING_SAVE_PREFIX = "pending-save:";
 const LIBRARY_SCAN_KEY = "aarre:library-scan";
 const LIBRARY_SCAN_ALARM = "aarre-library-scan";
+const BOOKMARK_ENHANCEMENT_KEY = "aarre:bookmark-enhancements:v1";
+const BOOKMARK_ENHANCEMENT_ALARM = "aarre-bookmark-enhancements";
+const IMMEDIATE_SNAPSHOT_PREFIX = "aarre:immediate-snapshot:";
 const ORGANIZATION_INSIGHTS_KEY = "aarre:organization-insights";
 const MAX_SCAN_HTML_BYTES = 600_000;
 const internalBookmarkIds = new Set<string>();
 const internalBookmarkTargets = new Set<string>();
 const pendingSaveDrafts = new Map<number, PendingSaveDraft>();
 const pageSnapshotTimers = new Map<number, number>();
-const immediatePageSnapshotTargets = new Map<number, string>();
+const AARRE_OPEN_PAGE_SNAPSHOT_DELAY_MS = 1_500;
+const SAVED_PAGE_SNAPSHOT_DELAY_MS = 250;
+let bookmarkedResourceLookupCache: Map<string, string> | null = null;
+let bookmarkedResourceLookupRevision = 0;
+interface ImmediatePageSnapshotTarget {
+  targetUrl: string;
+  delayMs: number;
+  completedUrl?: string;
+  navigationStartUrl?: string;
+  redirectedUrl?: string;
+  resourceKey: string;
+  showToast: boolean;
+  refreshExisting?: boolean;
+  documentId?: string;
+  trigger: SnapshotEnhancementProgress["trigger"];
+}
+const immediatePageSnapshotTargets = new Map<
+  number,
+  ImmediatePageSnapshotTarget
+>();
 let libraryScanRunning = false;
+let bookmarkEnhancementRunning = false;
+let bookmarkEnhancementMutation: Promise<void> = Promise.resolve();
+const renderedPageEnhancementRunning = new Set<string>();
+let pageContextMenuRevision = 0;
+let nativeBookmarkImportInProgress = false;
 const libraryScanRateLimiter = new DomainRateLimiter(1_000);
 const LIBRARY_SCAN_CONCURRENCY = 4;
 const LINK_HEALTH_REFRESH_MS = 7 * 24 * 60 * 60 * 1_000;
@@ -275,6 +337,374 @@ function hostFromUrl(url: string): string {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "发生未知错误。";
+}
+
+function updateBookmarkedResourceLookupEntry(resource: ResourceRecord): void {
+  if (!bookmarkedResourceLookupCache) return;
+  for (const [canonicalUrl, resourceKey] of bookmarkedResourceLookupCache) {
+    if (resourceKey === resource.resourceKey) {
+      bookmarkedResourceLookupCache.delete(canonicalUrl);
+    }
+  }
+  if (!resource.nativeBookmarkIds.length) return;
+  for (const candidate of [
+    resource.url,
+    resource.canonicalUrl,
+    ...(resource.aliases || [])
+  ]) {
+    try {
+      bookmarkedResourceLookupCache.set(
+        canonicalizeUrl(candidate),
+        resource.resourceKey
+      );
+    } catch {
+      // Invalid legacy aliases are ignored while the primary resource remains usable.
+    }
+  }
+}
+
+async function upsertLocalResource(resource: ResourceRecord): Promise<void> {
+  await persistLocalResource(resource);
+  bookmarkedResourceLookupRevision += 1;
+  updateBookmarkedResourceLookupEntry(resource);
+}
+
+async function pullCloudResources(): Promise<ResourceRecord[]> {
+  const resources = await pullCloudResourcesFromCloud();
+  bookmarkedResourceLookupRevision += 1;
+  bookmarkedResourceLookupCache = null;
+  return resources;
+}
+
+async function bookmarkedResourceLookup(): Promise<Map<string, string>> {
+  if (bookmarkedResourceLookupCache) return bookmarkedResourceLookupCache;
+  const startingRevision = bookmarkedResourceLookupRevision;
+  const lookup = new Map<string, string>();
+  for (const resource of await getLocalResources()) {
+    if (!resource.nativeBookmarkIds.length) continue;
+    for (const candidate of [
+      resource.url,
+      resource.canonicalUrl,
+      ...(resource.aliases || [])
+    ]) {
+      try {
+        lookup.set(canonicalizeUrl(candidate), resource.resourceKey);
+      } catch {
+        // Ignore a malformed legacy alias without invalidating the resource.
+      }
+    }
+  }
+  if (startingRevision !== bookmarkedResourceLookupRevision) {
+    return bookmarkedResourceLookup();
+  }
+  bookmarkedResourceLookupCache = lookup;
+  return lookup;
+}
+
+function immediateSnapshotKey(tabId: number): string {
+  return `${IMMEDIATE_SNAPSHOT_PREFIX}${tabId}`;
+}
+
+async function storeImmediateSnapshotTarget(
+  tabId: number,
+  target: ImmediatePageSnapshotTarget
+): Promise<void> {
+  immediatePageSnapshotTargets.set(tabId, target);
+  await chrome.storage.session.set({
+    [immediateSnapshotKey(tabId)]: target
+  });
+}
+
+async function readImmediateSnapshotTarget(
+  tabId: number
+): Promise<ImmediatePageSnapshotTarget | undefined> {
+  const memory = immediatePageSnapshotTargets.get(tabId);
+  if (memory) return memory;
+  const key = immediateSnapshotKey(tabId);
+  const stored = (await chrome.storage.session.get(key))[key];
+  if (!stored || typeof stored !== "object") return undefined;
+  const target = stored as Partial<ImmediatePageSnapshotTarget>;
+  if (
+    typeof target.targetUrl !== "string" ||
+    typeof target.resourceKey !== "string" ||
+    typeof target.delayMs !== "number"
+  ) {
+    await chrome.storage.session.remove(key);
+    return undefined;
+  }
+  const normalized: ImmediatePageSnapshotTarget = {
+    targetUrl: target.targetUrl,
+    resourceKey: target.resourceKey,
+    delayMs: target.delayMs,
+    showToast: target.showToast === true,
+    trigger:
+      target.trigger === "chrome_bookmark" ||
+      target.trigger === "aarre_save" ||
+      target.trigger === "aarre_open" ||
+      target.trigger === "normal_browse"
+        ? target.trigger
+        : "recovery",
+    ...(typeof target.documentId === "string"
+      ? { documentId: target.documentId }
+      : {}),
+    ...(typeof target.completedUrl === "string"
+      ? { completedUrl: target.completedUrl }
+      : {}),
+    ...(typeof target.navigationStartUrl === "string"
+      ? { navigationStartUrl: target.navigationStartUrl }
+      : {}),
+    ...(typeof target.redirectedUrl === "string"
+      ? { redirectedUrl: target.redirectedUrl }
+      : {}),
+    ...(target.refreshExisting === true ? { refreshExisting: true } : {})
+  };
+  immediatePageSnapshotTargets.set(tabId, normalized);
+  return normalized;
+}
+
+async function removeImmediateSnapshotTarget(
+  tabId: number,
+  expected?: ImmediatePageSnapshotTarget
+): Promise<void> {
+  if (
+    expected &&
+    immediatePageSnapshotTargets.get(tabId) &&
+    immediatePageSnapshotTargets.get(tabId) !== expected
+  ) {
+    return;
+  }
+  immediatePageSnapshotTargets.delete(tabId);
+  await chrome.storage.session.remove(immediateSnapshotKey(tabId));
+}
+
+async function getStoredEnhancementJobs(): Promise<
+  Record<string, BookmarkEnhancementJob>
+> {
+  const stored = (await chrome.storage.local.get(
+    BOOKMARK_ENHANCEMENT_KEY
+  ))[BOOKMARK_ENHANCEMENT_KEY];
+  if (!stored || typeof stored !== "object") return {};
+  return stored as Record<string, BookmarkEnhancementJob>;
+}
+
+async function setStoredEnhancementJobs(
+  jobs: Record<string, BookmarkEnhancementJob>
+): Promise<void> {
+  await chrome.storage.local.set({
+    [BOOKMARK_ENHANCEMENT_KEY]: jobs
+  });
+}
+
+async function mutateStoredEnhancementJobs<T>(
+  mutate: (jobs: Record<string, BookmarkEnhancementJob>) => T | Promise<T>
+): Promise<T> {
+  let resolveResult!: (value: T | PromiseLike<T>) => void;
+  let rejectResult!: (reason?: unknown) => void;
+  const result = new Promise<T>((resolve, reject) => {
+    resolveResult = resolve;
+    rejectResult = reject;
+  });
+  bookmarkEnhancementMutation = bookmarkEnhancementMutation
+    .catch(() => undefined)
+    .then(async () => {
+      try {
+        const jobs = await getStoredEnhancementJobs();
+        const value = await mutate(jobs);
+        await setStoredEnhancementJobs(jobs);
+        resolveResult(value);
+      } catch (error) {
+        rejectResult(error);
+      }
+    });
+  return result;
+}
+
+async function scheduleBookmarkEnhancements(
+  delayInMinutes = 1
+): Promise<void> {
+  await chrome.alarms.create(BOOKMARK_ENHANCEMENT_ALARM, {
+    delayInMinutes: Math.max(0.5, delayInMinutes)
+  });
+}
+
+async function enqueueBookmarkEnhancement(
+  resource: ResourceRecord,
+  pending: BookmarkEnhancementPart[],
+  snapshot?: Omit<SnapshotEnhancementProgress, "updatedAt">
+): Promise<void> {
+  if (!pending.length || !resource.nativeBookmarkIds.length) return;
+  const timestamp = now();
+  await mutateStoredEnhancementJobs((jobs) => {
+    const merged = mergeEnhancementJob(
+      jobs[resource.resourceKey],
+      {
+        resourceKey: resource.resourceKey,
+        url: resource.url,
+        pending,
+        ...(pending.includes("ai")
+          ? {
+              ai: {
+                state: "queued",
+                updatedAt: timestamp
+              } as const
+            }
+          : {}),
+        ...(snapshot
+          ? {
+              snapshot: {
+                ...snapshot,
+                updatedAt: timestamp
+              }
+            }
+          : {})
+      },
+      timestamp
+    );
+    jobs[resource.resourceKey] = {
+      ...merged,
+      nextAttemptAt: timestamp,
+      updatedAt: timestamp
+    };
+  });
+  await scheduleBookmarkEnhancements();
+}
+
+async function queueEnhancementsUntilVisit(
+  resource: ResourceRecord,
+  trigger: SnapshotEnhancementProgress["trigger"] = "recovery"
+): Promise<void> {
+  if (!resource.nativeBookmarkIds.length) return;
+  const settings = await getDisplaySettings();
+  const privacyBlocked = isSnapshotSensitiveUrl(
+    resource.url,
+    settings.snapshotExcludedHosts
+  );
+  const pending: BookmarkEnhancementPart[] = [];
+  if (
+    !privacyBlocked &&
+    (resource.aiStatus !== "ready" ||
+      !resource.summary.trim() ||
+      !resource.tags.length)
+  ) {
+    pending.push("ai");
+  }
+  if (
+    !privacyBlocked &&
+    !(await getPageSnapshot(resource.canonicalUrl))
+  ) {
+    pending.push("snapshot");
+  }
+  if (!pending.length) return;
+  const timestamp = now();
+  await mutateStoredEnhancementJobs((jobs) => {
+    jobs[resource.resourceKey] = {
+      ...mergeEnhancementJob(
+        jobs[resource.resourceKey],
+        {
+          resourceKey: resource.resourceKey,
+          url: resource.url,
+          pending,
+          ...(pending.includes("ai")
+            ? {
+                ai: {
+                  state: "waiting_for_content",
+                  updatedAt: timestamp
+                } as const
+              }
+            : {}),
+          ...(pending.includes("snapshot")
+            ? {
+                snapshot: {
+                  state: "waiting_page",
+                  trigger,
+                  updatedAt: timestamp
+                }
+              }
+            : {})
+        },
+        timestamp
+      ),
+      // 导入、恢复和 Chrome 同步只登记待访问增强，不在后台批量开页或花 AI。
+      nextAttemptAt: "9999-12-31T23:59:59.999Z",
+      updatedAt: timestamp
+    };
+  });
+}
+
+async function completeStoredEnhancementPart(
+  resourceKey: string,
+  part: BookmarkEnhancementPart
+): Promise<void> {
+  await mutateStoredEnhancementJobs((jobs) => {
+    const current = jobs[resourceKey];
+    if (!current) return;
+    const next = completeEnhancementPart(current, part, now());
+    if (next) jobs[resourceKey] = next;
+    else delete jobs[resourceKey];
+  });
+}
+
+async function hasPageAccess(url: string): Promise<boolean> {
+  try {
+    const origin = `${new URL(url).origin}/*`;
+    return chrome.permissions.contains({ origins: [origin] });
+  } catch {
+    return false;
+  }
+}
+
+async function deferStoredEnhancementJob(
+  resourceKey: string,
+  message: string
+): Promise<void> {
+  await mutateStoredEnhancementJobs((jobs) => {
+    const current = jobs[resourceKey];
+    if (!current) return;
+    jobs[resourceKey] = deferEnhancementJob(
+      current,
+      message,
+      Date.now()
+    );
+  });
+}
+
+async function updateStoredSnapshotProgress(
+  resourceKey: string,
+  progress: Omit<SnapshotEnhancementProgress, "updatedAt">
+): Promise<void> {
+  await mutateStoredEnhancementJobs((jobs) => {
+    const current = jobs[resourceKey];
+    if (!current) return;
+    jobs[resourceKey] = updateSnapshotProgress(current, progress, now());
+  });
+}
+
+async function updateStoredAiProgress(
+  resourceKey: string,
+  progress: Omit<AiEnhancementProgress, "updatedAt">
+): Promise<void> {
+  await mutateStoredEnhancementJobs((jobs) => {
+    const current = jobs[resourceKey];
+    if (!current) return;
+    jobs[resourceKey] = updateAiProgress(current, progress, now());
+  });
+}
+
+async function cancelEnhancementForResource(resourceKey: string): Promise<void> {
+  await mutateStoredEnhancementJobs((jobs) => {
+    delete jobs[resourceKey];
+  });
+  const tabs = await chrome.tabs.query({});
+  await Promise.all(
+    tabs.map(async (tab) => {
+      if (typeof tab.id !== "number") return;
+      const target = await readImmediateSnapshotTarget(tab.id);
+      if (target?.resourceKey === resourceKey) {
+        clearPageSnapshotTimer(tab.id);
+        await removeImmediateSnapshotTarget(tab.id, target);
+      }
+    })
+  );
 }
 
 async function runProtectedBookmarkMutation<T>(
@@ -429,6 +859,19 @@ async function getBookmarkBarSnapshot(): Promise<BookmarkBarSnapshot> {
   };
 }
 
+async function getBookmarkSaveState(
+  url: string
+): Promise<BookmarkSaveState> {
+  if (!isSupportedPageUrl(url)) {
+    throw new Error("当前地址不是可收藏的普通网页。");
+  }
+  const tree = await chrome.bookmarks.getTree();
+  return buildBookmarkSaveState(
+    tree.map(serializeBookmarkNode),
+    url
+  );
+}
+
 async function getNavigationSuggestions(
   rawQuery: string
 ): Promise<NavigationSuggestion[]> {
@@ -508,35 +951,305 @@ async function getNavigationSuggestions(
   return results.slice(0, 14);
 }
 
-function captureImmediateSnapshotIfReady(
-  tab: chrome.tabs.Tab
+function resourceMatchesLoadedUrl(
+  resource: ResourceRecord,
+  loadedUrl: string
 ): boolean {
+  let loadedCanonical: string;
+  try {
+    loadedCanonical = canonicalizeUrl(loadedUrl);
+  } catch {
+    return false;
+  }
+  return [resource.url, resource.canonicalUrl, ...(resource.aliases || [])].some(
+    (candidate) => {
+      try {
+        return canonicalizeUrl(candidate) === loadedCanonical;
+      } catch {
+        return false;
+      }
+    }
+  );
+}
+
+async function bookmarkedResourceForLoadedUrl(
+  loadedUrl: string
+): Promise<ResourceRecord | undefined> {
+  const canonicalLoadedUrl = canonicalizeUrl(loadedUrl);
+  const direct = await getLocalResource(
+    await resourceKeyForUrl(canonicalLoadedUrl)
+  );
+  if (
+    direct?.nativeBookmarkIds.length &&
+    resourceMatchesLoadedUrl(direct, loadedUrl)
+  ) {
+    return direct;
+  }
+
+  // 重定向后的最终 URL 通常不是 Chrome 书签中保存的原始 URL，因此不能先
+  // 用 bookmarks.search({ url }) 做门禁。使用本机索引把 aliases 也纳入命中，
+  // 同时避免在每次普通导航时全量扫描大型书签库。
+  const resourceKey = (await bookmarkedResourceLookup()).get(
+    canonicalLoadedUrl
+  );
+  if (!resourceKey) return undefined;
+  const aliased = await getLocalResource(resourceKey);
+  if (
+    aliased?.nativeBookmarkIds.length &&
+    resourceMatchesLoadedUrl(aliased, loadedUrl)
+  ) {
+    return aliased;
+  }
+  bookmarkedResourceLookupCache?.delete(canonicalLoadedUrl);
+  return undefined;
+}
+
+function snapshotTargetAllowsLoadedUrl(
+  target: ImmediatePageSnapshotTarget,
+  resource: ResourceRecord,
+  loadedUrl: string
+): boolean {
+  if (resourceMatchesLoadedUrl(resource, loadedUrl)) return true;
+  if (!target.redirectedUrl) return false;
+  try {
+    return canonicalizeUrl(target.redirectedUrl) === canonicalizeUrl(loadedUrl);
+  } catch {
+    return target.redirectedUrl === loadedUrl;
+  }
+}
+
+async function scheduleImmediateSnapshotIfReady(
+  tab: chrome.tabs.Tab
+): Promise<boolean> {
   if (
     typeof tab.id !== "number" ||
-    tab.status !== "complete" ||
-    !tab.url
+    !isLoadedSnapshotTab(tab)
   ) {
     return false;
   }
-  const targetUrl = immediatePageSnapshotTargets.get(tab.id);
-  if (!targetUrl) return false;
-  immediatePageSnapshotTargets.delete(tab.id);
-  if (!matchesSnapshotTargetUrl(targetUrl, tab.url)) return false;
-
-  clearPageSnapshotTimers();
-  void capturePageSnapshotForTab(tab).catch(() => undefined);
-  return true;
+  const target = await readImmediateSnapshotTarget(tab.id);
+  if (!target) return false;
+  const resource = await getLocalResource(target.resourceKey);
+  if (
+    !resource?.nativeBookmarkIds.length ||
+    !snapshotTargetAllowsLoadedUrl(target, resource, tab.url!)
+  ) {
+    await removeImmediateSnapshotTarget(tab.id, target);
+    return false;
+  }
+  if (
+    target.completedUrl &&
+    !matchesSnapshotTargetUrl(target.completedUrl, tab.url!)
+  ) {
+    await removeImmediateSnapshotTarget(tab.id, target);
+    return false;
+  }
+  target.completedUrl = tab.url;
+  await storeImmediateSnapshotTarget(tab.id, target);
+  return schedulePageSnapshotForTab(tab, {
+    delayMs: target.delayMs,
+    snapshotUrl: target.targetUrl,
+    resourceKey: target.resourceKey,
+    showToast: target.showToast,
+    documentId: target.documentId,
+    trigger: target.trigger,
+    refreshExisting: target.refreshExisting,
+    onSettled: (succeeded) => {
+      if (succeeded && typeof tab.id === "number") {
+        void removeImmediateSnapshotTarget(tab.id, target);
+      }
+    }
+  });
 }
 
-function rememberImmediateSnapshotTarget(
+async function discardMismatchedImmediateSnapshotTarget(
+  tab: chrome.tabs.Tab
+): Promise<void> {
+  if (typeof tab.id !== "number") return;
+  const target = await readImmediateSnapshotTarget(tab.id);
+  if (!target) return;
+  const resource = await getLocalResource(target.resourceKey);
+  if (
+    !tab.url ||
+    !resource?.nativeBookmarkIds.length ||
+    !snapshotTargetAllowsLoadedUrl(target, resource, tab.url)
+  ) {
+    clearPageSnapshotTimer(tab.id);
+    await removeImmediateSnapshotTarget(tab.id, target);
+  }
+}
+
+async function rememberImmediateSnapshotTarget(
   tab: chrome.tabs.Tab,
-  targetUrl: string
-) {
+  targetUrl: string,
+  delayMs = AARRE_OPEN_PAGE_SNAPSHOT_DELAY_MS,
+  showToast = true,
+  resourceKeyHint?: string,
+  documentId?: string,
+  trigger: SnapshotEnhancementProgress["trigger"] = "recovery"
+): Promise<void> {
   if (typeof tab.id !== "number" || !isSupportedPageUrl(targetUrl)) {
     return;
   }
-  immediatePageSnapshotTargets.set(tab.id, targetUrl);
-  captureImmediateSnapshotIfReady(tab);
+  const canonicalUrl = canonicalizeUrl(targetUrl);
+  const resourceKey =
+    resourceKeyHint || (await resourceKeyForUrl(canonicalUrl));
+  const resource = await getLocalResource(resourceKey);
+  if (!resource?.nativeBookmarkIds.length) return;
+  const existingSnapshot = await getPageSnapshot(resource.canonicalUrl);
+  const policy = snapshotCapturePolicy({
+    hasSnapshot: Boolean(existingSnapshot),
+    snapshotIsStale: isPageSnapshotStale(existingSnapshot),
+    trigger
+  });
+  if (!policy.capture) {
+    await completeStoredEnhancementPart(resourceKey, "snapshot");
+    return;
+  }
+  const existingTarget = await readImmediateSnapshotTarget(tab.id);
+  const sameResourceTarget =
+    existingTarget?.resourceKey === resourceKey
+      ? existingTarget
+      : undefined;
+  const mergedSchedule = mergePageSnapshotSchedule(
+    sameResourceTarget,
+    { delayMs, showToast: showToast && policy.showToast }
+  );
+  const target: ImmediatePageSnapshotTarget = {
+    targetUrl,
+    // 后台增强队列也可能为同一标签安排静默截图。不得让它覆盖
+    // “从 Aarre 打开旧收藏”所需的成功 toast 或缩短稳定等待。
+    delayMs: mergedSchedule.delayMs,
+    resourceKey,
+    showToast: mergedSchedule.showToast,
+    trigger,
+    ...(policy.refreshExisting || sameResourceTarget?.refreshExisting
+      ? { refreshExisting: true }
+      : {}),
+    ...(documentId || sameResourceTarget?.documentId
+      ? { documentId: documentId || sameResourceTarget?.documentId }
+      : {}),
+    ...(mergedSchedule.completedUrl
+      ? { completedUrl: mergedSchedule.completedUrl }
+      : {}),
+    ...(sameResourceTarget?.navigationStartUrl
+      ? { navigationStartUrl: sameResourceTarget.navigationStartUrl }
+      : {}),
+    ...(sameResourceTarget?.redirectedUrl
+      ? { redirectedUrl: sameResourceTarget.redirectedUrl }
+      : {})
+  };
+  await storeImmediateSnapshotTarget(tab.id, target);
+  await updateStoredSnapshotProgress(resourceKey, {
+    state: tab.status === "complete" ? "queued" : "waiting_page",
+    trigger,
+    tabId: tab.id,
+    ...(documentId ? { documentId } : {}),
+    ...(tab.url ? { loadedUrl: tab.url } : {}),
+    showToast: target.showToast,
+    ...(target.refreshExisting ? { refreshExisting: true } : {})
+  });
+  // chrome.tabs.update/create 返回的 Tab 可能仍是 loading，但网页可能在
+  // storage.session 写入期间已经 complete。重新读取可消除“complete 事件
+  // 先到、截图目标后存”导致永久漏拍的竞态。
+  const latestTab = await chrome.tabs.get(tab.id).catch(() => tab);
+  await scheduleImmediateSnapshotIfReady(latestTab);
+}
+
+async function prepareImmediateSnapshotTargetForNavigation(
+  tabId: number,
+  resource: ResourceRecord,
+  targetUrl: string,
+  trigger: SnapshotEnhancementProgress["trigger"],
+  showToast: boolean
+): Promise<ImmediatePageSnapshotTarget | undefined> {
+  if (!resource.nativeBookmarkIds.length) {
+    return undefined;
+  }
+  const existingSnapshot = await getPageSnapshot(resource.canonicalUrl);
+  const policy = snapshotCapturePolicy({
+    hasSnapshot: Boolean(existingSnapshot),
+    snapshotIsStale: isPageSnapshotStale(existingSnapshot),
+    trigger
+  });
+  if (!policy.capture) return undefined;
+  clearPageSnapshotTimer(tabId);
+  const target: ImmediatePageSnapshotTarget = {
+    targetUrl,
+    navigationStartUrl: targetUrl,
+    delayMs:
+      trigger === "aarre_open"
+        ? AARRE_OPEN_PAGE_SNAPSHOT_DELAY_MS
+        : SAVED_PAGE_SNAPSHOT_DELAY_MS,
+    resourceKey: resource.resourceKey,
+    showToast: showToast && policy.showToast,
+    trigger,
+    ...(policy.refreshExisting ? { refreshExisting: true } : {})
+  };
+  await storeImmediateSnapshotTarget(tabId, target);
+  await updateStoredSnapshotProgress(resource.resourceKey, {
+    state: "waiting_page",
+    trigger,
+    tabId,
+    loadedUrl: targetUrl,
+    ...(target.showToast ? { showToast: true } : {}),
+    ...(policy.refreshExisting ? { refreshExisting: true } : {})
+  });
+  return target;
+}
+
+async function createNavigationTab(
+  url: string,
+  openedFromAarre: boolean
+): Promise<chrome.tabs.Tab> {
+  if (!openedFromAarre) {
+    return chrome.tabs.create({ url });
+  }
+
+  const resource = await bookmarkedResourceForLoadedUrl(url);
+  // 先创建一个空白标签并持久化目标，再真正导航。这样即使页面命中缓存或
+  // 立刻发生跨域重定向，webNavigation 的首个事件也不会跑在目标登记之前。
+  const placeholder = await chrome.tabs.create({ active: true });
+  const preparedTarget =
+    typeof placeholder.id === "number" && resource
+      ? await prepareImmediateSnapshotTargetForNavigation(
+          placeholder.id,
+          resource,
+          url,
+          "aarre_open",
+          true
+        )
+      : undefined;
+  try {
+    const updated =
+      typeof placeholder.id === "number"
+        ? await chrome.tabs.update(placeholder.id, { url })
+        : null;
+    if (!updated) {
+      throw new Error("Chrome 未能创建目标标签页。");
+    }
+    await rememberImmediateSnapshotTarget(
+      updated,
+      resource?.canonicalUrl || url,
+      AARRE_OPEN_PAGE_SNAPSHOT_DELAY_MS,
+      true,
+      resource?.resourceKey,
+      undefined,
+      "aarre_open"
+    );
+    return updated;
+  } catch (error) {
+    if (typeof placeholder.id === "number") {
+      if (preparedTarget) {
+        await removeImmediateSnapshotTarget(
+          placeholder.id,
+          preparedTarget
+        ).catch(() => undefined);
+      }
+      await chrome.tabs.remove(placeholder.id).catch(() => undefined);
+    }
+    throw error;
+  }
 }
 
 async function navigate(
@@ -551,7 +1264,18 @@ async function navigate(
     }
     const tab = await chrome.tabs.update(input.tabId, { active: true });
     if (openedFromAarre && tab?.url) {
-      rememberImmediateSnapshotTarget(tab, input.url || tab.url);
+      const resource = await bookmarkedResourceForLoadedUrl(
+        input.url || tab.url
+      );
+      await rememberImmediateSnapshotTarget(
+        tab,
+        resource?.canonicalUrl || input.url || tab.url,
+        AARRE_OPEN_PAGE_SNAPSHOT_DELAY_MS,
+        true,
+        resource?.resourceKey,
+        undefined,
+        "aarre_open"
+      );
     }
     return { opened: true };
   }
@@ -562,24 +1286,75 @@ async function navigate(
 
   if (parsed.kind === "url") {
     if (disposition === "new") {
-      const tab = await chrome.tabs.create({ url: parsed.url });
-      if (openedFromAarre) {
-        rememberImmediateSnapshotTarget(tab, parsed.url);
-      }
+      await createNavigationTab(parsed.url, openedFromAarre);
     } else {
       const tab = await activeTab();
       if (tab?.id) {
-        const updated = await chrome.tabs.update(tab.id, {
-          url: parsed.url
-        });
+        const resource = openedFromAarre
+          ? await bookmarkedResourceForLoadedUrl(parsed.url)
+          : undefined;
+        const preparedTarget =
+          openedFromAarre && resource
+            ? await prepareImmediateSnapshotTargetForNavigation(
+                tab.id,
+                resource,
+                parsed.url,
+                "aarre_open",
+                true
+              )
+            : undefined;
+        const updated = await chrome.tabs
+          .update(tab.id, { url: parsed.url })
+          .catch(async (error) => {
+            if (preparedTarget) {
+              await removeImmediateSnapshotTarget(
+                tab.id!,
+                preparedTarget
+              );
+            }
+            throw error;
+          });
         if (openedFromAarre && updated) {
-          rememberImmediateSnapshotTarget(updated, parsed.url);
+          await rememberImmediateSnapshotTarget(
+            updated,
+            resource?.canonicalUrl || parsed.url,
+            AARRE_OPEN_PAGE_SNAPSHOT_DELAY_MS,
+            true,
+            resource?.resourceKey,
+            undefined,
+            "aarre_open"
+          );
         }
       } else {
-        const created = await chrome.tabs.create({ url: parsed.url });
-        if (openedFromAarre) {
-          rememberImmediateSnapshotTarget(created, parsed.url);
+        await createNavigationTab(parsed.url, openedFromAarre);
+      }
+    }
+    if (openedFromAarre) {
+      const resource = await bookmarkedResourceForLoadedUrl(parsed.url);
+      if (resource?.nativeBookmarkIds.length) {
+        const pending: BookmarkEnhancementPart[] = [];
+        if (
+          resource.aiStatus !== "ready" ||
+          !resource.summary.trim() ||
+          !resource.tags.length
+        ) {
+          pending.push("ai");
         }
+        if (!(await getPageSnapshot(resource.canonicalUrl))) {
+          pending.push("snapshot");
+        }
+        await enqueueBookmarkEnhancement(
+          resource,
+          pending,
+          pending.includes("snapshot")
+            ? {
+                state: "waiting_page",
+                trigger: "aarre_open",
+                showToast: true
+              }
+            : undefined
+        );
+        void processBookmarkEnhancements();
       }
     }
     return { opened: true };
@@ -609,12 +1384,28 @@ async function updateNativeBookmark(input: {
   if (!current || current.unmodifiable === "managed") {
     throw new Error("这个书签由 Chrome 或组织管理，无法修改。");
   }
+  const requestedUrl =
+    current.url && input.url !== undefined
+      ? validateEditableBookmarkUrl(input.url)
+      : undefined;
+  if (
+    current.url &&
+    requestedUrl &&
+    canonicalizeUrl(requestedUrl) !== canonicalizeUrl(current.url)
+  ) {
+    const saveState = await getBookmarkSaveState(requestedUrl);
+    if (saveState.matches.some((match) => match.id !== input.id)) {
+      throw new Error(
+        "这个网址已经存在于 Chrome 收藏中。请直接编辑已有收藏，避免合并时覆盖智能信息。"
+      );
+    }
+  }
   const perform = async () =>
     serializeBookmarkNode(
       await chrome.bookmarks.update(input.id, {
         title,
-        ...(current.url && input.url?.trim()
-          ? { url: input.url.trim() }
+        ...(current.url && requestedUrl
+          ? { url: requestedUrl }
           : {})
       })
     );
@@ -630,6 +1421,19 @@ async function updateNativeBookmark(input: {
     mutation,
     perform
   });
+}
+
+function validateEditableBookmarkUrl(value: string): string {
+  const text = value.trim();
+  try {
+    const parsed = new URL(text);
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      throw new Error("unsupported protocol");
+    }
+    return parsed.href;
+  } catch {
+    throw new Error("请输入以 http:// 或 https:// 开头的有效网址。");
+  }
 }
 
 function normalizeUserTags(tags: string[]): string[] {
@@ -665,6 +1469,349 @@ async function updateResourceTags(input: {
     void syncPendingIfReady();
   }
   return next;
+}
+
+async function updateBookmarkDetails(
+  input: UpdateBookmarkDetailsInput
+): Promise<UpdateBookmarkDetailsResult> {
+  if (input.userNote.length > 2_000) {
+    throw new Error("备注不能超过 2,000 个字符。");
+  }
+
+  let sourceResource = await getLocalResource(input.resourceKey);
+  if (!sourceResource?.nativeBookmarkIds.includes(input.bookmarkId)) {
+    await importNativeBookmarks();
+    sourceResource = await getLocalResource(input.resourceKey);
+  }
+  if (!sourceResource?.nativeBookmarkIds.includes(input.bookmarkId)) {
+    throw new Error(
+      "这个收藏位置已经变化。请刷新收藏库后重新编辑，Aarre 没有写入任何内容。"
+    );
+  }
+
+  const current = await chrome.bookmarks
+    .get(input.bookmarkId)
+    .then(([node]) => node);
+  if (!current?.url) {
+    throw new Error("这条 Chrome 收藏已经不存在，请刷新后再试。");
+  }
+  const managed = current.unmodifiable === "managed";
+  const requestedTitle = input.title.trim();
+  if (!managed && !requestedTitle) {
+    throw new Error("名称不能为空。");
+  }
+  if (!managed && requestedTitle.length > 240) {
+    throw new Error("名称不能超过 240 个字符。");
+  }
+  // 受组织管理的原生字段可能含历史空格或超过当前表单限制。
+  // 元数据编辑必须完全忽略这些禁用字段，不能把它误判成 Chrome 修改。
+  const title = managed ? current.title : requestedTitle;
+  const url = managed
+    ? current.url
+    : validateEditableBookmarkUrl(input.url);
+  const parentId = managed
+    ? current.parentId || input.parentId
+    : input.parentId;
+  const parent = await chrome.bookmarks
+    .get(parentId)
+    .then(([node]) => node);
+  // Chrome 保存的是用户输入的完整地址，不能用去追踪参数/普通 hash
+  // 后的 canonical URL 来判断“是否需要写回”。否则用户只修改
+  // utm、锚点或尾斜杠时，界面会提示成功，但 Chrome 里的网址没有变化。
+  const urlPlan = bookmarkUrlEditPlan({
+    source: sourceResource,
+    currentUrl: current.url,
+    nextUrl: url,
+    ...(url !== current.url
+      ? { changedUrlResourceKey: await resourceKeyForUrl(url) }
+      : {})
+  });
+  const { bookmarkUrlChanged, targetResourceKey, resourceIdentityChanged } =
+    urlPlan;
+  const titleChanged = title !== current.title;
+  const folderChanged = parentId !== current.parentId;
+  if (
+    folderChanged &&
+    (!parent || parent.url || parent.unmodifiable === "managed")
+  ) {
+    throw new Error("目标文件夹不可写入，请选择其他文件夹。");
+  }
+  if (
+    managed &&
+    (bookmarkUrlChanged || titleChanged || folderChanged)
+  ) {
+    throw new Error(
+      "这条收藏由 Chrome 或组织管理，只能修改 Aarre 标签和备注。"
+    );
+  }
+  if (resourceIdentityChanged) {
+    const saveState = await getBookmarkSaveState(url);
+    if (
+      saveState.matches.some(
+        (match) => match.id !== input.bookmarkId
+      )
+    ) {
+      throw new Error(
+        "这个网址已经存在于 Chrome 收藏中。请编辑已有收藏，避免覆盖它的智能信息。"
+      );
+    }
+  }
+
+  const auth = await getAuthState();
+  const timestamp = now();
+  const requestedTags = normalizeUserTags(input.tags);
+  const resolvedTags = bookmarkEditTags({
+    sourceTags: sourceResource.tags,
+    sourceTagsSource: sourceResource.tagsSource,
+    requestedTags,
+    tagsChanged: input.tagsChanged,
+    resourceIdentityChanged
+  });
+  // 已有资源可能使用页面声明的 canonical URL，不能在仅编辑标题、备注
+  // 或同 canonical URL 的细微地址变化时重新计算 key。
+  const previousTarget =
+    targetResourceKey === sourceResource.resourceKey
+      ? undefined
+      : await getLocalResource(targetResourceKey);
+  const chromeMutations: UndoMutation[] = [];
+  if (titleChanged || bookmarkUrlChanged) {
+    chromeMutations.push(
+      await snapshotNodeMutation({
+        nodeId: input.bookmarkId,
+        kind: "restore_update",
+        label: `恢复“${current.title || current.url}”的名称和网址`
+      })
+    );
+  }
+  if (folderChanged) {
+    chromeMutations.push(
+      await snapshotNodeMutation({
+        nodeId: input.bookmarkId,
+        kind: "restore_move",
+        label: `将“${current.title || current.url}”移回原文件夹`
+      })
+    );
+  }
+
+  let batch = chromeMutations.length
+    ? createUndoBatch({
+        source: "manual",
+        label: `编辑“${current.title || current.url}”`,
+        destructive: false,
+        mutations: chromeMutations
+      })
+    : null;
+  if (batch) {
+    await putUndoSnapshot(batch);
+  }
+
+  let updatedNode = current;
+  let storageChanged = false;
+  internalBookmarkIds.add(input.bookmarkId);
+  try {
+    if (titleChanged || bookmarkUrlChanged) {
+      if (batch) {
+        batch = {
+          ...batch,
+          mutations: batch.mutations.map((mutation) =>
+            mutation.kind === "restore_update"
+              ? { ...mutation, applied: true }
+              : mutation
+          )
+        };
+        await putUndoSnapshot(batch);
+      }
+      updatedNode = await chrome.bookmarks.update(input.bookmarkId, {
+        title,
+        url
+      });
+    }
+    if (folderChanged) {
+      if (batch) {
+        batch = {
+          ...batch,
+          mutations: batch.mutations.map((mutation) =>
+            mutation.kind === "restore_move"
+              ? { ...mutation, applied: true }
+              : mutation
+          )
+        };
+        await putUndoSnapshot(batch);
+      }
+      updatedNode = await chrome.bookmarks.move(input.bookmarkId, {
+        parentId
+      });
+    }
+
+    if (resourceIdentityChanged) {
+      const { remainingSource, nextResource } =
+        rehomeResourceAfterBookmarkUrlChange({
+          source: sourceResource,
+          ...(previousTarget ? { previousTarget } : {}),
+          targetResourceKey,
+          bookmarkId: input.bookmarkId,
+          url,
+          canonicalUrl: canonicalizeUrl(url),
+          title,
+          userNote: input.userNote.trim(),
+          tags: resolvedTags.tags,
+          categoryCoverId: categoryCoverForResource({
+            url,
+            title,
+            topics: [],
+            tags: resolvedTags.tags,
+            summary: ""
+          }),
+          nativeFolderPath: await folderPathForId(
+            updatedNode.parentId || parentId
+          ),
+          syncStatus: auth.configured ? "pending" : "local",
+          timestamp
+        });
+      await upsertLocalResource(remainingSource);
+      storageChanged = true;
+      await upsertLocalResource(nextResource);
+      if (!remainingSource.nativeBookmarkIds.length) {
+        await cancelEnhancementForResource(sourceResource.resourceKey);
+      }
+    } else {
+      await upsertLocalResource({
+        ...sourceResource,
+        title,
+        url,
+        userNote: input.userNote.trim(),
+        tags: resolvedTags.tags,
+        tagsSource: resolvedTags.tagsSource,
+        nativeFolderPath: await folderPathForId(
+          updatedNode.parentId || parentId
+        ),
+        syncStatus: auth.configured ? "pending" : "local",
+        updatedAt: timestamp
+      });
+      storageChanged = true;
+    }
+
+    await importNativeBookmarks();
+    const finalResource = await getLocalResource(targetResourceKey);
+    if (!finalResource?.nativeBookmarkIds.includes(input.bookmarkId)) {
+      throw new Error(
+        "Chrome 已完成修改，但 Aarre 未能确认新的绑定状态。"
+      );
+    }
+    if (auth.configured) {
+      await enqueueOutbox(finalResource, "");
+      void syncPendingIfReady();
+    }
+    if (resourceIdentityChanged) {
+      await queueEnhancementsUntilVisit(finalResource, "recovery");
+    }
+    if (batch) {
+      batch = { ...batch, status: "ready" };
+      await putUndoSnapshot(batch);
+    }
+    return {
+      bookmark: serializeBookmarkNode(updatedNode),
+      resource: finalResource,
+      // 供界面决定是否提示“重新生成摘要和封面”；仅完整地址的
+      // 细微变化已经写入 Chrome，但不会错误触发跨资源增强。
+      urlChanged: resourceIdentityChanged
+    };
+  } catch (error) {
+    const storageRecoverySteps: Array<{
+      name: string;
+      run: () => Promise<unknown>;
+    }> = [];
+    if (storageChanged) {
+      if (targetResourceKey !== sourceResource.resourceKey) {
+        storageRecoverySteps.push(
+          {
+            name: "cancel-target-enhancement",
+            run: () => cancelEnhancementForResource(targetResourceKey)
+          },
+          {
+            name: "remove-target-outbox",
+            run: () => removeOutboxItem(targetResourceKey)
+          }
+        );
+      }
+      storageRecoverySteps.push({
+        name: "restore-source-resource",
+        run: () => upsertLocalResource(sourceResource)
+      });
+      if (targetResourceKey !== sourceResource.resourceKey) {
+        if (previousTarget) {
+          storageRecoverySteps.push({
+            name: "restore-previous-target",
+            run: () => upsertLocalResource(previousTarget)
+          });
+        } else {
+          storageRecoverySteps.push({
+            name: "remove-created-target",
+            run: () => deleteLocalResource(targetResourceKey)
+          });
+        }
+      }
+      if (auth.configured) {
+        storageRecoverySteps.push({
+          name: "restore-source-outbox",
+          run: () => enqueueOutbox(sourceResource, "")
+        });
+      }
+    }
+    const failedRecoverySteps =
+      await runBookmarkEditRecoverySteps(storageRecoverySteps);
+    let chromeRollbackFailed = false;
+    let rolledBackBatch: UndoSnapshotBatch | undefined;
+    if (batch) {
+      const rolledBack = await undoBookmarkBatch(
+        batch,
+        defaultFolderId,
+        {
+          onBeforeRemove: markInternalBookmarkRemoval,
+          onAfterRemove: releaseInternalBookmarkRemoval
+        }
+      ).catch(() => null);
+      if (rolledBack) {
+        rolledBackBatch = rolledBack.batch;
+      }
+      chromeRollbackFailed = !rolledBack || rolledBack.failed > 0;
+    }
+    const finalRecoverySteps: Array<{
+      name: string;
+      run: () => Promise<unknown>;
+    }> = [];
+    if (rolledBackBatch) {
+      finalRecoverySteps.push({
+        name: "persist-undo-result",
+        run: () => putUndoSnapshot(rolledBackBatch)
+      });
+    }
+    finalRecoverySteps.push({
+      name: "reimport-native-bookmarks",
+      run: () => importNativeBookmarks()
+    });
+    if (sourceResource.nativeBookmarkIds.length) {
+      finalRecoverySteps.push({
+        name: "restore-source-enhancement",
+        run: () => queueEnhancementsUntilVisit(sourceResource)
+      });
+    }
+    failedRecoverySteps.push(
+      ...(await runBookmarkEditRecoverySteps(finalRecoverySteps))
+    );
+    if (failedRecoverySteps.length || chromeRollbackFailed) {
+      throw new Error(
+        "编辑未完整完成，自动恢复也未能全部完成。请立即刷新并检查这条 Chrome 收藏。"
+      );
+    }
+    const message =
+      error instanceof Error ? error.message : "收藏信息更新失败";
+    throw new Error(
+      batch ? `${message} 本次修改已自动回滚。` : message
+    );
+  } finally {
+    releaseInternalBookmarkRemoval(input.bookmarkId);
+  }
 }
 
 async function createNativeFolder(input: {
@@ -791,6 +1938,12 @@ async function createNativeBookmarkFromAgent(input: {
     throw new Error("书签名称不能为空。");
   }
   const url = validateAgentBookmarkUrl(input.url);
+  const saveState = await getBookmarkSaveState(url);
+  if (saveState.status !== "none") {
+    throw new Error(
+      "这个网址已经存在于 Chrome 收藏中。为避免重复，Aarre 没有再创建一条。"
+    );
+  }
   const [parent] = await chrome.bookmarks.get(input.parentId);
   if (
     !parent ||
@@ -1205,128 +2358,528 @@ async function captureActivePage(tabId?: number): Promise<PageCapture> {
   };
 }
 
-function clearPageSnapshotTimers(exceptTabId?: number) {
-  for (const [tabId, timer] of pageSnapshotTimers) {
-    if (tabId === exceptTabId) continue;
-    globalThis.clearTimeout(timer);
-    pageSnapshotTimers.delete(tabId);
+async function captureRenderedPageForDocument(
+  tabId: number,
+  expectedDocumentId?: string
+): Promise<PageCapture> {
+  const [before] = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: () => globalThis.location.href
+  });
+  if (
+    !before?.result ||
+    (expectedDocumentId && before.documentId !== expectedDocumentId)
+  ) {
+    throw new Error("页面文档已经变化，等待下次访问。");
   }
+  const [stability] = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: waitForStablePageInDocument,
+    args: [900, 4_000]
+  });
+  if (
+    stability?.result !== true ||
+    stability.documentId !== before.documentId
+  ) {
+    throw new Error("页面尚未稳定，等待下次访问。");
+  }
+  const capture = await captureActivePage(tabId);
+  const [after] = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: () => globalThis.location.href
+  });
+  if (
+    after?.result !== before.result ||
+    after.documentId !== before.documentId
+  ) {
+    throw new Error("读取正文期间页面已变化，等待下次访问。");
+  }
+  return capture;
 }
 
-async function capturePageSnapshotForTab(
-  tab: chrome.tabs.Tab
+async function coordinateActiveBookmarkedPage(
+  tab: chrome.tabs.Tab,
+  documentId?: string,
+  trigger: SnapshotEnhancementProgress["trigger"] = "normal_browse"
 ): Promise<void> {
   if (
     typeof tab.id !== "number" ||
-    typeof tab.windowId !== "number" ||
     !tab.url ||
-    !tab.active ||
-    tab.incognito ||
-    !isSupportedPageUrl(tab.url)
+    !isLoadedSnapshotTab(tab)
   ) {
     return;
+  }
+  // SPA 的 history 路由切换不会触发完整 reload。先丢弃旧路由的目标，
+  // 避免在 A 页登记的任务误截成 B 页。
+  await discardMismatchedImmediateSnapshotTarget(tab);
+  const immediateTarget = await readImmediateSnapshotTarget(tab.id);
+  const immediateResource = immediateTarget
+    ? await getLocalResource(immediateTarget.resourceKey)
+    : undefined;
+  const resource =
+    immediateTarget &&
+    immediateResource &&
+    snapshotTargetAllowsLoadedUrl(
+      immediateTarget,
+      immediateResource,
+      tab.url
+    )
+      ? immediateResource
+      : await bookmarkedResourceForLoadedUrl(tab.url);
+  if (!resource?.nativeBookmarkIds.length) return;
+  const settings = await getDisplaySettings();
+  const privacyBlocked = isSnapshotSensitiveUrl(
+    tab.url,
+    settings.snapshotExcludedHosts
+  );
+  const existingSnapshot = await getPageSnapshot(resource.canonicalUrl);
+  const snapshotPolicy = snapshotCapturePolicy({
+    hasSnapshot: Boolean(existingSnapshot),
+    snapshotIsStale: isPageSnapshotStale(existingSnapshot),
+    trigger
+  });
+  const needsAi =
+    resource.aiStatus !== "ready" ||
+    !resource.summary.trim() ||
+    !resource.tags.length;
+
+  if (snapshotPolicy.capture && !privacyBlocked) {
+    await enqueueBookmarkEnhancement(resource, ["snapshot"], {
+      state: "queued",
+      trigger,
+      tabId: tab.id,
+      ...(documentId ? { documentId } : {}),
+      loadedUrl: tab.url,
+      ...(snapshotPolicy.showToast ? { showToast: true } : {}),
+      ...(snapshotPolicy.refreshExisting ? { refreshExisting: true } : {})
+    });
+    await rememberImmediateSnapshotTarget(
+      tab,
+      resource.canonicalUrl,
+      trigger === "aarre_open"
+        ? AARRE_OPEN_PAGE_SNAPSHOT_DELAY_MS
+        : SAVED_PAGE_SNAPSHOT_DELAY_MS,
+      snapshotPolicy.showToast,
+      resource.resourceKey,
+      documentId,
+      trigger
+    );
+  }
+
+  if (!needsAi) return;
+  if (privacyBlocked) {
+    await upsertLocalResource({
+      ...resource,
+      aiStatus: "unavailable",
+      enhancementBlockReason: "privacy",
+      enhancementBlockMessage:
+        "Aarre 不会读取或发送内网、银行、支付和医疗页面内容。",
+      updatedAt: now()
+    });
+    await updateStoredAiProgress(resource.resourceKey, {
+      state: "privacy_blocked",
+      lastError: "隐私保护网站不读取或发送页面内容。"
+    });
+    await updateStoredSnapshotProgress(resource.resourceKey, {
+      state: "privacy_blocked",
+      trigger,
+      lastError: "隐私保护网站不生成页面截图。"
+    });
+    await completeStoredEnhancementPart(resource.resourceKey, "ai");
+    await completeStoredEnhancementPart(resource.resourceKey, "snapshot");
+    return;
+  }
+  await enqueueBookmarkEnhancement(resource, ["ai"]);
+  const runtime = await getAiRuntimeSettings();
+  if (!runtime.apiKey) {
+    await updateStoredAiProgress(resource.resourceKey, {
+      state: "waiting_for_key",
+      tabId: tab.id,
+      ...(documentId ? { documentId } : {}),
+      lastError: `等待配置 ${getAiProviderPreset(runtime.provider).name} API Key。`
+    });
+    return;
+  }
+  if (renderedPageEnhancementRunning.has(resource.resourceKey)) {
+    return;
+  }
+  renderedPageEnhancementRunning.add(resource.resourceKey);
+  try {
+    await updateStoredAiProgress(resource.resourceKey, {
+      state: "processing",
+      tabId: tab.id,
+      ...(documentId ? { documentId } : {})
+    });
+    const page = await captureRenderedPageForDocument(tab.id, documentId);
+    const latest = await getLocalResource(resource.resourceKey);
+    if (!latest?.nativeBookmarkIds.length) return;
+    const prepared: ResourceRecord = {
+      ...latest,
+      url: page.url,
+      title: latest.title || page.title,
+      contentExcerpt: page.excerpt,
+      contentHash: await hashText(page.content),
+      selectedText: page.selectedText,
+      author: page.author,
+      siteName: page.siteName,
+      language: page.language,
+      imageUrl: page.imageUrl,
+      faviconUrl: page.faviconUrl || latest.faviconUrl,
+      aiStatus: "processing",
+      enhancementBlockReason: undefined,
+      enhancementBlockMessage: undefined,
+      updatedAt: now()
+    };
+    await upsertLocalResource(prepared);
+    const enriched = await enrichResourceLocally(prepared, page);
+    await upsertLocalResource(enriched);
+    await completeStoredEnhancementPart(resource.resourceKey, "ai");
+  } catch (error) {
+    await updateStoredAiProgress(resource.resourceKey, {
+      state: "retry",
+      tabId: tab.id,
+      ...(documentId ? { documentId } : {}),
+      lastError: errorMessage(error)
+    });
+    await deferStoredEnhancementJob(
+      resource.resourceKey,
+      errorMessage(error)
+    );
+  } finally {
+    renderedPageEnhancementRunning.delete(resource.resourceKey);
+  }
+}
+
+function clearPageSnapshotTimer(tabId: number) {
+  const timer = pageSnapshotTimers.get(tabId);
+  if (timer !== undefined) globalThis.clearTimeout(timer);
+  pageSnapshotTimers.delete(tabId);
+}
+
+async function capturePageSnapshotForTab(
+  tabId: number,
+  expectedLoadedUrl: string,
+  snapshotUrl = expectedLoadedUrl,
+  options: {
+    resourceKey?: string;
+    showToast?: boolean;
+    refreshExisting?: boolean;
+    documentId?: string;
+    trigger?: SnapshotEnhancementProgress["trigger"];
+  } = {}
+): Promise<boolean> {
+  const tab = await chrome.tabs.get(tabId).catch(() => null);
+  if (
+    !tab ||
+    typeof tab.windowId !== "number" ||
+    !isLoadedSnapshotTab(tab, expectedLoadedUrl)
+  ) {
+    return false;
   }
   const settings = await getDisplaySettings();
   if (
     !settings.pageSnapshotsEnabled ||
-    isSnapshotSensitiveUrl(tab.url, settings.snapshotExcludedHosts)
+    isSnapshotSensitiveUrl(tab.url!, settings.snapshotExcludedHosts) ||
+    isSnapshotSensitiveUrl(snapshotUrl, settings.snapshotExcludedHosts)
   ) {
-    return;
+    return false;
   }
-  const canonicalUrl = canonicalizeUrl(tab.url);
-  const resourceKey = await resourceKeyForUrl(canonicalUrl);
+  const fallbackCanonicalUrl = canonicalizeUrl(snapshotUrl);
+  const resourceKey =
+    options.resourceKey || (await resourceKeyForUrl(fallbackCanonicalUrl));
   const resource = await getLocalResource(resourceKey);
-  if (!resource?.nativeBookmarkIds.length) return;
+  if (!resource?.nativeBookmarkIds.length) return false;
+  const canonicalUrl = resource.canonicalUrl || fallbackCanonicalUrl;
 
   const focusedWindow = await chrome.windows.getLastFocused();
-  if (focusedWindow.id !== tab.windowId) return;
+  if (focusedWindow.id !== tab.windowId) return false;
   const [active] = await chrome.tabs.query({
     active: true,
     windowId: tab.windowId
   });
-  if (active?.id !== tab.id || active.url !== tab.url || active.incognito) {
-    return;
+  if (
+    active?.id !== tab.id ||
+    !isLoadedSnapshotTab(active, expectedLoadedUrl)
+  ) {
+    return false;
   }
 
+  await updateStoredSnapshotProgress(resourceKey, {
+    state: "stabilizing",
+    trigger: options.trigger || "recovery",
+    tabId,
+    ...(options.documentId ? { documentId: options.documentId } : {}),
+    loadedUrl: tab.url!,
+    ...(options.showToast ? { showToast: true } : {}),
+    ...(options.refreshExisting ? { refreshExisting: true } : {})
+  });
+  const [stabilityResult] = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: waitForStablePageInDocument,
+    args: [900, 4_000]
+  });
+  if (
+    stabilityResult?.result !== true ||
+    (options.documentId &&
+      stabilityResult.documentId !== options.documentId)
+  ) {
+    return false;
+  }
+
+  // 等待期间用户可能已经切换标签或发起了下一次导航，截图前必须重新核对。
+  const stableTab = await chrome.tabs.get(tabId).catch(() => null);
+  if (
+    !stableTab ||
+    stableTab.windowId !== tab.windowId ||
+    !isLoadedSnapshotTab(stableTab, expectedLoadedUrl)
+  ) {
+    return false;
+  }
+  const stableFocusedWindow = await chrome.windows.getLastFocused();
+  if (stableFocusedWindow.id !== stableTab.windowId) return false;
+  const [stableActive] = await chrome.tabs.query({
+    active: true,
+    windowId: stableTab.windowId
+  });
+  if (
+    stableActive?.id !== tabId ||
+    !isLoadedSnapshotTab(stableActive, expectedLoadedUrl)
+  ) {
+    return false;
+  }
+  const [documentCheck] = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: () => globalThis.location.href
+  });
+  if (
+    !documentCheck?.result ||
+    documentCheck.result !== stableTab.url ||
+    documentCheck.documentId !== stabilityResult.documentId
+  ) {
+    return false;
+  }
+  const resourceBeforeCapture = await getLocalResource(resourceKey);
+  if (!resourceBeforeCapture?.nativeBookmarkIds.length) return false;
+
+  await updateStoredSnapshotProgress(resourceKey, {
+    state: "capturing",
+    trigger: options.trigger || "recovery",
+    tabId,
+    documentId: stabilityResult.documentId,
+    loadedUrl: stableTab.url!,
+    ...(options.showToast ? { showToast: true } : {}),
+    ...(options.refreshExisting ? { refreshExisting: true } : {})
+  });
   const pngDataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
     format: "png"
   });
+  // 截图调用本身是异步的。返回后再次确认同一文档仍是前台页，避免把用户
+  // 刚切换到的页面按旧收藏 URL 落库。
+  const capturedTab = await chrome.tabs.get(tabId).catch(() => null);
+  const capturedWindow = await chrome.windows.getLastFocused();
+  const [capturedActive] = await chrome.tabs.query({
+    active: true,
+    windowId: tab.windowId
+  });
+  const [capturedDocument] = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: () => globalThis.location.href
+  });
+  if (
+    !capturedTab ||
+    capturedWindow.id !== tab.windowId ||
+    capturedActive?.id !== tabId ||
+    !isLoadedSnapshotTab(capturedTab, expectedLoadedUrl) ||
+    capturedDocument?.result !== capturedTab.url ||
+    capturedDocument.documentId !== stabilityResult.documentId
+  ) {
+    return false;
+  }
   const capturedAt = now();
   const snapshot = await createPageSnapshot(
     canonicalUrl,
     pngDataUrl,
     capturedAt
   );
+  const resourceImmediatelyBeforeStore = await getLocalResource(resourceKey);
+  if (!resourceImmediatelyBeforeStore?.nativeBookmarkIds.length) return false;
   await putPageSnapshot(snapshot);
+  // AI 富化或原生书签事件可能在稳定等待期间更新同一资源。
+  // 必须重新读取后只追加 snapshotAt，不能用等待前的旧对象覆盖新元数据。
+  const latestResource = await getLocalResource(resourceKey);
+  if (!latestResource?.nativeBookmarkIds.length) {
+    await deletePageSnapshot(canonicalUrl);
+    return false;
+  }
   await upsertLocalResource({
-    ...resource,
+    ...latestResource,
     snapshotAt: capturedAt,
-    updatedAt: resource.updatedAt
+    updatedAt: latestResource.updatedAt
   });
+  void chrome.runtime
+    .sendMessage({
+      type: "PAGE_SNAPSHOT_UPDATED",
+      canonicalUrl,
+      capturedAt
+    })
+    .catch(() => undefined);
+  await completeStoredEnhancementPart(
+    options.resourceKey || resourceKey,
+    "snapshot"
+  );
+  if (options.showToast) {
+    await chrome.scripting
+      .executeScript({
+        target: { tabId },
+        func: showSnapshotUpdatedToastInDocument
+      })
+      .catch(() => undefined);
+  }
+  return true;
+}
+
+interface PageSnapshotScheduleOptions {
+  delayMs?: number;
+  snapshotUrl?: string;
+  resourceKey?: string;
+  showToast?: boolean;
+  refreshExisting?: boolean;
+  documentId?: string;
+  trigger?: SnapshotEnhancementProgress["trigger"];
+  onSettled?: (succeeded: boolean) => void;
 }
 
 function schedulePageSnapshotForTab(
   tab: chrome.tabs.Tab,
-  delay = 5_000
-) {
-  if (typeof tab.id !== "number") return;
-  clearPageSnapshotTimers(tab.id);
-  const existing = pageSnapshotTimers.get(tab.id);
-  if (existing !== undefined) globalThis.clearTimeout(existing);
+  options: PageSnapshotScheduleOptions = {}
+): boolean {
+  if (
+    typeof tab.id !== "number" ||
+    !tab.url ||
+    !isLoadedSnapshotTab(tab)
+  ) {
+    return false;
+  }
+  const tabId = tab.id;
+  const expectedLoadedUrl = tab.url;
+  clearPageSnapshotTimer(tab.id);
   const timer = globalThis.setTimeout(() => {
-    pageSnapshotTimers.delete(tab.id!);
-    void capturePageSnapshotForTab(tab).catch(() => undefined);
-  }, delay) as unknown as number;
+    pageSnapshotTimers.delete(tabId);
+    void capturePageSnapshotForTab(
+      tabId,
+      expectedLoadedUrl,
+      options.snapshotUrl,
+      {
+        resourceKey: options.resourceKey,
+        showToast: options.showToast,
+        documentId: options.documentId,
+        trigger: options.trigger,
+        refreshExisting: options.refreshExisting
+      }
+    )
+      .catch(async (error) => {
+        if (options.resourceKey) {
+          await updateStoredSnapshotProgress(options.resourceKey, {
+            state: "retry",
+            trigger: options.trigger || "recovery",
+            tabId,
+            loadedUrl: expectedLoadedUrl,
+            ...(options.documentId
+              ? { documentId: options.documentId }
+              : {}),
+            ...(options.showToast ? { showToast: true } : {}),
+            ...(options.refreshExisting ? { refreshExisting: true } : {}),
+            lastError: errorMessage(error)
+          }).catch(() => undefined);
+          await deferStoredEnhancementJob(
+            options.resourceKey,
+            errorMessage(error)
+          ).catch(() => undefined);
+        }
+        return false;
+      })
+      .then(async (succeeded) => {
+        if (!succeeded && options.resourceKey) {
+          await updateStoredSnapshotProgress(options.resourceKey, {
+            state: "waiting_foreground",
+            trigger: options.trigger || "recovery",
+            tabId,
+            loadedUrl: expectedLoadedUrl,
+            ...(options.documentId
+              ? { documentId: options.documentId }
+              : {}),
+            ...(options.showToast ? { showToast: true } : {}),
+            ...(options.refreshExisting ? { refreshExisting: true } : {}),
+            lastError:
+              "页面在稳定等待或截图期间离开前台，等待下次正常访问。"
+          }).catch(() => undefined);
+        }
+        options.onSettled?.(succeeded);
+      });
+  }, options.delayMs ?? AARRE_OPEN_PAGE_SNAPSHOT_DELAY_MS) as unknown as number;
   pageSnapshotTimers.set(tab.id, timer);
+  return true;
 }
 
 async function findOrCreateNativeBookmark(
   input: SaveBookmarkInput
 ): Promise<{ bookmark: chrome.bookmarks.BookmarkTreeNode; created: boolean }> {
   const folderId = input.folderId || (await defaultFolderId());
-  const [folder] = await chrome.bookmarks.get(folderId);
+  const state = await getBookmarkSaveState(input.capture.url);
+  let selected = input.existingBookmarkId
+    ? state.matches.find((match) => match.id === input.existingBookmarkId)
+    : undefined;
 
-  if (!folder || folder.url || folder.unmodifiable === "managed") {
-    throw new Error("选择的书签文件夹不可写入。");
+  if (input.existingBookmarkId && !selected) {
+    throw new Error("收藏状态已变化，请刷新后重新选择。");
+  }
+  if (!selected && !input.createSeparate) {
+    if (state.status === "exact" || state.status === "readonly") {
+      selected = state.matches[0];
+    } else if (state.status === "canonical") {
+      if (!input.confirmedCanonicalReuse) {
+        throw new Error("发现规范化后相同的收藏，请先确认复用或另存一份。");
+      }
+      selected = state.matches[0];
+    } else if (state.status === "multiple") {
+      throw new Error("发现多条相同收藏，请先选择要更新的记录。");
+    }
+  }
+  if (selected?.matchKind === "canonical" && !input.confirmedCanonicalReuse) {
+    throw new Error("请先确认复用规范化后相同的收藏。");
   }
 
-  const sameUrl = await chrome.bookmarks.search({ url: input.capture.url });
-  const existing = sameUrl.find((item) => item.parentId === folderId);
-
-  if (existing) {
-    if (existing.title !== input.title) {
-      const mutation = await snapshotNodeMutation({
-        nodeId: existing.id,
-        kind: "restore_update",
-        label: `更新书签“${existing.title || existing.url}”`
-      });
-      const updated = await runProtectedBookmarkMutation({
-        label: mutation.label,
-        destructive: false,
-        mutation,
-        perform: async () => {
-          const target = bookmarkTarget(folderId, input.capture.url);
-          internalBookmarkIds.add(existing.id);
-          internalBookmarkTargets.add(target);
-          try {
-            const result = await chrome.bookmarks.update(existing.id, {
-              title: input.title
-            });
-            releaseInternalBookmarkWrite(existing.id, target);
-            return result;
-          } catch (error) {
-            internalBookmarkIds.delete(existing.id);
-            internalBookmarkTargets.delete(target);
-            throw error;
-          }
-        }
-      });
-      return {
-        bookmark: updated,
-        created: false
-      };
+  if (selected) {
+    const [existing] = await chrome.bookmarks.get(selected.id);
+    if (!existing?.url) {
+      throw new Error("选中的收藏已不存在，请刷新后重试。");
     }
-    return { bookmark: existing, created: false };
+    if (existing.unmodifiable === "managed") {
+      return { bookmark: existing, created: false };
+    }
+    if (existing.title !== input.title.trim()) {
+      await updateNativeBookmark({
+        id: existing.id,
+        title: input.title.trim()
+      });
+    }
+    if (existing.parentId !== folderId) {
+      const [folder] = await chrome.bookmarks.get(folderId);
+      if (!folder || folder.url || folder.unmodifiable === "managed") {
+        throw new Error("选择的书签文件夹不可写入。");
+      }
+      await moveNativeBookmark({
+        id: existing.id,
+        parentId: folderId
+      });
+    }
+    const [updated] = await chrome.bookmarks.get(existing.id);
+    return { bookmark: updated, created: false };
+  }
+
+  const [folder] = await chrome.bookmarks.get(folderId);
+  if (!folder || folder.url || folder.unmodifiable === "managed") {
+    throw new Error("选择的书签文件夹不可写入。");
   }
 
   const mutation = await snapshotCreatedMutation({
@@ -1414,6 +2967,17 @@ async function saveBookmark(
   input: SaveBookmarkInput
 ): Promise<SaveBookmarkResult> {
   const auth = await getAuthState();
+  const display = await getDisplaySettings();
+  const sourceTab =
+    typeof input.sourceTabId === "number"
+      ? await chrome.tabs.get(input.sourceTabId).catch(() => null)
+      : null;
+  const privacyBlocked =
+    sourceTab?.incognito === true ||
+    isSnapshotSensitiveUrl(
+      input.capture.url,
+      display.snapshotExcludedHosts
+    );
   const { bookmark, created } = await findOrCreateNativeBookmark(input);
   const canonicalUrl = canonicalizeUrl(
     input.capture.url,
@@ -1451,6 +3015,8 @@ async function saveBookmark(
     coverUpdatedAt: existing?.coverUpdatedAt,
     categoryCoverId: existing?.categoryCoverId,
     snapshotAt: existing?.snapshotAt,
+    enhancementBlockReason: existing?.enhancementBlockReason,
+    enhancementBlockMessage: existing?.enhancementBlockMessage,
     faviconUrl: input.capture.faviconUrl,
     nativeBookmarkIds: [
       ...new Set([...(existing?.nativeBookmarkIds || []), bookmark.id])
@@ -1467,30 +3033,80 @@ async function saveBookmark(
     lastSyncedAt: existing?.lastSyncedAt
   };
 
+  // 原生书签写入和基础资源落库后立刻启动快照流程，不让可选的 AI
+  // 富化网络请求阻塞截图；真正截图仍会等待页面 complete 且稳定。
+  await upsertLocalResource(resource);
+  void Promise.resolve(
+    !privacyBlocked && display.pageSnapshotsEnabled ? sourceTab : null
+  )
+    .then(async (tab) => {
+      if (tab?.url && resourceMatchesLoadedUrl(resource, tab.url)) {
+        await rememberImmediateSnapshotTarget(
+          tab,
+          canonicalUrl,
+          SAVED_PAGE_SNAPSHOT_DELAY_MS,
+          false,
+          resourceKey,
+          undefined,
+          "aarre_save"
+        );
+      }
+    })
+    .catch(() => undefined);
+
   let aiWarning: string | undefined;
+  const hasTrustworthyRenderedContent =
+    sourceTab !== null &&
+    sourceTab.incognito !== true &&
+    Boolean(
+      sourceTab.url && resourceMatchesLoadedUrl(resource, sourceTab.url)
+    ) &&
+    input.capture.content.trim().length >= 80 &&
+    input.capture.excerpt.trim().length > 0;
   const needsAi =
     input.requestAi &&
     !(existing?.aiStatus === "ready" && !contentChanged);
   if (needsAi) {
-    const aiSettings = await getAiRuntimeSettings();
-    if (aiSettings.apiKey) {
-      try {
-        resource = await enrichResourceLocally(resource, input.capture);
-      } catch (error) {
-        aiWarning = errorMessage(error);
-        resource = {
-          ...resource,
-          aiStatus: "failed",
-          updatedAt: now()
-        };
-      }
-    } else {
-      aiWarning = `书签已保存。请先在设置中填写 ${aiSettings.provider === "gemini" ? "Gemini" : aiSettings.provider === "openai" ? "OpenAI" : "DeepSeek"} API Key，再生成摘要与标签。`;
+    if (privacyBlocked) {
+      aiWarning =
+        "收藏已保存。出于隐私保护，Aarre 不会读取或发送无痕、内网、银行、支付和医疗页面内容，也不会生成截图。";
       resource = {
         ...resource,
         aiStatus: "unavailable",
+        enhancementBlockReason: "privacy",
+        enhancementBlockMessage:
+          "Aarre 不会读取或发送无痕、内网、银行、支付和医疗页面内容。",
         updatedAt: now()
       };
+    } else {
+      const aiSettings = await getAiRuntimeSettings();
+      if (aiSettings.apiKey && hasTrustworthyRenderedContent) {
+        try {
+          resource = await enrichResourceLocally(resource, input.capture);
+        } catch (error) {
+          aiWarning = errorMessage(error);
+          resource = {
+            ...resource,
+            aiStatus: "failed",
+            updatedAt: now()
+          };
+        }
+      } else if (!aiSettings.apiKey) {
+        aiWarning = `书签已保存，摘要与标签任务已保留。请在设置中填写 ${aiSettings.provider === "gemini" ? "Gemini" : aiSettings.provider === "openai" ? "OpenAI" : "DeepSeek"} API Key，Aarre 会自动继续。`;
+        resource = {
+          ...resource,
+          aiStatus: "unavailable",
+          updatedAt: now()
+        };
+      } else {
+        aiWarning =
+          "书签已保存。首次正常打开该网页后，Aarre 会读取真实页面并补全摘要、标签和封面。";
+        resource = {
+          ...resource,
+          aiStatus: "pending",
+          updatedAt: now()
+        };
+      }
     }
   }
 
@@ -1498,14 +3114,11 @@ async function saveBookmark(
     ...resource,
     categoryCoverId: categoryCoverForResource(resource)
   };
+  const latestResource = await getLocalResource(resourceKey);
+  if (latestResource?.snapshotAt) {
+    resource.snapshotAt = latestResource.snapshotAt;
+  }
   await upsertLocalResource(resource);
-  void activeTab()
-    .then((tab) => {
-      if (tab?.url && canonicalizeUrl(tab.url) === canonicalUrl) {
-        schedulePageSnapshotForTab(tab, 0);
-      }
-    })
-    .catch(() => undefined);
   let synced = resource;
   if (auth.configured) {
     const queued = await enqueueOutbox(
@@ -1517,11 +3130,53 @@ async function saveBookmark(
     synced = await tryImmediateSync(queued);
   }
 
+  const pendingEnhancements: BookmarkEnhancementPart[] = [];
+  if (
+    !privacyBlocked &&
+    (synced.aiStatus !== "ready" ||
+      !synced.summary.trim() ||
+      !synced.tags.length)
+  ) {
+    pendingEnhancements.push("ai");
+  }
+  if (
+    !privacyBlocked &&
+    display.pageSnapshotsEnabled &&
+    !isSnapshotSensitiveUrl(
+      synced.url,
+      display.snapshotExcludedHosts
+    ) &&
+    !(await getPageSnapshot(synced.canonicalUrl))
+  ) {
+    pendingEnhancements.push("snapshot");
+  }
+  if (privacyBlocked) {
+    await cancelEnhancementForResource(resourceKey);
+  } else if (!hasTrustworthyRenderedContent) {
+    await queueEnhancementsUntilVisit(synced, "aarre_save");
+  } else {
+    await enqueueBookmarkEnhancement(
+      synced,
+      pendingEnhancements,
+      pendingEnhancements.includes("snapshot")
+        ? {
+            state: "queued",
+            trigger: "aarre_save",
+            ...(typeof input.sourceTabId === "number"
+              ? { tabId: input.sourceTabId }
+              : {})
+          }
+        : undefined
+    );
+    void processBookmarkEnhancements();
+  }
+
   return {
     resource: synced,
     nativeBookmarkCreated: created,
     cloudSyncAttempted: synced.syncStatus === "synced",
-    aiWarning
+    aiWarning,
+    enhancementPending: pendingEnhancements.length > 0
   };
 }
 
@@ -1638,18 +3293,214 @@ async function pageEssenceForResource(resource: ResourceRecord) {
     const contentType = response.headers.get("content-type") || "";
     if (
       !response.ok ||
+      /(?:^|\/)(?:login|signin|sign-in|auth)(?:\/|$)/i.test(
+        new URL(response.url || resource.url).pathname
+      ) ||
       (!contentType.includes("text/html") &&
         !contentType.includes("application/xhtml+xml"))
     ) {
-      return extractPageEssenceFromHtml("", resource.url);
+      return null;
     }
-    return extractPageEssenceFromHtml(
+    const essence = extractPageEssenceFromHtml(
       await readLimitedText(response),
       response.url || resource.url
     );
+    return essence.description ||
+      essence.h1 ||
+      essence.firstParagraph ||
+      essence.keywords.length
+      ? essence
+      : null;
   } catch {
-    // 登录墙、失效链接或网络失败时，仍允许 AI 基于名称、URL 和文件夹做保守补全。
-    return extractPageEssenceFromHtml("", resource.url);
+    // 登录墙、失效链接或网络失败不能伪装成完整增强。保留任务，等用户
+    // 正常访问该网页后再从真实渲染 DOM 读取正文。
+    return null;
+  }
+}
+
+async function processOneBookmarkEnhancement(
+  job: BookmarkEnhancementJob
+): Promise<void> {
+  let resource = await getLocalResource(job.resourceKey);
+  if (!resource?.nativeBookmarkIds.length) {
+    await cancelEnhancementForResource(job.resourceKey);
+    return;
+  }
+
+  const privacySettings = await getDisplaySettings();
+  const privacyBlocked = isSnapshotSensitiveUrl(
+    resource.url,
+    privacySettings.snapshotExcludedHosts
+  );
+  let enhancementDeferred = false;
+  if (job.pending.includes("ai")) {
+    if (privacyBlocked) {
+      resource = {
+        ...resource,
+        aiStatus: "unavailable",
+        enhancementBlockReason: "privacy",
+        enhancementBlockMessage:
+          "Aarre 不会读取或发送内网、银行、支付和医疗页面内容。",
+        updatedAt: now()
+      };
+      await upsertLocalResource(resource);
+      await updateStoredAiProgress(job.resourceKey, {
+        state: "privacy_blocked",
+        lastError: resource.enhancementBlockMessage
+      });
+      await completeStoredEnhancementPart(job.resourceKey, "ai");
+    } else if (
+      resource.aiStatus === "ready" &&
+      resource.summary.trim() &&
+      resource.tags.length
+    ) {
+      await completeStoredEnhancementPart(job.resourceKey, "ai");
+    } else {
+      const runtime = await getAiRuntimeSettings();
+      if (!runtime.apiKey) {
+        if (resource.aiStatus !== "unavailable") {
+          resource = {
+            ...resource,
+            aiStatus: "unavailable",
+            updatedAt: now()
+          };
+          await upsertLocalResource(resource);
+        }
+        await deferStoredEnhancementJob(
+          job.resourceKey,
+          `等待配置 ${getAiProviderPreset(runtime.provider).name} API Key。`
+        );
+        await updateStoredAiProgress(job.resourceKey, {
+          state: "waiting_for_key",
+          lastError: `等待配置 ${getAiProviderPreset(runtime.provider).name} API Key。`
+        });
+        enhancementDeferred = true;
+      } else {
+        resource = {
+          ...resource,
+          aiStatus: "pending",
+          updatedAt: now()
+        };
+        await upsertLocalResource(resource);
+        await deferStoredEnhancementJob(
+          job.resourceKey,
+          "等待用户正常访问网页后读取真实渲染正文。"
+        );
+        await updateStoredAiProgress(job.resourceKey, {
+          state: "waiting_for_content",
+          lastError: "等待真实网页访问后读取渲染正文。"
+        });
+        enhancementDeferred = true;
+      }
+    }
+  }
+
+  const latestJobs = await getStoredEnhancementJobs();
+  const latestJob = latestJobs[job.resourceKey];
+  if (!latestJob?.pending.includes("snapshot")) return;
+  resource = (await getLocalResource(job.resourceKey)) || resource;
+  const existingSnapshot = await getPageSnapshot(resource.canonicalUrl);
+  if (
+    existingSnapshot &&
+    (!latestJob.snapshot?.refreshExisting ||
+      !isPageSnapshotStale(existingSnapshot))
+  ) {
+    await completeStoredEnhancementPart(job.resourceKey, "snapshot");
+    return;
+  }
+  const display = privacySettings;
+  if (
+    !display.pageSnapshotsEnabled ||
+    isSnapshotSensitiveUrl(resource.url, display.snapshotExcludedHosts)
+  ) {
+    // 受保护网站按隐私规则永远使用 Aarre 兜底图，不进行后台窥探。
+    await updateStoredSnapshotProgress(job.resourceKey, {
+      state: "privacy_blocked",
+      trigger: job.snapshot?.trigger || "recovery",
+      lastError: "隐私保护网站不生成页面截图。"
+    });
+    await completeStoredEnhancementPart(job.resourceKey, "snapshot");
+    return;
+  }
+  if (!(await hasPageAccess(resource.url))) {
+    if (!enhancementDeferred) {
+      await deferStoredEnhancementJob(
+        job.resourceKey,
+        "等待截图权限；从 Aarre 打开该收藏后会继续。"
+      );
+    }
+    return;
+  }
+  const focusedWindow = await chrome.windows.getLastFocused();
+  const tabs = await chrome.tabs.query({
+    active: true,
+    ...(typeof focusedWindow.id === "number"
+      ? { windowId: focusedWindow.id }
+      : { lastFocusedWindow: true })
+  });
+  const matchingTab = tabs.find(
+    (tab) => tab.url && resourceMatchesLoadedUrl(resource!, tab.url)
+  );
+  if (matchingTab) {
+    await rememberImmediateSnapshotTarget(
+      matchingTab,
+      resource.canonicalUrl,
+      SAVED_PAGE_SNAPSHOT_DELAY_MS,
+      job.snapshot?.showToast === true,
+      resource.resourceKey,
+      job.snapshot?.documentId,
+      job.snapshot?.trigger || "recovery"
+    );
+  } else {
+    await updateStoredSnapshotProgress(job.resourceKey, {
+      state: "waiting_foreground",
+      trigger: job.snapshot?.trigger || "recovery",
+      ...(job.snapshot?.showToast ? { showToast: true } : {}),
+      ...(job.snapshot?.refreshExisting ? { refreshExisting: true } : {})
+    });
+  }
+  if (!enhancementDeferred) {
+    await deferStoredEnhancementJob(
+      job.resourceKey,
+      "等待目标网页处于前台并加载稳定。"
+    );
+  }
+}
+
+async function processBookmarkEnhancements(): Promise<void> {
+  if (bookmarkEnhancementRunning) return;
+  bookmarkEnhancementRunning = true;
+  try {
+    const jobs = await getStoredEnhancementJobs();
+    const due = Object.values(jobs)
+      .filter((job) => isEnhancementJobDue(job))
+      .sort((left, right) =>
+        left.nextAttemptAt.localeCompare(right.nextAttemptAt)
+      )
+      .slice(0, 4);
+    for (const job of due) {
+      await processOneBookmarkEnhancement(job).catch((error) =>
+        deferStoredEnhancementJob(job.resourceKey, errorMessage(error))
+      );
+    }
+  } finally {
+    bookmarkEnhancementRunning = false;
+    const remaining = Object.values(
+      await getStoredEnhancementJobs()
+    );
+    if (remaining.length) {
+      const nextAttempt = Math.min(
+        ...remaining.map((job) => {
+          const parsed = Date.parse(job.nextAttemptAt);
+          return Number.isFinite(parsed) ? parsed : Date.now();
+        })
+      );
+      await scheduleBookmarkEnhancements(
+        Math.max(0.5, (nextAttempt - Date.now()) / 60_000)
+      );
+    } else {
+      await chrome.alarms.clear(BOOKMARK_ENHANCEMENT_ALARM);
+    }
   }
 }
 
@@ -2202,9 +4053,25 @@ async function scanOneLibraryResource(
   resource: ResourceRecord,
   job: StoredLibraryScanJob
 ): Promise<ScanResourceResult> {
-  if (isInternalOrSensitiveUrl(resource.url)) {
+  const privacySettings = await getDisplaySettings();
+  if (
+    isInternalOrSensitiveUrl(resource.url) ||
+    isSnapshotSensitiveUrl(
+      resource.url,
+      privacySettings.snapshotExcludedHosts
+    )
+  ) {
+    const blocked = {
+      ...resource,
+      aiStatus: "unavailable" as const,
+      enhancementBlockReason: "privacy" as const,
+      enhancementBlockMessage:
+        "Aarre 不会读取或发送内网、银行、支付和医疗页面内容。",
+      updatedAt: now()
+    };
+    await upsertLocalResource(blocked);
     return {
-      resource,
+      resource: blocked,
       outcome: "skipped",
       message: "内部或受保护网址不会发起网络请求。"
     };
@@ -2249,6 +4116,19 @@ async function scanOneLibraryResource(
     }
 
     const essence = await pageEssenceForResource(resource);
+    if (!essence) {
+      const waiting = {
+        ...scannedResource,
+        aiStatus: needsAi ? ("pending" as const) : scannedResource.aiStatus,
+        updatedAt: now()
+      };
+      await upsertLocalResource(waiting);
+      return {
+        resource: waiting,
+        outcome: "skipped",
+        message: "未获得可信公开正文，等待用户正常访问网页后再增强。"
+      };
+    }
     const siteBrand = await scanSiteBrand(resource, essence, job.force);
     const coverRule = matchCoverRule(resource.url);
     const registryPageImage = resolveRuleAsset(
@@ -2615,21 +4495,30 @@ async function importNativeBookmarks(): Promise<ImportResult> {
 
   for (const [resourceKey, group] of grouped) {
     const primary = group[0];
-    const existing = known.get(resourceKey);
+    const existing =
+      known.get(resourceKey) ||
+      current.find((resource) =>
+        group.some(
+          ({ node }) =>
+            resource.nativeBookmarkIds.includes(node.id) ||
+            (node.url && resourceMatchesLoadedUrl(resource, node.url))
+        )
+      );
+    const resolvedResourceKey = existing?.resourceKey || resourceKey;
     const timestamp = now();
     const nativeBookmarkIds = group.map((item) => item.node.id);
     const baseChanged =
       !existing ||
       existing.title !== primary.node.title ||
       existing.url !== primary.node.url ||
-      existing.canonicalUrl !== primary.canonicalUrl ||
+      (!existing.canonicalUrl && existing.canonicalUrl !== primary.canonicalUrl) ||
       existing.nativeFolderPath.join("\n") !== primary.path.join("\n") ||
       existing.nativeBookmarkIds.join("\n") !==
         nativeBookmarkIds.join("\n");
 
     const resource: ResourceRecord = {
-      resourceKey,
-      canonicalUrl: primary.canonicalUrl,
+      resourceKey: resolvedResourceKey,
+      canonicalUrl: existing?.canonicalUrl || primary.canonicalUrl,
       url: primary.node.url!,
       title:
         primary.node.title || new URL(primary.node.url!).hostname,
@@ -2663,6 +4552,8 @@ async function importNativeBookmarks(): Promise<ImportResult> {
           summary: existing?.summary || ""
         }),
       snapshotAt: existing?.snapshotAt,
+      enhancementBlockReason: existing?.enhancementBlockReason,
+      enhancementBlockMessage: existing?.enhancementBlockMessage,
       faviconUrl: existing?.faviconUrl || "",
       nativeBookmarkIds,
       nativeFolderPath: primary.path,
@@ -2703,6 +4594,15 @@ async function importNativeBookmarks(): Promise<ImportResult> {
   }
 
   return { scanned: native.length, imported, alreadyKnown };
+}
+
+async function queueIndexedResourcesUntilVisit(): Promise<void> {
+  const resources = await getLocalResources();
+  for (const resource of resources) {
+    if (resource.nativeBookmarkIds.length) {
+      await queueEnhancementsUntilVisit(resource, "recovery");
+    }
+  }
 }
 
 async function ensureFolderPath(path: string[]): Promise<string> {
@@ -2791,6 +4691,7 @@ async function restoreMissingNativeBookmarks(): Promise<RestoreResult> {
       updatedAt: now()
     };
     await upsertLocalResource(updated);
+    await queueEnhancementsUntilVisit(updated, "recovery");
     restored += 1;
   }
 
@@ -3055,7 +4956,8 @@ async function askAgent(
 
 async function indexNativeBookmark(
   id: string,
-  node: chrome.bookmarks.BookmarkTreeNode
+  node: chrome.bookmarks.BookmarkTreeNode,
+  options: { enhance?: boolean; seed?: ResourceRecord } = {}
 ) {
   if (!node.url || !isSupportedPageUrl(node.url)) {
     return;
@@ -3064,35 +4966,68 @@ async function indexNativeBookmark(
   const resourceKey = await resourceKeyForUrl(node.url);
   const auth = await getAuthState();
   const existing = await getLocalResource(resourceKey);
+  const seed =
+    !existing &&
+    options.seed &&
+    options.seed.resourceKey !== resourceKey
+      ? options.seed
+      : undefined;
+  const base = existing || seed;
+  const seededAcrossUrl = Boolean(seed);
   const timestamp = now();
   const resource: ResourceRecord = {
     resourceKey,
     canonicalUrl: canonicalizeUrl(node.url),
     url: node.url,
-    title: node.title || existing?.title || new URL(node.url).hostname,
-    userNote: existing?.userNote || "",
-    summary: existing?.summary || "",
-    tags: existing?.tags || [],
-    tagsSource: existing?.tagsSource,
-    topics: existing?.topics || [],
-    contentExcerpt: existing?.contentExcerpt || "",
-    contentHash: existing?.contentHash || "",
-    selectedText: existing?.selectedText || "",
-    author: existing?.author || "",
-    siteName: existing?.siteName || new URL(node.url).hostname,
-    language: existing?.language || "",
-    imageUrl: existing?.imageUrl || "",
-    ...(existing?.thumbnailDataUrl
-      ? { thumbnailDataUrl: existing.thumbnailDataUrl }
+    title: node.title || base?.title || new URL(node.url).hostname,
+    userNote: base?.userNote || "",
+    summary: seededAcrossUrl ? "" : base?.summary || "",
+    tags: base?.tags || [],
+    tagsSource: base?.tagsSource,
+    topics: seededAcrossUrl ? [] : base?.topics || [],
+    aliases: seededAcrossUrl ? undefined : base?.aliases,
+    contentExcerpt: seededAcrossUrl ? "" : base?.contentExcerpt || "",
+    contentHash: seededAcrossUrl ? "" : base?.contentHash || "",
+    selectedText: seededAcrossUrl ? "" : base?.selectedText || "",
+    author: seededAcrossUrl ? "" : base?.author || "",
+    siteName: seededAcrossUrl
+      ? new URL(node.url).hostname
+      : base?.siteName || new URL(node.url).hostname,
+    language: seededAcrossUrl ? "" : base?.language || "",
+    imageUrl: seededAcrossUrl ? "" : base?.imageUrl || "",
+    ...(!seededAcrossUrl && base?.thumbnailDataUrl
+      ? { thumbnailDataUrl: base.thumbnailDataUrl }
       : {}),
-    faviconUrl: existing?.faviconUrl || "",
+    coverSource: seededAcrossUrl ? undefined : base?.coverSource,
+    coverUpdatedAt: seededAcrossUrl ? undefined : base?.coverUpdatedAt,
+    categoryCoverId: seededAcrossUrl
+      ? categoryCoverForResource({
+          url: node.url,
+          title: node.title || new URL(node.url).hostname,
+          topics: [],
+          tags: base?.tags || [],
+          summary: ""
+        })
+      : base?.categoryCoverId,
+    snapshotAt: seededAcrossUrl ? undefined : base?.snapshotAt,
+    enhancementBlockReason: seededAcrossUrl
+      ? undefined
+      : base?.enhancementBlockReason,
+    enhancementBlockMessage: seededAcrossUrl
+      ? undefined
+      : base?.enhancementBlockMessage,
+    faviconUrl: seededAcrossUrl ? "" : base?.faviconUrl || "",
     nativeBookmarkIds: [
       ...new Set([...(existing?.nativeBookmarkIds || []), id])
     ],
     nativeFolderPath: await folderPathForId(node.parentId || ""),
-    aiStatus: existing?.aiStatus || "not_requested",
+    aiStatus:
+      seededAcrossUrl ||
+      (options.enhance && existing?.aiStatus !== "ready")
+        ? "pending"
+        : existing?.aiStatus || "not_requested",
     syncStatus: auth.configured ? "pending" : "local",
-    createdAt: existing?.createdAt || timestamp,
+    createdAt: base?.createdAt || timestamp,
     updatedAt: timestamp,
     lastSyncedAt: existing?.lastSyncedAt
   };
@@ -3101,6 +5036,64 @@ async function indexNativeBookmark(
   if (auth.configured) {
     await enqueueOutbox(resource, "");
     void syncPendingIfReady();
+  }
+  if (options.enhance) {
+    const display = await getDisplaySettings();
+    const pending: BookmarkEnhancementPart[] = [];
+    if (
+      resource.aiStatus !== "ready" ||
+      !resource.summary.trim() ||
+      !resource.tags.length
+    ) {
+      pending.push("ai");
+    }
+    if (
+      display.pageSnapshotsEnabled &&
+      !isSnapshotSensitiveUrl(
+        resource.url,
+        display.snapshotExcludedHosts
+      ) &&
+      !(await getPageSnapshot(resource.canonicalUrl))
+    ) {
+      pending.push("snapshot");
+    }
+    const current = await activeTab();
+    const activeMatch =
+      current?.url && resourceMatchesLoadedUrl(resource, current.url);
+    if (activeMatch) {
+      await enqueueBookmarkEnhancement(
+        resource,
+        pending,
+        pending.includes("snapshot")
+          ? {
+              state: "queued",
+              trigger: "chrome_bookmark",
+              ...(typeof current.id === "number"
+                ? { tabId: current.id }
+                : {})
+            }
+          : undefined
+      );
+      await rememberImmediateSnapshotTarget(
+        current,
+        resource.url,
+        SAVED_PAGE_SNAPSHOT_DELAY_MS,
+        false,
+        resource.resourceKey,
+        undefined,
+        "chrome_bookmark"
+      );
+      await coordinateActiveBookmarkedPage(
+        current,
+        undefined,
+        "chrome_bookmark"
+      );
+      void processBookmarkEnhancements();
+    } else {
+      // Chrome Sync、批量导入或其他窗口创建书签时，只登记“首次访问再做”。
+      // 不把整个同步库变成一分钟一次的 alarm/backoff 风暴。
+      await queueEnhancementsUntilVisit(resource, "chrome_bookmark");
+    }
   }
 }
 
@@ -3111,11 +5104,25 @@ async function handleRequest(request: ExtensionRequest): Promise<unknown> {
     case "GET_AI_SETTINGS":
       return getAiSettingsStatus();
     case "SAVE_AI_SETTINGS":
-      return saveAiSettings(request.payload);
+      return saveAiSettings(request.payload).then(async (status) => {
+        // Key 就绪后只处理用户当前正在看的真实页面。其他 waiting_for_content
+        // 任务继续等首次访问，不能因为有 Key 就在后台全库制造空转与退避。
+        const current = await activeTab();
+        if (current?.status === "complete") {
+          await coordinateActiveBookmarkedPage(
+            current,
+            undefined,
+            "normal_browse"
+          );
+        }
+        return status;
+      });
     case "GET_BOOKMARK_BAR":
       return getBookmarkBarSnapshot();
     case "GET_PENDING_SAVE":
       return consumePendingSaveDraft(request.tabId);
+    case "GET_BOOKMARK_SAVE_STATE":
+      return getBookmarkSaveState(request.url);
     case "GET_NAVIGATION_SUGGESTIONS":
       return getNavigationSuggestions(request.query);
     case "NAVIGATE":
@@ -3193,6 +5200,8 @@ async function handleRequest(request: ExtensionRequest): Promise<unknown> {
       return updateNativeBookmark(request.payload);
     case "UPDATE_RESOURCE_TAGS":
       return updateResourceTags(request.payload);
+    case "UPDATE_BOOKMARK_DETAILS":
+      return updateBookmarkDetails(request.payload);
     case "CREATE_NATIVE_FOLDER":
       return createNativeFolder(request.payload);
     case "MOVE_NATIVE_BOOKMARK":
@@ -3259,19 +5268,31 @@ chrome.runtime.onInstalled.addListener(() => {
     Promise.all([
       chrome.contextMenus.create({
         id: CONTEXT_MENU_PAGE_ID,
-        title: "添加当前页面到收藏…",
+        title: "添加到收藏…",
         contexts: ["page", "selection"]
       }),
       chrome.contextMenus.create({
         id: CONTEXT_MENU_LINK_ID,
-        title: "添加此链接到收藏…",
+        title: "添加或管理此链接…",
         contexts: ["link"]
       })
     ])
-  );
+  ).then(() => refreshPageContextMenuState()).catch(() => undefined);
   void importNativeBookmarks()
-    .then(() => syncPendingIfReady())
+    .then(async () => {
+      await queueIndexedResourcesUntilVisit();
+      const current = await activeTab();
+      if (current?.status === "complete") {
+        await coordinateActiveBookmarkedPage(
+          current,
+          undefined,
+          "normal_browse"
+        );
+      }
+      await syncPendingIfReady();
+    })
     .catch(() => undefined);
+  void processBookmarkEnhancements();
   void syncOrganizationBadge();
   void getStoredLibraryScan().then((scan) => {
     if (scan.state === "running") {
@@ -3284,6 +5305,39 @@ chrome.runtime.onInstalled.addListener(() => {
       "搜索 Chrome 书签、历史记录和标签页，或使用默认搜索引擎"
   });
 });
+
+async function refreshPageContextMenuState(
+  knownTab?: chrome.tabs.Tab
+): Promise<void> {
+  const revision = ++pageContextMenuRevision;
+  const tab = knownTab || (await activeTab());
+  if (!tab?.url || !isSupportedPageUrl(tab.url)) {
+    if (revision !== pageContextMenuRevision) return;
+    await chrome.contextMenus
+      .update(CONTEXT_MENU_PAGE_ID, {
+        title: "添加到收藏…",
+        enabled: false
+      })
+      .catch(() => undefined);
+    return;
+  }
+  try {
+    const state = await getBookmarkSaveState(tab.url);
+    if (revision !== pageContextMenuRevision) return;
+    await chrome.contextMenus.update(
+      CONTEXT_MENU_PAGE_ID,
+      bookmarkPageMenuPresentation(state)
+    );
+  } catch {
+    if (revision !== pageContextMenuRevision) return;
+    await chrome.contextMenus
+      .update(
+        CONTEXT_MENU_PAGE_ID,
+        bookmarkPageMenuPresentation(null)
+      )
+      .catch(() => undefined);
+  }
+}
 
 async function handleContextMenuSave(
   info: chrome.contextMenus.OnClickData,
@@ -3362,52 +5416,182 @@ chrome.omnibox.onInputEntered.addListener((text, disposition) => {
 });
 
 chrome.tabs.onUpdated.addListener((_tabId, changeInfo, tab) => {
+  if (tab.active && (changeInfo.url || changeInfo.status)) {
+    void refreshPageContextMenuState(tab);
+  }
+  if (changeInfo.status === "loading" && typeof tab.id === "number") {
+    clearPageSnapshotTimer(tab.id);
+    // 不在 tabs.onUpdated 中仅凭 URL 变化删除目标：合法 server/client
+    // redirect 也会先暴露最终 URL。主框架 onCommitted 会依据 Chrome 的
+    // transitionQualifiers 保留重定向，普通用户导航则会删除。
+    return;
+  }
+  // pushState/replaceState 有时只产生 URL 变更而没有新的 complete 事件。
+  // 对已稳定的活动页也重新绑定增强任务，且先清掉旧路由目标。
+  if (
+    changeInfo.url &&
+    tab.active &&
+    tab.status === "complete" &&
+    changeInfo.status !== "complete"
+  ) {
+    void coordinateActiveBookmarkedPage(tab);
+  }
   if (changeInfo.status === "complete" && tab.active) {
-    if (!captureImmediateSnapshotIfReady(tab)) {
-      schedulePageSnapshotForTab(tab);
-    }
+    void scheduleImmediateSnapshotIfReady(tab);
+    void coordinateActiveBookmarkedPage(tab);
   }
 });
 
+chrome.webNavigation.onBeforeNavigate.addListener((details) => {
+  if (details.frameId !== 0) return;
+  void (async () => {
+    const target = await readImmediateSnapshotTarget(details.tabId);
+    if (!target) return;
+    // 任何新导航都先停止旧页面的定时器；是否保留目标由 committed 的
+    // redirect 证据决定，不能仅凭“同一个 tab”宽松接受不同 URL。
+    clearPageSnapshotTimer(details.tabId);
+    const resource = await getLocalResource(target.resourceKey);
+    if (
+      resource?.nativeBookmarkIds.length &&
+      snapshotTargetAllowsLoadedUrl(target, resource, details.url)
+    ) {
+      await storeImmediateSnapshotTarget(details.tabId, {
+        ...target,
+        navigationStartUrl: details.url,
+        redirectedUrl: undefined,
+        completedUrl: undefined,
+        documentId: undefined
+      });
+    }
+  })().catch(() => undefined);
+});
+
+chrome.webNavigation.onCommitted.addListener((details) => {
+  if (details.frameId !== 0) return;
+  void (async () => {
+    const target = await readImmediateSnapshotTarget(details.tabId);
+    if (!target) return;
+    const resource = await getLocalResource(target.resourceKey);
+    if (!resource?.nativeBookmarkIds.length) {
+      await removeImmediateSnapshotTarget(details.tabId, target);
+      return;
+    }
+    const directMatch = resourceMatchesLoadedUrl(resource, details.url);
+    const navigationStartUrl =
+      target.navigationStartUrl || target.targetUrl;
+    const redirectSourceMatches = resourceMatchesLoadedUrl(
+      resource,
+      navigationStartUrl
+    );
+    if (
+      !acceptsSnapshotNavigationCommit({
+        directMatch,
+        redirectSourceMatches,
+        transitionQualifiers: details.transitionQualifiers
+      })
+    ) {
+      clearPageSnapshotTimer(details.tabId);
+      await removeImmediateSnapshotTarget(details.tabId, target);
+      return;
+    }
+    const committedTarget: ImmediatePageSnapshotTarget = {
+      ...target,
+      completedUrl: details.url,
+      documentId: details.documentId,
+      ...(directMatch ? {} : { redirectedUrl: details.url })
+    };
+    await storeImmediateSnapshotTarget(details.tabId, committedTarget);
+    await updateStoredSnapshotProgress(target.resourceKey, {
+      state: "waiting_page",
+      trigger: target.trigger,
+      tabId: details.tabId,
+      documentId: details.documentId,
+      loadedUrl: details.url,
+      ...(target.showToast ? { showToast: true } : {}),
+      ...(target.refreshExisting ? { refreshExisting: true } : {})
+    });
+    if (!directMatch) {
+      // 只有 Chrome 明确认定为 server/client redirect 才登记别名；
+      // 普通用户导航绝不会借用原收藏任务。
+      const latest = await getLocalResource(target.resourceKey);
+      if (latest?.nativeBookmarkIds.length) {
+        await upsertLocalResource({
+          ...latest,
+          aliases: [
+            ...new Set([...(latest.aliases || []), details.url])
+          ],
+          updatedAt: now()
+        });
+      }
+    }
+  })().catch(() => undefined);
+});
+
+chrome.webNavigation.onCompleted.addListener((details) => {
+  if (details.frameId !== 0) return;
+  void chrome.tabs
+    .get(details.tabId)
+    .then((tab) => {
+      if (!tab.active) return;
+      void coordinateActiveBookmarkedPage(
+        tab,
+        details.documentId,
+        "normal_browse"
+      );
+    })
+    .catch(() => undefined);
+});
+
+chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
+  if (details.frameId !== 0) return;
+  void chrome.tabs
+    .get(details.tabId)
+    .then((tab) => {
+      if (!tab.active || tab.status !== "complete") return;
+      void coordinateActiveBookmarkedPage(
+        tab,
+        details.documentId,
+        "normal_browse"
+      );
+    })
+    .catch(() => undefined);
+});
+
 chrome.tabs.onActivated.addListener(({ tabId }) => {
-  clearPageSnapshotTimers();
   void chrome.tabs
     .get(tabId)
     .then((tab) => {
-      if (
-        tab.status === "complete" &&
-        !captureImmediateSnapshotIfReady(tab)
-      ) {
-        schedulePageSnapshotForTab(tab);
+      void refreshPageContextMenuState(tab);
+      if (tab.status === "complete") {
+        void scheduleImmediateSnapshotIfReady(tab);
+        void coordinateActiveBookmarkedPage(tab);
       }
     })
     .catch(() => undefined);
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
-  const timer = pageSnapshotTimers.get(tabId);
-  if (timer !== undefined) globalThis.clearTimeout(timer);
-  pageSnapshotTimers.delete(tabId);
-  immediatePageSnapshotTargets.delete(tabId);
+  clearPageSnapshotTimer(tabId);
+  void removeImmediateSnapshotTarget(tabId);
 });
 
 chrome.windows.onFocusChanged.addListener((windowId) => {
-  clearPageSnapshotTimers();
   if (windowId === chrome.windows.WINDOW_ID_NONE) return;
   void chrome.tabs
     .query({ active: true, windowId })
     .then(([tab]) => {
-      if (
-        tab?.status === "complete" &&
-        !captureImmediateSnapshotIfReady(tab)
-      ) {
-        schedulePageSnapshotForTab(tab);
+      void refreshPageContextMenuState(tab);
+      if (tab?.status === "complete") {
+        void scheduleImmediateSnapshotIfReady(tab);
+        void coordinateActiveBookmarkedPage(tab);
       }
     })
     .catch(() => undefined);
 });
 
 chrome.bookmarks.onCreated.addListener((id, node) => {
+  void refreshPageContextMenuState();
+  if (nativeBookmarkImportInProgress) return;
   if (
     internalBookmarkIds.has(id) ||
     (node.url &&
@@ -3417,20 +5601,81 @@ chrome.bookmarks.onCreated.addListener((id, node) => {
   ) {
     return;
   }
-  void indexNativeBookmark(id, node);
+  void indexNativeBookmark(id, node, { enhance: true });
 });
 
-chrome.bookmarks.onChanged.addListener((id) => {
+chrome.bookmarks.onImportBegan.addListener(() => {
+  nativeBookmarkImportInProgress = true;
+});
+
+chrome.bookmarks.onImportEnded.addListener(() => {
+  nativeBookmarkImportInProgress = false;
+  void importNativeBookmarks()
+    .then(() => queueIndexedResourcesUntilVisit())
+    .catch(() => undefined);
+  void refreshPageContextMenuState();
+});
+
+async function reindexChangedNativeBookmark(
+  id: string,
+  node: chrome.bookmarks.BookmarkTreeNode,
+  urlChanged: boolean
+): Promise<void> {
+  let sourceForNewUrl: ResourceRecord | undefined;
+  if (urlChanged) {
+    const resources = await getLocalResources();
+    sourceForNewUrl = resources.find((resource) =>
+      resource.nativeBookmarkIds.includes(id)
+    );
+    await Promise.all(
+      resources
+        .filter(
+          (resource) =>
+            resource.nativeBookmarkIds.includes(id) &&
+            (!node.url || !resourceMatchesLoadedUrl(resource, node.url))
+        )
+        .map(async (resource) => {
+          const next = {
+            ...resource,
+            nativeBookmarkIds: resource.nativeBookmarkIds.filter(
+              (bookmarkId) => bookmarkId !== id
+            ),
+            updatedAt: now()
+          };
+          await upsertLocalResource(next);
+          if (!next.nativeBookmarkIds.length) {
+            await cancelEnhancementForResource(resource.resourceKey);
+          }
+        })
+    );
+  }
+  await indexNativeBookmark(id, node, {
+    enhance: urlChanged,
+    ...(sourceForNewUrl ? { seed: sourceForNewUrl } : {})
+  });
+}
+
+chrome.bookmarks.onChanged.addListener((id, changeInfo) => {
+  void refreshPageContextMenuState();
   if (internalBookmarkIds.has(id)) {
     return;
   }
   void chrome.bookmarks
     .get(id)
-    .then(([node]) => node && indexNativeBookmark(id, node))
+    .then(
+      ([node]) =>
+        node &&
+        reindexChangedNativeBookmark(
+          id,
+          node,
+          typeof changeInfo.url === "string"
+        )
+    )
     .catch(() => undefined);
 });
 
 chrome.bookmarks.onMoved.addListener((id) => {
+  void refreshPageContextMenuState();
   if (internalBookmarkIds.has(id)) {
     return;
   }
@@ -3480,19 +5725,24 @@ async function handleRemovedNativeBookmark(
           removedIds.has(bookmarkId)
         )
       )
-      .map((resource) =>
-        upsertLocalResource({
+      .map(async (resource) => {
+        const next = {
           ...resource,
           nativeBookmarkIds: resource.nativeBookmarkIds.filter(
             (bookmarkId) => !removedIds.has(bookmarkId)
           ),
           updatedAt: now()
-        })
-      )
+        };
+        await upsertLocalResource(next);
+        if (!next.nativeBookmarkIds.length) {
+          await cancelEnhancementForResource(resource.resourceKey);
+        }
+      })
   );
 }
 
 chrome.bookmarks.onRemoved.addListener((id, removeInfo) => {
+  void refreshPageContextMenuState();
   void handleRemovedNativeBookmark(id, removeInfo).catch(() => undefined);
 });
 
@@ -3500,7 +5750,18 @@ chrome.runtime.onStartup.addListener(() => {
   void (async () => {
     await cleanupExpiredUndoSnapshots();
     await importNativeBookmarks();
+    // 浏览器启动时只恢复当前可见页面，不扫描或后台打开整个收藏库。
+    // 这样安装扩展前已收藏、且当前已经打开的网页也能立即进入补拍/AI 流程。
+    const current = await activeTab();
+    if (current?.status === "complete") {
+      await coordinateActiveBookmarkedPage(
+        current,
+        undefined,
+        "normal_browse"
+      );
+    }
     await syncOrganizationBadge();
+    await refreshPageContextMenuState();
     const auth = await getAuthState();
     if (auth.signedIn && auth.accountMatches === true) {
       // 先提交本地变更，再拉取云端，避免旧云端数据覆盖待同步状态。
@@ -3512,6 +5773,7 @@ chrome.runtime.onStartup.addListener(() => {
       await scheduleLibraryScan();
       void runLibraryScan();
     }
+    void processBookmarkEnhancements();
   })().catch(() => undefined);
 });
 
@@ -3520,5 +5782,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     void syncPendingIfReady();
   } else if (alarm.name === LIBRARY_SCAN_ALARM) {
     void runLibraryScan();
+  } else if (alarm.name === BOOKMARK_ENHANCEMENT_ALARM) {
+    void processBookmarkEnhancements();
   }
 });

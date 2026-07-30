@@ -185,6 +185,16 @@ export function normalizeResourceRecord(value: unknown): ResourceRecord {
     ...(stringValue(record.snapshotAt)
       ? { snapshotAt: stringValue(record.snapshotAt) }
       : {}),
+    ...(record.enhancementBlockReason === "privacy"
+      ? { enhancementBlockReason: "privacy" as const }
+      : {}),
+    ...(stringValue(record.enhancementBlockMessage)
+      ? {
+          enhancementBlockMessage: stringValue(
+            record.enhancementBlockMessage
+          )
+        }
+      : {}),
     ...(linkHealth ? { linkHealth } : {}),
     faviconUrl: stringValue(record.faviconUrl),
     nativeBookmarkIds: stringArray(record.nativeBookmarkIds),
@@ -335,6 +345,11 @@ export async function getPageSnapshot(
   return db.get("pageSnapshots", canonicalUrl);
 }
 
+export async function deletePageSnapshot(canonicalUrl: string): Promise<void> {
+  const db = await database();
+  await db.delete("pageSnapshots", canonicalUrl);
+}
+
 export async function getPageSnapshots(): Promise<PageSnapshot[]> {
   const db = await database();
   return (
@@ -409,6 +424,11 @@ export async function upsertLocalResource(
 ): Promise<void> {
   const db = await database();
   await db.put("resources", normalizeResourceRecord(nextResource));
+}
+
+export async function deleteLocalResource(resourceKey: string): Promise<void> {
+  const db = await database();
+  await db.delete("resources", resourceKey);
 }
 
 export async function mergeLocalResources(

@@ -1,10 +1,13 @@
 import { visibleFolderLabel } from "../../../lib/folder-options";
 import type { KnowledgeDashboard } from "../../../lib/types";
+import { ResourceLink } from "../components/ResourceLink";
 
 export function ResurfaceView({
-  dashboard
+  dashboard,
+  onOpenResource
 }: {
   dashboard: KnowledgeDashboard | null;
+  onOpenResource: (url: string) => void;
 }) {
   const items = dashboard?.resurfacing || [];
   return items.length ? (
@@ -13,9 +16,12 @@ export function ResurfaceView({
         <article key={item.resourceKey}>
           <span>{item.ageDays} 天前收藏</span>
           <h3>
-            <a href={item.url} target="_blank" rel="noreferrer">
+            <ResourceLink
+              url={item.url}
+              onOpenResource={onOpenResource}
+            >
               {item.title}
-            </a>
+            </ResourceLink>
           </h3>
           <p>{item.reason}</p>
           <small>{visibleFolderLabel(item.path)}</small>

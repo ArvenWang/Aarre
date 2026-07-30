@@ -1,11 +1,14 @@
 import { visibleFolderLabel } from "../../../lib/folder-options";
 import type { LibraryInsights } from "../../../lib/types";
+import { ResourceLink } from "../components/ResourceLink";
 import { displayTimestamp } from "../utils";
 
 export function ReadingView({
-  insights
+  insights,
+  onOpenResource
 }: {
   insights: LibraryInsights | null;
+  onOpenResource: (url: string) => void;
 }) {
   const queue = insights?.readingQueue || [];
   return queue.length ? (
@@ -15,9 +18,12 @@ export function ReadingView({
           <span className="reading-index">{index + 1}</span>
           <div>
             <h3>
-              <a href={item.url} target="_blank" rel="noreferrer">
+              <ResourceLink
+                url={item.url}
+                onOpenResource={onOpenResource}
+              >
                 {item.title}
-              </a>
+              </ResourceLink>
             </h3>
             <p>{visibleFolderLabel(item.path)}</p>
             <small>

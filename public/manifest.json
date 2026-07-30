@@ -3,7 +3,7 @@
   "name": "Aarre",
   "short_name": "Aarre",
   "description": "保留 Chrome 原生书签，同步网页上下文，并用 AI 帮你重新找到真正需要的内容。",
-  "version": "0.3.8",
+  "version": "0.4.3",
   "minimum_chrome_version": "134",
   "permissions": [
     "activeTab",
@@ -19,16 +19,11 @@
     "sidePanel",
     "storage",
     "tabs",
-    "unlimitedStorage"
+    "unlimitedStorage",
+    "webNavigation"
   ],
   "host_permissions": [
-    "https://generativelanguage.googleapis.com/*",
-    "https://api.openai.com/*",
-    "https://api.deepseek.com/*"
-  ],
-  "optional_host_permissions": [
-    "http://*/*",
-    "https://*/*"
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "background.js",

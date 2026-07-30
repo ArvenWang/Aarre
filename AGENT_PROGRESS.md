@@ -1,14 +1,22 @@
 # Aarre 项目进展
 
-最后更新：2026-07-30
+最后更新：2026-07-31
 
 ## 当前进展
+
+**统一收藏增强协调器已落地到当前 0.4.3 工作区。** Chrome 星标与 Aarre 保存都先创建真实原生书签，再持久登记 AI 摘要、标签和截图任务；权限、Key、网络、前台页面或 Service Worker 暂时不可用时，任务继续等待，不用伪造摘要、标签或封面冒充完成。`"<all_urls>"` 已作为必需网页权限，普通打开方式统一覆盖 Aarre、地址栏、Chrome 书签栏、历史记录和网页普通链接。
+
+**当前截图交互以“是否已收藏、是否缺图、截图是否满 7 天”为唯一判断，不再依赖入口。** 已收藏且缺图时，页面完成并经过字体、首屏图片、DOM 稳定检查后自动补拍；从 Aarre 或正常浏览补旧图成功显示一次“封面截图已更新”，Chrome 星标与 Aarre 新收藏的首次截图静默。已有截图未满 7 天不处理，满 7 天后只在正常浏览时静默刷新，不会每次访问都重拍。
+
+**隐私边界已统一为同时禁止 AI 与截图。** 无痕、内部、局域网、银行、支付、医疗和用户排除页面不读取正文、不调用外部 AI、也不截图，网页端只显示 Aarre 兜底图。截图前后继续核对前台标签、聚焦窗口、最终 URL、document/navigation 身份和收藏绑定；SPA、重定向、删除、URL 修改与 Service Worker 恢复统一走持久任务和精确页面身份。
+
+**网页端收藏库已完成 0.4.3 交互收口。** Tab 上方只保留单行 Aarre 品牌，收藏搜索回到收藏库自身工具栏；每张卡片可精确编辑或删除一个 Chrome 收藏位置。大封面只读取本机 `pageSnapshots`：有真实网页截图就显示截图，没有或读取失败就在 40 张本地 Aarre 兜底图中按语义或 canonical URL 稳定分配，不使用普通 `og:image`、网络代表图、侧边栏图片或低清 favicon。
 
 **Aarre 0.3.8 已完成 `docs/UI_REDESIGN.md` 的 UI / 视觉系统重构并通过本地交付验收。** 侧边栏与网页端现共用单一 Token、明暗主题、两档密度和基础组件；网页端六个 tab 已拆成独立视图，收藏库改为内容型瀑布流，报告补齐数据图表，主题图谱升级为可旋转缩放的三维力导向 Canvas。设计防回归脚本已接入 `npm run check`，本轮完整检查为 35 个测试文件、150 项测试全部通过。详细量测与边界见最新记录。
 
 **Aarre 0.3.8 已统一隐藏 Chrome 系统根目录，并完成整理提案的信息精简。** 侧边栏不再把“书签栏”“其他书签”或第二个本机书签栏作为普通文件夹展示，而是直接展示这些根目录下的真实内容；所有面向用户的文件夹路径统一从用户自建目录开始，根目录直存条目显示为“根目录”。归类提案改为“来源文件夹 / 网页名 → 目标文件夹”，网页名只出现一次；同位置的完全相同副本合并为“保留 1 个、删除 N 个副本”的明确说明。内部仍保留完整 Chrome 路径，移动、撤销、同步和删除目标不受影响。此前 0.3.7 已完成 `docs/REMEDIATION.md` v2 的第 1–7 批整改；F3 同源 300 条样本分类封面兜底为 46.67%，PRD 的 ≤12% 指标仍需产品决策。
 
-自动化与开发评审已经收口，但**不能把它说成全部上架验收完成**：当前浏览器控制工具明确禁止打开 `chrome://extensions`，因此无法在本轮把最新 `dist/` 重新加载为安装扩展；Chrome Web Store 正式 Extension ID、公开 HTTPS 隐私政策地址、真实 300/1,000/2,000 条书签指标与真人破坏性撤销门也仍需外部环境。详见“未解决问题”和本页最新记录。
+自动化与开发评审已经收口，但**不能把它说成全部上架验收完成**：当前浏览器控制工具明确禁止打开 `chrome://extensions` 和 `chrome-extension://` 页面，因此无法在本轮把最新 `dist/` 重新加载并操作安装扩展；Chrome Web Store 正式 Extension ID、公开 HTTPS 隐私政策地址、三条历史失败路径的安装态复测、真实 300/1,000/2,000 条书签指标与真人破坏性撤销门仍需外部环境。详见“未解决问题”和本页最新记录。
 
 **`docs/PRD.md` 已定稿到可开工状态（v1.2）。** 22 个需求分四个里程碑，第 12 章给出了执行顺序、文件归属和纪律。开发 Agent 请从第 12 章读起。F22 已于 2026-07-30 修订为「悬浮层只有一张页面快照」，以修订后的版本为准。
 
@@ -18,9 +26,87 @@
 
 正式产品名：`Aarre`。代码目录与内部包名暂时保留 `Bookmark-Layer`，避免无关路径迁移影响当前扩展。
 
-当前统一项目目录：`/Users/nefish/Desktop/WorkSpace/Coding/Aarre`。
+当前统一项目目录：`/Users/nefish/Desktop/Coding/Aarre`。
 
 ## 最近更新
+
+### 2026-07-31 · 0.4.3 收藏卡片编辑、40 张兜底封面与管理页极简顶部
+
+- **卡片编辑与删除闭环。** 每张收藏库瀑布流卡片增加次级“编辑”入口，可精确修改一个 Chrome 收藏位置的名称、完整 URL 和文件夹，以及 Aarre 自定义标签和备注；AI 摘要保持只读。多位置先选位置，删除只作用于所选 `bookmarkId`，并提供二次确认、30 天恢复说明、受管理收藏门禁、Escape / 焦点陷阱和保存/删除后的焦点转移。
+- **原生与增强数据分工。** Chrome 原生字段通过 `UPDATE_BOOKMARK_DETAILS` 写回并生成统一撤销批次；Aarre 元数据留在本机资源。真正跨资源改 URL 时只迁移所选绑定，其他副本留在旧资源，新资源清空旧摘要、正文、站点图、快照与 AI 状态，等待下次稳定打开后重建。追踪参数、普通 hash、尾斜杠、已知 canonical 和 redirect alias 的完整地址仍会真实写回 Chrome，但保持同一资源和全部增强信息。
+- **数据安全收口。** 编辑器通过 `tagsChanged` 区分 AI 标签和用户明确编辑的标签；只改标题、文件夹或备注不会把 AI 标签误标为用户标签，跨站只保留真正的用户标签。same-key 迁移被防御性拒绝，避免丢失同资源其他 Chrome 绑定。失败恢复会执行全部本地、outbox、增强任务、Chrome undo 与重导步骤，任何一步失败都明确提示“未完整恢复”，不再虚假承诺完整回滚。
+- **40 张 Aarre 兜底封面全部接入。** 收藏库大封面继续以本机真实页面截图为最高优先级；缺图或读取失败时，可靠语义映射到对应 Aarre 封面，否则按 canonical URL 的稳定 FNV-1a 哈希分配到完整 40 张本地 WebP。相同网页在刷新、筛选和排序后保持同图；普通 `og:image`、网络代表图、侧边栏图片和低清 favicon 不进入大封面。
+- **管理页顶部与收藏搜索。** Tab 上方删除大标题、说明、返回侧边栏、账号和“仅保存在本机”等内容，只保留单行 Aarre 标识。搜索框进入收藏库工具栏，只搜索收藏标题、标签、摘要和文件夹；输入草稿与已提交查询分离，提交后才改变结果、高亮、排序和 URL。错误的百分比相关度改为“标题匹配”等可理解文案。
+- **自动化与产物验证。** Node.js 22.22.2 下 `npm run check` 通过：设计 Token、TypeScript、45 个测试文件 / 208 项测试和 0.4.3 生产构建全部成功；`npm audit --audit-level=high` 为 0 漏洞，商店素材验证和 `git diff --check` 通过。`dist/manifest.json` 为 0.4.3，必需 `host_permissions` 为 `"<all_urls>"`，40 / 40 张 WebP 均进入约 1.9 MB 的 `dist/`，manager bundle 包含编辑、保存和删除确认功能。
+- **开发预览验收。** 默认桌面、600px 与 360px 视口均无横向溢出；移动端编辑入口为 44px 触控高度，弹窗在 360×800 内可滚动；收藏搜索提交前保持 309 项、提交 `Anthropic` 后为 1 项并写入 `q`；前 80 张兜底卡片出现 34 个不同封面 ID，单元测试用 2,000 个未知 URL 覆盖完整 40 张；编辑备注、成功 toast、删除二次确认/取消和控制台 0 error 均通过。该预览只证明 UI 与 mock 交互，不冒充安装态 Chrome/IndexedDB 事务验收。
+- **仍需真人安装态门。** 真实 Chrome 需要重载最新 `dist/` 后验证单/多位置编辑、managed 收藏、URL 跨资源迁移与失败恢复，以及此前截图增强矩阵；当前工具不能访问 `chrome://extensions` / `chrome-extension://`，因此本轮没有宣称安装版已通过。
+
+### 2026-07-31 · 统一收藏增强协调器、7 天截图新鲜度与收藏库筛选排序
+
+- **所有正常打开方式统一补缺。** Aarre、地址栏、Chrome 书签栏、历史记录和网页普通链接命中已收藏缺图页面后，都在 `complete` 之后继续等待字体、首屏图片和 DOM 稳定，再进行截图前后身份复核。新收藏首拍静默；从 Aarre 或正常浏览补旧图成功显示“封面截图已更新”。
+- **截图按 7 天新鲜度刷新。** 已有图未满 7 天不重拍；满 7 天后只在正常浏览时静默刷新，不显示 toast。真实页面截图仍是网页端大封面的唯一可信来源，缺图、拒绝或读取失败统一使用 Aarre `generic-webpage` 兜底，不使用 `og:image` 或分类封面冒充。
+- **新收藏和持久增强。** Chrome 星标与 Aarre 保存都创建完整增强任务；AI 摘要、标签和截图分别记账、互不阻塞。无 Key、断网、暂时没有合适前台页面或 Service Worker 重启时任务持久等待，在配置恢复或收藏下次正常打开时继续。
+- **隐私边界。** 无痕、内部、局域网、银行、支付、医疗及用户排除页面统一禁止正文读取、AI 调用和截图，只显示 Aarre 兜底图。
+- **收藏库文件夹筛选。** `src/ui/manager/library-collection.ts` 从真实 Chrome 书签树构建文件夹分面，隐藏“书签栏/其他书签”等系统根目录，支持根目录、嵌套目录、父目录包含全部后代、同一资源多位置去重和每个目录的真实计数。卡片显示当前目录位置，多位置显示“+N”。
+- **收藏库状态筛选与排序。** `src/ui/manager/views/LibraryView.tsx` 增加“全部/已理解/待处理”、文件夹下拉、清除筛选和空状态；排序支持 Chrome 原始顺序、最近/最早收藏、最近使用、最近更新和标题 A-Z。存在搜索词且使用默认排序时保留搜索相关度，不被 Chrome 顺序覆盖。
+- **筛选状态可恢复。** `src/ui/manager/ManagerApp.tsx`、`src/ui/manager/types.ts` 与 `src/ui/manager/library-collection.ts` 把状态、文件夹和排序写入管理页 URL；刷新或切换视图后可恢复，失效参数与已删除文件夹安全回退到“全部/所有文件夹/默认排序”。
+- **管理页打开入口收口。** 新增 `src/ui/manager/components/ResourceLink.tsx`，并接入收藏库、整理提案、待读、报告与重新发现视图。普通左键统一通过 Aarre 导航以登记增强来源；修饰键和中键保留浏览器原生打开，由正常浏览补缺安全网继续处理。
+- **本轮 UI 文件清单。** `src/ui/manager.css`、`src/ui/manager/ManagerApp.tsx`、`src/ui/manager/types.ts`、`src/ui/manager/library-collection.ts`、`src/ui/manager/components/LibraryCardCover.tsx`、`src/ui/manager/components/ResourceLink.tsx`、`src/ui/manager/views/LibraryView.tsx`、`OrganizeView.tsx`、`ReadingView.tsx`、`ReportView.tsx`、`ResurfaceView.tsx`；专项测试为 `tests/library-collection.test.ts`、`tests/library-card-cover.integration.test.tsx`、`tests/resource-link.test.tsx`。
+- **验证。** 0.4.2 `npm run check` 已通过：设计 Token、TypeScript、41 个测试文件 / 183 项测试、生产构建全部成功；`package.json` 与 `dist/manifest.json` 均为 0.4.2，产物必需 `host_permissions` 为 `"<all_urls>"`。文件夹专项覆盖隐藏系统根目录、嵌套/父目录筛选、多位置去重、根目录、Chrome 顺序、收藏/使用时间排序、搜索相关度、处理状态、URL 往返和非法参数回退；封面与链接集成测试覆盖真实截图/Aarre 兜底和普通左键/修饰键行为。安装态真人门仍需在真实 Chrome 重载最新 `dist/` 后完成。
+
+### 2026-07-31 · 历史故障基线：0.4.1 三条截图路径复测失败与统一增强架构决策（已由当前重构取代）
+
+- **真人失败基线。** Chrome 原生星标新增、Aarre 打开安装前旧收藏、Aarre 自身新增收藏三条路径均未生成封面截图；此前 39 个测试文件 / 169 项测试及构建通过只能证明纯函数和产物结构，不能证明安装态截图链路。
+- **权限根因已按 Chromium 源码核实。** `PermissionsData::CanCaptureVisiblePage()` 对 `captureVisibleTab()` 明确检查 host pattern 的 `match_all_urls()`；当前 `http://*/*` + `https://*/*` 不等于 `"<all_urls>"`。Chrome 原生星标又不会授予 `activeTab`，从管理页打开网页也没有稳定的临时授权，因此现权限方案无法支持产品承诺。
+- **共同管线根因。** `schedulePageSnapshotForTab()` 用 MV3 Service Worker 内存 `setTimeout` 安排截图，并通过 `.catch(() => false)` 吞掉全部异常；没有 `waiting_page / waiting_foreground / stabilizing / capturing / blocked_permission / blocked_privacy / ready` 等状态，也没有本地诊断界面。Chrome 官方明确要求 MV3 持久化关键状态，因为 Service Worker 终止会结束计时器。
+- **资源身份缺陷。** Aarre 保存优先使用页面声明 canonical 建立资源，但安排截图时拿地址栏 URL 与 canonical 严格比较，`rememberImmediateSnapshotTarget()` 又根据 URL 重算资源键；canonical 去参数、跨 `www`、语言主版本和重定向都可能导致保存成功但永不建截图任务。
+- **入口覆盖缺陷。** 当前只有显式 `NAVIGATE` 才登记旧收藏补拍；管理页部分原生链接、修饰键/中键、Chrome 书签栏、地址栏、历史记录和普通网页链接均可绕过。`tabs.onUpdated` 只恢复已经存在的即时目标，不会查询“当前 URL 是否已收藏且缺图”。
+- **平台边界。** 规范主方案仍是本机 `captureVisibleTab()`，它只能截指定窗口当前活动页。`bookmarks.onCreated` 只给书签节点，不提供来源 tab；因此原生星标后只能在 URL 唯一匹配且页面仍在前台时尽量即时完成，用户先切走时应持久等待下次打开，绝不能截取别的活动页。`offscreen` 只能辅助图片处理，不能加载任意外站截图；HTML/iframe 缩略图、`tabCapture`、`debugger` 和远程截图均不作为主方案。
+- **统一状态机。** Chrome 原生星标、Aarre 保存、从 Aarre 打开、普通浏览已收藏缺图页、浏览器启动恢复都只创建或唤醒同一种持久增强任务。截图任务直接携带 `resourceKey`，临时绑定 `tabId + documentId + finalUrl`；页面完成后由轻量内容脚本等待字体、首屏图片和 DOM 安静，再通知后台做截图前后双重身份校验。
+- **无感恢复规则。** 新收藏能即时完成则静默；用户离开则标记 `waiting_foreground`，下次该收藏以任意方式成为前台并稳定时自动补齐。旧收藏首次补拍成功只显示一次“封面截图已更新”。敏感/内部/无痕/用户排除页面标记为明确的永久跳过并使用 Aarre 兜底图，不得伪装为持续处理中。
+- **AI 边界。** 摘要与标签必须同时成功才算 AI `ready`，但要与截图独立记账、独立重试。当前 BYOK 模式没有 API Key 时不可能无条件完成 AI，只能保留 `waiting_for_key` 并做一次明确配置引导；若未来要求零配置全自动，需另行提供有显著数据披露、用户同意、成本和限流治理的 Aarre 托管 AI 服务。
+- **历史状态。** 上述审计发生在统一协调器实现之前；当前工作区已完成 `"<all_urls>"`、持久状态、精确 tab/document 绑定、普通浏览补缺和 7 天静默刷新。仍未完成的是最新 `dist/` 的真人 Chrome 安装态矩阵，不能把历史失败继续描述为当前源码“尚待实现”。
+
+### 2026-07-31 · 历史记录：0.4.1 原生收藏与旧收藏截图失效修正
+
+- **纠正 0.4.0 的错误权限假设。** Chrome 官方能力边界是：`bookmarks.onCreated` 能观察原生星标，但原生星标不是 Aarre 的用户手势，不会授予 `activeTab`；`scripting.executeScript` 和 `captureVisibleTab` 需要匹配的 host permission 或临时 `activeTab`。因此原生星标后若没有提前授予 optional 权限，0.4.0 的持久队列只能等待，无法履行“收藏后立即完成截图”的产品承诺。
+- **当时的 0.4.1 行为（现已作废）：** `public/manifest.json` 曾将 `http://*/*` / `https://*/*` 从 `optional_host_permissions` 改为必需 `host_permissions`，并仍只覆盖新收藏、从 Aarre 打开缺图旧收藏和主动扫描，不支持普通浏览补缺。当前实现已改为真正的 `"<all_urls>"`、所有正常打开方式补缺和 7 天静默刷新。
+- `getDisplaySettings()` 会把旧存储中 `pageSnapshotsEnabled: false` 实际迁移为 `true`；`saveDisplaySettings()` 也不再写回隐藏关闭状态，避免新版 UI 没有开关但后台永久静默禁用。
+- 截图目标写入 `chrome.storage.session` 后重新 `chrome.tabs.get()`，再依据最新状态安排任务，关闭“complete 事件先到、目标后落盘”的竞态。同页重载或动态二次加载只清除当前计时器，不再无条件丢掉补拍目标；明确跳转到其他 URL 才删除。
+- 后台增强队列与 Aarre 打开路径为同一资源安排任务时合并 `delayMs` / `showToast`：静默的 250ms 新收藏重试不能覆盖旧收藏路径的 1.5 秒等待和“封面截图已更新”提示。
+- **当时的两条路径文档口径已作废。** 当前隐私政策、架构、PRD、整改文档与商店权限披露以“新收藏首拍 + 所有正常打开方式补缺 + 7 天静默刷新”为准。
+- 版本从 0.4.0 提升到 0.4.1。完整检查、产物检查和安装态复测结果见下方“验证情况”；真实 Chrome 仍需重新加载 `dist/` 并接受权限变化后，分别验证原生星标和 Aarre 打开缺图旧收藏。
+
+### 2026-07-31 · 历史记录：0.4.0 Chrome 原生收藏完整增强层与右键状态机
+
+- 新增 `aarre:bookmark-enhancements:v1` 持久增强队列。Chrome `bookmarks.onCreated` 监听原生星标新增，基础资源落库后自动排入 AI 与截图任务；任务按资源键去重、指数退避、Alarm 恢复，配置 AI Key 后会主动唤醒。Chrome HTML 批量导入期间遵守 `onImportBegan/onImportEnded`，只做最终索引，不自动对整批历史书签发起昂贵增强。
+- **当时的 0.4.0 恢复边界（现已扩展）：** AI 摘要和标签作为同一必选生成步骤，收藏浮层移除了 AI 勾选框；暂时无 Key、网页权限、网络或前台页面时任务保留。当时只承诺从 Aarre 打开后继续，当前已覆盖所有正常打开方式。
+- 右键和侧边栏星标共用全局查重：无匹配才能直接新增；唯一完全相同记录更新原记录；canonical-only 命中必须确认复用或另存；多条命中显示位置并要求选择；受 Chrome 管理的记录只更新 Aarre 元数据。Agent 新建入口遇到已存在 URL 也拒绝制造重复。
+- 当前页面右键项随活动 tab、URL 和书签事件更新为“添加到收藏…”或“管理此收藏…”，异步刷新带 revision 防止慢查询覆盖新页面。Chrome Context Menus API 只公开点击事件，不公开菜单显示前的链接目标事件，因此链接项固定使用中性文案“添加或管理此链接…”，点击后在侧边栏再次校验。
+- **当时的 0.4.0 行为（现已作废）：** 新收藏和 Aarre 打开缺图旧收藏的截图目标写入 `chrome.storage.session`，普通浏览路径被移除。当前实现已恢复为所有正常打开方式统一补缺，并增加 7 天静默刷新。
+- 旧收藏补拍成功后向网页注入隔离的 Shadow DOM toast，文案为“封面截图已更新”，3 秒后自动移除；新收藏的首次截图保持静默。无痕、银行、支付、医疗、内网及用户排除网站继续不截图，只使用 Aarre 兜底图。
+- 没有新增 Manifest 权限；继续使用现有 `bookmarks`、`contextMenus`、`alarms`、`storage`、`scripting`、`tabs` 与按用户手势申请的 `optional_host_permissions`。
+- 版本从 0.3.9 提升到 0.4.0。Node.js 22.22.2 下 `npm run check` 全通过：38 个测试文件、165 项测试、类型检查、设计 Token 检查和生产构建成功；`npm audit --audit-level=high` 为 0 漏洞，商店素材验证和 `git diff --check` 通过。`package.json` 与 `dist/manifest.json` 均为 0.4.0，`dist/` 约 1.9 MB。
+- 尚未完成安装态真人门：需要在真实 Chrome 中分别验证原生星标、页面右键各状态、Key/权限恢复、动态站点稳定截图、补拍 toast、敏感/无痕拒绝和 Service Worker 暂停恢复。自动化与源码检查不能冒充这些浏览器交互证据。
+
+### 2026-07-30 · 0.3.9 网页端真实截图封面与稳定采集
+
+- 网页端收藏瀑布流新增独立 `LibraryCardCover`：大封面只按 canonical URL 延迟读取本机页面快照；无快照、权限拒绝、读取失败或快照图片加载失败时，统一显示 Aarre `generic-webpage-v1.webp`。普通 `thumbnailDataUrl` / `og:image`、站点标识和分类封面不再进入大封面。
+- 快照只在卡片进入前后 600px 预加载区时读取，离开后释放 Base64 数据，避免上千条收藏同时占用管理页内存；后台采集成功会广播刷新，管理页重新获得焦点也会复查可见卡片。
+- 管理页和侧边栏的普通点击统一走 `NAVIGATE`，首次由真实用户点击申请可选的 `http/https` 权限；拒绝权限不阻断保存或打开网页，只继续显示兜底图。用户已关闭快照设置时不会请求权限。
+- 新收藏在原生书签和基础本地资源写入后立即进入快照队列，不再等待可选 AI 富化完成；从 Aarre 打开的老收藏使用 1.5 秒最短稳定等待；正常浏览已收藏 URL 保持 `complete` 后 5 秒停留。
+- 截图前通过网页上下文等待字体、首屏可见图片和 DOM 900ms 安静，最长稳定观察 4 秒；等待前后都重新读取真实标签状态，必须同时满足前台、活动窗口、`status === "complete"`、URL 未变化、非无痕和非敏感地址。标签切换、窗口失焦、重新导航或关闭都会取消或放弃截图。
+- 页面快照由 680×425 提升为最长边 960、16:10、WebP q0.75，满足 240–300px 瀑布流卡片在 Retina 屏幕上的显示。PRD、架构和整改文档已同步权限、稳定等待和尺寸口径。
+- 版本从 0.3.8 提升到 0.3.9。Node.js 22.22.2 / npm 10.9.7 下 `npm run check` 全通过：36 个测试文件、155 项测试、类型检查、设计 Token 检查和生产构建成功；`npm audit --audit-level=high` 为 0 漏洞，商店素材验证通过，`git diff --check` 通过。`package.json` 与 `dist/manifest.json` 均为 0.3.9，`dist/` 约 1.8 MB。
+- 安装态真人门仍未完成：自动化浏览器能够看到用户现有 Aarre 管理页，但安全策略禁止进入 `chrome-extension://` 页面，也禁止进入 `chrome://extensions` 重载扩展。不能据此声称真实权限弹窗、动态网页稳定采集和卡片回填已经在安装版逐项验收。
+
+### 2026-07-30 · 拉取最新主线并完成本地生产构建
+
+- 工作区无未提交改动后，从 `origin/main` 以 fast-forward 方式将本地 `main` 从 `4c90cb9f8de2494414db95df07ef7df29879fea3` 更新到 `7e585635ca00721017da26b3072d9f958f4c8396`。
+- 使用 Node.js `22.22.2`、npm `10.9.7` 执行 `npm ci`；安装并审计 126 个依赖包，发现 0 个漏洞。
+- `npm run check` 全部通过：Node 版本检查、设计 Token 检查、TypeScript 类型检查、35 个测试文件 / 150 项测试和生产构建均成功。
+- 最新可加载的未压缩 Chrome 扩展已输出到 `/Users/nefish/Desktop/Coding/Aarre/dist/`，体积约 1.8 MB；`package.json` 与 `dist/manifest.json` 的版本均为 `0.3.8`。
+- 本轮仅完成源码同步、自动化检查与本地构建，没有执行 Chrome 已安装扩展的真人交互验收，也没有生成 Chrome Web Store 上传包。
 
 ### 2026-07-30 · UI/视觉重构实施完成（`docs/UI_REDESIGN.md` 批次 A–H）
 
@@ -1104,13 +1190,14 @@ F2 的撤销快照和 F22 的页面快照原来都叫 `snapshots`，但前者是
 
 ## 下一步计划
 
-本轮云端外开发已经结束，下一步是**发布与真人验收门**，不是继续堆功能：
+统一增强协调器、所有正常打开方式补缺、7 天截图新鲜度和收藏库文件夹筛选排序已实现。下一步重点是**真人安装态验收与商业化规模验证**，不是继续改交互规则：
 
-1. 在允许访问 `chrome://extensions` 的真人 Chrome 中加载 0.3.2 `dist/`，按本页“明确未通过 / 外部门”逐项补证；涉及删除时先建立专用测试文件夹，不在真实私人书签上冒险。
-2. 用不少于 300 条真实中英文书签完成封面来源分布、死链耗时、整理建议合理率、扫描并发和实际费用偏差报告。
-3. 在 Chrome Web Store 后台创建正式 Extension ID，把 `privacy.html` 同内容部署到公开 HTTPS 地址，再核对 Google OAuth 重定向 URI 与最终 Manifest。
-4. 若决定制作有声宣传片，配置正式 TTS 凭据后生成旁白并披露 AI 配音；当前中文字幕版可直接审阅。
-5. F14 云端迁移与 F21 Web/PWA 继续保持排除，除非产品负责人另开任务；F8 第二/三层须先拍板 D7。
+1. 在真实 Chrome 重载最新 `dist/`，逐项验证 Chrome 星标、Aarre 新增、Aarre/地址栏/普通链接打开缺图旧收藏、新收藏静默首拍、旧收藏 toast、7 天静默刷新、重定向、SPA、Service Worker 休眠、多窗口、无 Key/断网和敏感/无痕拒绝；保留实际版本、权限与后台错误证据。
+2. 对收藏库文件夹筛选、六种排序、状态组合、搜索相关度、URL 恢复、已删除文件夹回退、移动端布局和空状态做真人管理页验收。
+3. 用不少于 300 条真实中英文书签完成封面来源分布、死链耗时、整理建议合理率、扫描并发和实际费用偏差报告。
+4. 在 Chrome Web Store 后台创建正式 Extension ID，把 `privacy.html` 同内容部署到公开 HTTPS 地址，再核对 Google OAuth 重定向 URI 与最终 Manifest。
+5. 若决定制作有声宣传片，配置正式 TTS 凭据后生成旁白并披露 AI 配音；当前中文字幕版可直接审阅。
+6. F14 云端迁移与 F21 Web/PWA 继续保持排除，除非产品负责人另开任务；F8 第二/三层须先拍板 D7。
 
 **第 5 批：F14 云端迁移**
 
@@ -1158,17 +1245,17 @@ F2 的撤销快照和 F22 的页面快照原来都叫 `snapshots`，但前者是
 - 删除原生书签目前不会立即永久删除云端资源。F14 的墓碑机制加 F2 的回收站会一起解决。
 - 同一个 Canonical URL 的多位置、多备注模型目前合并为一个资源。
 - F3 真实 300 条中英文书签样本的来源分布和质量地板指标尚未统一验收。
-- F22 当前只完成本地真实 Chrome 预览与自动化；真实安装 `dist/` 后的截图权限、采集、敏感域名、无痕和 v3→v4 升级门尚未验收。
+- 0.4.1 的三条截图主路径失败属于历史安装态基线；当前工作区已补齐真正的 `"<all_urls>"`、统一持久协调器和普通浏览补缺，但尚未在真实 Chrome 重载最新 `dist/` 后逐项复测，因此只能说“源码与自动化已实现，真人安装态待验收”，不能沿用“当前源码缺少实现”或反向宣称真人已通过。
 - Chrome 移动端没有扩展运行环境，后续需要 Web/PWA 管理端（F21）。
 - 商店图标、截图、宣传图、中文字幕视频和文案已落盘；正式 Extension ID、公开隐私政策网址和安装版逐屏核对仍未完成。
-- 浏览器控制工具明确拒绝 `chrome://extensions` 且禁止绕过，所以本轮无法把开发预览验收升级成安装态验收。
+- 浏览器控制工具明确拒绝 `chrome://extensions` 和 `chrome-extension://` 页面且禁止绕过，所以本轮无法把开发预览验收升级成安装态验收。
 - 当前环境未配置正式 TTS 所需的 `OPENAI_API_KEY`；有声旁白未生成，现有视频为完整中文字幕版。
 
 **2026-07-30 独立代码审查提出的未解决项**
 
 完整清单见「最近更新」里的审查记录，此处只列需要优先处理的：
 
-- **待产品负责人拍板：** F22 实现（0.3.1 / 0.3.2 收敛为纯截图）与 `docs/PRD.md` F22 完全对立，PRD 未同步修改，两条验收标准已永久无法通过。快照采集时间角标被一并删除，建议无论方向如何都加回。
+- ~~F22 实现与 PRD 对立、文档未同步。~~ **已解决：** PRD 已统一为纯真实快照；0.3.9 又补齐网页端截图优先 / Aarre 兜底和稳定采集口径。采集时间按产品修订继续只用于淘汰，不在封面显示。
 - 删除确认文案写「此操作无法撤销」，与 F2 实际的 30 天可恢复能力矛盾。
 - F7 整理提案无自动生成、无扫描完成引导，入口是一个无文字图标按钮，实际触达接近于零。
 - F3 的「兜底率 ≤ 12%」既达不到（规则表 17 条 vs 目标 150+、透明背景合成未实现）也无法测量，需要先做统计工具。
@@ -1182,6 +1269,19 @@ F2 的撤销快照和 F22 的页面快照原来都叫 `snapshots`，但前者是
 
 ## 验证情况
 
+- 当前 0.4.3 工作区 `npm run check`：通过；Node.js 22.22.2，包含设计 Token、TypeScript、45 个测试文件 / 208 项测试和生产构建；`package.json` 与 `dist/manifest.json` 均为 0.4.3，产物必需 `host_permissions` 为 `"<all_urls>"`，40 / 40 张本地兜底 WebP 已进入 `dist/assets/`。
+- 当前 0.4.3 `npm audit --audit-level=high`：0 漏洞；`npm run verify:store-assets` 与 `git diff --check` 通过；`npm run verify:artifacts` 检测到当前没有 `outputs/` 交付包并安全跳过历史包校验。开发预览完成默认桌面、600px、360px、编辑/保存/删除确认、收藏搜索与封面分布检查，控制台 0 error；不替代安装态扩展验收。
+- 0.4.2 历史 `npm run check`：通过；Node.js 22.22.2，包含设计 Token、TypeScript、41 个测试文件 / 183 项测试和生产构建；`package.json` 与 `dist/manifest.json` 均为 0.4.2，产物必需 `host_permissions` 为 `"<all_urls>"`。
+- 0.4.2 历史 `npm audit --audit-level=high`：0 漏洞；`npm run verify:store-assets` 与 `git diff --check` 通过；`npm run verify:artifacts` 检测到当前没有 `outputs/` 交付包并安全跳过历史包校验。
+- 当前截图与增强专项自动化覆盖：真正的 `"<all_urls>"` Manifest 权限；持久任务分项状态；页面稳定、敏感域名、前后台/无痕/URL 与文档变化拒绝；真实截图大封面/Aarre 兜底；新收藏静默与旧收藏 toast 合并规则；7 天截图新鲜度纯函数。
+- 当前收藏库 UI 专项自动化覆盖：隐藏 Chrome 系统根目录、根目录/嵌套/父目录筛选、同资源多位置去重、目录计数、Chrome 默认顺序、最近/最早收藏、最近使用、搜索相关度、已理解/待处理、URL 状态往返和非法参数回退；管理页封面与统一链接行为有集成测试。
+- **最新安装态仍待复测。** 0.4.1 的三条真人失败结果保留为历史回归基线，不代表当前源码仍未实现；当前浏览器控制能力因安全策略不能读取 `chrome://extensions` 与 `chrome-extension://`，无法在本轮代替真人重载并操作最新扩展。
+- 0.4.0 `npm run check`：通过；Node.js 22.22.2，包含设计 Token、TypeScript、38 个测试文件 / 165 项测试和生产构建；`package.json` 与 `dist/manifest.json` 均为 0.4.0，`dist/` 约 1.9 MB。
+- 0.4.0 专项自动化覆盖：右键页面文案的无匹配/已匹配/查询失败状态；完全相同、canonical-only、多条与只读收藏识别；增强任务去重、分项完成和退避；补拍 toast 单实例与自动清理；0.3.9 的真实截图大封面与 Aarre 兜底策略继续通过。
+- 0.4.0 `npm audit --audit-level=high`：0 漏洞；`npm run verify:store-assets` 与 `git diff --check` 通过。
+- 0.3.9 `npm run check`：通过；Node.js 22.22.2 / npm 10.9.7，包含设计 Token、TypeScript、36 个测试文件 / 155 项测试和生产构建；`package.json` 与 `dist/manifest.json` 均为 0.3.9，`dist/` 约 1.8 MB。
+- 0.3.9 专项自动化覆盖：大封面真实快照优先、无快照只用统一 Aarre 兜底图、`og:image` / 分类封面不进入大封面、loading / 后台 / 无痕 / URL 已变化的标签绝不进入截图，以及 960px 快照尺寸。
+- 0.3.9 `npm audit --audit-level=high`：0 漏洞；`npm run verify:store-assets`、`npm run verify:artifacts`（当前无 outputs，安全跳过）和 `git diff --check` 通过。
 - `npm run check`：通过；包含 TypeScript 类型检查、28 个测试文件 / 98 项测试和生产构建，`dist/manifest.json` 版本为 0.3.2。
 - `npm run verify:store-assets`：通过；5 张 JPEG 精确尺寸正确，宣传视频为 35.63 秒、1280×800、30fps、H.264/AAC。
 - `npm audit`：0 个已知漏洞。
@@ -1198,7 +1298,7 @@ F2 的撤销快照和 F22 的页面快照原来都叫 `snapshots`，但前者是
 - npm 依赖审计：0 个已知漏洞。
 - 书签知识卡实测为白底、无投影、约 5.5% 中性色描边和 14px 圆角；扫描前后分别为紧凑/展开状态，内容自然换行。编辑页可查看完整 AI 简介与主题，新增“用户精选”标签保存后重新打开仍存在，并显示“采用你的版本”；浏览器控制台无错误。
 - 尚未声称 Google OAuth、Supabase、Gemini、Chrome Sync 已完成真人端到端验证。
-- 尚未声称最新 0.3.2 `dist/` 已在 Chrome 扩展管理页加载；本轮内部页访问被浏览器安全策略阻止。
+- 当前 `dist/` 已由最新工作区重新构建；自动化通过，但三条历史失败路径和新增的普通浏览/7 天刷新矩阵尚未完成真人安装态复测，因此不得把本地产物描述为已经通过全部发布验收。
 
 ## 暂不应并行修改
 
@@ -1206,11 +1306,10 @@ F2 的撤销快照和 F22 的页面快照原来都叫 `snapshots`，但前者是
 
 | 文件 | 占用者 | 需求 |
 | --- | --- | --- |
-| （空） | | |
 
 **长期规则**
 
-- `src/extension/background.ts`（2,227 行）和 `src/ui/sidepanel/SidePanelApp.tsx`（2,815 行）是两个高冲突文件。**同一时间只允许一个 Agent 修改其中任意一个**，必须先在上表登记。
+- `src/extension/background.ts`（约 5,800 行）和 `src/ui/sidepanel/SidePanelApp.tsx`（约 4,900 行）是两个高冲突文件。**同一时间只允许一个 Agent 修改其中任意一个**，必须先在上表登记。
 - 云端相关文件由 F14 独占改造，其他需求不要触碰：`src/lib/auth.ts`、`src/lib/cloud.ts`、`src/lib/supabase.ts`、`scripts/build.mjs`、`supabase/` 整个目录。
 - **IndexedDB 版本号是共享资源，必须串行分配**：v2 归 F2 的 `undoSnapshots`、v3 归 F3 的 `siteBrands`、v4 归 F22 的 `pageSnapshots`。两个 Agent 同时改成同一个版本号会导致其中一方的 store 永远建不出来。
 - `src/lib/storage.ts` 的 `normalizeResourceRecord` 会被多个需求同时加字段。**只追加，不重排，不改已有字段的默认值**，这样多方改动能自然合并。

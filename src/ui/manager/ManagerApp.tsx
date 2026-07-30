@@ -3,17 +3,17 @@ import {
   useEffect,
   useMemo,
   useState,
-  type FormEvent,
   type ReactNode
 } from "react";
-import { signInWithGoogle, signOut } from "../../lib/auth";
 import {
   getDisplaySettings,
-  type ListCoverStyle
+  requestPageSnapshotPermission
 } from "../../lib/display-settings";
 import { sendExtensionRequest } from "../../lib/messages";
+import { searchLocalResources } from "../../lib/search";
 import type {
   AppState,
+  BookmarkBarSnapshot,
   BookmarkAgentActionExecutionResult,
   KnowledgeDashboard,
   LibraryInsights,
@@ -22,49 +22,27 @@ import type {
   SiteBrandRecord
 } from "../../lib/types";
 import {
-  BookmarkIcon,
-  SearchIcon
+  BookmarkIcon
 } from "../components/Icons";
 import type {
   LibraryFilter,
+  LibrarySort,
   ManagerView
 } from "./types";
+import {
+  ALL_LIBRARY_FOLDERS,
+  buildLibraryCollection,
+  filterAndSortLibraryResults,
+  readLibraryControls,
+  writeLibraryControls,
+  writeLibraryQuery
+} from "./library-collection";
 import { LibraryView } from "./views/LibraryView";
 import { OrganizeView } from "./views/OrganizeView";
 import { ReadingView } from "./views/ReadingView";
 import { ReportView } from "./views/ReportView";
 import { ResurfaceView } from "./views/ResurfaceView";
 import { TopicsView } from "./views/TopicsView";
-
-const VIEW_COPY: Record<
-  ManagerView,
-  { title: string; description: string }
-> = {
-  library: {
-    title: "我的收藏",
-    description: "保留 Chrome 原生书签，并补充摘要、标签和智能检索。"
-  },
-  organize: {
-    title: "整理提案",
-    description: "先预览，再选择应用。任何删除项都默认不勾选。"
-  },
-  reading: {
-    title: "待读队列",
-    description: "按 Chrome 记录的打开时间排序；未记录到使用的收藏优先。"
-  },
-  report: {
-    title: "知识报告",
-    description: "关注点迁移、知识缺口和收藏健康度都由现有本地元数据计算。"
-  },
-  topics: {
-    title: "主题图谱",
-    description: "第一次从整体看见你收藏的知识主题及其联系。"
-  },
-  resurface: {
-    title: "重新发现",
-    description: "把与你最近关注内容相关的老收藏主动带回来。"
-  }
-};
 
 const VALID_VIEWS: ManagerView[] = [
   "library",
@@ -74,6 +52,15 @@ const VALID_VIEWS: ManagerView[] = [
   "topics",
   "resurface"
 ];
+
+const VIEW_LABELS: Record<ManagerView, string> = {
+  library: "收藏库",
+  organize: "整理提案",
+  reading: "待读队列",
+  report: "报告",
+  topics: "主题图谱",
+  resurface: "重新发现"
+};
 
 function asSearchResults(
   items: ResourceRecord[] | SearchResult[]
@@ -86,25 +73,35 @@ function asSearchResults(
 function initialLocationState(): {
   query: string;
   view: ManagerView;
+  filter: LibraryFilter;
+  folderId: string;
+  sort: LibrarySort;
 } {
   const params = new URLSearchParams(window.location.search);
   const requestedView = params.get("view") as ManagerView | null;
+  const controls = readLibraryControls(params);
   return {
     query: params.get("q") || "",
     view:
       requestedView && VALID_VIEWS.includes(requestedView)
         ? requestedView
-        : "library"
+        : "library",
+    ...controls
   };
 }
 
 export function ManagerApp() {
   const initial = useMemo(initialLocationState, []);
   const [appState, setAppState] = useState<AppState | null>(null);
-  const [query, setQuery] = useState(initial.query);
-  const [filter, setFilter] = useState<LibraryFilter>("all");
+  const [queryDraft, setQueryDraft] = useState(initial.query);
+  const [appliedQuery, setAppliedQuery] = useState(initial.query);
+  const [filter, setFilter] = useState<LibraryFilter>(initial.filter);
+  const [folderId, setFolderId] = useState(initial.folderId);
+  const [sort, setSort] = useState<LibrarySort>(initial.sort);
   const [view, setView] = useState<ManagerView>(initial.view);
-  const [results, setResults] = useState<SearchResult[]>([]);
+  const [libraryResults, setLibraryResults] = useState<SearchResult[]>([]);
+  const [bookmarkSnapshot, setBookmarkSnapshot] =
+    useState<BookmarkBarSnapshot | null>(null);
   const [insights, setInsights] = useState<LibraryInsights | null>(null);
   const [dashboard, setDashboard] =
     useState<KnowledgeDashboard | null>(null);
@@ -121,31 +118,33 @@ export function ManagerApp() {
   const [confirmDestructiveApply, setConfirmDestructiveApply] =
     useState(false);
   const [siteBrands, setSiteBrands] = useState<SiteBrandRecord[]>([]);
-  const [listCoverStyle, setListCoverStyle] =
-    useState<ListCoverStyle>("site");
+  const [pageSnapshotsEnabled, setPageSnapshotsEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [action, setAction] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
-  const loadResources = useCallback(
-    async (nextQuery = query) => {
-      const items = await sendExtensionRequest({
-        type: "GET_RESOURCES",
-        query: nextQuery
-      });
-      setResults(asSearchResults(items));
-    },
-    [query]
-  );
+  const loadResources = useCallback(async () => {
+    const items = await sendExtensionRequest({
+      type: "GET_RESOURCES"
+    });
+    setLibraryResults(asSearchResults(items));
+  }, []);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  const refresh = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError("");
     try {
       const state = await sendExtensionRequest({ type: "GET_APP_STATE" });
       setAppState(state);
+      setBookmarkSnapshot(
+        await sendExtensionRequest({ type: "GET_BOOKMARK_BAR" })
+      );
       setSiteBrands(
         await sendExtensionRequest({ type: "GET_SITE_BRANDS" })
+      );
+      setPageSnapshotsEnabled(
+        (await getDisplaySettings()).pageSnapshotsEnabled
       );
       const nextInsights = await sendExtensionRequest({
         type: "GET_LIBRARY_INSIGHTS"
@@ -163,7 +162,6 @@ export function ManagerApp() {
             )
         )
       );
-      setListCoverStyle((await getDisplaySettings()).listCoverStyle);
       if (
         state.auth.configured &&
         state.auth.signedIn &&
@@ -179,7 +177,7 @@ export function ManagerApp() {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "加载失败");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [loadResources]);
 
@@ -189,25 +187,100 @@ export function ManagerApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    document.title = `Aarre · ${VIEW_LABELS[view]}`;
+  }, [view]);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(""), 4_000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
+  const results = useMemo(
+    () =>
+      appliedQuery
+        ? searchLocalResources(
+            libraryResults.map((item) => item.resource),
+            appliedQuery
+          )
+        : libraryResults,
+    [appliedQuery, libraryResults]
+  );
+
+  const libraryCollection = useMemo(
+    () =>
+      buildLibraryCollection(
+        libraryResults.map((item) => item.resource),
+        bookmarkSnapshot
+      ),
+    [bookmarkSnapshot, libraryResults]
+  );
+
+  useEffect(() => {
+    if (
+      folderId !== ALL_LIBRARY_FOLDERS &&
+      bookmarkSnapshot &&
+      !libraryCollection.folders.some((folder) => folder.id === folderId)
+    ) {
+      setFolderId(ALL_LIBRARY_FOLDERS);
+      const controls = writeLibraryControls(
+        new URL(window.location.href),
+        {
+          filter,
+          folderId: ALL_LIBRARY_FOLDERS,
+          sort
+        }
+      );
+      window.history.replaceState(null, "", controls);
+    }
+  }, [
+    bookmarkSnapshot,
+    filter,
+    folderId,
+    libraryCollection.folders,
+    sort
+  ]);
+
+  const folderScopedResults = useMemo(
+    () =>
+      filterAndSortLibraryResults(
+        results,
+        {
+          filter: "all",
+          folderId,
+          sort: "default"
+        },
+        libraryCollection.locations,
+        appliedQuery
+      ),
+    [appliedQuery, folderId, libraryCollection.locations, results]
+  );
   const readyCount = useMemo(
     () =>
-      results.filter((item) => item.resource.aiStatus === "ready").length,
-    [results]
-  );
-  const pendingCount = results.length - readyCount;
-  const visibleResults = useMemo(() => {
-    if (filter === "ready") {
-      return results.filter(
+      folderScopedResults.filter(
         (item) => item.resource.aiStatus === "ready"
-      );
-    }
-    if (filter === "pending") {
-      return results.filter(
-        (item) => item.resource.aiStatus !== "ready"
-      );
-    }
-    return results;
-  }, [filter, results]);
+      ).length,
+    [folderScopedResults]
+  );
+  const pendingCount = folderScopedResults.length - readyCount;
+  const visibleResults = useMemo(
+    () =>
+      filterAndSortLibraryResults(
+        results,
+        { filter, folderId, sort },
+        libraryCollection.locations,
+        appliedQuery
+      ),
+    [
+      appliedQuery,
+      filter,
+      folderId,
+      libraryCollection.locations,
+      results,
+      sort
+    ]
+  );
   const siteBrandByHost = useMemo(
     () =>
       new Map(
@@ -231,6 +304,26 @@ export function ManagerApp() {
     const url = new URL(window.location.href);
     if (nextView === "library") url.searchParams.delete("view");
     else url.searchParams.set("view", nextView);
+    window.history.replaceState(null, "", url);
+  }
+
+  function updateLibraryControls(next: {
+    filter?: LibraryFilter;
+    folderId?: string;
+    sort?: LibrarySort;
+  }) {
+    const controls = {
+      filter: next.filter ?? filter,
+      folderId: next.folderId ?? folderId,
+      sort: next.sort ?? sort
+    };
+    setFilter(controls.filter);
+    setFolderId(controls.folderId);
+    setSort(controls.sort);
+    const url = writeLibraryControls(
+      new URL(window.location.href),
+      controls
+    );
     window.history.replaceState(null, "", url);
   }
 
@@ -294,61 +387,46 @@ export function ManagerApp() {
     }
   }
 
-  async function handleSearch(event: FormEvent) {
-    event.preventDefault();
-    setAction("search");
+  function handleSearch() {
+    const nextQuery = queryDraft.trim();
     setError("");
-    try {
-      await loadResources(query);
-      const url = new URL(window.location.href);
-      if (query) url.searchParams.set("q", query);
-      else url.searchParams.delete("q");
-      window.history.replaceState(null, "", url);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "搜索失败");
-    } finally {
-      setAction("");
-    }
+    setAppliedQuery(nextQuery);
+    const url = writeLibraryQuery(
+      new URL(window.location.href),
+      nextQuery
+    );
+    window.history.replaceState(null, "", url);
   }
 
-  async function handleLogin() {
-    setAction("login");
-    setError("");
-    try {
-      await signInWithGoogle();
-      const state = await sendExtensionRequest({ type: "AUTH_CHANGED" });
-      setAppState(state);
-      await loadResources();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "登录失败");
-    } finally {
-      setAction("");
-    }
+  function clearSearch() {
+    setQueryDraft("");
+    setAppliedQuery("");
+    const url = writeLibraryQuery(new URL(window.location.href), "");
+    window.history.replaceState(null, "", url);
   }
 
-  async function handleSignOut() {
-    setAction("logout");
-    setError("");
-    try {
-      await signOut();
-      setAppState(
-        await sendExtensionRequest({ type: "GET_APP_STATE" })
-      );
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "退出失败");
-    } finally {
-      setAction("");
-    }
+  function handleLibraryResourceChanged(message: string) {
+    setNotice(message);
+    void refresh(true);
   }
 
-  async function openSidePanel() {
+  async function openResource(url: string) {
     setError("");
     try {
-      await sendExtensionRequest({ type: "OPEN_SIDE_PANEL" });
+      // 权限拒绝只会让封面继续使用 Aarre 兜底图，不能阻断正常导航。
+      if (pageSnapshotsEnabled) {
+        await requestPageSnapshotPermission().catch(() => false);
+      }
+      await sendExtensionRequest({
+        type: "NAVIGATE",
+        payload: {
+          text: url,
+          url,
+          disposition: "new"
+        }
+      });
     } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "无法打开侧边栏"
-      );
+      setError(caught instanceof Error ? caught.message : "无法打开网页");
     }
   }
 
@@ -392,11 +470,17 @@ export function ManagerApp() {
             onToggleProposal={toggleProposal}
             onApply={() => void applyOrganizationPlan()}
             onUndo={() => void undoOrganizationPlan()}
+            onOpenResource={(url) => void openResource(url)}
           />
         );
         break;
       case "reading":
-        viewContent = <ReadingView insights={insights} />;
+        viewContent = (
+          <ReadingView
+            insights={insights}
+            onOpenResource={(url) => void openResource(url)}
+          />
+        );
         break;
       case "report":
         viewContent = (
@@ -405,6 +489,7 @@ export function ManagerApp() {
             period={reportPeriod}
             onPeriodChange={setReportPeriod}
             onOpenOrganize={() => selectView("organize")}
+            onOpenResource={(url) => void openResource(url)}
           />
         );
         break;
@@ -412,7 +497,12 @@ export function ManagerApp() {
         viewContent = <TopicsView dashboard={dashboard} />;
         break;
       case "resurface":
-        viewContent = <ResurfaceView dashboard={dashboard} />;
+        viewContent = (
+          <ResurfaceView
+            dashboard={dashboard}
+            onOpenResource={(url) => void openResource(url)}
+          />
+        );
         break;
       default:
         viewContent = (
@@ -420,13 +510,40 @@ export function ManagerApp() {
             results={results}
             visibleResults={visibleResults}
             filter={filter}
+            folderId={folderId}
+            folders={libraryCollection.folders}
+            locations={libraryCollection.locations}
+            sort={sort}
             readyCount={readyCount}
             pendingCount={pendingCount}
-            query={query}
+            scopeCount={folderScopedResults.length}
+            libraryCount={libraryResults.length}
+            bookmarkSnapshot={bookmarkSnapshot}
+            queryDraft={queryDraft}
+            query={appliedQuery}
             action={action}
             siteBrandByHost={siteBrandByHost}
-            listCoverStyle={listCoverStyle}
-            onFilterChange={setFilter}
+            onFilterChange={(value) =>
+              updateLibraryControls({ filter: value })
+            }
+            onFolderChange={(value) =>
+              updateLibraryControls({ folderId: value })
+            }
+            onSortChange={(value) =>
+              updateLibraryControls({ sort: value })
+            }
+            onClearFilters={() =>
+              updateLibraryControls({
+                filter: "all",
+                folderId: ALL_LIBRARY_FOLDERS,
+                sort: "default"
+              })
+            }
+            onQueryDraftChange={setQueryDraft}
+            onSearch={handleSearch}
+            onClearSearch={clearSearch}
+            onResourceChanged={handleLibraryResourceChanged}
+            onOpenResource={(url) => void openResource(url)}
             onRefresh={() => void refresh()}
           />
         );
@@ -435,113 +552,21 @@ export function ManagerApp() {
 
   return (
     <main className="manager-shell">
-      <header className="manager-header">
+      <header className="manager-topbar">
         <div className="manager-brand">
           <div className="brand-mark">
             <BookmarkIcon />
           </div>
-          <div>
-            <div className="eyebrow">AARRE</div>
-            <strong>收藏智能层</strong>
-          </div>
-        </div>
-
-        <div className="manager-header-actions">
-          <button
-            type="button"
-            className="button button-quiet button-small manager-sidepanel-return"
-            onClick={() => void openSidePanel()}
-          >
-            返回侧边栏
-          </button>
-          <div className="manager-account">
-            {appState?.auth.userAvatarUrl ? (
-              <img src={appState.auth.userAvatarUrl} alt="" />
-            ) : (
-              <span className="avatar-fallback">
-                {(appState?.auth.userEmail || "?")
-                  .slice(0, 1)
-                  .toUpperCase()}
-              </span>
-            )}
-            <div>
-              <strong>
-                {appState?.auth.signedIn
-                  ? appState.auth.userName || appState.auth.userEmail
-                  : "仅保存在本机"}
-              </strong>
-              <small>
-                {appState?.auth.signedIn
-                  ? appState.pendingSyncCount
-                    ? `${appState.pendingSyncCount} 条将在后台自动同步`
-                    : "智能信息已自动同步"
-                  : "Chrome 原生书签仍由 Chrome 同步"}
-              </small>
-            </div>
-            {appState?.auth.configured ? (
-              appState.auth.signedIn ? (
-                <button
-                  className="text-button"
-                  onClick={() => void handleSignOut()}
-                  disabled={Boolean(action)}
-                >
-                  退出
-                </button>
-              ) : (
-                <button
-                  className="button button-dark button-small"
-                  onClick={() => void handleLogin()}
-                  disabled={Boolean(action)}
-                >
-                  {action === "login" ? "登录中…" : "Google 登录"}
-                </button>
-              )
-            ) : null}
-          </div>
+          <strong>Aarre</strong>
         </div>
       </header>
 
-      <section className="manager-hero">
-        <div>
-          <h1>{VIEW_COPY[view].title}</h1>
-          <p>{VIEW_COPY[view].description}</p>
-        </div>
-
-        {view === "library" ? (
-          <div className="manager-search-area">
-            <form className="search-box" onSubmit={handleSearch}>
-              <SearchIcon aria-hidden="true" />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="例如：适合深色产品首页的轻量动态背景"
-                aria-label="搜索收藏"
-              />
-              <button
-                type="submit"
-                className="button button-dark"
-                disabled={action === "search"}
-              >
-                {action === "search" ? "搜索中…" : "搜索"}
-              </button>
-            </form>
-            <p className="semantic-toggle">
-              搜索在本机完成，支持标题、标签、摘要、中文和拼音首字母。
-            </p>
-          </div>
-        ) : null}
-      </section>
-
-      {appState?.auth.accountMatches === false ? (
-        <div className="notice notice-error">
-          产品登录账号与当前 Chrome 配置文件账号不一致，同步已暂停。
-        </div>
-      ) : null}
+      <h1 className="visually-hidden">{`Aarre · ${VIEW_LABELS[view]}`}</h1>
 
       <nav className="manager-view-tabs" aria-label="收藏管理功能">
         {(
           [
-            ["library", "收藏库", results.length],
+            ["library", "收藏库", libraryResults.length],
             [
               "organize",
               "整理提案",
@@ -566,9 +591,21 @@ export function ManagerApp() {
         ))}
       </nav>
 
+      {appState?.auth.accountMatches === false ? (
+        <div className="notice notice-error">
+          产品登录账号与当前 Chrome 配置文件账号不一致，同步已暂停。
+        </div>
+      ) : null}
+
       {error ? (
         <div className="notice notice-error" role="alert">
           {error}
+        </div>
+      ) : null}
+
+      {notice ? (
+        <div className="manager-toast" role="status" aria-live="polite">
+          {notice}
         </div>
       ) : null}
 

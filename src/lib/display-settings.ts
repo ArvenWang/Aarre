@@ -1,9 +1,14 @@
 export type ListCoverStyle = "site" | "page";
 
 const DISPLAY_SETTINGS_KEY = "aarre:display-settings";
+export const PAGE_SNAPSHOT_ORIGINS = ["<all_urls>"] as const;
 
 export interface DisplaySettings {
   listCoverStyle: ListCoverStyle;
+  /**
+   * 仅为兼容旧存储结构保留。完整增强层要求截图始终开启；
+   * 用户仍可通过 snapshotExcludedHosts 排除不应截图的网站。
+   */
   pageSnapshotsEnabled: boolean;
   snapshotExcludedHosts: string[];
   scanCostLimitCny: number;
@@ -39,10 +44,20 @@ export async function getDisplaySettings(): Promise<DisplaySettings> {
   const stored = (await chrome.storage.local.get(DISPLAY_SETTINGS_KEY))[
     DISPLAY_SETTINGS_KEY
   ] as Partial<DisplaySettings> | undefined;
+  if (stored?.pageSnapshotsEnabled === false) {
+    await chrome.storage.local.set({
+      [DISPLAY_SETTINGS_KEY]: {
+        ...stored,
+        pageSnapshotsEnabled: true
+      }
+    });
+  }
   return {
     listCoverStyle:
       stored?.listCoverStyle === "page" ? "page" : "site",
-    pageSnapshotsEnabled: stored?.pageSnapshotsEnabled !== false,
+    // 0.4.0 以前可能持久化过 false，但新版界面已经没有关闭入口。
+    // 若继续尊重该隐藏值，原生收藏和旧收藏补拍会被永久静默禁用。
+    pageSnapshotsEnabled: true,
     scanCostLimitCny:
       typeof stored?.scanCostLimitCny === "number" &&
       Number.isFinite(stored.scanCostLimitCny) &&
@@ -68,7 +83,7 @@ export async function saveDisplaySettings(
     ...DEFAULT_DISPLAY_SETTINGS,
     listCoverStyle:
       merged.listCoverStyle === "page" ? "page" : "site",
-    pageSnapshotsEnabled: merged.pageSnapshotsEnabled !== false,
+    pageSnapshotsEnabled: true,
     scanCostLimitCny:
       typeof merged.scanCostLimitCny === "number" &&
       Number.isFinite(merged.scanCostLimitCny)
@@ -86,4 +101,23 @@ export async function saveDisplaySettings(
     [DISPLAY_SETTINGS_KEY]: normalized
   });
   return normalized;
+}
+
+/**
+ * 网页访问权限是完整增强层的必需权限。先检查权限可让旧版
+ * optional_host_permissions 构建继续工作，也避免已授权用户收到重复请求。
+ */
+export async function requestPageSnapshotPermission(): Promise<boolean> {
+  if (!chrome.permissions) return true;
+  if (
+    await chrome.permissions
+      .contains({ origins: [...PAGE_SNAPSHOT_ORIGINS] })
+      .catch(() => false)
+  ) {
+    return true;
+  }
+  if (!chrome.permissions.request) return false;
+  return chrome.permissions.request({
+    origins: [...PAGE_SNAPSHOT_ORIGINS]
+  });
 }

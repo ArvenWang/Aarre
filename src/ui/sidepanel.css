@@ -1093,6 +1093,18 @@ main.native-panel:has(> .search-box) {
   position: relative;
 }
 
+.readonly-folder-value {
+  min-height: 42px;
+  padding: 0 var(--sp-3);
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--ink-muted);
+  background: var(--surface-sunken);
+  font-size: var(--fs-small);
+}
+
 .folder-select-trigger {
   width: 100%;
   min-height: 42px;
@@ -1218,6 +1230,87 @@ main.native-panel:has(> .search-box) {
   color: var(--ink-faint);
 }
 
+.save-state-note {
+  margin-top: var(--sp-4);
+  padding: var(--sp-3);
+  display: grid;
+  gap: var(--sp-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.save-state-note strong {
+  color: var(--ink);
+  font-size: var(--fs-small);
+}
+
+.save-state-note span {
+  color: var(--ink-muted);
+  font-size: var(--fs-caption);
+  line-height: 1.5;
+}
+
+.save-match-picker {
+  min-width: 0;
+  margin: var(--sp-4) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-2);
+  border: 0;
+}
+
+.save-match-picker legend {
+  margin-bottom: var(--sp-1);
+  color: var(--ink-muted);
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-medium);
+}
+
+.save-match-picker label {
+  min-width: 0;
+  padding: var(--sp-3);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.save-match-picker label:has(input:checked) {
+  border-color: var(--line-strong);
+  background: var(--surface-sunken);
+}
+
+.save-match-picker input {
+  width: 17px;
+  height: 17px;
+  margin: 2px 0 0;
+  accent-color: var(--ink);
+}
+
+.save-match-picker strong,
+.save-match-picker small {
+  display: block;
+}
+
+.save-match-picker strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--fs-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.save-match-picker small {
+  margin-top: var(--sp-1);
+  color: var(--ink-muted);
+  font-size: var(--fs-caption);
+}
+
 .native-check {
   margin-top: var(--sp-4);
   padding: var(--sp-3);
@@ -1227,6 +1320,18 @@ main.native-panel:has(> .search-box) {
   gap: var(--sp-3);
   border-radius: var(--radius-md);
   background: var(--surface-sunken);
+}
+
+.native-check.smart-layer-required > span:first-child {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--surface);
+  background: var(--ink);
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-strong);
 }
 
 .native-check input {

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  AARRE_FALLBACK_COVER_IDS,
+  aarreFallbackCoverId,
+  CATEGORY_COVER_FILES,
   categoryCoverForResource,
   categoryCoverUrl,
   coverBrightnessForHost,
@@ -7,7 +10,8 @@ import {
   matchCoverRule,
   recordPageImageSample,
   registrableHost,
-  resolveRuleAsset
+  resolveRuleAsset,
+  stableFallbackCoverId
 } from "../src/lib/cover-registry";
 import { COVER_RULES } from "../src/lib/cover-rules";
 
@@ -55,6 +59,59 @@ describe("cover registry", () => {
     ).toBe(coverBrightnessForHost("https://example.com/two"));
     expect(coverBrightnessForHost("example.com")).toBeGreaterThanOrEqual(0.94);
     expect(coverBrightnessForHost("example.com")).toBeLessThanOrEqual(1.06);
+  });
+
+  it("ships and exposes all 40 local Aarre fallback covers", () => {
+    expect(AARRE_FALLBACK_COVER_IDS).toHaveLength(40);
+    expect(AARRE_FALLBACK_COVER_IDS).toEqual(
+      Object.keys(CATEGORY_COVER_FILES).sort()
+    );
+    for (const id of AARRE_FALLBACK_COVER_IDS) {
+      expect(categoryCoverUrl(id), `${id} should resolve`).toContain(
+        CATEGORY_COVER_FILES[id]
+      );
+    }
+  });
+
+  it("keeps a reliable semantic fallback before stable hash distribution", () => {
+    expect(
+      aarreFallbackCoverId({
+        canonicalUrl: "https://example.com/reference",
+        url: "https://example.com/reference",
+        title: "Reference",
+        topics: [],
+        tags: [],
+        summary: "",
+        categoryCoverId: "documentation-api"
+      })
+    ).toBe("documentation-api");
+    expect(
+      aarreFallbackCoverId({
+        canonicalUrl: "https://example.com/model",
+        url: "https://example.com/model",
+        title: "模型训练实践",
+        topics: ["机器学习"],
+        tags: [],
+        summary: "",
+        categoryCoverId: "generic-webpage"
+      })
+    ).toBe("ai-automation");
+  });
+
+  it("assigns unknown pages deterministically by canonical URL", () => {
+    const canonical = "https://example.com/article?a=1&b=2";
+    const first = stableFallbackCoverId(
+      "https://EXAMPLE.com/article/?b=2&utm_source=test&a=1"
+    );
+    expect(first).toBe(stableFallbackCoverId(canonical));
+    expect(first).toBe(stableFallbackCoverId(canonical));
+
+    const assigned = new Set(
+      Array.from({ length: 2_000 }, (_, index) =>
+        stableFallbackCoverId(`https://unknown.example/${index}`)
+      )
+    );
+    expect(assigned).toEqual(new Set(AARRE_FALLBACK_COVER_IDS));
   });
 
   it("falls back from subdomains to a practical registrable host", () => {

@@ -1,4 +1,5 @@
 import type { LibraryInsights } from "../../../lib/types";
+import { ResourceLink } from "../components/ResourceLink";
 
 interface OrganizeViewProps {
   insights: LibraryInsights | null;
@@ -13,6 +14,7 @@ interface OrganizeViewProps {
   onToggleProposal: (actionIds: string[], checked: boolean) => void;
   onApply: () => void;
   onUndo: () => void;
+  onOpenResource: (url: string) => void;
 }
 
 export function OrganizeView({
@@ -27,7 +29,8 @@ export function OrganizeView({
   onSelectSafe,
   onToggleProposal,
   onApply,
-  onUndo
+  onUndo,
+  onOpenResource
 }: OrganizeViewProps) {
   const proposals = insights?.organizationPlan.proposals || [];
   return (
@@ -148,14 +151,13 @@ export function OrganizeView({
                 {proposal.recoveryLinks?.length ? (
                   <div className="proposal-recovery-links">
                     {proposal.recoveryLinks.map((link) => (
-                      <a
+                      <ResourceLink
                         key={link.url}
-                        href={link.url}
-                        target="_blank"
-                        rel="noreferrer"
+                        url={link.url}
+                        onOpenResource={onOpenResource}
                       >
                         {link.label}
-                      </a>
+                      </ResourceLink>
                     ))}
                   </div>
                 ) : null}

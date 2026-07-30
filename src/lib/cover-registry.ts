@@ -1,4 +1,5 @@
 import type { ResourceRecord } from "./types";
+import { canonicalizeUrl } from "./url";
 import {
   COVER_RULES,
   matchCoverRule,
@@ -68,6 +69,55 @@ export const CATEGORY_COVER_FILES = {
 } as const;
 
 export type CategoryCoverId = keyof typeof CATEGORY_COVER_FILES;
+
+/**
+ * Aarre 随扩展一同打包的完整兜底封面池。
+ *
+ * 排序后的文件 id 是跨渲染、排序和设备都一致的；不要在 UI 中用
+ * Math.random() 选择，否则同一条收藏会在每次刷新时跳图。
+ */
+export const AARRE_FALLBACK_COVER_IDS = Object.freeze(
+  (Object.keys(CATEGORY_COVER_FILES) as CategoryCoverId[]).sort()
+);
+
+type FallbackCoverResource = Pick<
+  ResourceRecord,
+  | "canonicalUrl"
+  | "url"
+  | "title"
+  | "topics"
+  | "tags"
+  | "summary"
+  | "categoryCoverId"
+>;
+
+function stableFallbackKey(input: string): string {
+  try {
+    return canonicalizeUrl(input);
+  } catch {
+    return input.trim().toLocaleLowerCase();
+  }
+}
+
+function stableStringHash(input: string): number {
+  let hash = 2166136261;
+  for (const character of input) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+/**
+ * 为没有可靠语义分类的网页稳定分配一张本地 Aarre 兜底图。
+ * canonical URL 相同就一定得到相同结果；跟当前列表位置和排序无关。
+ */
+export function stableFallbackCoverId(input: string): CategoryCoverId {
+  const key = stableFallbackKey(input);
+  return AARRE_FALLBACK_COVER_IDS[
+    stableStringHash(key) % AARRE_FALLBACK_COVER_IDS.length
+  ];
+}
 
 export function ruleCategoryCoverId(
   input: string
@@ -156,6 +206,35 @@ export function categoryCoverForResource(
     if (pattern.test(semanticText)) return id;
   }
   return "generic-webpage";
+}
+
+/**
+ * 管理页大卡片只允许“真实网页截图”或“本地 Aarre 兜底图”。
+ *
+ * 已有的可靠分类和 AI 语义优先；无法判断时使用 canonical URL
+ * 的稳定哈希把资源分散到完整的 40 张本地资产中。这里不会读取
+ * og:image、侧边栏图片或任何网络封面。
+ */
+export function aarreFallbackCoverId(
+  resource: FallbackCoverResource
+): CategoryCoverId {
+  if (
+    resource.categoryCoverId &&
+    resource.categoryCoverId !== "generic-webpage" &&
+    resource.categoryCoverId in CATEGORY_COVER_FILES
+  ) {
+    return resource.categoryCoverId as CategoryCoverId;
+  }
+
+  const semanticCover = categoryCoverForResource({
+    ...resource,
+    categoryCoverId: undefined
+  });
+  if (semanticCover !== "generic-webpage") return semanticCover;
+
+  return stableFallbackCoverId(
+    resource.canonicalUrl || resource.url
+  );
 }
 
 export function categoryCoverUrl(id: string | undefined): string {
