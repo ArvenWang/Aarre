@@ -12,6 +12,7 @@ import {
 } from "../src/lib/page-essence";
 import {
   composeSiteIconPixels,
+  extractLargestPngFromIco,
   normalizeSvgViewport,
   SITE_ICON_SURFACES
 } from "../src/lib/thumbnail";
@@ -30,6 +31,7 @@ type CompositionMode = "legacy" | "themed";
 type MeasuredSource =
   | "registry"
   | "apple-touch-icon"
+  | "conventional-favicon-ico"
   | "manifest"
   | "high-resolution-rel-icon"
   | "og-image"
@@ -294,6 +296,7 @@ async function conventionalCandidates(
   pageUrl: string
 ): Promise<SiteIconCandidate[]> {
   const origin = new URL(pageUrl).origin;
+  const candidates: SiteIconCandidate[] = [];
   const paths = [
     "/apple-touch-icon-180x180.png",
     "/apple-touch-icon.png",
@@ -309,17 +312,32 @@ async function conventionalCandidates(
         signal: AbortSignal.timeout(5_000)
       });
       if (response.ok) {
-        return [
-          {
-            url,
-            source: "conventional-apple-touch-icon",
-            declaredSize: path.includes("152") ? 152 : 180
-          }
-        ];
+        candidates.push({
+          url,
+          source: "conventional-apple-touch-icon",
+          declaredSize: path.includes("152") ? 152 : 180
+        });
+        break;
       }
     } catch {
       // Continue through the same conventional candidates as production.
     }
+  }
+  const icoUrl = new URL("/favicon.ico", origin).toString();
+  try {
+    const response = await fetch(icoUrl, {
+      method: "HEAD",
+      redirect: "follow",
+      signal: AbortSignal.timeout(5_000)
+    });
+    if (response.ok) {
+      candidates.push({
+        url: icoUrl,
+        source: "conventional-favicon-ico"
+      });
+    }
+  } catch {
+    // Continue to the same conventional SVG candidate as production.
   }
   const svgUrl = new URL("/favicon.svg", origin).toString();
   try {
@@ -329,12 +347,16 @@ async function conventionalCandidates(
       signal: AbortSignal.timeout(5_000)
     });
     if (response.ok) {
-      return [{ url: svgUrl, source: "svg-icon", vector: true }];
+      candidates.push({
+        url: svgUrl,
+        source: "svg-icon",
+        vector: true
+      });
     }
   } catch {
     // No conventional SVG candidate.
   }
-  return [];
+  return candidates;
 }
 
 function uniqueCandidates(
@@ -357,7 +379,11 @@ async function fetchImage(candidate: SiteIconCandidate): Promise<Buffer> {
     signal: AbortSignal.timeout(12_000)
   });
   const contentType = response.headers.get("content-type") || "";
-  if (!response.ok || !contentType.toLowerCase().startsWith("image/")) {
+  if (
+    !response.ok ||
+    (candidate.source !== "conventional-favicon-ico" &&
+      !contentType.toLowerCase().startsWith("image/"))
+  ) {
     throw new Error("not-an-image");
   }
   return readLimitedResponse(
@@ -368,16 +394,38 @@ async function fetchImage(candidate: SiteIconCandidate): Promise<Buffer> {
   );
 }
 
-function inspectLegacyPixels(data: Buffer): number {
+function inspectLegacyPixels(
+  data: Buffer,
+  contentRect: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }
+): number {
+  const left = Math.max(0, Math.floor(contentRect.x));
+  const top = Math.max(0, Math.floor(contentRect.y));
+  const right = Math.min(
+    ICON_SIZE,
+    Math.ceil(contentRect.x + contentRect.width)
+  );
+  const bottom = Math.min(
+    ICON_SIZE,
+    Math.ceil(contentRect.y + contentRect.height)
+  );
   let ink = 0;
   for (let index = 0; index < data.length; index += 4) {
+    const pixel = index / 4;
+    const x = pixel % ICON_SIZE;
+    const y = Math.floor(pixel / ICON_SIZE);
+    if (x < left || x >= right || y < top || y >= bottom) continue;
     if ((data[index + 3] || 0) < 24) continue;
     const red = data[index] || 0;
     const green = data[index + 1] || 0;
     const blue = data[index + 2] || 0;
     if (Math.max(255 - red, 255 - green, 255 - blue) >= 28) ink += 1;
   }
-  return ink / (ICON_SIZE * ICON_SIZE);
+  return ink / Math.max(1, (right - left) * (bottom - top));
 }
 
 async function renderedPixels(
@@ -418,6 +466,27 @@ async function inspectCandidate(
     };
   }
 
+  const ico = extractLargestPngFromIco(input);
+  let icoFrame:
+    | Extract<typeof ico, { kind: "png" }>
+    | undefined;
+  if (ico.kind === "unsupported-ico") {
+    return {
+      accepted: false,
+      scale: 0,
+      rejection: {
+        reason: "unsupported-ico-frame",
+        pageUrl,
+        assetUrl: candidate.url,
+        source: candidate.source
+      }
+    };
+  }
+  if (ico.kind === "png") {
+    icoFrame = ico;
+    input = Buffer.from(ico.bytes);
+  }
+
   let metadata: sharp.Metadata;
   try {
     metadata = await sharp(input, { failOn: "warning" }).metadata();
@@ -435,6 +504,10 @@ async function inspectCandidate(
   }
   // 与生产一致：矢量资产按最长边 ICON_SIZE 重新栅格化，不受 128px 下限约束。
   let vector = false;
+  let nativeWidth = icoFrame?.width || metadata.width || 0;
+  let nativeHeight = icoFrame?.height || metadata.height || 0;
+  let renderWidth = metadata.width || 0;
+  let renderHeight = metadata.height || 0;
   if (metadata.format === "svg") {
     const normalized = normalizeSvgViewport(
       input.toString("utf8"),
@@ -442,35 +515,56 @@ async function inspectCandidate(
     );
     if (normalized.intrinsicWidth > 0) {
       vector = true;
-      metadata.width = normalized.intrinsicWidth;
-      metadata.height = normalized.intrinsicHeight;
+      nativeWidth = normalized.intrinsicWidth;
+      nativeHeight = normalized.intrinsicHeight;
+      const vectorScale =
+        ICON_SIZE / Math.max(nativeWidth, nativeHeight);
+      renderWidth = Math.round(nativeWidth * vectorScale);
+      renderHeight = Math.round(nativeHeight * vectorScale);
       input = Buffer.from(normalized.source, "utf8");
     }
   }
-  const width = metadata.width || 0;
-  const height = metadata.height || 0;
   const base = {
     pageUrl,
     assetUrl: candidate.url,
     source: candidate.source,
-    nativeWidth: width,
-    nativeHeight: height
+    nativeWidth,
+    nativeHeight
   };
-  if (!vector && (width < 128 || height < 128)) {
+  if (!vector && (nativeWidth < 128 || nativeHeight < 128)) {
     return {
       accepted: false,
       scale: 0,
       rejection: { ...base, reason: "below-128px" }
     };
   }
-  if (Math.max(width, height) / Math.min(width, height) > 1.2) {
+  if (
+    Math.max(nativeWidth, nativeHeight) /
+      Math.min(nativeWidth, nativeHeight) >
+    1.2
+  ) {
     return {
       accepted: false,
       scale: 0,
       rejection: { ...base, reason: "non-square" }
     };
   }
-  const scale = Math.min(1, ICON_SIZE / Math.max(width, height));
+  const scale = vector
+    ? 1
+    : Math.min(1, ICON_SIZE / Math.max(nativeWidth, nativeHeight));
+  const drawScale = Math.min(
+    1,
+    ICON_SIZE / Math.max(renderWidth, renderHeight)
+  );
+  const drawnWidth = renderWidth * drawScale;
+  const drawnHeight = renderHeight * drawScale;
+  const contentRect = {
+    x: (ICON_SIZE - drawnWidth) / 2,
+    y: (ICON_SIZE - drawnHeight) / 2,
+    width: drawnWidth,
+    height: drawnHeight,
+    canvasWidth: ICON_SIZE
+  };
   try {
     if (composition === "legacy") {
       const pixels = await renderedPixels(input, {
@@ -479,7 +573,7 @@ async function inspectCandidate(
         b: 0,
         alpha: 0
       });
-      if (inspectLegacyPixels(pixels) < 0.15) {
+      if (inspectLegacyPixels(pixels, contentRect) < 0.15) {
         return {
           accepted: false,
           scale,
@@ -500,7 +594,11 @@ async function inspectCandidate(
       );
       for (const surface of Object.values(SITE_ICON_SURFACES)) {
         if (
-          composeSiteIconPixels(sourcePixels, surface).inkCoverage < 0.15
+          composeSiteIconPixels(
+            sourcePixels,
+            surface,
+            contentRect
+          ).inkCoverage < 0.15
         ) {
           return {
             accepted: false,
@@ -528,6 +626,9 @@ function measuredSource(
   candidate: SiteIconCandidate
 ): Exclude<MeasuredSource, "og-image" | "category-fallback"> {
   if (candidate.source === "registry") return "registry";
+  if (candidate.source === "conventional-favicon-ico") {
+    return "conventional-favicon-ico";
+  }
   if (
     candidate.source === "apple-touch-icon" ||
     candidate.source === "conventional-apple-touch-icon"
@@ -671,6 +772,14 @@ function markdownReport(report: Record<string, unknown>): string {
     string,
     { count: number; samples: unknown[] }
   >;
+  const fallbackBreakdown = report.fallbackBreakdown as {
+    withRejectedCandidates: number;
+    withoutCandidates: number;
+  };
+  const sourceHostSamples = report.sourceHostSamples as Record<
+    string,
+    string[]
+  >;
   return [
     `# Aarre 封面兜底率测量`,
     "",
@@ -678,6 +787,8 @@ function markdownReport(report: Record<string, unknown>): string {
     `- 模式：${report.composition}`,
     `- 测量时间：${report.measuredAt}`,
     `- 分类封面兜底：${fallback.count} 条 / ${fallback.percent}%`,
+    `- 有候选但被拒：${fallbackBreakdown.withRejectedCandidates} 条`,
+    `- 无候选：${fallbackBreakdown.withoutCandidates} 条`,
     `- 最大缩放比：${report.maxScale}（要求不超过 1）`,
     "",
     "## 来源分布",
@@ -688,6 +799,10 @@ function markdownReport(report: Record<string, unknown>): string {
       ([source, value]) =>
         `| ${source} | ${value.count} | ${value.percent}% |`
     ),
+    "",
+    `conventional-favicon-ico 命中域名：${
+      sourceHostSamples["conventional-favicon-ico"]?.join("、") || "无"
+    }`,
     "",
     "## 质量闸门拒绝",
     "",
@@ -776,6 +891,7 @@ async function main() {
       [
         "registry",
         "apple-touch-icon",
+        "conventional-favicon-ico",
         "manifest",
         "high-resolution-rel-icon",
         "og-image",
@@ -811,6 +927,7 @@ async function main() {
     "non-square",
     "low-ink-or-contrast"
   ];
+  const qualityRejectionReasons = new Set(rejectionReasons);
   const rejections = Object.fromEntries(
     rejectionReasons.map((reason) => {
       const rows = allRejections.filter((item) => item.reason === reason);
@@ -846,6 +963,31 @@ async function main() {
     fallback: {
       count: fallbackRows.length,
       percent: percent(fallbackRows.length, sample.length)
+    },
+    fallbackBreakdown: {
+      withRejectedCandidates: fallbackRows.filter(
+        (item) =>
+          item.rejections.some((rejection) =>
+            qualityRejectionReasons.has(rejection.reason)
+          )
+      ).length,
+      withoutCandidates: fallbackRows.filter(
+        (item) =>
+          !item.rejections.some((rejection) =>
+            qualityRejectionReasons.has(rejection.reason)
+          )
+      ).length
+    },
+    sourceHostSamples: {
+      "conventional-favicon-ico": [
+        ...new Set(
+          measured
+            .filter(
+              (item) => item.source === "conventional-favicon-ico"
+            )
+            .map((item) => item.host)
+        )
+      ].slice(0, 30)
     },
     maxScale: Number(
       Math.max(...measured.map((item) => item.maxScale)).toFixed(4)

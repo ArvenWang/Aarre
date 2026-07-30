@@ -1466,6 +1466,24 @@ interface TreeProps {
   ) => Promise<void>;
 }
 
+export type BookmarkPreviewMoveDecision = "keep" | "cancel" | "arm";
+
+export function decideBookmarkPreviewMove(input: {
+  nodeId: string;
+  activeNodeId: string;
+  timerArmed: boolean;
+  distance: number;
+  elapsed: number;
+}): BookmarkPreviewMoveDecision {
+  // 速度门只用于判断“是否值得启动预览”。预览一旦已经出现，同一行内
+  // 的鼠标移动不能再把它取消，否则会形成消失—重新计时—再出现的闪烁。
+  if (input.activeNodeId === input.nodeId) return "keep";
+  if (input.distance / Math.max(1, input.elapsed) > 0.65) {
+    return "cancel";
+  }
+  return input.timerArmed ? "keep" : "arm";
+}
+
 function BookmarkTree({
   nodes,
   resourceByUrl,
@@ -1490,6 +1508,7 @@ function BookmarkTree({
   const lastHoverTarget = useRef("");
   const activeDragId = useRef("");
   const previewTimer = useRef<number | undefined>(undefined);
+  const previewIntentNodeId = useRef("");
   const pointerSample = useRef<{
     x: number;
     y: number;
@@ -1515,6 +1534,7 @@ function BookmarkTree({
     }
     previewTimer.current = window.setTimeout(() => {
       previewTimer.current = undefined;
+      previewIntentNodeId.current = node.id;
       onPreviewIntent(node, target.getBoundingClientRect());
     }, 400);
   }
@@ -1524,6 +1544,7 @@ function BookmarkTree({
       window.clearTimeout(previewTimer.current);
       previewTimer.current = undefined;
     }
+    previewIntentNodeId.current = "";
     pointerSample.current = null;
     onPreviewLeave();
   }
@@ -1693,9 +1714,16 @@ function BookmarkTree({
                   event.clientX - previous.x,
                   event.clientY - previous.y
                 );
-                if (distance / elapsed > 0.65) {
+                const decision = decideBookmarkPreviewMove({
+                  nodeId: node.id,
+                  activeNodeId: previewIntentNodeId.current,
+                  timerArmed: previewTimer.current !== undefined,
+                  distance,
+                  elapsed
+                });
+                if (decision === "cancel") {
                   cancelPreview();
-                } else if (previewTimer.current === undefined) {
+                } else if (decision === "arm") {
                   armPreview(node, event.currentTarget);
                 }
               }}
@@ -1725,7 +1753,7 @@ function BookmarkTree({
                         .getBoundingClientRect()
                     );
                   } else if (event.key === "Escape") {
-                    onPreviewLeave();
+                    cancelPreview();
                   }
                 }}
                 title={node.url || node.title}

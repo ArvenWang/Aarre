@@ -1717,6 +1717,7 @@ async function conventionalIconCandidates(
 ): Promise<SiteIconCandidate[]> {
   try {
     const origin = new URL(pageUrl).origin;
+    const candidates: SiteIconCandidate[] = [];
     const paths = [
       "/apple-touch-icon-180x180.png",
       "/apple-touch-icon.png",
@@ -1733,17 +1734,33 @@ async function conventionalIconCandidates(
           signal: AbortSignal.timeout(5_000)
         });
         if (response.ok) {
-          return [
-            {
-              url,
-              source: "conventional-apple-touch-icon",
-              declaredSize: path.includes("152") ? 152 : 180
-            }
-          ];
+          candidates.push({
+            url,
+            source: "conventional-apple-touch-icon",
+            declaredSize: path.includes("152") ? 152 : 180
+          });
+          break;
         }
       } catch {
         // Continue to the next conventional path.
       }
+    }
+    const icoUrl = new URL("/favicon.ico", origin).toString();
+    try {
+      const response = await fetch(icoUrl, {
+        method: "HEAD",
+        credentials: "omit",
+        redirect: "follow",
+        signal: AbortSignal.timeout(5_000)
+      });
+      if (response.ok) {
+        candidates.push({
+          url: icoUrl,
+          source: "conventional-favicon-ico"
+        });
+      }
+    } catch {
+      // Continue to the conventional SVG candidate.
     }
     const svgUrl = new URL("/favicon.svg", origin).toString();
     try {
@@ -1754,17 +1771,16 @@ async function conventionalIconCandidates(
         signal: AbortSignal.timeout(5_000)
       });
       if (response.ok) {
-        return [
-          {
-            url: svgUrl,
-            source: "svg-icon",
-            vector: true
-          }
-        ];
+        candidates.push({
+          url: svgUrl,
+          source: "svg-icon",
+          vector: true
+        });
       }
     } catch {
       // No conventional SVG icon.
     }
+    return candidates;
   } catch {
     // Invalid URLs are filtered before this function.
   }

@@ -125,6 +125,7 @@ export type SiteIconSource =
   | "registry"
   | "apple-touch-icon"
   | "conventional-apple-touch-icon"
+  | "conventional-favicon-ico"
   | "manifest"
   | "svg-icon"
   | "large-icon"

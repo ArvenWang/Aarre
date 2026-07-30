@@ -1,7 +1,10 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { BookmarkPreviewLayer } from "../src/ui/sidepanel/SidePanelApp";
+import {
+  BookmarkPreviewLayer,
+  decideBookmarkPreviewMove
+} from "../src/ui/sidepanel/SidePanelApp";
 import type { PageSnapshot } from "../src/lib/types";
 
 const snapshot: PageSnapshot = {
@@ -48,5 +51,43 @@ describe("bookmark hover preview rendering gate", () => {
     const textContent = markup.replace(/<[^>]+>/g, "");
 
     expect(textContent).toBe("");
+  });
+});
+
+describe("bookmark hover intent stability", () => {
+  it("keeps an already displayed preview while moving inside the same row", () => {
+    expect(
+      decideBookmarkPreviewMove({
+        nodeId: "bookmark-1",
+        activeNodeId: "bookmark-1",
+        timerArmed: false,
+        distance: 120,
+        elapsed: 1
+      })
+    ).toBe("keep");
+  });
+
+  it("still cancels a pending preview when the pointer is moving too fast", () => {
+    expect(
+      decideBookmarkPreviewMove({
+        nodeId: "bookmark-1",
+        activeNodeId: "",
+        timerArmed: true,
+        distance: 120,
+        elapsed: 1
+      })
+    ).toBe("cancel");
+  });
+
+  it("arms a preview only after pointer movement has slowed down", () => {
+    expect(
+      decideBookmarkPreviewMove({
+        nodeId: "bookmark-1",
+        activeNodeId: "",
+        timerArmed: false,
+        distance: 2,
+        elapsed: 20
+      })
+    ).toBe("arm");
   });
 });

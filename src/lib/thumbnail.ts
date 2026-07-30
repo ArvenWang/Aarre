@@ -76,7 +76,11 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
-async function fetchImage(url: string, maxBytes = MAX_IMAGE_BYTES) {
+async function fetchImage(
+  url: string,
+  maxBytes = MAX_IMAGE_BYTES,
+  allowUnknownContentType = false
+) {
   const response = await fetch(url, {
     credentials: "omit",
     redirect: "follow",
@@ -86,7 +90,11 @@ async function fetchImage(url: string, maxBytes = MAX_IMAGE_BYTES) {
     signal: AbortSignal.timeout(12_000)
   });
   const contentType = response.headers.get("content-type") || "";
-  if (!response.ok || !contentType.toLowerCase().startsWith("image/")) {
+  if (
+    !response.ok ||
+    (!allowUnknownContentType &&
+      !contentType.toLowerCase().startsWith("image/"))
+  ) {
     throw new Error("not-an-image");
   }
   return readLimitedBlob(response, maxBytes);
@@ -117,6 +125,97 @@ export interface SvgViewport {
   source: string;
   intrinsicWidth: number;
   intrinsicHeight: number;
+}
+
+export type IcoPngExtraction =
+  | { kind: "not-ico" }
+  | { kind: "unsupported-ico" }
+  | {
+      kind: "png";
+      bytes: Uint8Array<ArrayBuffer>;
+      width: number;
+      height: number;
+    };
+
+/**
+ * ICO 是一个多帧容器。这里严格选择目录中的最大帧；只有该帧本身是 PNG
+ * 编码时才抽出复用现有图像管线。DIB/BMP 帧不做隐式降级，避免引入一套
+ * 复杂且难以审计的解码器。
+ */
+export function extractLargestPngFromIco(
+  input: ArrayBuffer | Uint8Array
+): IcoPngExtraction {
+  const bytes =
+    input instanceof Uint8Array ? input : new Uint8Array(input);
+  if (bytes.byteLength < 6) return { kind: "not-ico" };
+  const view = new DataView(
+    bytes.buffer,
+    bytes.byteOffset,
+    bytes.byteLength
+  );
+  if (view.getUint16(0, true) !== 0 || view.getUint16(2, true) !== 1) {
+    return { kind: "not-ico" };
+  }
+
+  const count = view.getUint16(4, true);
+  const directoryEnd = 6 + count * 16;
+  if (!count || directoryEnd > bytes.byteLength) {
+    return { kind: "unsupported-ico" };
+  }
+
+  let largest:
+    | {
+        width: number;
+        height: number;
+        size: number;
+        offset: number;
+      }
+    | undefined;
+  for (let index = 0; index < count; index += 1) {
+    const entryOffset = 6 + index * 16;
+    const width = bytes[entryOffset] === 0 ? 256 : bytes[entryOffset]!;
+    const height =
+      bytes[entryOffset + 1] === 0 ? 256 : bytes[entryOffset + 1]!;
+    const size = view.getUint32(entryOffset + 8, true);
+    const offset = view.getUint32(entryOffset + 12, true);
+    if (
+      size === 0 ||
+      offset < directoryEnd ||
+      offset > bytes.byteLength ||
+      size > bytes.byteLength - offset
+    ) {
+      continue;
+    }
+    if (
+      !largest ||
+      width * height > largest.width * largest.height ||
+      (width * height === largest.width * largest.height &&
+        Math.max(width, height) >
+          Math.max(largest.width, largest.height))
+    ) {
+      largest = { width, height, size, offset };
+    }
+  }
+  if (!largest) return { kind: "unsupported-ico" };
+
+  const pngMagic = [0x89, 0x50, 0x4e, 0x47] as const;
+  if (
+    pngMagic.some(
+      (value, index) => bytes[largest!.offset + index] !== value
+    )
+  ) {
+    return { kind: "unsupported-ico" };
+  }
+  const frameBytes = new Uint8Array(largest.size);
+  frameBytes.set(
+    bytes.subarray(largest.offset, largest.offset + largest.size)
+  );
+  return {
+    kind: "png",
+    bytes: frameBytes,
+    width: largest.width,
+    height: largest.height
+  };
 }
 
 function parseSvgLength(value: string | undefined): number {
@@ -255,15 +354,39 @@ export interface CompositedSiteIcon {
   inkCoverage: number;
 }
 
+export interface SiteIconContentRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  canvasWidth: number;
+}
+
 /**
  * 把透明站点图标合成到真实承载色上。只对接近承载色、会消失的像素
  * 做中性前景色补偿；本来已有足够对比度的品牌色保持不变。
  */
 export function composeSiteIconPixels(
   sourcePixels: Uint8ClampedArray,
-  surface: SiteIconSurface
+  surface: SiteIconSurface,
+  contentRect: SiteIconContentRect
 ): CompositedSiteIcon {
   const output = new Uint8ClampedArray(sourcePixels.length);
+  const canvasWidth = Math.max(1, Math.floor(contentRect.canvasWidth));
+  const canvasHeight = Math.ceil(
+    sourcePixels.length / 4 / canvasWidth
+  );
+  const left = Math.max(0, Math.floor(contentRect.x));
+  const top = Math.max(0, Math.floor(contentRect.y));
+  const right = Math.min(
+    canvasWidth,
+    Math.ceil(contentRect.x + contentRect.width)
+  );
+  const bottom = Math.min(
+    canvasHeight,
+    Math.ceil(contentRect.y + contentRect.height)
+  );
+  const contentArea = Math.max(1, (right - left) * (bottom - top));
   const surfaceLuminance = relativeLuminance(
     surface.red,
     surface.green,
@@ -308,7 +431,14 @@ export function composeSiteIconPixels(
     output[index + 1] = green;
     output[index + 2] = blue;
     output[index + 3] = 255;
+    const pixel = index / 4;
+    const x = pixel % canvasWidth;
+    const y = Math.floor(pixel / canvasWidth);
     if (
+      x >= left &&
+      x < right &&
+      y >= top &&
+      y < bottom &&
       alpha >= 24 / 255 &&
       Math.max(
         Math.abs(red - surface.red),
@@ -322,7 +452,7 @@ export function composeSiteIconPixels(
 
   return {
     pixels: output,
-    inkCoverage: ink / (sourcePixels.length / 4)
+    inkCoverage: ink / contentArea
   };
 }
 
@@ -340,13 +470,31 @@ async function cacheSiteIconCandidate(
 ): Promise<CachedSiteIcon> {
   let source = await fetchImage(
     candidate.url,
-    candidate.vector ? MAX_SVG_BYTES : MAX_IMAGE_BYTES
+    candidate.vector ? MAX_SVG_BYTES : MAX_IMAGE_BYTES,
+    candidate.source === "conventional-favicon-ico"
   );
+  const sourceBytes = new Uint8Array(await source.arrayBuffer());
+  const ico = extractLargestPngFromIco(sourceBytes);
+  let icoFrame:
+    | Extract<IcoPngExtraction, { kind: "png" }>
+    | undefined;
+  if (ico.kind === "unsupported-ico") {
+    return { iconRejectReason: "unsupported-ico-frame" };
+  }
+  if (ico.kind === "png") {
+    icoFrame = ico;
+    source = new Blob([ico.bytes], { type: "image/png" });
+  }
   let viewport: SvgViewport | null = null;
+  const sourceLooksLikeSvg = new TextDecoder()
+    .decode(sourceBytes.subarray(0, Math.min(1_024, sourceBytes.length)))
+    .trimStart()
+    .startsWith("<svg");
   if (
     candidate.vector ||
     source.type.toLowerCase().includes("svg") ||
-    /\.svg(?:[?#]|$)/i.test(candidate.url)
+    /\.svg(?:[?#]|$)/i.test(candidate.url) ||
+    sourceLooksLikeSvg
   ) {
     source = await safeSvgBlob(source);
     const normalized = normalizeSvgViewport(
@@ -362,8 +510,10 @@ async function cacheSiteIconCandidate(
   try {
     // 固有尺寸用于上报和方形判定；绘制一律用解码后的实际位图尺寸，
     // 矢量图这两者不同。
-    const nativeWidth = viewport?.intrinsicWidth || bitmap.width;
-    const nativeHeight = viewport?.intrinsicHeight || bitmap.height;
+    const nativeWidth =
+      viewport?.intrinsicWidth || icoFrame?.width || bitmap.width;
+    const nativeHeight =
+      viewport?.intrinsicHeight || icoFrame?.height || bitmap.height;
     const renderWidth = bitmap.width;
     const renderHeight = bitmap.height;
     if (!viewport && (nativeWidth < 128 || nativeHeight < 128)) {
@@ -399,10 +549,12 @@ async function cacheSiteIconCandidate(
     );
     const width = renderWidth * scale;
     const height = renderHeight * scale;
+    const x = (SITE_ICON_SIZE - width) / 2;
+    const y = (SITE_ICON_SIZE - height) / 2;
     sourceContext.drawImage(
       bitmap,
-      (SITE_ICON_SIZE - width) / 2,
-      (SITE_ICON_SIZE - height) / 2,
+      x,
+      y,
       width,
       height
     );
@@ -430,12 +582,18 @@ async function cacheSiteIconCandidate(
       context.fillRect(0, 0, SITE_ICON_SIZE, SITE_ICON_SIZE);
       context.drawImage(
         bitmap,
-        (SITE_ICON_SIZE - width) / 2,
-        (SITE_ICON_SIZE - height) / 2,
+        x,
+        y,
         width,
         height
       );
-      const composed = composeSiteIconPixels(sourcePixels, surface);
+      const composed = composeSiteIconPixels(sourcePixels, surface, {
+        x,
+        y,
+        width,
+        height,
+        canvasWidth: SITE_ICON_SIZE
+      });
       const imageData = context.createImageData(
         SITE_ICON_SIZE,
         SITE_ICON_SIZE
