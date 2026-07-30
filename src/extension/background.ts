@@ -96,6 +96,7 @@ import {
   parseNavigationInput
 } from "../lib/navigation";
 import { createPendingSaveDraft } from "../lib/pending-save";
+import { buildSelectableFolderOptions } from "../lib/folder-options";
 import type {
   ActiveTabSummary,
   AiProviderId,
@@ -325,41 +326,7 @@ async function getActiveTabSummary(): Promise<ActiveTabSummary | null> {
 
 async function getFolderOptions(): Promise<NativeFolderOption[]> {
   const tree = await chrome.bookmarks.getTree();
-  const options: NativeFolderOption[] = [];
-
-  function visit(
-    node: chrome.bookmarks.BookmarkTreeNode,
-    parentPath: string[],
-    depth: number
-  ) {
-    if (node.url) {
-      return;
-    }
-
-    const isRoot = node.id === "0";
-    const path = isRoot
-      ? parentPath
-      : [...parentPath, node.title || "未命名文件夹"];
-
-    if (!isRoot && node.unmodifiable !== "managed") {
-      options.push({
-        id: node.id,
-        name: node.title || "未命名文件夹",
-        path,
-        depth
-      });
-    }
-
-    for (const child of node.children || []) {
-      visit(child, path, isRoot ? depth : depth + 1);
-    }
-  }
-
-  for (const root of tree) {
-    visit(root, [], 0);
-  }
-
-  return options;
+  return buildSelectableFolderOptions(tree);
 }
 
 async function defaultFolderId(): Promise<string> {

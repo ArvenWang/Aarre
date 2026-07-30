@@ -19,6 +19,10 @@ import { registrableHost } from "../../lib/cover-registry";
 import { sendExtensionRequest } from "../../lib/messages";
 import { pendingSaveReadyTabId } from "../../lib/pending-save";
 import {
+  initialSaveFolderId,
+  visibleFolderPath
+} from "../../lib/folder-options";
+import {
   buildLocalSearchIndex,
   searchLocalIndex
 } from "../../lib/search";
@@ -263,8 +267,12 @@ function FolderSelect({
         aria-expanded={open}
         aria-controls={listboxId}
         onClick={() => (open ? setOpen(false) : openMenu())}
+        disabled={!options.length}
       >
-        <span>{selected?.name || "选择文件夹"}</span>
+        <span>
+          {selected?.name ||
+            (options.length ? "选择文件夹" : "暂无自建文件夹")}
+        </span>
         <ChevronDownIcon />
       </button>
       {open ? (
@@ -3396,11 +3404,10 @@ export function SidePanelApp() {
       });
       setFolders(folderOptions);
       setFolderId(
-        existingBookmark?.parentId ||
-          snapshot?.primaryRootId ||
-          snapshot?.root.id ||
-          folderOptions[0]?.id ||
-          ""
+        initialSaveFolderId(
+          folderOptions,
+          existingBookmark?.parentId
+        )
       );
 
       if (draft?.kind === "link") {
@@ -4392,7 +4399,9 @@ export function SidePanelApp() {
                               }
                               title={suggestion.reason}
                             >
-                              {suggestion.path.join(" / ")}
+                              {visibleFolderPath(
+                                suggestion.path
+                              ).join(" / ")}
                               <span>{suggestion.reason}</span>
                             </button>
                           ))}
