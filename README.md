@@ -1,6 +1,6 @@
 # Aarre
 
-Aarre 是一个 Chrome 原生书签增强层。它把标题、URL 和文件夹写入真实的 Chrome 书签，并在本地保存网页摘要、标签等智能信息；云端账号与跨设备备份是可选能力。
+Aarre 是一个 Chrome 原生书签增强层。它把标题、URL 和文件夹写入真实的 Chrome 书签，并在本地保存网页摘要、标签等智能信息。云端同步正在按 F14 重做，当前构建未启用账号与跨设备备份。
 
 ## 已实现的关键闭环
 
@@ -14,15 +14,13 @@ Aarre 是一个 Chrome 原生书签增强层。它把标题、URL 和文件夹�
 - 用户可编辑收藏名称、收藏原因和原生 Chrome 文件夹。
 - 保存时创建或更新真实 Chrome 原生书签。
 - 监听原生书签的新增、改名、移动和删除。
-- 无云端账号时完整支持本地保存与检索；配置云端后再启用持久补同步队列。
-- 同步失败按指数退避重试，不会让失败任务阻塞后续收藏。
-- 使用 Google OAuth 登录，并校验产品账号与当前 Chrome 配置文件账号一致。
-- 可选通过 Supabase Auth、Postgres RLS 和云端函数同步每个用户的智能信息。
-- 支持扩展使用用户提供的 API Key 直接调用 Gemini、OpenAI、DeepSeek，生成中文摘要、标签和主题；三家服务均要求配置自己的 Key，处理发生在所选 AI 服务商，不要求先配置 Supabase。
+- 无需云端账号即可完整使用本地保存、检索、摘要、标签和 Agent。
+- 旧版 Supabase 同步与 Google OAuth 路径当前未启用，正在按 F14 重做为自建同步服务。
+- 支持扩展使用用户提供的 API Key 直接调用 Gemini、OpenAI、DeepSeek，生成中文摘要、标签和主题；三家服务均要求配置自己的 Key，处理发生在所选 AI 服务商，不经过 Aarre 自己的服务器。
 - 设置页提供显式启动的全目录 AI 扫描：在用户授权网页读取权限后，逐条提取网页描述、标题、首段与路径信息，补全旧书签的简介、标签和主题；任务可暂停、恢复和取消。
 - 收藏列表直接展示名称、AI 简介、标签和完整 URL；尚未扫描的项目会明确显示待处理状态。
 - 底部 Agent 使用全目录紧凑索引和最近会话上下文回答，不再只截取少量关键词结果；发送后进入独立会话页，真实历史会话保存在当前 Chrome 配置中。
-- 配置云端后可使用 Gemini Embedding 与 pgvector 语义搜索；未配置时使用本地摘要与标签检索。
+- 本地检索覆盖标题、摘要、标签、AI 别名、中文二元组和拼音，不依赖云端语义检索。
 - 现有 Chrome 书签自动进入本地智能索引，无需手动导入；不会因此在后台批量打开网页或读取正文。
 - 原生书签始终以 Chrome 为唯一事实来源，智能层不会用云端副本覆盖 Chrome 的标题、URL 或文件夹结构。
 
@@ -31,12 +29,12 @@ Aarre 是一个 Chrome 原生书签增强层。它把标题、URL 和文件夹�
 | 数据 | 真实来源 | 同步方式 |
 | --- | --- | --- |
 | 标题、URL、文件夹 | Chrome 原生书签 | Chrome Sync |
-| 收藏原因、摘要、标签 | Aarre | 当前 Chrome 配置文件本地；可选同步到 Supabase |
+| 收藏原因、摘要、标签 | Aarre | 当前 Chrome 配置文件本地；自建云端同步正在重做，当前未启用 |
 | Agent 历史会话 | Aarre | 当前 Chrome 配置文件本地 |
 | AI 模型密钥 | 当前 Chrome 配置文件 | 由扩展直接发送给用户选择的 AI 服务商 |
-| 待同步内容 | 当前 Chrome 配置文件本地 | 仅在配置 Supabase 后启用补同步 |
+| 待同步内容 | 当前 Chrome 配置文件本地 | 当前不发送；等待 F14 自建同步服务 |
 
-统一输入框只在用户输入时查询 Chrome History API 生成本机联想，不会把完整浏览历史写入产品数据库。单页收藏只在用户主动收藏且勾选 AI 处理时读取正文。全目录扫描必须由用户在设置页明确启动并授权网页读取；扫描不携带站点 Cookie，内部、局域网和受保护地址不会发送给 AI。未配置云端时不会创建云端同步任务。
+统一输入框只在用户输入时查询 Chrome History API 生成本机联想，不会把完整浏览历史写入产品数据库。单页收藏只在用户主动收藏且勾选 AI 处理时读取正文。全目录扫描必须由用户在设置页明确启动并授权网页读取；扫描不携带站点 Cookie，内部、局域网和受保护地址不会发送给 AI。当前构建未启用云端同步，不会把这些内容发送到 Aarre 自己的服务器。
 
 ## 本地开发
 
@@ -50,54 +48,18 @@ npm run check
 
 生产构建输出在 `dist/`。在 `chrome://extensions` 打开开发者模式，选择“加载已解压的扩展程序”，然后选择 `dist/`。
 
-## 可选：配置 Supabase 与 Google 登录
+## 云端同步状态：正在重做，当前未启用
 
-只使用 Chrome 原生书签、本地摘要标签和 DeepSeek / OpenAI / Gemini BYOK 时，可以跳过本节。
+旧版 Supabase Auth、Postgres RLS、Edge Function 和 Google OAuth 同步方案不属于当前可用能力，也不应在当前构建中配置。该段保留是为了记录 F14 的迁移上下文，避免后续重复走回已经放弃的方案。
 
-### 1. 创建 Supabase 项目
+F14 的目标是迁移到 Aarre 自建服务，并严格收窄同步边界：
 
-运行迁移：
+- 只同步摘要、标签、主题等智能层元数据。
+- 页面正文和页面快照永不上传。
+- 用户的 Gemini、OpenAI 或 DeepSeek Key 只保存在当前 Chrome 配置中，由扩展直接调用所选服务商，不经过 Aarre 服务器。
+- Chrome 标题、URL 和文件夹结构继续以 Chrome 原生书签为唯一事实来源。
 
-```bash
-supabase link --project-ref YOUR_PROJECT_REF
-supabase db push
-```
-
-### 2. 配置 Google OAuth
-
-在 Google Auth Platform 创建 Web application 类型的 OAuth 客户端：
-
-1. 将 Supabase 提供的 Google Callback URL 加入 Google 的 Authorized redirect URIs。
-2. 在 Supabase Auth 中启用 Google Provider。
-3. 将扩展的回调地址加入 Supabase Redirect URLs：
-
-```text
-https://EXTENSION_ID.chromiumapp.org/auth
-```
-
-扩展实际回调地址会显示在收藏管理页的“云端尚未连接”区域。正式发布时应使用 Chrome Web Store 分配的固定 Extension ID，并完成 Google 品牌验证。
-
-### 3. 配置扩展构建环境
-
-复制 `.env.example` 为 `.env.local`，填写：
-
-```text
-VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
-```
-
-构建脚本只会把实际 Supabase 项目域名加入扩展权限，不会申请 `*.supabase.co` 或 `<all_urls>`。
-
-### 4. 配置和部署 AI 云端函数
-
-```bash
-supabase secrets set GEMINI_API_KEY=YOUR_SERVER_SIDE_KEY
-supabase secrets set GEMINI_SUMMARY_MODEL=gemini-2.5-flash-lite
-supabase functions deploy enrich-bookmark
-supabase functions deploy search-bookmarks
-```
-
-内置模型密钥必须只保存在 Supabase Secret 中，禁止写入 `.env.local` 或扩展包。用户也可在扩展设置页配置 Gemini、OpenAI 或 DeepSeek Key；BYOK 只保存在当前 Chrome 配置的本地存储中，并由扩展直接调用相应服务商。
+在 F14 完成并经过真实环境验收之前，README 不把任何云端账号、备份或同步能力视为已交付。
 
 ## 验证
 
@@ -107,7 +69,7 @@ npm run test
 npm run build
 ```
 
-当前自动化覆盖 URL 规范化、跟踪参数清理、本地检索排序、IndexedDB 缓存与队列、正文提取、敏感表单排除、页面精华提取、Agent 全目录上下文、会话持久化、AI 服务商设置和 DeepSeek 本地直连。Google OAuth、Chrome Sync、Supabase 与真实批量 AI 请求的端到端验证需要真实项目凭据和解压安装后的 Chrome 扩展。
+当前自动化覆盖 URL 规范化、跟踪参数清理、本地检索排序、IndexedDB 缓存与队列、正文提取、敏感表单排除、页面精华提取、Agent 全目录上下文、会话持久化、AI 服务商设置和 DeepSeek 本地直连。Chrome Sync 与真实批量 AI 请求的端到端验证需要解压安装后的 Chrome 扩展；旧版 Supabase 云端路径当前未启用，不列为已交付能力。
 
 生成交付物前必须先提交全部源码，并运行：
 
@@ -125,6 +87,6 @@ npm run package:artifacts
 - Chrome 内部页、Chrome Web Store 等受保护页面不能读取正文。
 - 旧书签会自动出现在侧边栏；配置 AI 后可在设置页启动全目录扫描。失效链接、登录墙和内部地址可能只能生成保守摘要，或被隐私规则跳过。
 - Chrome 移动端不能运行扩展；原生书签仍可由 Chrome Sync 到手机，智能管理端后续需要 Web/PWA。
-- 当前删除原生书签只移除本机绑定，云端记录保留，以避免同步延迟导致误删；正式删除与回收站策略仍需补充。
+- 删除书签或文件夹前会写入本机撤销快照，删除后的结构保留 30 天，可在设置页「最近的更改」里恢复。
 
 详细架构见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。

@@ -147,6 +147,39 @@ function mergeEditableTags(
   return next;
 }
 
+export function highlightTextMatches(
+  text: string,
+  query: string
+): React.ReactNode {
+  const needle = query.trim();
+  if (!needle) return text;
+
+  const expression = new RegExp(
+    needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+    "giu"
+  );
+  const parts: React.ReactNode[] = [];
+  let cursor = 0;
+
+  for (const match of text.matchAll(expression)) {
+    const matchIndex = match.index;
+    if (matchIndex > cursor) {
+      parts.push(text.slice(cursor, matchIndex));
+    }
+    const matchEnd = matchIndex + match[0].length;
+    parts.push(
+      <mark key={`${matchIndex}:${matchEnd}`}>
+        {text.slice(matchIndex, matchEnd)}
+      </mark>
+    );
+    cursor = matchEnd;
+  }
+
+  if (!parts.length) return text;
+  if (cursor < text.length) parts.push(text.slice(cursor));
+  return parts;
+}
+
 interface FolderSelectProps {
   options: NativeFolderOption[];
   value: string;
@@ -1323,7 +1356,10 @@ function SettingsPage({
           <div className="settings-section-heading">
             <div>
               <h2 id="recent-changes-title">最近的更改</h2>
-              <p>保留 30 天。恢复后 Chrome 会分配新的书签 ID，智能信息仍按网址自动关联。</p>
+              <p>
+                删除的书签和文件夹结构会保留 30 天，可以在这里完整恢复。恢复后
+                Chrome 会分配新的书签 ID，智能信息仍按网址自动关联。
+              </p>
             </div>
           </div>
           {undoBatches.length ? (
@@ -1517,6 +1553,7 @@ interface TreeProps {
   resourceByUrl: Map<string, ResourceRecord>;
   siteBrandByHost: Map<string, SiteBrandRecord>;
   coverStyle: ListCoverStyle;
+  highlightQuery: string;
   onPreviewIntent: (
     node: NativeBookmarkNode,
     rect: DOMRect
@@ -1542,6 +1579,7 @@ function BookmarkTree({
   resourceByUrl,
   siteBrandByHost,
   coverStyle,
+  highlightQuery,
   onPreviewIntent,
   onPreviewLeave,
   depth = 0,
@@ -1764,8 +1802,7 @@ function BookmarkTree({
                   event.clientY - previous.y
                 );
                 if (distance / elapsed > 0.65) {
-                  armPreview(node, event.currentTarget);
-                  onPreviewLeave();
+                  cancelPreview();
                 } else if (previewTimer.current === undefined) {
                   armPreview(node, event.currentTarget);
                 }
@@ -1829,7 +1866,12 @@ function BookmarkTree({
                   />
                 )}
                 <span className="bookmark-copy">
-                  <strong>{node.title || "未命名"}</strong>
+                  <strong>
+                    {highlightTextMatches(
+                      node.title || "未命名",
+                      highlightQuery
+                    )}
+                  </strong>
                   {node.url ? <small>{hostFromUrl(node.url)}</small> : null}
                 </span>
               </button>
@@ -1860,6 +1902,7 @@ function BookmarkTree({
                     resourceByUrl={resourceByUrl}
                     siteBrandByHost={siteBrandByHost}
                     coverStyle={coverStyle}
+                    highlightQuery={highlightQuery}
                     depth={depth + 1}
                     expanded={expanded}
                     onToggle={onToggle}
@@ -1883,14 +1926,12 @@ function BookmarkTree({
 }
 
 interface BookmarkPreviewCardProps {
-  node: NativeBookmarkNode;
   snapshot: PageSnapshot;
   flip: boolean;
   offset: number;
 }
 
 function BookmarkPreviewCard({
-  node,
   snapshot,
   flip,
   offset
@@ -1910,7 +1951,7 @@ function BookmarkPreviewCard({
               maxHeight: `calc(100vh - ${offset + 12}px)`
             }
       }
-      aria-label={`${node.title} 的预览`}
+      aria-hidden="true"
     >
       <div className="bookmark-preview-visual">
         <img src={snapshot.imageDataUrl} alt="" />
@@ -1922,7 +1963,7 @@ function BookmarkPreviewCard({
 interface AgentComposerProps {
   value: string;
   busy: boolean;
-  configured?: boolean;
+  configured: boolean;
   placeholder?: string;
   onChange: (value: string) => void;
   onSubmit: (event: React.FormEvent) => void;
@@ -1932,7 +1973,7 @@ interface AgentComposerProps {
 function AgentComposer({
   value,
   busy,
-  configured = true,
+  configured,
   placeholder = "询问你的收藏…",
   onChange,
   onSubmit,
@@ -2004,8 +2045,10 @@ interface AgentChatPageProps {
   conversation: AgentConversation;
   prompt: string;
   busy: boolean;
+  configured: boolean;
   error: string;
   onPromptChange: (value: string) => void;
+  onConfigure: () => void;
   onBack: () => void;
   onSubmit: (event: React.FormEvent) => void;
   onOpenSource: (url: string) => void;
@@ -2018,8 +2061,10 @@ function AgentChatPage({
   conversation,
   prompt,
   busy,
+  configured,
   error,
   onPromptChange,
+  onConfigure,
   onBack,
   onSubmit,
   onOpenSource,
@@ -2184,9 +2229,11 @@ function AgentChatPage({
       <AgentComposer
         value={prompt}
         busy={busy}
+        configured={configured}
         placeholder="继续询问…"
         onChange={onPromptChange}
         onSubmit={onSubmit}
+        onConfigure={onConfigure}
       />
     </main>
   );
@@ -3333,6 +3380,10 @@ export function SidePanelApp() {
   function submitAgentQuery(input: string) {
     const query = input.trim();
     if (!query || busy) return;
+    if (!aiConfigured) {
+      setPanelView("settings");
+      return;
+    }
     const timestamp = new Date().toISOString();
     const conversation =
       panelView === "chat" && activeConversation
@@ -3721,8 +3772,10 @@ export function SidePanelApp() {
         conversation={activeConversation}
         prompt={agentPrompt}
         busy={busy === "agent" || busy === "agent-actions"}
+        configured={aiConfigured}
         error={error}
         onPromptChange={setAgentPrompt}
+        onConfigure={() => setPanelView("settings")}
         onBack={() => {
           setError("");
           setPanelView("library");
@@ -4001,7 +4054,12 @@ export function SidePanelApp() {
                           className="bookmark-thumbnail"
                         />
                         <span>
-                          <strong>{result.resource.title}</strong>
+                          <strong>
+                            {highlightTextMatches(
+                              result.resource.title,
+                              libraryQuery
+                            )}
+                          </strong>
                           <small>
                             {result.resource.nativeFolderPath.join(
                               " / "
@@ -4037,9 +4095,15 @@ export function SidePanelApp() {
                     type="button"
                     className="button button-dark button-small"
                     disabled={Boolean(busy)}
-                    onClick={() => submitAgentQuery(libraryQuery)}
+                    onClick={() =>
+                      aiConfigured
+                        ? submitAgentQuery(libraryQuery)
+                        : setPanelView("settings")
+                    }
                   >
-                    让 AI 帮我找
+                    {aiConfigured
+                      ? "让 AI 帮我找"
+                      : "配置 AI 后可以让它帮你找"}
                   </button>
                 </div>
               )
@@ -4086,6 +4150,7 @@ export function SidePanelApp() {
                   resourceByUrl={resourceByUrl}
                   siteBrandByHost={siteBrandByHost}
                   coverStyle={listCoverStyle}
+                  highlightQuery={libraryQuery}
                   onPreviewIntent={showBookmarkPreview}
                   onPreviewLeave={closeBookmarkPreview}
                   expanded={visibleExpanded}
@@ -4124,9 +4189,15 @@ export function SidePanelApp() {
                   type="button"
                   className="button button-dark button-small"
                   disabled={Boolean(busy)}
-                  onClick={() => submitAgentQuery(libraryQuery)}
+                  onClick={() =>
+                    aiConfigured
+                      ? submitAgentQuery(libraryQuery)
+                      : setPanelView("settings")
+                  }
                 >
-                  让 AI 帮我找
+                  {aiConfigured
+                    ? "让 AI 帮我找"
+                    : "配置 AI 后可以让它帮你找"}
                 </button>
               </div>
             ) : (
@@ -4178,7 +4249,6 @@ export function SidePanelApp() {
 
       {bookmarkPreview && previewSnapshot ? (
         <BookmarkPreviewCard
-          node={bookmarkPreview.node}
           snapshot={previewSnapshot}
           flip={bookmarkPreview.flip}
           offset={bookmarkPreview.offset}
@@ -4451,8 +4521,8 @@ export function SidePanelApp() {
                     >
                       <p role="alert">
                         {editor.node.url
-                          ? "将从 Chrome 永久删除这个书签，此操作无法撤销。"
-                          : `将永久删除整个文件夹及其中 ${countBookmarks(editor.node)} 个书签，此操作无法撤销。`}
+                          ? "将从 Chrome 删除这个书签。30 天内可以在设置页「最近的更改」里恢复。"
+                          : `将删除整个文件夹及其中 ${countBookmarks(editor.node)} 个书签。30 天内可以在设置页「最近的更改」里恢复。`}
                       </p>
                       <div>
                         <button

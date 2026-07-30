@@ -4395,6 +4395,14 @@ a:focus-visible {
   line-height: 1.35;
 }
 
+.bookmark-copy mark,
+.library-search-result-main strong mark {
+  padding: 0 0.08em;
+  border-radius: 3px;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
 .bookmark-summary {
   margin-top: 3px;
   display: -webkit-box;
