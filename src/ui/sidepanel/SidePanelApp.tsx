@@ -1875,38 +1875,13 @@ function BookmarkTree({
 
 interface BookmarkPreviewCardProps {
   node: NativeBookmarkNode;
-  resource?: ResourceRecord;
-  siteBrand?: SiteBrandRecord;
   snapshot: PageSnapshot;
   flip: boolean;
   offset: number;
 }
 
-function relativeSnapshotDate(value: string): string {
-  const days = Math.max(
-    0,
-    Math.floor((Date.now() - Date.parse(value)) / 86_400_000)
-  );
-  if (days === 0) return "今天";
-  if (days === 1) return "昨天";
-  return `${days} 天前`;
-}
-
-function fullDate(value?: string | number): string {
-  if (!value) return "暂无记录";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "暂无记录";
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "short",
-    day: "numeric"
-  }).format(date);
-}
-
 function BookmarkPreviewCard({
   node,
-  resource,
-  siteBrand,
   snapshot,
   flip,
   offset
@@ -1930,62 +1905,6 @@ function BookmarkPreviewCard({
     >
       <div className="bookmark-preview-visual">
         <img src={snapshot.imageDataUrl} alt="" />
-        <span>
-          快照 · {relativeSnapshotDate(snapshot.capturedAt)}
-          {Date.now() - Date.parse(snapshot.capturedAt) >
-          90 * 86_400_000
-            ? " · 可能已过期"
-            : ""}
-        </span>
-      </div>
-      <div className="bookmark-preview-info">
-        <header>
-          <div>
-            <SiteThumbnail
-              url={node.url || ""}
-              brandImageUrl={siteBrand?.iconDataUrl}
-              categoryCoverId={resource?.categoryCoverId}
-              label={resource?.siteName || hostFromUrl(node.url || "")}
-              className="bookmark-preview-site"
-            />
-            <span>
-              <strong>
-                {resource?.siteName || hostFromUrl(node.url || "")}
-              </strong>
-              <small>{hostFromUrl(node.url || "")}</small>
-            </span>
-          </div>
-        </header>
-        <h2>{node.title || "未命名"}</h2>
-        <p>
-          {resource?.summary ||
-            resource?.contentExcerpt ||
-            "这条收藏还没有 AI 摘要。你仍可根据完整标题、站点和文件夹位置确认内容。"}
-        </p>
-        {resource?.tags.length ? (
-          <div className="bookmark-preview-tags">
-            {resource.tags.map((tag) => (
-              <span key={tag}>{tag}</span>
-            ))}
-          </div>
-        ) : null}
-        <dl>
-          <div>
-            <dt>文件夹</dt>
-            <dd>
-              {resource?.nativeFolderPath.join(" / ") || "Chrome 书签"}
-            </dd>
-          </div>
-          <div>
-            <dt>收藏时间</dt>
-            <dd>{fullDate(node.dateAdded)}</dd>
-          </div>
-          <div>
-            <dt>上次打开</dt>
-            <dd>{fullDate(node.dateLastUsed)}</dd>
-          </div>
-        </dl>
-        <small className="bookmark-preview-key">按 P 打开预览 · Esc 关闭</small>
       </div>
     </aside>
   );
@@ -4233,22 +4152,6 @@ export function SidePanelApp() {
       {bookmarkPreview && previewSnapshot ? (
         <BookmarkPreviewCard
           node={bookmarkPreview.node}
-          resource={
-            bookmarkPreview.node.url
-              ? resourceForUrl(
-                  resourceByUrl,
-                  bookmarkPreview.node.url
-                )
-              : undefined
-          }
-          siteBrand={
-            bookmarkPreview.node.url
-              ? siteBrandForUrl(
-                  siteBrandByHost,
-                  bookmarkPreview.node.url
-                )
-              : undefined
-          }
           snapshot={previewSnapshot}
           flip={bookmarkPreview.flip}
           offset={bookmarkPreview.offset}
