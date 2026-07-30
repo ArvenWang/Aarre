@@ -1,0 +1,276 @@
+{
+  "schemaVersion": 1,
+  "measuredAt": "2026-07-30T08:12:29.989Z",
+  "inputLabel": "Bookmarks + Bookmarks",
+  "composition": "themed",
+  "availableUrlCount": 414,
+  "sampleCount": 300,
+  "sources": {
+    "registry": {
+      "count": 3,
+      "percent": 1
+    },
+    "apple-touch-icon": {
+      "count": 98,
+      "percent": 32.67
+    },
+    "manifest": {
+      "count": 9,
+      "percent": 3
+    },
+    "high-resolution-rel-icon": {
+      "count": 35,
+      "percent": 11.67
+    },
+    "og-image": {
+      "count": 2,
+      "percent": 0.67
+    },
+    "category-fallback": {
+      "count": 153,
+      "percent": 51
+    }
+  },
+  "fallback": {
+    "count": 153,
+    "percent": 51
+  },
+  "maxScale": 1,
+  "zeroUpsamplePassed": true,
+  "rejections": {
+    "below-128px": {
+      "count": 23,
+      "samples": [
+        {
+          "pageUrl": "http://www.jeffhandesign.com/[path-8a5edab2]",
+          "assetUrl": "https://cdn.myportfolio.com/[path-edf6e9b7].jpg",
+          "source": "large-icon",
+          "nativeWidth": 32,
+          "nativeHeight": 32
+        },
+        {
+          "pageUrl": "https://devouringdetails.com/[path-8a5edab2]",
+          "assetUrl": "https://devouringdetails.com/[path-78108a7d].png",
+          "source": "apple-touch-icon",
+          "nativeWidth": 100,
+          "nativeHeight": 100
+        },
+        {
+          "pageUrl": "https://diana.lu/[path-26223c06]",
+          "assetUrl": "https://framerusercontent.com/[path-63eb4dbc].png",
+          "source": "large-icon",
+          "nativeWidth": 32,
+          "nativeHeight": 32
+        },
+        {
+          "pageUrl": "https://collectui.com/[path-8a5edab2]",
+          "assetUrl": "https://collectui.com/[path-78108a7d].png",
+          "source": "large-icon",
+          "nativeWidth": 80,
+          "nativeHeight": 80
+        },
+        {
+          "pageUrl": "https://github.com/[path-91e96fa8]",
+          "assetUrl": "https://github.com/[path-43f0533a].png",
+          "source": "registry",
+          "nativeWidth": 120,
+          "nativeHeight": 120
+        },
+        {
+          "pageUrl": "https://animejs.com/[path-8a5edab2]",
+          "assetUrl": "https://animejs.com/[path-379bfe54].png",
+          "source": "large-icon",
+          "nativeWidth": 64,
+          "nativeHeight": 64
+        },
+        {
+          "pageUrl": "https://doc.weixin.qq.com/[path-e91ca852]",
+          "assetUrl": "https://wwcdn.weixin.qq.com/[path-27782040].png",
+          "source": "large-icon",
+          "nativeWidth": 32,
+          "nativeHeight": 32
+        },
+        {
+          "pageUrl": "http://mockuphone.com/[path-8a5edab2]",
+          "assetUrl": "https://mockuphone.com/[path-c4e11276].png",
+          "source": "large-icon",
+          "nativeWidth": 32,
+          "nativeHeight": 32
+        },
+        {
+          "pageUrl": "http://www.iconfont.cn/[path-8a5edab2]",
+          "assetUrl": "https://img.alicdn.com/[path-952c2662].png",
+          "source": "apple-touch-icon",
+          "nativeWidth": 114,
+          "nativeHeight": 114
+        },
+        {
+          "pageUrl": "https://www.thiings.co/[path-583f2e21]",
+          "assetUrl": "https://www.thiings.co/[path-78108a7d].png",
+          "source": "large-icon",
+          "nativeWidth": 80,
+          "nativeHeight": 80
+        },
+        {
+          "pageUrl": "https://www.futuretools.io/[path-8a5edab2]",
+          "assetUrl": "https://futuretools.io/[path-ebc7d153].png",
+          "source": "apple-touch-icon",
+          "nativeWidth": 134,
+          "nativeHeight": 81
+        },
+        {
+          "pageUrl": "https://www.aicpb.com/[path-ab6ff45f]",
+          "assetUrl": "https://www.aicpb.com/[path-78108a7d].png",
+          "source": "large-icon",
+          "nativeWidth": 64,
+          "nativeHeight": 64
+        }
+      ]
+    },
+    "non-square": {
+      "count": 0,
+      "samples": []
+    },
+    "low-ink-or-contrast": {
+      "count": 2,
+      "samples": [
+        {
+          "pageUrl": "https://kasumi-docs.vercel.app/[path-8a5edab2]",
+          "assetUrl": "https://kasumi-docs.vercel.app/[path-78108a7d].png",
+          "source": "large-icon",
+          "nativeWidth": 1024,
+          "nativeHeight": 1024
+        },
+        {
+          "pageUrl": "https://www.fluidfunctionalism.com/[path-8a5edab2]",
+          "assetUrl": "https://www.fluidfunctionalism.com/[path-ea055fc9].png",
+          "source": "apple-touch-icon",
+          "nativeWidth": 180,
+          "nativeHeight": 180
+        }
+      ]
+    }
+  },
+  "fallbackTopDomains": [
+    {
+      "host": "3dpresso.ai",
+      "count": 2
+    },
+    {
+      "host": "animejs.com",
+      "count": 2
+    },
+    {
+      "host": "app.artflow.ai",
+      "count": 2
+    },
+    {
+      "host": "app.exactly.ai",
+      "count": 2
+    },
+    {
+      "host": "app.meshy.ai",
+      "count": 2
+    },
+    {
+      "host": "blog.sina.com.cn",
+      "count": 2
+    },
+    {
+      "host": "book.douban.com",
+      "count": 2
+    },
+    {
+      "host": "cli.im",
+      "count": 2
+    },
+    {
+      "host": "clipdrop.co",
+      "count": 2
+    },
+    {
+      "host": "cowtransfer.com",
+      "count": 2
+    },
+    {
+      "host": "designsparks.io",
+      "count": 2
+    },
+    {
+      "host": "doc.weixin.qq.com",
+      "count": 2
+    },
+    {
+      "host": "generative-dynamics.github.io",
+      "count": 2
+    },
+    {
+      "host": "home.blusea.cn",
+      "count": 2
+    },
+    {
+      "host": "huggingface.co",
+      "count": 2
+    },
+    {
+      "host": "iconly.pro",
+      "count": 2
+    },
+    {
+      "host": "mcp.composio.dev",
+      "count": 2
+    },
+    {
+      "host": "mockuphone.com",
+      "count": 2
+    },
+    {
+      "host": "openxlab.org.cn",
+      "count": 2
+    },
+    {
+      "host": "prompts.chat",
+      "count": 2
+    },
+    {
+      "host": "rotato.app",
+      "count": 2
+    },
+    {
+      "host": "useyourinterface.com",
+      "count": 2
+    },
+    {
+      "host": "v.mp3juices.click",
+      "count": 2
+    },
+    {
+      "host": "weavesilk.com",
+      "count": 2
+    },
+    {
+      "host": "www.aicpb.com",
+      "count": 2
+    },
+    {
+      "host": "www.futuretools.io",
+      "count": 2
+    },
+    {
+      "host": "www.gizma.com",
+      "count": 2
+    },
+    {
+      "host": "www.howzhi.com",
+      "count": 2
+    },
+    {
+      "host": "www.jeffhandesign.com",
+      "count": 2
+    },
+    {
+      "host": "www.libfabu.com",
+      "count": 2
+    }
+  ]
+}

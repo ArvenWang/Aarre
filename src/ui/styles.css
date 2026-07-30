@@ -920,10 +920,18 @@ a {
   width: 100%;
   height: 100vh;
   min-width: 320px;
+  overflow: hidden;
   display: grid;
   grid-template-rows: auto auto auto minmax(0, 1fr) auto;
   color: #252821;
   background: #f7f7f2;
+}
+
+body:has(.native-panel),
+body:has(.native-panel) #root {
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .native-header {
@@ -1469,13 +1477,14 @@ a {
   z-index: 30;
   padding: 16px;
   display: grid;
-  place-items: end center;
+  place-items: center;
   background: rgba(28, 31, 25, 0.38);
   backdrop-filter: blur(4px);
 }
 
 .native-dialog {
   width: 100%;
+  max-width: 520px;
   max-height: calc(100vh - 32px);
   padding: 18px;
   overflow: auto;
@@ -3391,7 +3400,7 @@ body {
 @keyframes native-dialog-panel-in {
   from {
     opacity: 0;
-    transform: translateY(14px) scale(0.97);
+    transform: scale(0.985);
   }
 
   to {
@@ -3405,7 +3414,7 @@ body {
 }
 
 .native-dialog {
-  transform-origin: center bottom;
+  transform-origin: center;
   animation: native-dialog-panel-in 320ms cubic-bezier(0.16, 1, 0.3, 1)
     both;
 }
@@ -3914,7 +3923,7 @@ textarea:focus-visible {
 .search-box:focus-within,
 .omnibox-shell:focus-within {
   border-color: color-mix(in srgb, var(--ink) 18%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 6%, transparent);
+  box-shadow: none;
 }
 
 input:focus-visible,
@@ -4068,12 +4077,12 @@ a:focus-visible {
 
 .native-settings-panel {
   grid-template-rows: auto minmax(0, 1fr);
-  animation: settings-page-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: settings-page-in 160ms ease-out both;
 }
 
 .settings-page-header {
-  min-height: 72px;
-  padding: 14px 16px;
+  min-height: 66px;
+  padding: 12px 18px;
   display: flex;
   align-items: center;
   gap: 9px;
@@ -4087,7 +4096,7 @@ a:focus-visible {
 .settings-page-header h1 {
   margin: 0;
   color: var(--ink);
-  font-size: 19px;
+  font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
@@ -4099,14 +4108,18 @@ a:focus-visible {
 }
 
 .settings-page-content {
+  width: 100%;
   min-height: 0;
-  padding: 14px;
+  padding: 2px 18px 24px;
+  overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
   scrollbar-width: none;
 }
 
 .settings-page-content::-webkit-scrollbar {
   width: 0;
+  height: 0;
 }
 
 .settings-notice {
@@ -4128,11 +4141,18 @@ a:focus-visible {
 }
 
 .settings-section {
-  margin-bottom: 12px;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--paper) 58%, white);
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 18px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
+
+.settings-section:last-child {
+  border-bottom: 0;
 }
 
 .settings-section-heading {
@@ -4140,6 +4160,10 @@ a:focus-visible {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+.settings-section-heading > div {
+  min-width: 0;
 }
 
 .settings-section h2 {
@@ -4172,14 +4196,19 @@ a:focus-visible {
 }
 
 .settings-change-list {
+  width: 100%;
+  min-width: 0;
   margin-top: 12px;
   display: grid;
   gap: 7px;
 }
 
 .settings-change-list article {
+  width: 100%;
+  min-width: 0;
   padding: 9px 10px;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
@@ -4193,6 +4222,7 @@ a:focus-visible {
 
 .settings-change-list article > div {
   min-width: 0;
+  overflow: hidden;
 }
 
 .settings-change-list strong,
@@ -4219,7 +4249,14 @@ a:focus-visible {
   margin-bottom: 0;
 }
 
+.settings-change-list article > .button {
+  min-width: 52px;
+  flex: 0 0 auto;
+}
+
 .settings-provider-tabs {
+  width: 100%;
+  min-width: 0;
   margin-top: 14px;
   padding: 3px;
   display: grid;
@@ -4227,6 +4264,10 @@ a:focus-visible {
   gap: 3px;
   border-radius: 12px;
   background: var(--component);
+}
+
+.settings-cover-tabs {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .settings-provider-tab {
@@ -4345,7 +4386,7 @@ a:focus-visible {
 .settings-field-footer {
   margin-top: 10px;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
@@ -4381,12 +4422,10 @@ a:focus-visible {
 @keyframes settings-page-in {
   from {
     opacity: 0;
-    transform: translateX(10px);
   }
 
   to {
     opacity: 1;
-    transform: translateX(0);
   }
 }
 
@@ -4669,8 +4708,7 @@ a:focus-visible {
 
 .agent-history-panel {
   grid-template-rows: auto minmax(0, 1fr);
-  animation: agent-page-enter 220ms cubic-bezier(0.22, 1, 0.36, 1)
-    both;
+  animation: agent-page-enter 160ms ease-out both;
 }
 
 .agent-page-header {
@@ -5076,12 +5114,10 @@ a:focus-visible {
 @keyframes agent-page-enter {
   from {
     opacity: 0;
-    transform: translateX(8px);
   }
 
   to {
     opacity: 1;
-    transform: translateX(0);
   }
 }
 
@@ -5109,7 +5145,6 @@ a:focus-visible {
   z-index: 7;
   overflow: hidden;
   background: #fff;
-  box-shadow: inset 0 -1px rgba(36, 36, 36, 0.045);
 }
 
 .bookmark-row[data-folder="true"]:hover,
@@ -5552,8 +5587,8 @@ main.native-panel:has(> .library-search) > .agent-composer {
 }
 
 .library-search:focus-within {
-  border-color: color-mix(in srgb, var(--accent) 52%, transparent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  border-color: color-mix(in srgb, var(--ink) 20%, transparent);
+  box-shadow: none;
 }
 
 .library-search > svg {
@@ -6064,66 +6099,19 @@ main.native-panel:has(> .library-search) > .agent-composer {
   font-weight: 650;
 }
 
-.settings-snapshot-switch {
-  min-width: 74px;
-  padding: 5px 8px 5px 5px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border: 0;
-  border-radius: 999px;
-  color: var(--muted);
-  background: var(--component);
-  font-size: 8px;
-}
-
-.settings-snapshot-switch > span {
-  width: 22px;
-  height: 14px;
-  position: relative;
-  border-radius: 999px;
-  background: #b4b6bb;
-}
-
-.settings-snapshot-switch > span::after {
-  content: "";
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #fff;
-  transition: transform 150ms ease;
-}
-
-.settings-snapshot-switch[data-active="true"] {
-  color: var(--success);
-  background: var(--success-soft);
-}
-
-.settings-snapshot-switch[data-active="true"] > span {
-  background: var(--success);
-}
-
-.settings-snapshot-switch[data-active="true"] > span::after {
-  transform: translateX(8px);
-}
-
 .bookmark-preview-card {
   position: fixed;
   z-index: 40;
   right: 12px;
-  width: min(340px, calc(100vw - 24px));
+  width: min(286px, calc(100vw - 72px));
   max-height: calc(100vh - 24px);
   overflow: hidden;
   pointer-events: none;
   border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
-  border-radius: 18px;
+  border-radius: 15px;
   color: var(--ink);
   background: #fff;
-  box-shadow: 0 20px 60px rgba(36, 36, 36, 0.2);
+  box-shadow: 0 16px 40px rgba(36, 36, 36, 0.16);
   animation: bookmark-preview-in 160ms cubic-bezier(0.22, 1, 0.36, 1)
     both;
 }

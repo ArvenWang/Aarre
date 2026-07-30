@@ -625,8 +625,6 @@ function SettingsPage({
   const [action, setAction] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [snapshotsEnabled, setSnapshotsEnabled] = useState(true);
-  const [snapshotExcludedHosts, setSnapshotExcludedHosts] = useState("");
   const [scanCostLimitCny, setScanCostLimitCny] = useState(10);
   const [undoBatches, setUndoBatches] = useState<UndoSnapshotBatch[]>([]);
   const [scanEstimate, setScanEstimate] =
@@ -658,10 +656,6 @@ function SettingsPage({
       .then(setUsageStats)
       .catch(() => undefined);
     void getDisplaySettings().then((display) => {
-      setSnapshotsEnabled(display.pageSnapshotsEnabled);
-      setSnapshotExcludedHosts(
-        display.snapshotExcludedHosts.join("\n")
-      );
       setScanCostLimitCny(display.scanCostLimitCny);
     });
   }, []);
@@ -871,49 +865,6 @@ function SettingsPage({
     }
   }
 
-  async function saveSnapshotSettings(
-    nextEnabled = snapshotsEnabled,
-    requestCapturePermission = false
-  ) {
-    if (action) return;
-    setAction("snapshot-settings");
-    setError("");
-    try {
-      if (
-        nextEnabled &&
-        requestCapturePermission &&
-        chrome.permissions?.request
-      ) {
-        const granted = await chrome.permissions.request({
-          origins: ["http://*/*", "https://*/*"]
-        });
-        if (!granted) {
-          throw new Error(
-            "需要网页访问权限才能自动积累预览快照；设置没有更改。"
-          );
-        }
-      }
-      const next = await saveDisplaySettings({
-        pageSnapshotsEnabled: nextEnabled,
-        snapshotExcludedHosts: snapshotExcludedHosts
-          .split(/[\n,，;；\s]+/)
-          .map((host) => host.trim())
-          .filter(Boolean)
-      });
-      setSnapshotsEnabled(next.pageSnapshotsEnabled);
-      setSnapshotExcludedHosts(next.snapshotExcludedHosts.join("\n"));
-      setMessage(
-        next.pageSnapshotsEnabled
-          ? "页面快照采集已开启，仅保存于本机。"
-          : "页面快照采集已关闭，不会产生新快照。"
-      );
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "快照设置保存失败");
-    } finally {
-      setAction("");
-    }
-  }
-
   const accountName =
     appState?.auth.userName ||
     appState?.auth.userEmail ||
@@ -961,7 +912,7 @@ function SettingsPage({
           <div className="settings-section-heading">
             <div>
               <h2 id="ai-settings-title">AI 服务</h2>
-              <p>用于生成书签摘要和标签，增强本地检索。</p>
+              <p>生成摘要与标签，增强本地检索。</p>
             </div>
             <span
               className="settings-status"
@@ -1000,12 +951,11 @@ function SettingsPage({
             ))}
           </div>
           <p className="settings-provider-help">
-            {providerPreset.description}
             {settings?.provider === provider &&
             settings.apiKeyConfigured &&
             settings.apiKeySuffix
-              ? ` 当前 Key：•••• ${settings.apiKeySuffix}`
-              : ""}
+              ? `已保存 Key：•••• ${settings.apiKeySuffix}`
+              : "选择服务商并填写自己的 API Key。"}
           </p>
 
           <label className="settings-field">
@@ -1036,9 +986,7 @@ function SettingsPage({
             />
           </label>
           <div className="settings-field-footer">
-            <p>
-              Key 仅保存在这个 Chrome 配置文件中；调用时由扩展直接发送到所选 AI 服务商。
-            </p>
+            <p>Key 仅保存在当前 Chrome 配置文件。</p>
             <button
               type="button"
               className="button button-dark button-small"
@@ -1059,13 +1007,11 @@ function SettingsPage({
           <div className="settings-section-heading">
             <div>
               <h2 id="cover-style-title">列表封面风格</h2>
-              <p>
-                站点标识在 48px 下更清晰；页面封面更丰富，但细节可能更少。
-              </p>
+              <p>选择列表中优先显示的图片类型。</p>
             </div>
           </div>
           <div
-            className="settings-provider-tabs"
+            className="settings-provider-tabs settings-cover-tabs"
             role="radiogroup"
             aria-label="列表封面风格"
           >
@@ -1078,7 +1024,7 @@ function SettingsPage({
               disabled={Boolean(action)}
               onClick={() => void handleCoverStyle("site")}
             >
-              站点标识（整齐）
+              站点标识
             </button>
             <button
               type="button"
@@ -1089,60 +1035,7 @@ function SettingsPage({
               disabled={Boolean(action)}
               onClick={() => void handleCoverStyle("page")}
             >
-              页面封面（丰富）
-            </button>
-          </div>
-        </section>
-
-        <section
-          className="settings-section"
-          aria-labelledby="snapshot-settings-title"
-        >
-          <div className="settings-section-heading">
-            <div>
-              <h2 id="snapshot-settings-title">页面预览快照</h2>
-              <p>
-                已收藏网页在前台停留 5 秒后保存真实快照；只存在本机，绝不参与同步。
-              </p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={snapshotsEnabled}
-              className="settings-snapshot-switch"
-              data-active={snapshotsEnabled}
-              disabled={Boolean(action)}
-              onClick={() => {
-                const next = !snapshotsEnabled;
-                void saveSnapshotSettings(next, next);
-              }}
-            >
-              <span />
-              {snapshotsEnabled ? "已开启" : "已关闭"}
-            </button>
-          </div>
-          <label className="settings-field">
-            <span>额外不采集的域名（每行一个）</span>
-            <textarea
-              rows={3}
-              value={snapshotExcludedHosts}
-              placeholder={"work.example.com\nprivate.example.org"}
-              onChange={(event) =>
-                setSnapshotExcludedHosts(event.target.value)
-              }
-            />
-          </label>
-          <div className="settings-field-footer">
-            <p>
-              内网、银行、支付和医疗站点已内置排除；无痕窗口始终不采集。
-            </p>
-            <button
-              type="button"
-              className="button button-quiet button-small"
-              disabled={Boolean(action)}
-              onClick={() => void saveSnapshotSettings()}
-            >
-              保存排除清单
+              页面封面
             </button>
           </div>
         </section>
@@ -1154,9 +1047,7 @@ function SettingsPage({
           <div className="settings-section-heading">
             <div>
               <h2 id="library-scan-title">全目录扫描</h2>
-              <p>
-                逐个读取可访问网页，补充站点标识和代表图；已配置 AI 时同时生成简介、标签和主题。
-              </p>
+              <p>更新站点图标、摘要和标签。</p>
             </div>
             <span
               className="settings-status"
@@ -1261,7 +1152,7 @@ function SettingsPage({
             </div>
           ) : null}
           <p className="settings-scan-privacy">
-            站点标识和代表图会压缩后只保存在本机；简介和标签会产生所选 AI 服务商的调用费用。内部网址、局域网和受保护地址不会发起任何网络请求。
+            扫描结果保存在本机；AI 请求直接发送到所选服务商。
           </p>
           <div className="settings-scan-actions">
             {appState?.libraryScan.state === "running" ? (
@@ -1359,10 +1250,7 @@ function SettingsPage({
           <div className="settings-section-heading">
             <div>
               <h2 id="recent-changes-title">最近的更改</h2>
-              <p>
-                删除的书签和文件夹结构会保留 30 天，可以在这里完整恢复。恢复后
-                Chrome 会分配新的书签 ID，智能信息仍按网址自动关联。
-              </p>
+              <p>删除的书签和文件夹保留 30 天。</p>
             </div>
           </div>
           {undoBatches.length ? (
@@ -1398,7 +1286,7 @@ function SettingsPage({
         <section className="settings-section settings-onboarding-section">
           <div>
             <h2>首次使用引导</h2>
-            <p>重新查看 Chrome 书签、AI 服务和本地快照的使用说明。</p>
+            <p>重新查看主要功能说明。</p>
           </div>
           <button
             type="button"
@@ -1417,9 +1305,7 @@ function SettingsPage({
           <div className="settings-section-heading">
             <div>
               <h2 id="privacy-settings-title">隐私与数据自主权</h2>
-              <p>
-                一键导出智能层元数据、Agent 会话、站点资产、页面快照、撤销记录和安全设置；API Key、Key 尾号与登录令牌永不写入导出文件。
-              </p>
+              <p>导出本地数据，不包含 API Key 或登录信息。</p>
             </div>
           </div>
           <div className="settings-field-footer">
@@ -1449,7 +1335,7 @@ function SettingsPage({
           <div className="settings-section-heading">
             <div>
               <h2 id="account-settings-title">Google 账号</h2>
-              <p>可选，用于跨设备同步和云端备份。</p>
+              <p>云端同步正在重做，当前版本未启用。</p>
             </div>
           </div>
           <div className="settings-account-row">
@@ -1978,6 +1864,7 @@ export function BookmarkPreviewCard({
 
 interface BookmarkPreviewLayerProps {
   snapshot: PageSnapshot | null;
+  hidden?: boolean;
   placement: {
     flip: boolean;
     offset: number;
@@ -1986,9 +1873,10 @@ interface BookmarkPreviewLayerProps {
 
 export function BookmarkPreviewLayer({
   snapshot,
+  hidden = false,
   placement
 }: BookmarkPreviewLayerProps) {
-  if (!snapshot || !placement) return null;
+  if (hidden || !snapshot || !placement) return null;
   return (
     <BookmarkPreviewCard
       snapshot={snapshot}
@@ -2082,19 +1970,21 @@ function conversationDate(value: string): string {
 function organizationNoticeDetails(
   notice: OrganizationNotice
 ): string {
+  // 量词按提案粒度区分：重复提案一条对应一组同 URL 收藏，归类和失效提案
+  // 都是一条对应一个书签。
   const details = [
     notice.counts.duplicate
       ? `${notice.counts.duplicate} 组重复`
       : "",
     notice.counts.dead ? `${notice.counts.dead} 条失效` : "",
     notice.counts.classify
-      ? `${notice.counts.classify} 组可归类`
+      ? `${notice.counts.classify} 条可归类`
       : "",
     notice.counts.largeFolder
       ? `${notice.counts.largeFolder} 个大文件夹`
       : ""
   ].filter(Boolean);
-  return details.join("、") || `${notice.actionableCount} 组可执行建议`;
+  return details.join("、") || `${notice.actionableCount} 条可执行建议`;
 }
 
 interface AgentChatPageProps {
@@ -3130,6 +3020,16 @@ export function SidePanelApp() {
     }
   }
 
+  function dismissBookmarkPreviewImmediately() {
+    previewCanonicalUrl.current = "";
+    if (previewCloseTimer.current !== undefined) {
+      window.clearTimeout(previewCloseTimer.current);
+      previewCloseTimer.current = undefined;
+    }
+    setBookmarkPreview(null);
+    setPreviewSnapshot(null);
+  }
+
   function closeBookmarkPreview() {
     // 离开书签行后立即取消尚未完成的快照查询，避免异步结果晚到时闪出卡片。
     previewCanonicalUrl.current = "";
@@ -3170,7 +3070,13 @@ export function SidePanelApp() {
           const gap = 14;
           const spaceBelow = window.innerHeight - rect.bottom - gap;
           const spaceAbove = rect.top - gap;
-          const flip = spaceBelow < 360 && spaceAbove > spaceBelow;
+          const previewWidth = Math.min(
+            286,
+            Math.max(0, window.innerWidth - 72)
+          );
+          const previewHeight = (previewWidth * 10) / 16 + 2;
+          const flip =
+            spaceBelow < previewHeight && spaceAbove > spaceBelow;
           setBookmarkPreview({
             node,
             flip,
@@ -3572,6 +3478,7 @@ export function SidePanelApp() {
     existingBookmark?: NativeBookmarkNode
   ) {
     if (!appState) return;
+    dismissBookmarkPreviewImmediately();
     setEditor({ kind: "save" });
     setConfirmDeleteId("");
     setBusy("capture");
@@ -3654,6 +3561,7 @@ export function SidePanelApp() {
   }
 
   function startEdit(node: NativeBookmarkNode) {
+    dismissBookmarkPreviewImmediately();
     const resource = node.url
       ? resourceForUrl(resourceByUrl, node.url)
       : undefined;
@@ -3671,6 +3579,7 @@ export function SidePanelApp() {
   }
 
   function startCreateFolder(parentId: string) {
+    dismissBookmarkPreviewImmediately();
     setEditor({ kind: "folder", parentId });
     setConfirmDeleteId("");
     setEditTitle("");
@@ -4448,6 +4357,7 @@ export function SidePanelApp() {
 
       <BookmarkPreviewLayer
         snapshot={previewSnapshot}
+        hidden={Boolean(editor)}
         placement={bookmarkPreview}
       />
 

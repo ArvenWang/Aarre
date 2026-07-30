@@ -12,10 +12,14 @@ const snapshot: PageSnapshot = {
   height: 800
 };
 
-function render(snapshotValue: PageSnapshot | null): string {
+function render(
+  snapshotValue: PageSnapshot | null,
+  hidden = false
+): string {
   return renderToStaticMarkup(
     createElement(BookmarkPreviewLayer, {
       snapshot: snapshotValue,
+      hidden,
       placement: { flip: false, offset: 120 }
     })
   );
@@ -33,6 +37,10 @@ describe("bookmark hover preview rendering gate", () => {
     const markup = render(null);
 
     expect(markup).toBe("");
+  });
+
+  it("renders no overlay while an editor is open", () => {
+    expect(render(snapshot, true)).toBe("");
   });
 
   it("contains no visible or hidden text content", () => {

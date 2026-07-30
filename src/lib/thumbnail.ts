@@ -113,6 +113,75 @@ async function safeSvgBlob(blob: Blob): Promise<Blob> {
   return new Blob([source], { type: "image/svg+xml" });
 }
 
+export interface SvgViewport {
+  source: string;
+  intrinsicWidth: number;
+  intrinsicHeight: number;
+}
+
+function parseSvgLength(value: string | undefined): number {
+  const match = value?.trim().match(/^([0-9]*\.?[0-9]+)\s*(?:px|pt)?$/i);
+  const parsed = Number(match?.[1]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+/**
+ * SVG 的 `width="32"` 只是默认渲染尺寸，不是分辨率上限——矢量图可以在任意
+ * 尺寸下无损重绘。若照 32 解码再套 128px 下限，会把大量站点的 favicon.svg
+ * 当成小图拒掉，正好是 PRD 5.5 想避免的结果。这里把根元素改写成按最长边
+ * SITE_ICON_SIZE 渲染，让解码器直接栅格化到目标尺寸。
+ *
+ * 拿不到固有宽高也拿不到 viewBox 时返回 0，调用方据此退回位图判定，
+ * 避免给未知画布强加一个可能裁掉内容的 viewBox。
+ */
+export function normalizeSvgViewport(
+  source: string,
+  size: number
+): SvgViewport {
+  const unresolved: SvgViewport = {
+    source,
+    intrinsicWidth: 0,
+    intrinsicHeight: 0
+  };
+  const openTag = source.match(/^<svg\b[^>]*[^/]>/i)?.[0];
+  if (!openTag) return unresolved;
+
+  const attribute = (name: string): string | undefined =>
+    openTag.match(
+      new RegExp(`[\\s]${name}\\s*=\\s*["']([^"']*)["']`, "i")
+    )?.[1];
+
+  const viewBox = (attribute("viewBox") || "")
+    .split(/[\s,]+/)
+    .filter(Boolean)
+    .map(Number);
+  const hasViewBox =
+    viewBox.length === 4 && viewBox.every((value) => Number.isFinite(value));
+  const boxWidth = hasViewBox ? viewBox[2]! : 0;
+  const boxHeight = hasViewBox ? viewBox[3]! : 0;
+
+  const intrinsicWidth = parseSvgLength(attribute("width")) || boxWidth;
+  const intrinsicHeight = parseSvgLength(attribute("height")) || boxHeight;
+  if (intrinsicWidth <= 0 || intrinsicHeight <= 0) return unresolved;
+
+  const scale = size / Math.max(intrinsicWidth, intrinsicHeight);
+  const rewritten = `${openTag
+    .replace(/\s+(?:width|height)\s*=\s*["'][^"']*["']/gi, "")
+    .slice(0, -1)}${
+    boxWidth > 0 && boxHeight > 0
+      ? ""
+      : ` viewBox="0 0 ${intrinsicWidth} ${intrinsicHeight}"`
+  } width="${Math.round(intrinsicWidth * scale)}" height="${Math.round(
+    intrinsicHeight * scale
+  )}">`;
+
+  return {
+    source: rewritten + source.slice(openTag.length),
+    intrinsicWidth,
+    intrinsicHeight
+  };
+}
+
 function inspectPixels(
   context: OffscreenCanvasRenderingContext2D,
   width: number,
@@ -273,18 +342,31 @@ async function cacheSiteIconCandidate(
     candidate.url,
     candidate.vector ? MAX_SVG_BYTES : MAX_IMAGE_BYTES
   );
+  let viewport: SvgViewport | null = null;
   if (
     candidate.vector ||
     source.type.toLowerCase().includes("svg") ||
     /\.svg(?:[?#]|$)/i.test(candidate.url)
   ) {
     source = await safeSvgBlob(source);
+    const normalized = normalizeSvgViewport(
+      await source.text(),
+      SITE_ICON_SIZE
+    );
+    if (normalized.intrinsicWidth > 0) {
+      viewport = normalized;
+      source = new Blob([normalized.source], { type: "image/svg+xml" });
+    }
   }
   const bitmap = await bitmapFromBlob(source);
   try {
-    const nativeWidth = bitmap.width;
-    const nativeHeight = bitmap.height;
-    if (nativeWidth < 128 || nativeHeight < 128) {
+    // 固有尺寸用于上报和方形判定；绘制一律用解码后的实际位图尺寸，
+    // 矢量图这两者不同。
+    const nativeWidth = viewport?.intrinsicWidth || bitmap.width;
+    const nativeHeight = viewport?.intrinsicHeight || bitmap.height;
+    const renderWidth = bitmap.width;
+    const renderHeight = bitmap.height;
+    if (!viewport && (nativeWidth < 128 || nativeHeight < 128)) {
       return {
         iconRejectReason: "below-128px",
         nativeWidth,
@@ -313,10 +395,10 @@ async function cacheSiteIconCandidate(
     sourceContext.clearRect(0, 0, SITE_ICON_SIZE, SITE_ICON_SIZE);
     const scale = Math.min(
       1,
-      SITE_ICON_SIZE / Math.max(nativeWidth, nativeHeight)
+      SITE_ICON_SIZE / Math.max(renderWidth, renderHeight)
     );
-    const width = nativeWidth * scale;
-    const height = nativeHeight * scale;
+    const width = renderWidth * scale;
+    const height = renderHeight * scale;
     sourceContext.drawImage(
       bitmap,
       (SITE_ICON_SIZE - width) / 2,

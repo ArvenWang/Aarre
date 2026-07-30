@@ -12,6 +12,7 @@ import {
 } from "../src/lib/page-essence";
 import {
   composeSiteIconPixels,
+  normalizeSvgViewport,
   SITE_ICON_SURFACES
 } from "../src/lib/thumbnail";
 import type {
@@ -432,6 +433,20 @@ async function inspectCandidate(
       }
     };
   }
+  // 与生产一致：矢量资产按最长边 ICON_SIZE 重新栅格化，不受 128px 下限约束。
+  let vector = false;
+  if (metadata.format === "svg") {
+    const normalized = normalizeSvgViewport(
+      input.toString("utf8"),
+      ICON_SIZE
+    );
+    if (normalized.intrinsicWidth > 0) {
+      vector = true;
+      metadata.width = normalized.intrinsicWidth;
+      metadata.height = normalized.intrinsicHeight;
+      input = Buffer.from(normalized.source, "utf8");
+    }
+  }
   const width = metadata.width || 0;
   const height = metadata.height || 0;
   const base = {
@@ -441,7 +456,7 @@ async function inspectCandidate(
     nativeWidth: width,
     nativeHeight: height
   };
-  if (width < 128 || height < 128) {
+  if (!vector && (width < 128 || height < 128)) {
     return {
       accepted: false,
       scale: 0,
