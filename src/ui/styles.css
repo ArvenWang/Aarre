@@ -1837,6 +1837,18 @@ body {
   gap: 20px;
 }
 
+.manager-header-actions {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.manager-sidepanel-return {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 .manager-brand {
   gap: 9px;
 }
@@ -2027,6 +2039,48 @@ body {
   color: #8f8f8f;
   font-size: 9px;
   font-variant-numeric: tabular-nums;
+}
+
+.organization-notice-banner {
+  margin: 0 10px 10px;
+  padding: 10px 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 16%, transparent);
+  border-radius: 11px;
+  background: var(--accent-soft);
+}
+
+.organization-notice-banner > div:first-child {
+  min-width: 0;
+}
+
+.organization-notice-banner strong,
+.organization-notice-banner small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.organization-notice-banner strong {
+  color: var(--ink);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.organization-notice-banner small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.organization-notice-banner > div:last-child {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
 }
 
 .library-filter-group {

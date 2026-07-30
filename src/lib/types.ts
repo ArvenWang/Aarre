@@ -539,6 +539,19 @@ export interface LibraryInsights {
   readingQueue: ReadingQueueItem[];
 }
 
+export interface OrganizationNotice {
+  generatedAt: string;
+  signature: string;
+  proposalCount: number;
+  actionableCount: number;
+  counts: {
+    duplicate: number;
+    dead: number;
+    classify: number;
+    largeFolder: number;
+  };
+}
+
 export interface ResurfacingItem {
   resourceKey: string;
   title: string;

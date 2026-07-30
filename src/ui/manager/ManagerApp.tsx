@@ -378,6 +378,17 @@ export function ManagerApp() {
     setAction("");
   }
 
+  async function openSidePanel() {
+    setError("");
+    try {
+      await sendExtensionRequest({ type: "OPEN_SIDE_PANEL" });
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "无法打开侧边栏"
+      );
+    }
+  }
+
   return (
     <main className="manager-shell">
       <header className="manager-header">
@@ -391,47 +402,58 @@ export function ManagerApp() {
           </div>
         </div>
 
-        <div className="manager-account">
-          {appState?.auth.userAvatarUrl ? (
-            <img src={appState.auth.userAvatarUrl} alt="" />
-          ) : (
-            <span className="avatar-fallback">
-              {(appState?.auth.userEmail || "?").slice(0, 1).toUpperCase()}
-            </span>
-          )}
-          <div>
-            <strong>
-              {appState?.auth.signedIn
-                ? appState.auth.userName || appState.auth.userEmail
-                : "仅保存在本机"}
-            </strong>
-            <small>
-              {appState?.auth.signedIn
-                ? appState.pendingSyncCount
-                  ? `${appState.pendingSyncCount} 条将在后台自动同步`
-                  : "智能信息已自动同步"
-                : "Chrome 原生书签仍由 Chrome 同步"}
-            </small>
-          </div>
-          {appState?.auth.configured ? (
-            appState.auth.signedIn ? (
-              <button
-                className="text-button"
-                onClick={handleSignOut}
-                disabled={Boolean(action)}
-              >
-                退出
-              </button>
+        <div className="manager-header-actions">
+          <button
+            type="button"
+            className="button button-quiet button-small manager-sidepanel-return"
+            onClick={() => void openSidePanel()}
+          >
+            返回侧边栏
+          </button>
+          <div className="manager-account">
+            {appState?.auth.userAvatarUrl ? (
+              <img src={appState.auth.userAvatarUrl} alt="" />
             ) : (
-              <button
-                className="button button-dark button-small"
-                onClick={handleLogin}
-                disabled={Boolean(action)}
-              >
-                {action === "login" ? "登录中…" : "Google 登录"}
-              </button>
-            )
-          ) : null}
+              <span className="avatar-fallback">
+                {(appState?.auth.userEmail || "?")
+                  .slice(0, 1)
+                  .toUpperCase()}
+              </span>
+            )}
+            <div>
+              <strong>
+                {appState?.auth.signedIn
+                  ? appState.auth.userName || appState.auth.userEmail
+                  : "仅保存在本机"}
+              </strong>
+              <small>
+                {appState?.auth.signedIn
+                  ? appState.pendingSyncCount
+                    ? `${appState.pendingSyncCount} 条将在后台自动同步`
+                    : "智能信息已自动同步"
+                  : "Chrome 原生书签仍由 Chrome 同步"}
+              </small>
+            </div>
+            {appState?.auth.configured ? (
+              appState.auth.signedIn ? (
+                <button
+                  className="text-button"
+                  onClick={handleSignOut}
+                  disabled={Boolean(action)}
+                >
+                  退出
+                </button>
+              ) : (
+                <button
+                  className="button button-dark button-small"
+                  onClick={handleLogin}
+                  disabled={Boolean(action)}
+                >
+                  {action === "login" ? "登录中…" : "Google 登录"}
+                </button>
+              )
+            ) : null}
+          </div>
         </div>
       </header>
 
@@ -553,21 +575,6 @@ export function ManagerApp() {
           </p>
         </div>
         <div className="toolbar-actions">
-          <button
-            className="button button-quiet"
-            onClick={() =>
-              void sendExtensionRequest({ type: "OPEN_SIDE_PANEL" }).catch(
-                (caught) =>
-                  setError(
-                    caught instanceof Error
-                      ? caught.message
-                      : "无法打开侧边栏"
-                  )
-              )
-            }
-          >
-            返回侧边栏
-          </button>
           <button
             className="button button-quiet refresh-button"
             onClick={() => void refresh()}

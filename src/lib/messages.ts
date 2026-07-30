@@ -22,6 +22,7 @@ import type {
   LibraryInsights,
   LibraryScanEstimate,
   LibraryScanStatus,
+  OrganizationNotice,
   ResurfacingItem,
   ResourceRecord,
   RestoreResult,
@@ -55,6 +56,8 @@ export type ExtensionRequest =
       actions: BookmarkAgentActionProposal[];
     }
   | { type: "GET_LIBRARY_INSIGHTS" }
+  | { type: "GET_ORGANIZATION_NOTICE" }
+  | { type: "DISMISS_ORGANIZATION_NOTICE" }
   | { type: "GET_KNOWLEDGE_DASHBOARD" }
   | { type: "GET_CONTEXT_RESURFACING" }
   | {
@@ -126,6 +129,8 @@ export type ResponseDataByRequest = {
     batchId?: string;
   };
   GET_LIBRARY_INSIGHTS: LibraryInsights;
+  GET_ORGANIZATION_NOTICE: OrganizationNotice | null;
+  DISMISS_ORGANIZATION_NOTICE: { dismissed: true };
   GET_KNOWLEDGE_DASHBOARD: KnowledgeDashboard;
   GET_CONTEXT_RESURFACING: ResurfacingItem[];
   APPLY_ORGANIZATION_ACTIONS: {

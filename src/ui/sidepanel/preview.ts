@@ -514,6 +514,7 @@ const previewResources: ResourceRecord[] = [
 ];
 
 let previewConversations: AgentConversation[] = [];
+let previewOrganizationNoticeDismissed = false;
 
 let previewAiSettings: AiSettingsStatus = {
   provider: "gemini",
@@ -886,6 +887,27 @@ export function installSidePanelPreview() {
                 )
               }
             };
+          case "GET_ORGANIZATION_NOTICE":
+            return {
+              ok: true,
+              data: previewOrganizationNoticeDismissed
+                ? null
+                : {
+                    generatedAt: new Date().toISOString(),
+                    signature: "preview-organization-notice",
+                    proposalCount: 12,
+                    actionableCount: 9,
+                    counts: {
+                      duplicate: 3,
+                      dead: 5,
+                      classify: 4,
+                      largeFolder: 0
+                    }
+                  }
+            };
+          case "DISMISS_ORGANIZATION_NOTICE":
+            previewOrganizationNoticeDismissed = true;
+            return { ok: true, data: { dismissed: true } };
           case "GET_KNOWLEDGE_DASHBOARD":
             return {
               ok: true,
@@ -1143,6 +1165,7 @@ export function installSidePanelPreview() {
             return { ok: true, data: previewSuggestions };
           case "NAVIGATE":
           case "OPEN_MANAGER":
+          case "OPEN_SIDE_PANEL":
             return { ok: true, data: { opened: true } };
           case "ASK_BOOKMARK_AGENT":
             if (

@@ -59,6 +59,7 @@ import type {
   LibraryScanEstimate,
   NativeBookmarkNode,
   NativeFolderOption,
+  OrganizationNotice,
   PendingSaveDraft,
   PageCapture,
   PageSnapshot,
@@ -2041,6 +2042,24 @@ function conversationDate(value: string): string {
   }).format(date);
 }
 
+function organizationNoticeDetails(
+  notice: OrganizationNotice
+): string {
+  const details = [
+    notice.counts.duplicate
+      ? `${notice.counts.duplicate} 组重复`
+      : "",
+    notice.counts.dead ? `${notice.counts.dead} 条失效` : "",
+    notice.counts.classify
+      ? `${notice.counts.classify} 组可归类`
+      : "",
+    notice.counts.largeFolder
+      ? `${notice.counts.largeFolder} 个大文件夹`
+      : ""
+  ].filter(Boolean);
+  return details.join("、") || `${notice.actionableCount} 组可执行建议`;
+}
+
 interface AgentChatPageProps {
   conversation: AgentConversation;
   prompt: string;
@@ -2403,6 +2422,10 @@ export function SidePanelApp() {
   const [contextResurfacing, setContextResurfacing] = useState<
     ResurfacingItem[]
   >([]);
+  const [organizationNotice, setOrganizationNotice] =
+    useState<OrganizationNotice | null>(null);
+  const [organizationNoticeBusy, setOrganizationNoticeBusy] =
+    useState(false);
   const [listCoverStyle, setListCoverStyle] =
     useState<ListCoverStyle>("site");
   const [aiConfigured, setAiConfigured] = useState(false);
@@ -2526,7 +2549,8 @@ export function SidePanelApp() {
       nextState,
       nextSiteBrands,
       nextAiSettings,
-      nextResurfacing
+      nextResurfacing,
+      nextOrganizationNotice
     ] = await Promise.all([
       sendExtensionRequest({ type: "GET_BOOKMARK_BAR" }),
       sendExtensionRequest({ type: "GET_APP_STATE" }),
@@ -2534,7 +2558,10 @@ export function SidePanelApp() {
       sendExtensionRequest({ type: "GET_AI_SETTINGS" }),
       sendExtensionRequest({ type: "GET_CONTEXT_RESURFACING" }).catch(
         () => []
-      )
+      ),
+      sendExtensionRequest({
+        type: "GET_ORGANIZATION_NOTICE"
+      }).catch(() => null)
     ]);
     setSnapshot(nextSnapshot);
     setAppState(nextState);
@@ -2542,6 +2569,14 @@ export function SidePanelApp() {
     setSiteBrands(nextSiteBrands);
     setAiConfigured(nextAiSettings.apiKeyConfigured);
     setContextResurfacing(nextResurfacing);
+    setOrganizationNotice(nextOrganizationNotice);
+  }, []);
+
+  const loadOrganizationNotice = useCallback(async () => {
+    const next = await sendExtensionRequest({
+      type: "GET_ORGANIZATION_NOTICE"
+    });
+    setOrganizationNotice(next);
   }, []);
 
   const loadConversations = useCallback(async () => {
@@ -2682,6 +2717,16 @@ export function SidePanelApp() {
     return () =>
       chrome.runtime.onMessage.removeListener(handleScanUpdate);
   }, []);
+
+  useEffect(() => {
+    const handleOrganizationUpdate = (message: { type?: string }) => {
+      if (message.type !== "ORGANIZATION_INSIGHTS_UPDATED") return;
+      void loadOrganizationNotice().catch(() => undefined);
+    };
+    chrome.runtime.onMessage.addListener(handleOrganizationUpdate);
+    return () =>
+      chrome.runtime.onMessage.removeListener(handleOrganizationUpdate);
+  }, [loadOrganizationNotice]);
 
   useEffect(() => {
     const content = contentRef.current;
@@ -3887,6 +3932,63 @@ export function SidePanelApp() {
           </button>
         ) : null}
       </header>
+
+      {organizationNotice ? (
+        <section
+          className="organization-notice-banner"
+          aria-label="书签整理建议"
+        >
+          <div>
+            <strong>
+              发现 {organizationNotice.proposalCount} 条可以整理的地方
+            </strong>
+            <small>{organizationNoticeDetails(organizationNotice)}</small>
+          </div>
+          <div>
+            <button
+              type="button"
+              className="button button-quiet button-small"
+              disabled={organizationNoticeBusy}
+              onClick={() => {
+                setOrganizationNoticeBusy(true);
+                void sendExtensionRequest({
+                  type: "DISMISS_ORGANIZATION_NOTICE"
+                })
+                  .then(() => setOrganizationNotice(null))
+                  .catch((caught) =>
+                    setError(
+                      caught instanceof Error
+                        ? caught.message
+                        : "暂时无法隐藏整理提示"
+                    )
+                  )
+                  .finally(() => setOrganizationNoticeBusy(false));
+              }}
+            >
+              暂不
+            </button>
+            <button
+              type="button"
+              className="button button-dark button-small"
+              disabled={organizationNoticeBusy}
+              onClick={() =>
+                void sendExtensionRequest({
+                  type: "OPEN_MANAGER",
+                  view: "organize"
+                }).catch((caught) =>
+                  setError(
+                    caught instanceof Error
+                      ? caught.message
+                      : "无法打开整理提案"
+                  )
+                )
+              }
+            >
+              去处理
+            </button>
+          </div>
+        </section>
+      ) : null}
 
       <form
         className="library-search"

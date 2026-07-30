@@ -97,6 +97,15 @@ import {
 } from "../lib/navigation";
 import { createPendingSaveDraft } from "../lib/pending-save";
 import { buildSelectableFolderOptions } from "../lib/folder-options";
+import {
+  buildLibraryFingerprint,
+  dismissStoredOrganizationInsights,
+  mergeStoredOrganizationInsights,
+  organizationBadgeText,
+  organizationNoticeFromStored,
+  sameLibraryFingerprint,
+  type StoredOrganizationInsights
+} from "../lib/organization-notice";
 import type {
   ActiveTabSummary,
   AiProviderId,
@@ -137,6 +146,7 @@ const CONTEXT_MENU_LINK_ID = "bookmark-layer-save-link";
 const PENDING_SAVE_PREFIX = "pending-save:";
 const LIBRARY_SCAN_KEY = "aarre:library-scan";
 const LIBRARY_SCAN_ALARM = "aarre-library-scan";
+const ORGANIZATION_INSIGHTS_KEY = "aarre:organization-insights";
 const MAX_SCAN_HTML_BYTES = 600_000;
 const internalBookmarkIds = new Set<string>();
 const internalBookmarkTargets = new Set<string>();
@@ -1486,11 +1496,7 @@ function flashActionBadge(
   void chrome.action.setBadgeText({ text, tabId });
   void chrome.action.setTitle({ title, tabId });
   setTimeout(() => {
-    void chrome.action.setBadgeText({ text: "", tabId });
-    void chrome.action.setTitle({
-      title: "打开 Aarre",
-      tabId
-    });
+    void syncOrganizationBadge(tabId);
   }, 2_000);
 }
 
@@ -2048,6 +2054,10 @@ async function startLibraryScan(force = false): Promise<LibraryScanStatus> {
   if (resources.length) {
     await scheduleLibraryScan();
     void runLibraryScan();
+  } else {
+    await ensureStoredOrganizationInsights(true).catch(
+      () => undefined
+    );
   }
   return publicLibraryScan(job);
 }
@@ -2375,6 +2385,9 @@ async function runLibraryScan(): Promise<void> {
         };
         await setStoredLibraryScan(job);
         await finalizeLibraryScanUsage(job).catch(() => job);
+        await ensureStoredOrganizationInsights(true).catch(
+          () => undefined
+        );
         break;
       }
 
@@ -2412,6 +2425,9 @@ async function runLibraryScan(): Promise<void> {
       job = await recordScanBatchResults(results);
       if (job.state === "completed") {
         await finalizeLibraryScanUsage(job).catch(() => job);
+        await ensureStoredOrganizationInsights(true).catch(
+          () => undefined
+        );
         break;
       }
     }
@@ -2794,15 +2810,107 @@ function buildBookmarkAgentCatalog(
 }
 
 async function getLibraryInsights() {
+  return (await ensureStoredOrganizationInsights()).insights;
+}
+
+async function getStoredOrganizationInsights(): Promise<
+  StoredOrganizationInsights | null
+> {
+  const stored = (await chrome.storage.local.get(
+    ORGANIZATION_INSIGHTS_KEY
+  ))[ORGANIZATION_INSIGHTS_KEY];
+  if (
+    !stored ||
+    typeof stored !== "object" ||
+    !("insights" in stored) ||
+    !("fingerprint" in stored) ||
+    !("signature" in stored)
+  ) {
+    return null;
+  }
+  return stored as StoredOrganizationInsights;
+}
+
+async function syncOrganizationBadge(
+  tabId?: number
+): Promise<void> {
+  const stored = await getStoredOrganizationInsights();
+  const notice = organizationNoticeFromStored(stored);
+  const text = organizationBadgeText(notice?.proposalCount || 0);
+  await Promise.all([
+    chrome.action.setBadgeBackgroundColor({
+      color: "#205aef",
+      tabId
+    }),
+    chrome.action.setBadgeText({ text, tabId }),
+    chrome.action.setTitle({
+      title: notice
+        ? `Aarre：发现 ${notice.proposalCount} 条整理建议`
+        : "打开 Aarre",
+      tabId
+    })
+  ]);
+}
+
+async function publishStoredOrganizationInsights(
+  stored: StoredOrganizationInsights
+): Promise<void> {
+  await chrome.storage.local.set({
+    [ORGANIZATION_INSIGHTS_KEY]: stored
+  });
+  await syncOrganizationBadge();
+  void chrome.runtime
+    .sendMessage({ type: "ORGANIZATION_INSIGHTS_UPDATED" })
+    .catch(() => undefined);
+}
+
+async function ensureStoredOrganizationInsights(
+  force = false
+): Promise<StoredOrganizationInsights> {
   await importNativeBookmarks();
   const [resources, tree] = await Promise.all([
     getLocalResources(),
     chrome.bookmarks.getTree()
   ]);
-  return buildLibraryInsights(
-    resources.filter((resource) => resource.nativeBookmarkIds.length > 0),
-    buildBookmarkAgentCatalog(tree)
+  const linkedResources = resources.filter(
+    (resource) => resource.nativeBookmarkIds.length > 0
   );
+  const catalog = buildBookmarkAgentCatalog(tree);
+  const fingerprint = buildLibraryFingerprint(
+    linkedResources,
+    catalog
+  );
+  const previous = await getStoredOrganizationInsights();
+  if (
+    !force &&
+    previous &&
+    sameLibraryFingerprint(previous.fingerprint, fingerprint)
+  ) {
+    await syncOrganizationBadge();
+    return previous;
+  }
+
+  const insights = buildLibraryInsights(linkedResources, catalog);
+  const next = mergeStoredOrganizationInsights(
+    previous,
+    insights,
+    fingerprint
+  );
+  await publishStoredOrganizationInsights(next);
+  return next;
+}
+
+async function getOrganizationNotice() {
+  const stored = await ensureStoredOrganizationInsights();
+  return organizationNoticeFromStored(stored);
+}
+
+async function dismissOrganizationNotice() {
+  const stored = await ensureStoredOrganizationInsights();
+  await publishStoredOrganizationInsights(
+    dismissStoredOrganizationInsights(stored)
+  );
+  return { dismissed: true as const };
 }
 
 async function getKnowledgeDashboard() {
@@ -2947,6 +3055,10 @@ async function handleRequest(request: ExtensionRequest): Promise<unknown> {
       return executeBookmarkAgentActions(request.actions);
     case "GET_LIBRARY_INSIGHTS":
       return getLibraryInsights();
+    case "GET_ORGANIZATION_NOTICE":
+      return getOrganizationNotice();
+    case "DISMISS_ORGANIZATION_NOTICE":
+      return dismissOrganizationNotice();
     case "GET_KNOWLEDGE_DASHBOARD":
       return getKnowledgeDashboard();
     case "GET_CONTEXT_RESURFACING":
@@ -3081,6 +3193,7 @@ chrome.runtime.onInstalled.addListener(() => {
   void importNativeBookmarks()
     .then(() => syncPendingIfReady())
     .catch(() => undefined);
+  void syncOrganizationBadge();
   void getStoredLibraryScan().then((scan) => {
     if (scan.state === "running") {
       void scheduleLibraryScan();
@@ -3258,6 +3371,7 @@ chrome.runtime.onStartup.addListener(() => {
   void (async () => {
     await cleanupExpiredUndoSnapshots();
     await importNativeBookmarks();
+    await syncOrganizationBadge();
     const auth = await getAuthState();
     if (auth.signedIn && auth.accountMatches === true) {
       // 先提交本地变更，再拉取云端，避免旧云端数据覆盖待同步状态。
