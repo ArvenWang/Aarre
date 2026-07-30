@@ -1,0 +1,125 @@
+:root {
+  color-scheme: light dark;
+
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-sunken: #f5f6f7;
+  --ink: #17191c;
+  --ink-muted: #6c7278;
+  --ink-faint: #a0a5aa;
+  --line: #ebedef;
+  --line-strong: #dadde0;
+  --accent: #12a594;
+  --positive: #12a594;
+  --negative: #d2493a;
+
+  --chart-1: #12a594;
+  --chart-2: #5b7cd8;
+  --chart-3: #c2762e;
+  --chart-4: #7b6bc4;
+  --chart-5: #4d9c5a;
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 30px;
+
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+  --sp-8: 72px;
+
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-strong: 650;
+
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+
+  --font-ui:
+    "Avenir Next", "Avenir", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", sans-serif;
+  --fs-caption: 12px;
+  --fs-small: 13px;
+  --fs-body: 15px;
+  --fs-lead: 18px;
+  --fs-h3: 21px;
+  --fs-h2: 27px;
+  --fs-h1: 40px;
+  --lh-body: 1.7;
+
+  --shadow-composer:
+    0 12px 32px color-mix(in srgb, var(--ink) 8%, transparent);
+  --shadow-float:
+    0 20px 56px color-mix(in srgb, var(--ink) 14%, transparent);
+}
+
+[data-density="compact"] {
+  --fs-caption: 11px;
+  --fs-small: 12px;
+  --fs-body: 13px;
+  --fs-lead: 15px;
+  --fs-h3: 17px;
+  --fs-h2: 20px;
+  --fs-h1: 26px;
+  --lh-body: 1.55;
+}
+
+[data-density="comfortable"] {
+  --fs-caption: 12px;
+  --fs-small: 13px;
+  --fs-body: 15px;
+  --fs-lead: 18px;
+  --fs-h3: 21px;
+  --fs-h2: 27px;
+  --fs-h1: 40px;
+  --lh-body: 1.7;
+}
+
+:root[data-theme="dark"],
+[data-theme="dark"] {
+  --bg: #0f1113;
+  --surface: #16181b;
+  --surface-sunken: #1d2023;
+  --ink: #eef0f2;
+  --ink-muted: #949a9f;
+  --ink-faint: #676d72;
+  --line: #24272a;
+  --line-strong: #34383c;
+  --accent: #2ec4b0;
+  --positive: #2ec4b0;
+  --negative: #e0776a;
+
+  --chart-1: #2ec4b0;
+  --chart-2: #7d9ce8;
+  --chart-3: #dba05a;
+  --chart-4: #a394e0;
+  --chart-5: #6fbf7c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1113;
+    --surface: #16181b;
+    --surface-sunken: #1d2023;
+    --ink: #eef0f2;
+    --ink-muted: #949a9f;
+    --ink-faint: #676d72;
+    --line: #24272a;
+    --line-strong: #34383c;
+    --accent: #2ec4b0;
+    --positive: #2ec4b0;
+    --negative: #e0776a;
+
+    --chart-1: #2ec4b0;
+    --chart-2: #7d9ce8;
+    --chart-3: #dba05a;
+    --chart-4: #a394e0;
+    --chart-5: #6fbf7c;
+  }
+}

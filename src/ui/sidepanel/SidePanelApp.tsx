@@ -74,6 +74,7 @@ import type {
   SiteBrandRecord,
   UndoSnapshotBatch
 } from "../../lib/types";
+import { ResourceIdentity } from "../components/ResourceIdentity";
 import {
   ArrowLeftIcon,
   ArrowUpIcon,
@@ -1649,7 +1650,9 @@ function BookmarkTree({
               }
               data-dragging={draggedId === node.id}
               draggable={!node.unmodifiable}
-              style={{ "--tree-depth": depth } as React.CSSProperties}
+              style={{
+                "--tree-depth": `${depth * 20}px`
+              } as React.CSSProperties}
               onDragStart={(event) => {
                 event.dataTransfer.effectAllowed = "move";
                 event.dataTransfer.setData(
@@ -1770,11 +1773,21 @@ function BookmarkTree({
                   {folder ? <ChevronRightIcon /> : null}
                 </span>
                 {folder ? (
-                  <span className="tree-icon" data-folder="true">
-                    <FolderIcon />
-                  </span>
+                  <>
+                    <span className="tree-icon" data-folder="true">
+                      <FolderIcon />
+                    </span>
+                    <span className="bookmark-copy">
+                      <strong>
+                        {highlightTextMatches(
+                          node.title || "未命名",
+                          highlightQuery
+                        )}
+                      </strong>
+                    </span>
+                  </>
                 ) : (
-                  <SiteThumbnail
+                  <ResourceIdentity
                     url={node.url || ""}
                     imageUrl={metadata?.thumbnailDataUrl}
                     brandImageUrl={
@@ -1796,18 +1809,15 @@ function BookmarkTree({
                     categoryCoverId={metadata?.categoryCoverId}
                     coverStyle={coverStyle}
                     label={node.title}
-                    className="bookmark-thumbnail"
-                  />
-                )}
-                <span className="bookmark-copy">
-                  <strong>
-                    {highlightTextMatches(
+                    title={highlightTextMatches(
                       node.title || "未命名",
                       highlightQuery
                     )}
-                  </strong>
-                  {node.url ? <small>{hostFromUrl(node.url)}</small> : null}
-                </span>
+                    meta={hostFromUrl(node.url || "")}
+                    className="bookmark-identity"
+                    thumbnailClassName="bookmark-thumbnail"
+                  />
+                )}
               </button>
 
               {!node.unmodifiable && !node.folderType ? (
@@ -1937,6 +1947,22 @@ function AgentComposer({
   onSubmit,
   onConfigure
 }: AgentComposerProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea || !configured) return;
+    // 先归零再读取 scrollHeight，删除文字时高度才能一起回落。
+    textarea.style.height = "auto";
+    const nextHeight = Math.max(
+      48,
+      Math.min(112, textarea.scrollHeight)
+    );
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY =
+      textarea.scrollHeight > 112 ? "auto" : "hidden";
+  }, [configured, value]);
+
   if (!configured) {
     return (
       <div className="agent-composer agent-composer-setup">
@@ -1956,6 +1982,7 @@ function AgentComposer({
       onSubmit={(event) => onSubmit(event)}
     >
       <textarea
+        ref={textareaRef}
         id="bookmark-agent-prompt"
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -1970,7 +1997,7 @@ function AgentComposer({
           }
         }}
         placeholder={placeholder}
-        rows={2}
+        rows={1}
         aria-label={placeholder}
       />
       <div className="agent-composer-toolbar">
@@ -3770,7 +3797,7 @@ export function SidePanelApp() {
   if (onboardingVisible === null) {
     return (
       <main className="native-panel">
-        <div className="native-loading">正在准备 Aarre…</div>
+        <div className="empty-state">正在准备 Aarre…</div>
       </main>
     );
   }
@@ -3804,7 +3831,10 @@ export function SidePanelApp() {
           });
         }}
         onAppStateChange={setAppState}
-        onClose={() => setPanelView("library")}
+        onClose={() => {
+          setPanelView("library");
+          void refresh();
+        }}
       />
     );
   }
@@ -4008,7 +4038,7 @@ export function SidePanelApp() {
       ) : null}
 
       <form
-        className="library-search"
+        className="search-box"
         role="search"
         onSubmit={(event) => {
           event.preventDefault();
@@ -4046,7 +4076,7 @@ export function SidePanelApp() {
       </form>
 
       {error ? (
-        <div className="native-error" role="alert">
+        <div className="notice notice-error native-error-layout" role="alert">
           <span>{error}</span>
           <div>
             {!snapshot ? (
@@ -4215,7 +4245,7 @@ export function SidePanelApp() {
                   ))}
                 </div>
               ) : (
-                <div className="native-empty library-search-empty">
+                <div className="empty-state library-search-empty">
                   <span>
                     <SearchIcon />
                   </span>
@@ -4309,7 +4339,7 @@ export function SidePanelApp() {
                 />
               </>
             ) : libraryQuery.trim() ? (
-              <div className="native-empty library-search-empty">
+              <div className="empty-state library-search-empty">
                 <span>
                   <SearchIcon />
                 </span>
@@ -4331,7 +4361,7 @@ export function SidePanelApp() {
                 </button>
               </div>
             ) : (
-              <div className="native-empty">
+              <div className="empty-state">
                 <span>
                   <StarIcon />
                 </span>
@@ -4340,7 +4370,7 @@ export function SidePanelApp() {
               </div>
             )
           ) : (
-            <div className="native-loading">正在读取 Chrome 书签…</div>
+            <div className="empty-state">正在读取 Chrome 书签…</div>
           )}
         </section>
         {scrollThumb.scrollable ? (
@@ -4439,7 +4469,7 @@ export function SidePanelApp() {
             </div>
 
             {editor.kind === "save" && busy === "capture" ? (
-              <div className="native-loading dialog-loading">
+              <div className="empty-state dialog-loading">
                 正在读取当前页面…
               </div>
             ) : (
@@ -4663,7 +4693,7 @@ export function SidePanelApp() {
                         </button>
                         <button
                           type="button"
-                          className="danger-button"
+                          className="button button-danger"
                           data-confirming="true"
                           onClick={() => void deleteEditorNode()}
                           disabled={Boolean(busy)}
@@ -4680,7 +4710,7 @@ export function SidePanelApp() {
                       !editor.node.folderType ? (
                         <button
                           type="button"
-                          className="danger-button"
+                          className="button button-danger"
                           onClick={() =>
                             setConfirmDeleteId(editor.node.id)
                           }

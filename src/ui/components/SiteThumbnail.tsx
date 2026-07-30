@@ -6,7 +6,7 @@ import {
 } from "../../lib/cover-registry";
 import type { ListCoverStyle } from "../../lib/display-settings";
 
-interface SiteThumbnailProps {
+export interface SiteThumbnailProps {
   url: string;
   imageUrl?: string;
   brandImageUrl?: string;

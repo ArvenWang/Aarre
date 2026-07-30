@@ -1,0 +1,213 @@
+import type {
+  KnowledgeDashboard,
+  LibraryReport
+} from "../../../lib/types";
+
+interface ReportViewProps {
+  dashboard: KnowledgeDashboard | null;
+  period: "week" | "month";
+  onPeriodChange: (period: "week" | "month") => void;
+  onOpenOrganize: () => void;
+}
+
+function reportMetrics(report: LibraryReport) {
+  return [
+    {
+      label: "本期新增",
+      value: report.createdCount,
+      detail: report.period === "week" ? "最近 7 天" : "最近 30 天",
+      tone: "neutral"
+    },
+    {
+      label: "很少打开",
+      value: report.rarelyOpenedOver90Days,
+      detail: "超过 90 天",
+      tone: "neutral"
+    },
+    {
+      label: "失效链接",
+      value: report.health.deadLinks,
+      detail: report.health.newlyDetectedDeadLinks
+        ? `其中 ${report.health.newlyDetectedDeadLinks} 条本期发现`
+        : "本期无新增",
+      tone: report.health.newlyDetectedDeadLinks ? "negative" : "positive"
+    },
+    {
+      label: "过大文件夹",
+      value: report.health.largeFolders,
+      detail: report.health.largeFolders ? "建议整理" : "结构健康",
+      tone: report.health.largeFolders ? "negative" : "positive"
+    }
+  ] as const;
+}
+
+export function ReportView({
+  dashboard,
+  period,
+  onPeriodChange,
+  onOpenOrganize
+}: ReportViewProps) {
+  if (!dashboard) {
+    return (
+      <div className="empty-state">
+        <strong>报告还在准备</strong>
+        <p>完成本地索引后，这里会显示真实的收藏趋势和健康度。</p>
+      </div>
+    );
+  }
+
+  const report = period === "week" ? dashboard.weekly : dashboard.monthly;
+  const maxTrend = Math.max(
+    1,
+    ...report.topicTrends.flatMap((trend) => [
+      trend.current,
+      trend.previous
+    ])
+  );
+
+  return (
+    <section className="report-shell">
+      <div className="report-period-tabs" aria-label="报告周期">
+        <button
+          type="button"
+          data-active={period === "week"}
+          onClick={() => onPeriodChange("week")}
+        >
+          周报
+        </button>
+        <button
+          type="button"
+          data-active={period === "month"}
+          onClick={() => onPeriodChange("month")}
+        >
+          月报
+        </button>
+      </div>
+
+      <header className="report-lead">
+        <span>本周结论</span>
+        <h2>{report.attentionShift}</h2>
+        <p>
+          本期新增 {report.createdCount} 条；有{" "}
+          {report.rarelyOpenedOver90Days} 条收藏超过 90
+          天很少通过书签打开。
+        </p>
+      </header>
+
+      <div className="report-metrics" aria-label="收藏指标">
+        {reportMetrics(report).map((metric) => (
+          <article key={metric.label}>
+            <strong>{metric.value}</strong>
+            <span>{metric.label}</span>
+            <small data-tone={metric.tone}>{metric.detail}</small>
+          </article>
+        ))}
+      </div>
+
+      <div className="report-sections">
+        <section className="report-trends">
+          <header>
+            <div>
+              <span className="section-eyebrow">主题变化</span>
+              <h3>这段时间，你在关注什么</h3>
+            </div>
+            <div className="trend-legend" aria-label="图例">
+              <span data-series="current">本期</span>
+              <span data-series="previous">上期</span>
+            </div>
+          </header>
+          <div className="trend-bars">
+            {report.topicTrends.length ? (
+              report.topicTrends.map((trend) => (
+                <div className="trend-bar-row" key={trend.topic}>
+                  <span>{trend.topic}</span>
+                  <div>
+                    <i
+                      data-series="previous"
+                      style={{
+                        width: `${(trend.previous / maxTrend) * 100}%`
+                      }}
+                    />
+                    <i
+                      data-series="current"
+                      style={{
+                        width: `${(trend.current / maxTrend) * 100}%`
+                      }}
+                    />
+                  </div>
+                  <strong>{trend.current}</strong>
+                </div>
+              ))
+            ) : (
+              <p className="report-empty-copy">本期还没有形成明显的主题变化。</p>
+            )}
+          </div>
+        </section>
+
+        <section className="report-gaps">
+          <header>
+            <span className="section-eyebrow">知识缺口</span>
+            <h3>主题覆盖角度</h3>
+            <p>满分 4 分别代表入门、实践、对比和深入四种内容角度。</p>
+          </header>
+          {report.knowledgeGaps.length ? (
+            <div>
+              {report.knowledgeGaps.slice(0, 6).map((gap) => (
+                <article key={gap.topic}>
+                  <span>{gap.topic}</span>
+                  <strong>{gap.angleCount} / 4</strong>
+                  <i>
+                    <span
+                      style={{
+                        width: `${Math.min(4, gap.angleCount) * 25}%`
+                      }}
+                    />
+                  </i>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="report-empty-copy">
+              当前还没有足够密集的同主题收藏来判断内容角度。
+            </p>
+          )}
+        </section>
+      </div>
+
+      <section className="report-resurfacing">
+        <header>
+          <div>
+            <span className="section-eyebrow">重新浮现</span>
+            <h3>值得再看一次</h3>
+          </div>
+          <button
+            type="button"
+            className="button button-quiet"
+            onClick={onOpenOrganize}
+          >
+            查看整理提案
+          </button>
+        </header>
+        {report.resurfacing.length ? (
+          <div>
+            {report.resurfacing.slice(0, 3).map((item) => (
+              <a
+                key={item.resourceKey}
+                href={item.url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <strong>{item.title}</strong>
+                <small>{item.reason}</small>
+              </a>
+            ))}
+          </div>
+        ) : (
+          <p className="report-empty-copy">
+            目前没有同时满足“足够久”和“与近期主题相关”的收藏。
+          </p>
+        )}
+      </section>
+    </section>
+  );
+}

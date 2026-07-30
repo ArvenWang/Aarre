@@ -1,0 +1,2279 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Aarre 视觉风格样张</title>
+    <style>
+      /* ============================================================
+         结构性 token —— 各风格共用，属于「系统」而非「风格」
+         ============================================================ */
+      :root {
+        --fw-regular: 400;
+        --fw-medium: 500;
+        --fw-strong: 650;
+
+        --sp-1: 4px;
+        --sp-2: 8px;
+        --sp-3: 12px;
+        --sp-4: 16px;
+        --sp-5: 24px;
+        --sp-6: 32px;
+        --sp-7: 48px;
+        --sp-8: 72px;
+
+        --dur-fast: 120ms;
+        --dur-base: 200ms;
+        --ease: cubic-bezier(0.2, 0, 0, 1);
+      }
+
+      /* 颜色分工：黑白灰负责交互与结构（按钮、焦点、选中、命中高亮），
+         彩色只出现在图表与图谱这类「颜色本身在编码数据」的地方。
+         --accent 因此只允许被图表用，不得用于任何按钮或焦点态。 */
+
+      @property --fade-start {
+        syntax: "<number>";
+        inherits: false;
+        initial-value: 1;
+      }
+      @property --fade-end {
+        syntax: "<number>";
+        inherits: false;
+        initial-value: 0;
+      }
+      @keyframes reveal-top {
+        from { --fade-start: 1; }
+        to { --fade-start: 0; }
+      }
+      @keyframes reveal-bottom {
+        from { --fade-end: 0; }
+        to { --fade-end: 1; }
+      }
+
+      /* 密度是同一套系统的两档，不是两套设计。
+         侧边栏用紧凑档，网页端用宽松档。 */
+      [data-density="compact"] {
+        --fs-caption: 11px;
+        --fs-small: 12px;
+        --fs-body: 13px;
+        --fs-lead: 15px;
+        --fs-h3: 17px;
+        --fs-h2: 20px;
+        --fs-h1: 26px;
+        --lh-body: 1.55;
+      }
+      [data-density="comfortable"] {
+        --fs-caption: 12px;
+        --fs-small: 13px;
+        --fs-body: 15px;
+        --fs-lead: 18px;
+        --fs-h3: 21px;
+        --fs-h2: 27px;
+        --fs-h1: 40px;
+        --lh-body: 1.7;
+      }
+
+      /* ============================================================
+         风格 D · 清爽（当前方案）
+         ============================================================ */
+      [data-style="fresh"] {
+        --bg: #ffffff;
+        --surface: #ffffff;
+        --surface-sunken: #f5f6f7;
+        --ink: #17191c;
+        --ink-muted: #6c7278;
+        --ink-faint: #a0a5aa;
+        --line: #ebedef;
+        --line-strong: #dadde0;
+        --accent: #12a594;
+        --accent-ink: #ffffff;
+        --accent-wash: #eef8f6;
+        --positive: #12a594;
+        --negative: #d2493a;
+        --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif;
+        --radius-sm: 8px;
+        --radius-md: 14px;
+        --radius-lg: 20px;
+        --radius-xl: 30px;
+        --track: 0;
+      }
+      [data-style="fresh"][data-mode="dark"] {
+        --bg: #0f1113;
+        --surface: #16181b;
+        --surface-sunken: #1d2023;
+        --ink: #eef0f2;
+        --ink-muted: #949a9f;
+        --ink-faint: #676d72;
+        --line: #24272a;
+        --line-strong: #34383c;
+        --accent: #2ec4b0;
+        --accent-ink: #0f1113;
+        --accent-wash: #16302c;
+        --positive: #2ec4b0;
+        --negative: #e0776a;
+      }
+
+      /* ============================================================
+         风格 B · 石墨（保留对照）
+         ============================================================ */
+      [data-style="graphite"] {
+        --bg: #f7f8f8;
+        --surface: #ffffff;
+        --surface-sunken: #f0f1f2;
+        --ink: #18181b;
+        --ink-muted: #6e7175;
+        --ink-faint: #a1a4a8;
+        --line: #e5e6e8;
+        --line-strong: #d2d4d7;
+        --accent: #0f766e;
+        --accent-ink: #ffffff;
+        --accent-wash: #e6f2f0;
+        --positive: #0f766e;
+        --negative: #b4342a;
+        --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif;
+        --radius-sm: 6px;
+        --radius-md: 10px;
+        --radius-lg: 16px;
+        --radius-xl: 24px;
+        --track: -0.006em;
+      }
+      [data-style="graphite"][data-mode="dark"] {
+        --bg: #0d0f10;
+        --surface: #161819;
+        --surface-sunken: #1d2021;
+        --ink: #eceef0;
+        --ink-muted: #93989d;
+        --ink-faint: #676c71;
+        --line: #26292b;
+        --line-strong: #383c3f;
+        --accent: #3dbba5;
+        --accent-ink: #0d0f10;
+        --accent-wash: #16302c;
+        --positive: #3dbba5;
+        --negative: #e07a72;
+      }
+
+      /* ============================================================
+         风格 C · 砂岩（保留对照）
+         ============================================================ */
+      [data-style="sand"] {
+        --bg: #f6f4f1;
+        --surface: #fffdfb;
+        --surface-sunken: #efebe6;
+        --ink: #1c1917;
+        --ink-muted: #78716c;
+        --ink-faint: #a8a29a;
+        --line: #e7e2db;
+        --line-strong: #d6cfc5;
+        --accent: #9c4221;
+        --accent-ink: #fffdfb;
+        --accent-wash: #f6e9e2;
+        --positive: #3f6212;
+        --negative: #9c4221;
+        --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif;
+        --radius-sm: 8px;
+        --radius-md: 14px;
+        --radius-lg: 20px;
+        --radius-xl: 30px;
+        --track: 0.004em;
+      }
+      [data-style="sand"][data-mode="dark"] {
+        --bg: #14100e;
+        --surface: #1c1917;
+        --surface-sunken: #241f1c;
+        --ink: #f5f1ec;
+        --ink-muted: #a8a29a;
+        --ink-faint: #7a736c;
+        --line: #2b2521;
+        --line-strong: #3d3630;
+        --accent: #e07a5f;
+        --accent-ink: #14100e;
+        --accent-wash: #33221c;
+        --positive: #a3b86c;
+        --negative: #e07a5f;
+      }
+
+      /* ============================================================
+         骨架
+         ============================================================ */
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: var(--font-ui);
+        letter-spacing: var(--track);
+        -webkit-font-smoothing: antialiased;
+        transition: background var(--dur-base) var(--ease),
+          color var(--dur-base) var(--ease);
+      }
+
+      .switcher {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        gap: var(--sp-2);
+        padding: var(--sp-3) var(--sp-5);
+        background: var(--surface);
+        border-bottom: 1px solid var(--line);
+        flex-wrap: wrap;
+        font-size: 12px;
+      }
+      .switcher-label {
+        font-size: 11px;
+        color: var(--ink-faint);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-weight: var(--fw-strong);
+        margin-right: var(--sp-1);
+      }
+      .switcher button + .switcher-label {
+        margin-left: var(--sp-4);
+      }
+      .switcher button {
+        font: inherit;
+        padding: 5px 12px;
+        border-radius: 6px;
+        border: 1px solid var(--line-strong);
+        background: transparent;
+        color: var(--ink-muted);
+        cursor: pointer;
+        transition: all var(--dur-fast) var(--ease);
+      }
+      .switcher button:hover {
+        color: var(--ink);
+        border-color: var(--ink-faint);
+      }
+      .switcher button[aria-pressed="true"] {
+        background: var(--ink);
+        color: var(--surface);
+        border-color: var(--ink);
+      }
+
+      .canvas {
+        padding: var(--sp-8) var(--sp-5);
+        display: flex;
+        justify-content: center;
+      }
+      [data-view="sidepanel"] #view-manager,
+      [data-view="manager"] #view-sidepanel {
+        display: none;
+      }
+
+      /* ============================================================
+         网页端 —— 内容型排版，宽松密度
+         ============================================================ */
+      #view-manager {
+        width: 100%;
+        max-width: 1120px;
+        font-size: var(--fs-body);
+        line-height: var(--lh-body);
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        gap: var(--sp-3);
+        margin-bottom: var(--sp-7);
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .brand-mark {
+        width: 30px;
+        height: 30px;
+        border-radius: 11px;
+        background: var(--ink);
+        color: var(--surface);
+        display: grid;
+        place-items: center;
+        font-size: 15px;
+        font-weight: var(--fw-strong);
+      }
+      .brand-name {
+        font-size: var(--fs-lead);
+        font-weight: var(--fw-strong);
+        letter-spacing: 0.01em;
+      }
+      .account {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: var(--fs-small);
+        color: var(--ink-muted);
+      }
+      .avatar {
+        width: 30px;
+        height: 30px;
+        border-radius: 999px;
+        background: var(--surface-sunken);
+        border: 1px solid var(--line);
+        display: grid;
+        place-items: center;
+        font-size: var(--fs-small);
+        font-weight: var(--fw-medium);
+        color: var(--ink-muted);
+      }
+
+      .tabs {
+        display: flex;
+        gap: var(--sp-1);
+        margin-bottom: var(--sp-8);
+      }
+      .tabs button {
+        font: inherit;
+        font-size: var(--fs-body);
+        color: var(--ink-muted);
+        background: none;
+        border: none;
+        padding: 9px var(--sp-4);
+        border-radius: 999px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        transition: all var(--dur-fast) var(--ease);
+      }
+      .tabs button:hover {
+        color: var(--ink);
+        background: var(--surface-sunken);
+      }
+      .tabs button[aria-selected="true"] {
+        color: var(--ink);
+        font-weight: var(--fw-medium);
+        background: var(--surface-sunken);
+      }
+      .tabs .count {
+        font-size: var(--fs-caption);
+        color: var(--ink-faint);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .section {
+        margin-bottom: var(--sp-8);
+      }
+      .section-head {
+        margin-bottom: var(--sp-6);
+      }
+      .section-head h2 {
+        font-size: var(--fs-h2);
+        font-weight: var(--fw-strong);
+        margin: 0 0 6px;
+        letter-spacing: -0.015em;
+      }
+      .section-note {
+        font-size: var(--fs-small);
+        color: var(--ink-muted);
+        margin: 0;
+      }
+
+      /* ---------- 搜索 ---------- */
+      .search {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: var(--surface);
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-xl);
+        padding: 13px var(--sp-5);
+        margin-bottom: var(--sp-6);
+        transition: border-color var(--dur-fast) var(--ease);
+      }
+      .search:focus-within {
+        border-color: color-mix(in srgb, var(--ink) 32%, transparent);
+      }
+      .search svg {
+        flex-shrink: 0;
+        color: var(--ink-faint);
+      }
+      .search input {
+        font: inherit;
+        font-size: var(--fs-body);
+        border: none;
+        outline: none;
+        background: none;
+        color: var(--ink);
+        flex: 1;
+      }
+      .search input::placeholder {
+        color: var(--ink-faint);
+      }
+      .search-meta {
+        font-size: var(--fs-small);
+        color: var(--ink-faint);
+        white-space: nowrap;
+      }
+
+      /* ---------- 收藏库：卡片瀑布流 ---------- */
+      /* 用 column-width 而不是 column-count：浏览器按可用宽度决定列数，
+         窄屏自动退到 3/2/1 栏，宽屏自动加栏，卡片宽度始终落在 240–300 之间。 */
+      .masonry {
+        column-width: 240px;
+        column-gap: var(--sp-5);
+      }
+      /* 卡片本身不做边框和底色：内容型网站里，圆角封面 + 下方两行文字
+         已经足够成组，再加一层卡片壳只会把注意力从内容上引开。 */
+      .card {
+        --reveal: 89px;
+        break-inside: avoid;
+        margin-bottom: var(--sp-6);
+        cursor: pointer;
+      }
+      /* 悬停时封面压矮 --reveal，下方正好让出同样高度给详情。
+         两者严格相等，卡片总高不变，瀑布流不会重排。 */
+      .cover {
+        --h: 232px;
+        position: relative;
+        height: var(--h);
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--line);
+        background: var(--surface-sunken);
+        color: var(--ink);
+        overflow: hidden;
+        transition: height 340ms var(--ease);
+      }
+      .card:hover .cover {
+        height: calc(var(--h) - var(--reveal));
+      }
+      .card-extra {
+        height: 0;
+        overflow: hidden;
+        opacity: 0;
+        transition: height 340ms var(--ease), opacity 200ms var(--ease);
+      }
+      .card:hover .card-extra {
+        height: var(--reveal);
+        opacity: 1;
+      }
+      .card-extra p {
+        margin: 10px 0 8px;
+        font-size: var(--fs-small);
+        line-height: 1.7;
+        color: var(--ink-muted);
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+      /* 真实产品里这里是页面快照或站点图标。样张用抽象骨架代替，
+         带一点色相是为了不被误读成加载占位。 */
+      .cover[data-tone] {
+        background: color-mix(in srgb, var(--tone) 6%, var(--surface-sunken));
+        color: var(--tone);
+      }
+      .cover[data-tone="teal"] { --tone: #0e7c70; }
+      .cover[data-tone="blue"] { --tone: #4a68bd; }
+      .cover[data-tone="amber"] { --tone: #a4631f; }
+      .cover[data-tone="violet"] { --tone: #6b5cb0; }
+      [data-mode="dark"] .cover[data-tone="teal"] { --tone: #4fd0bd; }
+      [data-mode="dark"] .cover[data-tone="blue"] { --tone: #8fa8ee; }
+      [data-mode="dark"] .cover[data-tone="amber"] { --tone: #e2a463; }
+      [data-mode="dark"] .cover[data-tone="violet"] { --tone: #ac9de8; }
+      .cover.tall {
+        --h: 272px;
+      }
+      .cover.short {
+        --h: 200px;
+      }
+      /* 模拟页面快照：抽象出的版式骨架。高度固定在封面的原始高度上，
+         这样封面压矮时是从下方裁掉，而不是把内容压扁。 */
+      .cover .mock {
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: var(--h);
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+      }
+      .cover .mock i {
+        display: block;
+        height: 7px;
+        border-radius: 3px;
+        background: currentColor;
+        opacity: 0.16;
+      }
+      .cover .mock i.head {
+        height: 15px;
+        width: 62%;
+        opacity: 0.3;
+        margin-bottom: 5px;
+      }
+      .cover .mock i.w80 { width: 80%; }
+      .cover .mock i.w65 { width: 65%; }
+      .cover .mock i.w45 { width: 45%; }
+      .cover .mock .blocks {
+        display: flex;
+        gap: 7px;
+        margin-top: 6px;
+        flex: 1;
+      }
+      .cover .mock .blocks span {
+        flex: 1;
+        border-radius: 6px;
+        background: currentColor;
+        opacity: 0.1;
+      }
+      /* 无快照时的字母封面，对应产品里的分类兜底封面 */
+      .cover.letter b {
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: var(--h);
+        display: grid;
+        place-items: center;
+        font-size: 42px;
+        font-weight: var(--fw-strong);
+        opacity: 0.22;
+      }
+
+      /* 默认只留标题和站点，其余全部收进悬停层 */
+      .card-body {
+        padding: var(--sp-4) 2px 0;
+      }
+      .card-source {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: var(--fs-caption);
+        color: var(--ink-faint);
+        margin-top: 7px;
+      }
+      .favicon {
+        width: 17px;
+        height: 17px;
+        border-radius: 6px;
+        background: var(--surface-sunken);
+        border: 1px solid var(--line);
+        display: grid;
+        place-items: center;
+        font-size: 9px;
+        font-weight: var(--fw-strong);
+        color: var(--ink-muted);
+      }
+      .card-title {
+        font-size: var(--fs-body);
+        font-weight: var(--fw-strong);
+        line-height: 1.5;
+        letter-spacing: -0.005em;
+        margin: 0;
+      }
+      .card-title mark {
+        background: color-mix(in srgb, var(--ink) 15%, transparent);
+        color: inherit;
+        border-radius: 3px;
+        padding: 0 2px;
+      }
+      .card-summary {
+        font-size: var(--fs-small);
+        color: var(--ink-muted);
+        line-height: 1.75;
+        margin: 0 0 var(--sp-4);
+      }
+      .card-foot {
+        display: flex;
+        align-items: center;
+        gap: var(--sp-2);
+        flex-wrap: wrap;
+      }
+      .tag {
+        font-size: var(--fs-caption);
+        color: var(--ink-muted);
+        background: var(--surface-sunken);
+        border-radius: 999px;
+        padding: 3px 11px;
+      }
+      .card-when {
+        margin-left: auto;
+        font-size: var(--fs-caption);
+        color: var(--ink-faint);
+        white-space: nowrap;
+      }
+      .card-hit {
+        font-size: var(--fs-caption);
+        color: var(--accent);
+      }
+
+      /* ---------- 报告 ---------- */
+      .eyebrow {
+        font-size: var(--fs-caption);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--ink-faint);
+        font-weight: var(--fw-strong);
+        margin: 0 0 var(--sp-3);
+      }
+      .report-lead {
+        max-width: 720px;
+        margin-bottom: var(--sp-7);
+      }
+      .report-lead h3 {
+        font-size: var(--fs-h3);
+        font-weight: var(--fw-strong);
+        margin: 0 0 10px;
+        line-height: 1.55;
+        letter-spacing: -0.012em;
+      }
+      .report-lead p {
+        margin: 0;
+        font-size: var(--fs-small);
+        color: var(--ink-muted);
+      }
+
+      .stat-strip {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: var(--sp-5);
+        margin-bottom: var(--sp-7);
+        padding-bottom: var(--sp-6);
+        border-bottom: 1px solid var(--line);
+      }
+      .stat .value {
+        font-size: var(--fs-h1);
+        font-weight: var(--fw-strong);
+        line-height: 1.05;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.03em;
+      }
+      .stat .label {
+        font-size: var(--fs-small);
+        color: var(--ink-muted);
+        margin-top: 7px;
+      }
+      .stat .delta {
+        font-size: var(--fs-caption);
+        margin-top: 3px;
+        font-variant-numeric: tabular-nums;
+        color: var(--ink-faint);
+      }
+      .delta.up { color: var(--positive); }
+      .delta.down { color: var(--negative); }
+
+      .two-col {
+        display: grid;
+        grid-template-columns: 1.25fr 1fr;
+        gap: var(--sp-7);
+      }
+      .block-title {
+        font-size: var(--fs-body);
+        font-weight: var(--fw-strong);
+        margin: 0 0 4px;
+      }
+      .block-sub {
+        font-size: var(--fs-caption);
+        color: var(--ink-faint);
+        margin: 0 0 var(--sp-5);
+      }
+
+      .bars {
+        display: flex;
+        flex-direction: column;
+        gap: var(--sp-3);
+      }
+      .bar-row {
+        display: grid;
+        grid-template-columns: 78px 1fr 30px;
+        align-items: center;
+        gap: var(--sp-4);
+        font-size: var(--fs-caption);
+      }
+      .bar-label {
+        color: var(--ink-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .bar-track {
+        position: relative;
+        height: 16px;
+      }
+      .bar-prev,
+      .bar-cur {
+        position: absolute;
+        left: 0;
+        border-radius: 3px;
+      }
+      .bar-prev {
+        top: 0;
+        height: 5px;
+        background: var(--line-strong);
+      }
+      .bar-cur {
+        top: 8px;
+        height: 8px;
+        background: var(--accent);
+      }
+      .bar-value {
+        text-align: right;
+        color: var(--ink);
+        font-variant-numeric: tabular-nums;
+        font-weight: var(--fw-medium);
+      }
+      .legend {
+        display: flex;
+        gap: var(--sp-5);
+        font-size: var(--fs-caption);
+        color: var(--ink-faint);
+        margin-top: var(--sp-5);
+      }
+      .legend span {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .swatch {
+        width: 16px;
+        height: 5px;
+        border-radius: 3px;
+      }
+
+      .metric {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        padding: 13px 0;
+        border-bottom: 1px solid var(--line);
+        font-size: var(--fs-small);
+      }
+      .metric:last-child { border-bottom: none; }
+      .metric .k { color: var(--ink-muted); }
+      .metric .v {
+        font-variant-numeric: tabular-nums;
+        font-weight: var(--fw-medium);
+      }
+
+      /* ---------- 三维图谱 ---------- */
+      /* 分析区放在图谱下方而不是右侧：右侧结构下，主题数一多面板就变长，
+         会把图谱一起拉高。上下结构里两者高度互不影响。 */
+      .graph-wrap {
+        position: relative;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        background: var(--surface);
+        overflow: hidden;
+      }
+      #graph3d {
+        display: block;
+        width: 100%;
+        height: 500px;
+        cursor: grab;
+      }
+      #graph3d:active { cursor: grabbing; }
+      .graph-hint {
+        position: absolute;
+        left: var(--sp-5);
+        bottom: var(--sp-4);
+        font-size: var(--fs-caption);
+        color: var(--ink-faint);
+        pointer-events: none;
+      }
+      .graph-readout {
+        position: absolute;
+        right: var(--sp-4);
+        top: var(--sp-4);
+        min-width: 178px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--surface);
+        padding: var(--sp-3) var(--sp-4);
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity var(--dur-fast) var(--ease);
+      }
+      .graph-readout[data-visible="true"] { opacity: 1; }
+      .graph-readout .topic {
+        font-size: var(--fs-small);
+        font-weight: var(--fw-strong);
+        margin-bottom: 7px;
+      }
+      .graph-readout .line {
+        display: flex;
+        justify-content: space-between;
+        gap: var(--sp-4);
+        font-size: var(--fs-caption);
+        color: var(--ink-muted);
+        padding: 3px 0;
+      }
+      .graph-readout .line b {
+        color: var(--ink);
+        font-weight: var(--fw-medium);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .insights {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: var(--sp-7);
+        margin-top: var(--sp-6);
+        padding-top: var(--sp-6);
+        border-top: 1px solid var(--line);
+      }
+      .insight-block h4 {
+        font-size: var(--fs-caption);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--ink-faint);
+        font-weight: var(--fw-strong);
+        margin: 0 0 var(--sp-4);
+      }
+      .insight-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 0;
+        font-size: var(--fs-small);
+      }
+      .insight-row .bead {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        flex-shrink: 0;
+      }
+      .insight-row .bead.hollow {
+        background: none;
+        border: 1.3px dashed var(--ink-faint);
+      }
+      .insight-row .name {
+        flex: 1;
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .insight-row .num {
+        color: var(--ink-faint);
+        font-variant-numeric: tabular-nums;
+        font-size: var(--fs-caption);
+        white-space: nowrap;
+      }
+      .insight-block p {
+        margin: var(--sp-3) 0 0;
+        font-size: var(--fs-caption);
+        color: var(--ink-muted);
+        line-height: 1.8;
+      }
+      /* 每栏最多列 5 行，其余折成一行「还有 N 个」，主题数增长时高度不变 */
+      .insight-more {
+        margin-top: var(--sp-2);
+        font-size: var(--fs-caption);
+        color: var(--ink-faint);
+      }
+      .graph-caption {
+        font-size: var(--fs-caption);
+        color: var(--ink-faint);
+        margin-top: var(--sp-5);
+        line-height: 1.85;
+        max-width: 780px;
+      }
+
+      /* ============================================================
+         侧边栏 —— 紧凑密度
+         ============================================================ */
+      .sidepanel-stage {
+        display: flex;
+        gap: var(--sp-8);
+        align-items: flex-start;
+        justify-content: center;
+        flex-wrap: wrap;
+        font-size: var(--fs-body);
+      }
+      .browser {
+        width: 392px;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid var(--line-strong);
+        background: var(--surface);
+      }
+      .browser-chrome {
+        display: flex;
+        align-items: center;
+        gap: var(--sp-2);
+        padding: 10px var(--sp-3);
+        background: var(--surface);
+        border-bottom: 1px solid var(--line);
+        font-size: var(--fs-small);
+        color: var(--ink-muted);
+      }
+      .browser-chrome .glyph {
+        width: 16px;
+        height: 16px;
+        border-radius: 4px;
+        background: var(--ink);
+      }
+      .browser-chrome .close {
+        margin-left: auto;
+        color: var(--ink-faint);
+      }
+      .panel-body {
+        background: var(--surface);
+        height: 640px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .sp-header {
+        display: flex;
+        align-items: center;
+        gap: var(--sp-2);
+        padding: var(--sp-4) var(--sp-3) 10px;
+      }
+      .sp-header h1 {
+        font-size: 19px;
+        font-weight: var(--fw-strong);
+        letter-spacing: -0.01em;
+        margin: 0;
+      }
+      .sp-actions {
+        margin-left: auto;
+        display: flex;
+        gap: 2px;
+      }
+      .icon-button {
+        width: 34px;
+        height: 34px;
+        border-radius: 12px;
+        border: none;
+        background: none;
+        color: var(--ink-muted);
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+        transition: background var(--dur-fast) var(--ease),
+          color var(--dur-fast) var(--ease);
+      }
+      .icon-button:hover {
+        background: var(--surface-sunken);
+        color: var(--ink);
+      }
+      .sp-search {
+        margin: 0 var(--sp-3) 10px;
+        padding: 10px var(--sp-4);
+        border-radius: var(--radius-xl);
+        margin-bottom: 10px;
+      }
+      .sp-notice {
+        margin: 0 var(--sp-3) var(--sp-3);
+        display: flex;
+        align-items: center;
+        gap: var(--sp-2);
+        background: var(--surface-sunken);
+        border-radius: var(--radius-md);
+        padding: 10px var(--sp-3);
+        font-size: var(--fs-small);
+      }
+      .sp-notice .text { flex: 1; color: var(--ink); }
+      .sp-notice button {
+        font: inherit;
+        font-size: var(--fs-caption);
+        border: none;
+        background: var(--ink);
+        color: var(--surface);
+        border-radius: 999px;
+        padding: 5px 13px;
+        cursor: pointer;
+      }
+      /* 列表上下溢出时的渐隐，由滚动位置驱动：顶部未滚动时不虚，
+         滚到底时底部不虚。沿用线上的 52px 尺度。 */
+      .sp-scroll {
+        flex: 1;
+        --fade: 52px;
+        overflow-y: auto;
+        scrollbar-width: none;
+        padding: 0 var(--sp-2);
+        -webkit-mask-image: linear-gradient(
+          to bottom,
+          rgba(0, 0, 0, var(--fade-start)) 0,
+          #000 var(--fade),
+          #000 calc(100% - var(--fade)),
+          rgba(0, 0, 0, var(--fade-end)) 100%
+        );
+        mask-image: linear-gradient(
+          to bottom,
+          rgba(0, 0, 0, var(--fade-start)) 0,
+          #000 var(--fade),
+          #000 calc(100% - var(--fade)),
+          rgba(0, 0, 0, var(--fade-end)) 100%
+        );
+        animation: reveal-top linear both, reveal-bottom linear both;
+        animation-timeline: scroll(self), scroll(self);
+        animation-range: 0 var(--fade), calc(100% - var(--fade)) 100%;
+      }
+      .sp-scroll::-webkit-scrollbar {
+        display: none;
+      }
+      .tree-folder {
+        display: flex;
+        align-items: center;
+        gap: var(--sp-2);
+        padding: 8px var(--sp-2);
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        font-size: var(--fs-body);
+        font-weight: var(--fw-medium);
+      }
+      .tree-folder:hover { background: var(--surface-sunken); }
+      .tree-folder .chev { color: var(--ink-faint); display: flex; }
+      .tree-folder .count {
+        margin-left: auto;
+        font-size: var(--fs-caption);
+        color: var(--ink-faint);
+        font-variant-numeric: tabular-nums;
+      }
+      .tree-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 7px var(--sp-2);
+        margin-left: var(--sp-4);
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+      }
+      .tree-item:hover { background: var(--surface-sunken); }
+      .tree-item .thumb {
+        width: 28px;
+        height: 28px;
+        border-radius: var(--radius-sm);
+        background: var(--surface-sunken);
+        border: 1px solid var(--line);
+        display: grid;
+        place-items: center;
+        font-size: var(--fs-caption);
+        font-weight: var(--fw-strong);
+        color: var(--ink-muted);
+        flex-shrink: 0;
+      }
+      .tree-item .copy { min-width: 0; flex: 1; }
+      .tree-item .name {
+        font-size: var(--fs-body);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .tree-item .host {
+        font-size: var(--fs-caption);
+        color: var(--ink-faint);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* 圆角收到 22：与圆角同心会把发送键顶得太靠边，这里改为固定内缩 12，
+         放弃同心换取观感。 */
+      .sp-composer {
+        --composer-radius: 22px;
+        --send-size: 32px;
+        --send-inset: 12px;
+        margin: 10px var(--sp-3) var(--sp-3);
+        padding: 14px var(--send-inset) var(--send-inset) var(--sp-4);
+        border: 1px solid var(--line);
+        border-radius: var(--composer-radius);
+        background: var(--surface);
+        box-shadow: 0 12px 32px rgba(24, 26, 29, 0.08);
+        transition: border-color var(--dur-base) var(--ease),
+          box-shadow var(--dur-base) var(--ease);
+      }
+      .sp-composer:hover {
+        border-color: var(--line-strong);
+      }
+      .sp-composer:focus-within {
+        border-color: color-mix(in srgb, var(--ink) 28%, transparent);
+        box-shadow: 0 12px 32px rgba(24, 26, 29, 0.11);
+      }
+      /* 高度由内容撑开：48 起、112 封顶，超出后内部滚动 */
+      .sp-composer textarea {
+        display: block;
+        width: 100%;
+        min-height: 48px;
+        max-height: 112px;
+        font: inherit;
+        font-size: var(--fs-body);
+        line-height: 1.5;
+        border: none;
+        outline: none;
+        background: none;
+        color: var(--ink);
+        resize: none;
+        overflow-y: auto;
+        padding: 0 var(--sp-2) 0 0;
+        scrollbar-width: none;
+      }
+      .sp-composer textarea::-webkit-scrollbar { display: none; }
+      .sp-composer textarea::placeholder { color: var(--ink-faint); }
+      .sp-toolbar {
+        min-height: var(--send-size);
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+      }
+      .send {
+        width: var(--send-size);
+        height: var(--send-size);
+        border-radius: 999px;
+        border: none;
+        background: var(--ink);
+        color: var(--surface);
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+        flex-shrink: 0;
+        transition: opacity var(--dur-fast) var(--ease);
+      }
+      .send:hover { opacity: 0.82; }
+
+      .stage-note {
+        width: 320px;
+        font-size: var(--fs-small);
+        color: var(--ink-muted);
+        line-height: 1.85;
+      }
+      .stage-note h4 {
+        font-size: var(--fs-body);
+        font-weight: var(--fw-strong);
+        margin: 0 0 var(--sp-3);
+        color: var(--ink);
+      }
+      .stage-note p { margin: 0 0 var(--sp-4); }
+      .stage-note code {
+        font-size: 0.92em;
+        background: var(--surface-sunken);
+        border-radius: 4px;
+        padding: 1px 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="switcher">
+      <span class="switcher-label">风格</span>
+      <button data-set-style="fresh" aria-pressed="true">D · 清爽</button>
+      <button data-set-style="graphite" aria-pressed="false">B · 石墨</button>
+      <button data-set-style="sand" aria-pressed="false">C · 砂岩</button>
+      <span class="switcher-label">明暗</span>
+      <button data-set-mode="light" aria-pressed="true">浅色</button>
+      <button data-set-mode="dark" aria-pressed="false">深色</button>
+      <span class="switcher-label">界面</span>
+      <button data-set-view="manager" aria-pressed="true">网页端</button>
+      <button data-set-view="sidepanel" aria-pressed="false">侧边栏</button>
+    </div>
+
+    <div class="canvas">
+      <!-- ==================== 网页端 ==================== -->
+      <div id="view-manager" data-density="comfortable">
+        <div class="topbar">
+          <div class="brand">
+            <div class="brand-mark">A</div>
+            <div class="brand-name">Aarre</div>
+          </div>
+          <div class="account">
+            <span>仅保存在本机</span>
+            <div class="avatar">N</div>
+          </div>
+        </div>
+
+        <nav class="tabs">
+          <button aria-selected="true">收藏库 <span class="count">1,284</span></button>
+          <button aria-selected="false">整理提案 <span class="count">23</span></button>
+          <button aria-selected="false">待读队列 <span class="count">41</span></button>
+          <button aria-selected="false">报告</button>
+          <button aria-selected="false">主题图谱 <span class="count">24</span></button>
+          <button aria-selected="false">重新发现 <span class="count">8</span></button>
+        </nav>
+
+        <!-- ---------- 收藏库 ---------- -->
+        <section class="section">
+          <div class="section-head">
+            <h2>收藏库</h2>
+            <p class="section-note">搜索在本机完成，支持标题、标签、摘要与拼音首字母</p>
+          </div>
+
+          <div class="search">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <circle cx="7" cy="7" r="4.75" stroke="currentColor" stroke-width="1.4" />
+              <path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+            </svg>
+            <input value="动效" aria-label="搜索收藏" />
+            <span class="search-meta">命中 37 条</span>
+          </div>
+
+          <div class="masonry">
+            <article class="card">
+              <div data-tone="teal" class="cover tall">
+                <div class="mock">
+                  <i class="head"></i>
+                  <i class="w80"></i>
+                  <i class="w65"></i>
+                  <div class="blocks"><span></span><span></span></div>
+                  <i class="w45"></i>
+                </div>
+              </div>
+              <div class="card-body">
+                <h3 class="card-title">Motion One —— 轻量 Web <mark>动效</mark>库</h3>
+                <div class="card-source"><span class="favicon">M</span>motion.dev</div>
+              </div>
+              <div class="card-extra">
+                  <p>基于 Web Animations API 的动画库，压缩后约 4KB，原生支持 spring 与 timeline，
+                  不需要额外的渲染循环。</p>
+                  <div class="card-foot">
+                    <span class="tag">动效设计</span>
+                    <span class="tag">前端框架</span>
+                    <span class="card-when">7月12日</span>
+                  </div>
+              </div>
+            </article>
+
+            <article class="card">
+              <div data-tone="blue" class="cover letter"><b>R</b>
+              </div>
+              <div class="card-body">
+                <h3 class="card-title">Rive —— 可交互矢量<mark>动效</mark>编辑器</h3>
+                <div class="card-source"><span class="favicon">R</span>rive.app</div>
+              </div>
+              <div class="card-extra">
+                  <p>设计与状态机在同一个文件里，导出后由代码驱动状态切换。</p>
+                  <div class="card-foot">
+                    <span class="tag">设计工具</span>
+                    <span class="card-when">5月03日</span>
+                  </div>
+              </div>
+            </article>
+
+            <article class="card">
+              <div data-tone="amber" class="cover short">
+                <div class="mock">
+                  <i class="head"></i>
+                  <i class="w80"></i>
+                  <i class="w45"></i>
+                </div>
+              </div>
+              <div class="card-body">
+                <h3 class="card-title">用 CSS 实现滚动驱动<mark>动效</mark>的四种方式</h3>
+                <div class="card-source"><span class="favicon">C</span>css-tricks.com</div>
+              </div>
+              <div class="card-extra">
+                  <p>从 scroll-timeline 到 view-timeline 的逐项对比，含浏览器支持现状与降级方案。</p>
+                  <div class="card-foot">
+                    <span class="tag">CSS 技巧</span>
+                    <span class="card-when">6月02日</span>
+                  </div>
+              </div>
+            </article>
+
+            <article class="card">
+              <div data-tone="violet" class="cover">
+                <div class="mock">
+                  <i class="head"></i>
+                  <div class="blocks"><span></span><span></span><span></span></div>
+                  <i class="w65"></i>
+                </div>
+              </div>
+              <div class="card-body">
+                <h3 class="card-title">GSAP ScrollTrigger 滚动<mark>动效</mark>完整指南</h3>
+                <div class="card-source"><span class="favicon">G</span>gsap.com</div>
+              </div>
+              <div class="card-extra">
+                  <p>从 pin、scrub 到 snap 的逐项讲解，含 12 个可直接复制的示例，
+                  以及与原生 scroll-timeline 的取舍建议。</p>
+                  <div class="card-foot">
+                    <span class="tag">动效设计</span>
+                    <span class="tag">教程</span>
+                    <span class="card-when">6月28日</span>
+                  </div>
+              </div>
+            </article>
+
+            <article class="card">
+              <div data-tone="teal" class="cover letter short"><b>L</b>
+              </div>
+              <div class="card-body">
+                <h3 class="card-title">LottieFiles 免费<mark>动效</mark>素材库</h3>
+                <div class="card-source"><span class="favicon">L</span>lottiefiles.com</div>
+              </div>
+              <div class="card-extra">
+                  <p>可在线调色与裁剪，导出 JSON 或 dotLottie。</p>
+                  <div class="card-foot">
+                    <span class="tag">设计资源</span>
+                    <span class="card-when">3月18日</span>
+                  </div>
+              </div>
+            </article>
+
+            <article class="card">
+              <div data-tone="blue" class="cover tall">
+                <div class="mock">
+                  <i class="head"></i>
+                  <i class="w80"></i>
+                  <div class="blocks"><span></span></div>
+                  <i class="w65"></i>
+                  <i class="w45"></i>
+                </div>
+              </div>
+              <div class="card-body">
+                <h3 class="card-title">Framer Motion 布局<mark>动效</mark>原理拆解</h3>
+                <div class="card-source"><span class="favicon">F</span>framer.com</div>
+              </div>
+              <div class="card-extra">
+                  <p>讲清楚 layoutId 的共享元素过渡是怎么算出来的，以及为什么某些情况下会闪烁。</p>
+                  <div class="card-foot">
+                    <span class="tag">动效设计</span>
+                    <span class="tag">组件库</span>
+                    <span class="card-when">4月21日</span>
+                  </div>
+              </div>
+            </article>
+
+            <article class="card">
+              <div data-tone="amber" class="cover short">
+                <div class="mock">
+                  <i class="head"></i>
+                  <i class="w80"></i>
+                  <i class="w45"></i>
+                </div>
+              </div>
+              <div class="card-body">
+                <h3 class="card-title">Spline 网页 3D 场景与交互<mark>动效</mark></h3>
+                <div class="card-source"><span class="favicon">S</span>spline.design</div>
+              </div>
+              <div class="card-extra">
+                  <p>浏览器里建模，导出 React 组件直接嵌入页面。</p>
+                  <div class="card-foot">
+                    <span class="tag">设计工具</span>
+                    <span class="card-when">2月09日</span>
+                  </div>
+              </div>
+            </article>
+
+            <article class="card">
+              <div data-tone="violet" class="cover letter"><b>T</b>
+              </div>
+              <div class="card-body">
+                <h3 class="card-title">Theatre.js 可视化<mark>动效</mark>编排</h3>
+                <div class="card-source"><span class="favicon">T</span>theatrejs.com</div>
+              </div>
+              <div class="card-extra">
+                  <p>给代码里的任意数值加关键帧，带时间轴面板，适合调复杂的序列动画。</p>
+                  <div class="card-foot">
+                    <span class="tag">动效设计</span>
+                    <span class="tag">开源项目</span>
+                    <span class="card-when">1月27日</span>
+                  </div>
+              </div>
+            </article>
+
+            <article class="card">
+              <div data-tone="teal" class="cover">
+                <div class="mock">
+                  <i class="head"></i>
+                  <i class="w65"></i>
+                  <div class="blocks"><span></span><span></span></div>
+                </div>
+              </div>
+              <div class="card-body">
+                <h3 class="card-title">缓动函数速查表</h3>
+                <div class="card-source"><span class="favicon">E</span>easings.net</div>
+              </div>
+              <div class="card-extra">
+                  <p>三十种常用 easing 的曲线与代码，点一下就能看到实际运动效果。</p>
+                  <div class="card-foot">
+                    <span class="tag">动效设计</span>
+                    <span class="card-when">6月15日</span>
+                  </div>
+              </div>
+            </article>
+
+            <article class="card">
+              <div data-tone="blue" class="cover short">
+                <div class="mock">
+                  <i class="head"></i>
+                  <div class="blocks"><span></span><span></span><span></span></div>
+                </div>
+              </div>
+              <div class="card-body">
+                <h3 class="card-title">Lenis 平滑滚动库</h3>
+                <div class="card-source"><span class="favicon">L</span>lenis.darkroom.engineering</div>
+              </div>
+              <div class="card-extra">
+                  <p>不劫持原生滚动，可与 ScrollTrigger 共用同一套时间轴。</p>
+                  <div class="card-foot">
+                    <span class="tag">前端框架</span>
+                    <span class="card-when">5月30日</span>
+                  </div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- ---------- 报告 ---------- -->
+        <section class="section">
+          <div class="section-head">
+            <h2>报告</h2>
+            <p class="section-note">本周 · 7月24日 — 7月30日</p>
+          </div>
+
+          <div class="report-lead">
+            <p class="eyebrow">本周结论</p>
+            <h3>你的关注重点从「设计工具」转向「AI 绘画」，本期分别为 6 条和 12 条。</h3>
+            <p>本期新增 42 条 · 有 137 条收藏超过 90 天很少通过书签打开</p>
+          </div>
+
+          <div class="stat-strip">
+            <div class="stat">
+              <div class="value">42</div>
+              <div class="label">本期新增</div>
+              <div class="delta up">较上期 +11</div>
+            </div>
+            <div class="stat">
+              <div class="value">137</div>
+              <div class="label">90 天未打开</div>
+              <div class="delta down">较上期 +8</div>
+            </div>
+            <div class="stat">
+              <div class="value">4</div>
+              <div class="label">失效链接</div>
+              <div class="delta up">较上期 −2</div>
+            </div>
+            <div class="stat">
+              <div class="value">3</div>
+              <div class="label">过大文件夹</div>
+              <div class="delta">与上期持平</div>
+            </div>
+          </div>
+
+          <div class="two-col">
+            <div>
+              <p class="block-title">主题变化</p>
+              <p class="block-sub">各主题本期与上期新增收藏条数（条）</p>
+              <div class="bars" id="trend-bars"></div>
+              <div class="legend">
+                <span><i class="swatch" style="background: var(--accent)"></i>本期</span>
+                <span><i class="swatch" style="background: var(--line-strong)"></i>上期</span>
+              </div>
+            </div>
+
+            <div>
+              <p class="block-title">知识缺口</p>
+              <p class="block-sub">已覆盖的内容角度数，满分 4（入门 / 实践 / 对比 / 深入）</p>
+              <div>
+                <div class="metric"><span class="k">AI 绘画</span><span class="v">1 / 4</span></div>
+                <div class="metric"><span class="k">LLM 应用</span><span class="v">1 / 4</span></div>
+                <div class="metric"><span class="k">组件库</span><span class="v">2 / 4</span></div>
+                <div class="metric"><span class="k">产品管理</span><span class="v">2 / 4</span></div>
+                <div class="metric"><span class="k">动效设计</span><span class="v">3 / 4</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ---------- 主题图谱 ---------- -->
+        <section class="section">
+          <div class="section-head">
+            <h2>主题图谱</h2>
+            <p class="section-note">三维力导向 · 拖动可旋转 · 悬停查看主题</p>
+          </div>
+          <div>
+            <div class="graph-wrap">
+              <canvas id="graph3d"></canvas>
+              <div class="graph-readout" id="readout">
+                <div class="topic"></div>
+                <div class="line"><span>收藏条数</span><b data-k="count"></b></div>
+                <div class="line"><span>关联主题</span><b data-k="degree"></b></div>
+                <div class="line"><span>所属社区</span><b data-k="cluster"></b></div>
+              </div>
+              <div class="graph-hint">拖动旋转 · 滚轮缩放 · 悬停高亮邻居</div>
+            </div>
+          </div>
+          <div class="insights">
+            <div class="insight-block">
+              <h4>主题社区</h4>
+              <div id="insight-clusters"></div>
+              <p>按共现关系自动划分，命名取该社区里收藏最多的主题。</p>
+            </div>
+            <div class="insight-block">
+              <h4>孤岛主题</h4>
+              <div id="insight-isolated"></div>
+              <p>与任何其他主题都没有共现，说明这些内容是零散收进来的，还没有形成体系。</p>
+            </div>
+            <div class="insight-block">
+              <h4>收藏多但关联少</h4>
+              <div id="insight-lonely"></div>
+              <p>攒了不少，却几乎不和别的主题一起出现，往往是「随手存了但没真正用起来」的信号。</p>
+            </div>
+          </div>
+          <p class="graph-caption">
+            球体体积正比于该主题的收藏条数，连线粗细正比于两个主题在同一条收藏中共现的次数，
+            颜色为自动识别的主题社区，虚圈表示零共现的孤岛主题。近处更实、远处更淡。
+          </p>
+        </section>
+      </div>
+
+      <!-- ==================== 侧边栏 ==================== -->
+      <div id="view-sidepanel" data-density="compact">
+        <div class="sidepanel-stage">
+          <div class="browser">
+            <div class="browser-chrome">
+              <span class="glyph"></span>
+              <span>Aarre</span>
+              <span class="close">✕</span>
+            </div>
+            <div class="panel-body">
+              <div class="sp-header">
+                <h1>收藏</h1>
+                <div class="sp-actions">
+                  <button class="icon-button" title="收藏当前页">
+                    <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                      <path d="M10 2.6l2.3 4.8 5.2.7-3.8 3.6 1 5.2L10 14.5l-4.7 2.4 1-5.2L2.5 8.1l5.2-.7L10 2.6z"
+                            stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" />
+                    </svg>
+                  </button>
+                  <button class="icon-button" title="历史会话">
+                    <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                      <circle cx="10" cy="10" r="7.4" stroke="currentColor" stroke-width="1.4" />
+                      <path d="M10 5.8V10l3 1.9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+                    </svg>
+                  </button>
+                  <button class="icon-button" title="设置">
+                    <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                      <circle cx="10" cy="10" r="2.6" stroke="currentColor" stroke-width="1.4" />
+                      <path d="M16.2 12.1a1.4 1.4 0 00.28 1.55l.05.05a1.7 1.7 0 11-2.4 2.4l-.05-.05a1.4 1.4 0 00-1.55-.28 1.4 1.4 0 00-.85 1.29v.14a1.7 1.7 0 11-3.4 0v-.07a1.4 1.4 0 00-.92-1.29 1.4 1.4 0 00-1.55.28l-.05.05a1.7 1.7 0 11-2.4-2.4l.05-.05a1.4 1.4 0 00.28-1.55 1.4 1.4 0 00-1.29-.85h-.14a1.7 1.7 0 110-3.4h.07a1.4 1.4 0 001.29-.92 1.4 1.4 0 00-.28-1.55l-.05-.05a1.7 1.7 0 112.4-2.4l.05.05a1.4 1.4 0 001.55.28h.07a1.4 1.4 0 00.85-1.29v-.14a1.7 1.7 0 113.4 0v.07a1.4 1.4 0 00.85 1.29 1.4 1.4 0 001.55-.28l.05-.05a1.7 1.7 0 112.4 2.4l-.05.05a1.4 1.4 0 00-.28 1.55v.07a1.4 1.4 0 001.29.85h.14a1.7 1.7 0 110 3.4h-.07a1.4 1.4 0 00-1.29.85z"
+                            stroke="currentColor" stroke-width="1.25" stroke-linejoin="round" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="search sp-search">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                  <circle cx="7" cy="7" r="4.75" stroke="currentColor" stroke-width="1.4" />
+                  <path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+                </svg>
+                <input placeholder="搜索收藏，支持拼音首字母" aria-label="搜索收藏" />
+              </div>
+
+              <div class="sp-notice">
+                <span class="text">有 23 条整理建议</span>
+                <button>查看</button>
+              </div>
+
+              <div class="sp-scroll">
+                <div class="tree-folder">
+                  <span class="chev">
+                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                      <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.4"
+                            stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                  </span>
+                  设计资源
+                  <span class="count">128</span>
+                </div>
+                <div class="tree-item">
+                  <div class="thumb">M</div>
+                  <div class="copy">
+                    <div class="name">Motion One —— 轻量 Web 动效库</div>
+                    <div class="host">motion.dev</div>
+                  </div>
+                </div>
+                <div class="tree-item">
+                  <div class="thumb">R</div>
+                  <div class="copy">
+                    <div class="name">Rive —— 可交互矢量动效编辑器</div>
+                    <div class="host">rive.app</div>
+                  </div>
+                </div>
+                <div class="tree-item">
+                  <div class="thumb">F</div>
+                  <div class="copy">
+                    <div class="name">Figma 变量与模式完整说明</div>
+                    <div class="host">figma.com</div>
+                  </div>
+                </div>
+
+                <div class="tree-folder">
+                  <span class="chev">
+                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                      <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.4"
+                            stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                  </span>
+                  AI 工具
+                  <span class="count">96</span>
+                </div>
+                <div class="tree-item">
+                  <div class="thumb">H</div>
+                  <div class="copy">
+                    <div class="name">Hugging Face 模型库</div>
+                    <div class="host">huggingface.co</div>
+                  </div>
+                </div>
+                <div class="tree-item">
+                  <div class="thumb">P</div>
+                  <div class="copy">
+                    <div class="name">Prompt 工程实践手册</div>
+                    <div class="host">prompts.chat</div>
+                  </div>
+                </div>
+
+                <div class="tree-item">
+                  <div class="thumb">C</div>
+                  <div class="copy">
+                    <div class="name">Claude 提示词最佳实践</div>
+                    <div class="host">docs.anthropic.com</div>
+                  </div>
+                </div>
+
+                <div class="tree-folder">
+                  <span class="chev">
+                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                      <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.4"
+                            stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                  </span>
+                  前端
+                  <span class="count">214</span>
+                </div>
+                <div class="tree-item">
+                  <div class="thumb">M</div>
+                  <div class="copy">
+                    <div class="name">MDN Web Docs</div>
+                    <div class="host">developer.mozilla.org</div>
+                  </div>
+                </div>
+                <div class="tree-item">
+                  <div class="thumb">V</div>
+                  <div class="copy">
+                    <div class="name">Vite 构建配置参考</div>
+                    <div class="host">vite.dev</div>
+                  </div>
+                </div>
+                <div class="tree-item">
+                  <div class="thumb">T</div>
+                  <div class="copy">
+                    <div class="name">TypeScript 类型体操速查</div>
+                    <div class="host">typescriptlang.org</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="sp-composer">
+                <textarea rows="1" placeholder="让 Aarre 帮你整理或查找…" aria-label="AI 输入"></textarea>
+                <div class="sp-toolbar">
+                  <button class="send" aria-label="发送">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                      <path d="M8 13V3M8 3L4 7M8 3l4 4" stroke="currentColor" stroke-width="1.7"
+                            stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="stage-note">
+            <h4>为什么侧边栏要纯白</h4>
+            <p>
+              上方那条是 Chrome 侧边栏自己的头部。扩展内容一旦用非白底，
+              这里就会出现一条可见的色差接缝，面板看起来像「贴」在浏览器里而不是浏览器的一部分。
+            </p>
+            <p>
+              纯白之后层次全部靠发丝线和悬停底色表达：分组标题不加背景块，
+              列表项默认无填充、悬停时才出现 <code>--surface-sunken</code>。
+            </p>
+            <h4 style="margin-top: 28px">颜色只在图表里出现</h4>
+            <p>
+              按钮、焦点、选中、命中高亮全部走中性黑灰——发送键是黑底白箭头，
+              输入框聚焦时边框只是变深，不变绿。彩色留给报告的柱子和图谱的球，
+              那些地方颜色本身在编码数据。
+            </p>
+            <h4 style="margin-top: 28px">输入框沿用线上几何</h4>
+            <p>
+              48px 起、112px 封顶，随输入内容自己顶高，不是点一下就变高。
+              圆角 24px，发送键右／下各留 8px，于是
+              <code>8 + 16 = 24</code>，按钮圆心正好落在圆角的圆心上。
+            </p>
+            <p>
+              列表上下溢出时保留线上的 52px 渐隐，由滚动位置驱动：
+              顶部未滚动时不虚，滚到底时底部不虚。
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      /* ---------- 切换 ---------- */
+      const root = document.documentElement;
+      root.dataset.style = "fresh";
+      root.dataset.mode = "light";
+      root.dataset.view = "manager";
+
+      function wire(attribute, key, after) {
+        document.querySelectorAll(`[${attribute}]`).forEach((button) => {
+          button.addEventListener("click", () => {
+            root.dataset[key] = button.getAttribute(attribute);
+            document.querySelectorAll(`[${attribute}]`).forEach((other) => {
+              other.setAttribute("aria-pressed", String(other === button));
+            });
+            if (after) after();
+          });
+        });
+      }
+      wire("data-set-style", "style", () => refreshGraphTheme());
+      wire("data-set-mode", "mode", () => refreshGraphTheme());
+      wire("data-set-view", "view", () => resizeGraph());
+
+      /* ---------- 主题变化条形图 ---------- */
+      const TRENDS = [
+        { topic: "AI 绘画", current: 12, previous: 5 },
+        { topic: "组件库", current: 9, previous: 8 },
+        { topic: "LLM 应用", current: 8, previous: 3 },
+        { topic: "设计工具", current: 6, previous: 11 },
+        { topic: "动效设计", current: 5, previous: 2 },
+        { topic: "前端框架", current: 4, previous: 7 }
+      ];
+      const maxTrend = Math.max(...TRENDS.flatMap((t) => [t.current, t.previous]));
+      document.getElementById("trend-bars").innerHTML = TRENDS.map(
+        (item) => `
+        <div class="bar-row">
+          <span class="bar-label">${item.topic}</span>
+          <span class="bar-track">
+            <i class="bar-prev" style="width:${(item.previous / maxTrend) * 100}%"></i>
+            <i class="bar-cur" style="width:${(item.current / maxTrend) * 100}%"></i>
+          </span>
+          <span class="bar-value">${item.current}</span>
+        </div>`
+      ).join("");
+
+      /* ============================================================
+         三维主题图谱
+         ============================================================ */
+      const NODES = [
+        ["AI 绘画", 31], ["设计工具", 28], ["组件库", 26], ["LLM 应用", 24],
+        ["前端框架", 22], ["图标资源", 21], ["效率工具", 20], ["开源项目", 19],
+        ["Prompt 工程", 18], ["动效设计", 17], ["产品管理", 16], ["配色方案", 15],
+        ["数据可视化", 14], ["字体排版", 13], ["AI 视频", 12], ["原型设计", 12],
+        ["CSS 技巧", 11], ["文档协作", 10], ["3D 生成", 9], ["用户研究", 8],
+        ["摄影后期", 7], ["无代码建站", 6], ["播客", 4], ["求职", 3]
+      ].map(([id, count]) => ({ id, count }));
+
+      const EDGES = [
+        ["AI 绘画", "Prompt 工程", 14], ["AI 绘画", "LLM 应用", 8],
+        ["AI 绘画", "3D 生成", 6], ["AI 绘画", "AI 视频", 7],
+        ["AI 绘画", "设计工具", 6], ["LLM 应用", "Prompt 工程", 11],
+        ["LLM 应用", "开源项目", 5], ["AI 视频", "3D 生成", 4],
+        ["设计工具", "图标资源", 12], ["设计工具", "配色方案", 9],
+        ["设计工具", "动效设计", 8], ["设计工具", "字体排版", 7],
+        ["设计工具", "原型设计", 5], ["图标资源", "配色方案", 5],
+        ["图标资源", "字体排版", 4], ["配色方案", "字体排版", 6],
+        ["摄影后期", "配色方案", 3], ["动效设计", "CSS 技巧", 6],
+        ["组件库", "前端框架", 13], ["组件库", "CSS 技巧", 8],
+        ["组件库", "动效设计", 5], ["前端框架", "开源项目", 9],
+        ["前端框架", "CSS 技巧", 7], ["数据可视化", "前端框架", 6],
+        ["数据可视化", "开源项目", 4], ["无代码建站", "前端框架", 3],
+        ["产品管理", "用户研究", 7], ["产品管理", "原型设计", 6],
+        ["产品管理", "文档协作", 5], ["产品管理", "数据可视化", 3],
+        ["用户研究", "原型设计", 4], ["文档协作", "效率工具", 4]
+      ].map(([source, target, weight]) => ({ source, target, weight }));
+
+      const INDEX = new Map(NODES.map((node, i) => [node.id, i]));
+      const DEGREE = new Map(NODES.map((node) => [node.id, 0]));
+      for (const edge of EDGES) {
+        DEGREE.set(edge.source, DEGREE.get(edge.source) + 1);
+        DEGREE.set(edge.target, DEGREE.get(edge.target) + 1);
+      }
+
+      /* 球体面积正比于收藏条数 —— 半径必须是 sqrt(count) 的纯比例，
+         任何常数项都会把量级差异压平。 */
+      const RADIUS_UNIT = 3.2;
+      function baseRadius(count) {
+        return RADIUS_UNIT * Math.sqrt(count);
+      }
+      /* 透视会让近处的小节点看起来比远处的大节点还大，把「大小=数量」这条
+         读法毁掉。这里把纵深对半径的影响开 0.45 次方压缩，只留下够用的
+         远近线索，数量始终是主导变量。 */
+      function screenRadius(count, scale) {
+        return Math.max(2, baseRadius(count) * Math.pow(scale, 0.45) * 1.3);
+      }
+
+      function seeded(seed) {
+        let s = seed >>> 0;
+        return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
+      }
+
+      const CLOUD_RADIUS = 205;
+      const FOCAL = 620;
+      const DEPTH_OFFSET = 300;
+
+      function layout3D() {
+        const n = NODES.length;
+        const radius = 190;
+        const k = Math.cbrt((radius * radius * radius * 8) / n) * 0.92;
+        const CUTOFF = k * 3.2;
+        const rand = seeded(20260730);
+        const pos = NODES.map(() => ({
+          x: (rand() - 0.5) * radius,
+          y: (rand() - 0.5) * radius,
+          z: (rand() - 0.5) * radius
+        }));
+        const disp = pos.map(() => ({ x: 0, y: 0, z: 0 }));
+        const iterations = 620;
+        let temp = radius * 0.16;
+        const cool = temp / (iterations + 1);
+
+        for (let step = 0; step < iterations; step += 1) {
+          disp.forEach((d) => { d.x = 0; d.y = 0; d.z = 0; });
+          for (let i = 0; i < n; i += 1) {
+            for (let j = i + 1; j < n; j += 1) {
+              const dx = pos[i].x - pos[j].x;
+              const dy = pos[i].y - pos[j].y;
+              const dz = pos[i].z - pos[j].z;
+              const dist = Math.hypot(dx, dy, dz) || 0.01;
+              /* 斥力在 CUTOFF 之外衰减到 0。没有截断的话，零连接的孤岛节点
+                 会被整团斥力推到极远，归一化时反过来把连通部分压成一个点。 */
+              if (dist >= CUTOFF) continue;
+              const rep = ((k * k) / dist) * (1 - dist / CUTOFF);
+              disp[i].x += (dx / dist) * rep;
+              disp[i].y += (dy / dist) * rep;
+              disp[i].z += (dz / dist) * rep;
+              disp[j].x -= (dx / dist) * rep;
+              disp[j].y -= (dy / dist) * rep;
+              disp[j].z -= (dz / dist) * rep;
+            }
+          }
+          for (const edge of EDGES) {
+            const a = INDEX.get(edge.source);
+            const b = INDEX.get(edge.target);
+            const dx = pos[a].x - pos[b].x;
+            const dy = pos[a].y - pos[b].y;
+            const dz = pos[a].z - pos[b].z;
+            const dist = Math.hypot(dx, dy, dz) || 0.01;
+            const pull = ((dist * dist) / k) * Math.min(2, 0.45 + edge.weight * 0.26);
+            disp[a].x -= (dx / dist) * pull;
+            disp[a].y -= (dy / dist) * pull;
+            disp[a].z -= (dz / dist) * pull;
+            disp[b].x += (dx / dist) * pull;
+            disp[b].y += (dy / dist) * pull;
+            disp[b].z += (dz / dist) * pull;
+          }
+          for (let i = 0; i < n; i += 1) {
+            disp[i].x -= pos[i].x * 0.02;
+            disp[i].y -= pos[i].y * 0.02;
+            disp[i].z -= pos[i].z * 0.02;
+            const m = Math.hypot(disp[i].x, disp[i].y, disp[i].z) || 0.01;
+            const lim = Math.min(m, temp);
+            pos[i].x += (disp[i].x / m) * lim;
+            pos[i].y += (disp[i].y / m) * lim;
+            pos[i].z += (disp[i].z / m) * lim;
+          }
+          temp -= cool;
+        }
+
+        const centre = pos.reduce(
+          (acc, p) => ({ x: acc.x + p.x / n, y: acc.y + p.y / n, z: acc.z + p.z / n }),
+          { x: 0, y: 0, z: 0 }
+        );
+        const centred = pos.map((p) => ({
+          x: p.x - centre.x,
+          y: p.y - centre.y,
+          z: p.z - centre.z
+        }));
+        /* 用连通节点的范围定标。孤岛节点被斥力推到最外圈，
+           拿它们当基准会把真正有关系的主体压成很小的一团。 */
+        const spread = centred
+          .filter((_, i) => DEGREE.get(NODES[i].id) > 0)
+          .map((p) => Math.hypot(p.x, p.y, p.z))
+          .sort((a, b) => a - b);
+        const extent = spread[spread.length - 1] || 1;
+        const factor = CLOUD_RADIUS / extent;
+        return centred.map((p) => ({
+          x: p.x * factor,
+          y: p.y * factor,
+          z: p.z * factor
+        }));
+      }
+
+      function clusters() {
+        const adj = new Map(NODES.map((node) => [node.id, []]));
+        for (const edge of EDGES) {
+          adj.get(edge.source).push([edge.target, edge.weight]);
+          adj.get(edge.target).push([edge.source, edge.weight]);
+        }
+        const label = new Map(NODES.map((node, i) => [node.id, i]));
+        const order = NODES.map((node) => node.id).sort();
+        for (let pass = 0; pass < 30; pass += 1) {
+          let changed = false;
+          for (const id of order) {
+            const neighbours = adj.get(id);
+            if (!neighbours.length) continue;
+            const tally = new Map();
+            for (const [other, weight] of neighbours) {
+              tally.set(label.get(other), (tally.get(label.get(other)) || 0) + weight);
+            }
+            let best = label.get(id);
+            let score = -1;
+            for (const [value, total] of [...tally].sort((a, b) => a[0] - b[0])) {
+              if (total > score) { score = total; best = value; }
+            }
+            if (best !== label.get(id)) { label.set(id, best); changed = true; }
+          }
+          if (!changed) break;
+        }
+        const uniq = [...new Set(label.values())].sort((a, b) => a - b);
+        const remap = new Map(uniq.map((value, i) => [value, i]));
+        return new Map([...label].map(([id, value]) => [id, remap.get(value)]));
+      }
+
+      const POS3D = layout3D();
+      const CLUSTERS = clusters();
+
+      /* 社区不做人工命名，一律用该社区里收藏最多的主题指代 */
+      function clusterLabel(id) {
+        const group = CLUSTERS.get(id);
+        const members = NODES.filter(
+          (node) => CLUSTERS.get(node.id) === group && DEGREE.get(node.id) > 0
+        ).sort((left, right) => right.count - left.count);
+        return members.length ? `「${members[0].id}」群` : "独立";
+      }
+
+      const CLUSTER_COLORS = {
+        fresh: {
+          light: ["#12a594", "#5b7cd8", "#c2762e", "#7b6bc4", "#4d9c5a"],
+          dark: ["#2ec4b0", "#7d9ce8", "#dba05a", "#a394e0", "#6fbf7c"]
+        },
+        graphite: {
+          light: ["#0f766e", "#3f6212", "#7c5295", "#b4532a", "#2563a8"],
+          dark: ["#3dbba5", "#a3c26b", "#b49ad8", "#e39268", "#79b3e8"]
+        },
+        sand: {
+          light: ["#9c4221", "#3f6212", "#7c5a2e", "#5c4033", "#2f5d50"],
+          dark: ["#e07a5f", "#a3b86c", "#d9b382", "#c99a86", "#7fae9c"]
+        }
+      };
+
+      const canvas = document.getElementById("graph3d");
+      const ctx = canvas.getContext("2d");
+      const readout = document.getElementById("readout");
+
+      let yaw = 0.6;
+      let pitch = -0.26;
+      let zoom = 1.9;
+      let dragging = false;
+      let lastPointer = null;
+      let hoverIndex = -1;
+      let projected = [];
+      let palette = CLUSTER_COLORS.fresh.light;
+      let tokens = {};
+
+      function refreshGraphTheme() {
+        const style = root.dataset.style;
+        const mode = root.dataset.mode;
+        palette = (CLUSTER_COLORS[style] || CLUSTER_COLORS.fresh)[mode];
+        const css = getComputedStyle(document.body);
+        tokens = {
+          surface: css.getPropertyValue("--surface").trim(),
+          ink: css.getPropertyValue("--ink").trim(),
+          inkMuted: css.getPropertyValue("--ink-muted").trim(),
+          inkFaint: css.getPropertyValue("--ink-faint").trim(),
+          font: css.getPropertyValue("--font-ui").trim()
+        };
+        renderInsights();
+      }
+
+      /* 每栏最多 5 行，多出来的折成一行。主题数从 24 涨到 200 也不会变高。 */
+      const ROW_CAP = 5;
+      function capped(rows, unit) {
+        const shown = rows.slice(0, ROW_CAP).join("");
+        const rest = rows.length - ROW_CAP;
+        return rest > 0
+          ? `${shown}<div class="insight-more">还有 ${rest} 个${unit}</div>`
+          : shown;
+      }
+
+      /* 问题面板：全部由现有数据算出，没有写死的结论 */
+      function renderInsights() {
+        const groups = new Map();
+        for (const node of NODES) {
+          if (DEGREE.get(node.id) === 0) continue;
+          const id = CLUSTERS.get(node.id);
+          if (!groups.has(id)) groups.set(id, []);
+          groups.get(id).push(node);
+        }
+        const ordered = [...groups.entries()]
+          .map(([id, members]) => ({
+            id,
+            members: [...members].sort((a, b) => b.count - a.count),
+            total: members.reduce((sum, member) => sum + member.count, 0)
+          }))
+          .sort((left, right) => right.total - left.total);
+
+        document.getElementById("insight-clusters").innerHTML = capped(
+          ordered.map(
+            (group) => `
+            <div class="insight-row">
+              <span class="bead" style="background:${palette[group.id % palette.length]}"></span>
+              <span class="name">以「${group.members[0].id}」为核心</span>
+              <span class="num">${group.total} 条</span>
+            </div>`
+          ),
+          "社区"
+        );
+
+        document.getElementById("insight-isolated").innerHTML = capped(
+          NODES.filter((node) => DEGREE.get(node.id) === 0).map(
+            (node) => `
+            <div class="insight-row">
+              <span class="bead hollow"></span>
+              <span class="name">${node.id}</span>
+              <span class="num">${node.count} 条</span>
+            </div>`
+          ),
+          "主题"
+        );
+
+        document.getElementById("insight-lonely").innerHTML = NODES.filter(
+          (node) => DEGREE.get(node.id) > 0
+        )
+          .map((node) => ({ node, ratio: node.count / DEGREE.get(node.id) }))
+          .sort((left, right) => right.ratio - left.ratio)
+          .slice(0, 3)
+          .map(
+            ({ node }) => `
+            <div class="insight-row">
+              <span class="bead" style="background:${
+                palette[CLUSTERS.get(node.id) % palette.length]
+              }"></span>
+              <span class="name">${node.id}</span>
+              <span class="num">${node.count} 条 · ${DEGREE.get(node.id)} 关联</span>
+            </div>`
+          )
+          .join("");
+      }
+
+      function resizeGraph() {
+        const ratio = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        if (!rect.width) return;
+        canvas.width = Math.round(rect.width * ratio);
+        canvas.height = Math.round(rect.height * ratio);
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      }
+
+      function project() {
+        const rect = canvas.getBoundingClientRect();
+        const cx = rect.width / 2;
+        const cy = rect.height / 2;
+        const cosY = Math.cos(yaw);
+        const sinY = Math.sin(yaw);
+        const cosX = Math.cos(pitch);
+        const sinX = Math.sin(pitch);
+
+        projected = POS3D.map((point, i) => {
+          const x1 = point.x * cosY + point.z * sinY;
+          const z1 = -point.x * sinY + point.z * cosY;
+          const y1 = point.y * cosX - z1 * sinX;
+          const z2 = point.y * sinX + z1 * cosX;
+          const denominator = Math.max(1, FOCAL + z2 + DEPTH_OFFSET);
+          const scale = (FOCAL / denominator) * zoom;
+          return { index: i, x: cx + x1 * scale, y: cy + y1 * scale, z: z2, scale };
+        });
+      }
+
+      function withAlpha(color, alpha) {
+        if (color.startsWith("#") && color.length === 7) {
+          const r = parseInt(color.slice(1, 3), 16);
+          const g = parseInt(color.slice(3, 5), 16);
+          const b = parseInt(color.slice(5, 7), 16);
+          return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+        return color;
+      }
+
+      function draw() {
+        const rect = canvas.getBoundingClientRect();
+        if (!rect.width) return;
+        ctx.clearRect(0, 0, rect.width, rect.height);
+
+        const depths = projected.map((p) => p.z);
+        const near = Math.min(...depths);
+        const far = Math.max(...depths);
+        const span = far - near || 1;
+        const depthOf = (z) => 1 - (z - near) / span;
+
+        const neighbours = new Set();
+        if (hoverIndex >= 0) {
+          neighbours.add(NODES[hoverIndex].id);
+          for (const edge of EDGES) {
+            if (edge.source === NODES[hoverIndex].id) neighbours.add(edge.target);
+            if (edge.target === NODES[hoverIndex].id) neighbours.add(edge.source);
+          }
+        }
+
+        const drawableEdges = EDGES.map((edge) => {
+          const a = projected[INDEX.get(edge.source)];
+          const b = projected[INDEX.get(edge.target)];
+          return { edge, a, b, depth: (a.z + b.z) / 2 };
+        }).sort((left, right) => right.depth - left.depth);
+
+        for (const { edge, a, b } of drawableEdges) {
+          const same = CLUSTERS.get(edge.source) === CLUSTERS.get(edge.target);
+          const nearness = depthOf((a.z + b.z) / 2);
+          const dim =
+            hoverIndex >= 0 &&
+            !(neighbours.has(edge.source) && neighbours.has(edge.target));
+          const base = same
+            ? palette[CLUSTERS.get(edge.source) % palette.length]
+            : tokens.inkFaint;
+          ctx.strokeStyle = withAlpha(
+            base,
+            dim ? 0.05 : (0.13 + nearness * 0.37) * (same ? 1 : 0.6)
+          );
+          ctx.lineWidth = (0.5 + edge.weight * 0.16) * (0.55 + nearness * 0.7);
+          ctx.lineCap = "round";
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.stroke();
+        }
+
+        const drawableNodes = [...projected].sort((left, right) => right.z - left.z);
+        const labelled = new Set(drawableNodes.slice(-11).map((point) => point.index));
+
+        for (const point of drawableNodes) {
+          const node = NODES[point.index];
+          const nearness = depthOf(point.z);
+          const isolated = DEGREE.get(node.id) === 0;
+          const dim = hoverIndex >= 0 && !neighbours.has(node.id);
+          const radius = screenRadius(node.count, point.scale);
+          const colour = palette[CLUSTERS.get(node.id) % palette.length];
+
+          if (!dim && nearness > 0.45 && !isolated) {
+            ctx.fillStyle = withAlpha(colour, 0.09 * (nearness - 0.45) * 2);
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, radius * 1.9, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          ctx.beginPath();
+          ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+          if (isolated) {
+            ctx.fillStyle = withAlpha(tokens.surface, 1);
+            ctx.fill();
+            ctx.strokeStyle = withAlpha(tokens.inkFaint, dim ? 0.12 : 0.35 + nearness * 0.3);
+            ctx.lineWidth = 1.2;
+            ctx.setLineDash([3, 2.5]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+          } else {
+            ctx.fillStyle = withAlpha(colour, dim ? 0.1 : 0.42 + nearness * 0.58);
+            ctx.fill();
+            ctx.strokeStyle = withAlpha(tokens.surface, dim ? 0.2 : 0.9);
+            ctx.lineWidth = 1.4 * point.scale;
+            ctx.stroke();
+          }
+
+        }
+
+        /* 标注单独走一遍，否则前排球体会盖住后排球体的文字。
+           三维投影压平纵深，全标必然叠字，只标最靠前的一批。 */
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        for (const point of drawableNodes) {
+          const node = NODES[point.index];
+          const isolated = DEGREE.get(node.id) === 0;
+          const emphasised = hoverIndex === point.index;
+          if (!labelled.has(point.index) && !emphasised && !isolated) continue;
+          const nearness = depthOf(point.z);
+          const dim = hoverIndex >= 0 && !neighbours.has(node.id);
+          const radius = screenRadius(node.count, point.scale);
+          ctx.font = `${emphasised ? 600 : 400} ${(10.5 * Math.min(1.15, point.scale)).toFixed(1)}px ${tokens.font}`;
+          ctx.fillStyle = withAlpha(
+            emphasised ? tokens.ink : tokens.inkMuted,
+            dim ? 0.12 : 0.24 + nearness * 0.76
+          );
+          ctx.fillText(node.id, point.x, point.y + radius + 5);
+        }
+      }
+
+      function frame() {
+        if (!dragging && hoverIndex < 0) yaw += 0.0021;
+        project();
+        draw();
+        requestAnimationFrame(frame);
+      }
+
+      canvas.addEventListener("pointerdown", (event) => {
+        dragging = true;
+        lastPointer = { x: event.clientX, y: event.clientY };
+        canvas.setPointerCapture(event.pointerId);
+      });
+      canvas.addEventListener("pointerup", (event) => {
+        dragging = false;
+        canvas.releasePointerCapture(event.pointerId);
+      });
+      canvas.addEventListener("pointermove", (event) => {
+        if (dragging && lastPointer) {
+          /* 近处的点 z 为负，yaw 增大会让正面往左走。要让「抓住球往右拖、
+             正面就跟着往右转」，这里必须取负号。 */
+          yaw -= (event.clientX - lastPointer.x) * 0.006;
+          pitch = Math.max(-1.2, Math.min(1.2, pitch + (event.clientY - lastPointer.y) * 0.005));
+          lastPointer = { x: event.clientX, y: event.clientY };
+          return;
+        }
+        const rect = canvas.getBoundingClientRect();
+        const px = event.clientX - rect.left;
+        const py = event.clientY - rect.top;
+        let found = -1;
+        let bestDepth = Infinity;
+        for (const point of projected) {
+          const node = NODES[point.index];
+          const radius = screenRadius(node.count, point.scale) + 5;
+          if (Math.hypot(point.x - px, point.y - py) < radius && point.z < bestDepth) {
+            bestDepth = point.z;
+            found = point.index;
+          }
+        }
+        if (found !== hoverIndex) {
+          hoverIndex = found;
+          if (found >= 0) {
+            const node = NODES[found];
+            readout.querySelector(".topic").textContent = node.id;
+            readout.querySelector('[data-k="count"]').textContent = `${node.count} 条`;
+            readout.querySelector('[data-k="degree"]').textContent = `${DEGREE.get(node.id)} 个`;
+            readout.querySelector('[data-k="cluster"]').textContent =
+              DEGREE.get(node.id) === 0 ? "孤岛主题" : clusterLabel(node.id);
+            readout.dataset.visible = "true";
+          } else {
+            readout.dataset.visible = "false";
+          }
+        }
+      });
+      canvas.addEventListener("pointerleave", () => {
+        dragging = false;
+        hoverIndex = -1;
+        readout.dataset.visible = "false";
+      });
+      canvas.addEventListener(
+        "wheel",
+        (event) => {
+          event.preventDefault();
+          zoom = Math.max(0.55, Math.min(2.4, zoom - event.deltaY * 0.0012));
+        },
+        { passive: false }
+      );
+      window.addEventListener("resize", resizeGraph);
+
+      /* 输入框随内容顶高：先归零再按 scrollHeight 量，否则缩短时不会回落 */
+      const composer = document.querySelector(".sp-composer textarea");
+      composer.addEventListener("input", () => {
+        composer.style.height = "auto";
+        composer.style.height = `${composer.scrollHeight}px`;
+      });
+
+      refreshGraphTheme();
+      resizeGraph();
+      frame();
+    </script>
+  </body>
+</html>
