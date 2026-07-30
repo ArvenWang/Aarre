@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { isSnapshotSensitiveUrl } from "../src/lib/page-snapshot";
+import {
+  isSnapshotSensitiveUrl,
+  matchesSnapshotTargetUrl
+} from "../src/lib/page-snapshot";
 import { normalizeSnapshotExcludedHost } from "../src/lib/display-settings";
 
 describe("page snapshot privacy", () => {
@@ -42,5 +45,23 @@ describe("page snapshot privacy", () => {
       normalizeSnapshotExcludedHost("https://Work.Example.com/private")
     ).toBe("work.example.com");
     expect(normalizeSnapshotExcludedHost("not a host")).toBe("");
+  });
+
+  it("matches an Aarre-opened target only after the intended URL finishes loading", () => {
+    expect(
+      matchesSnapshotTargetUrl(
+        "https://example.com/guide#overview",
+        "https://example.com/guide"
+      )
+    ).toBe(true);
+    expect(
+      matchesSnapshotTargetUrl(
+        "https://example.com/guide",
+        "https://example.com/login"
+      )
+    ).toBe(false);
+    expect(matchesSnapshotTargetUrl("not a url", "https://example.com")).toBe(
+      false
+    );
   });
 });

@@ -1371,6 +1371,9 @@ function SettingsPage({
                     <strong>{batch.label}</strong>
                     <small>
                       {conversationDate(batch.createdAt)}
+                      {batch.source === "chrome"
+                        ? " · Chrome 书签管理器"
+                        : ""}
                       {batch.destructive ? " · 回收站" : ""}
                     </small>
                   </div>

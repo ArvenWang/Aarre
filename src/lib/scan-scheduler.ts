@@ -34,7 +34,7 @@ export function interleaveResourcesByHost(
 
 export class DomainRateLimiter {
   private readonly queues = new Map<string, Promise<void>>();
-  private readonly lastStartedAt = new Map<string, number>();
+  private readonly lastFinishedAt = new Map<string, number>();
 
   constructor(
     private readonly intervalMs = 1_000,
@@ -65,15 +65,17 @@ export class DomainRateLimiter {
     this.queues.set(host, queued);
     await previous;
     try {
-      const lastStartedAt = this.lastStartedAt.get(host);
+      const lastFinishedAt = this.lastFinishedAt.get(host);
       const remaining =
-        lastStartedAt === undefined
+        lastFinishedAt === undefined
           ? 0
-          : lastStartedAt + this.intervalMs - this.now();
+          : lastFinishedAt + this.intervalMs - this.now();
       if (remaining > 0) await this.wait(remaining);
-      this.lastStartedAt.set(host, this.now());
       return await task();
     } finally {
+      // 无论成功还是失败，都从任务结束时重新计算间隔，避免慢站点或
+      // 连续失败绕过同域限速。
+      this.lastFinishedAt.set(host, this.now());
       release();
       if (this.queues.get(host) === queued) {
         this.queues.delete(host);

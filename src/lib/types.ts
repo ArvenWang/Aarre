@@ -381,7 +381,7 @@ export type UndoSnapshotStatus = "pending" | "ready" | "undone" | "partial";
 
 export interface UndoSnapshotBatch {
   batchId: string;
-  source: "agent" | "manual";
+  source: "agent" | "manual" | "chrome";
   label: string;
   destructive: boolean;
   createdAt: string;

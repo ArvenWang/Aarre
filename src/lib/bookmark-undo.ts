@@ -45,6 +45,37 @@ export function createUndoBatch(input: {
   };
 }
 
+export function createRemovedNodeUndoBatch(input: {
+  node: chrome.bookmarks.BookmarkTreeNode;
+  parentId: string;
+  index: number;
+  at?: Date;
+}): UndoSnapshotBatch {
+  const node = serializeBookmarkNode({
+    ...input.node,
+    parentId: input.parentId,
+    index: input.index
+  });
+  const label = `Chrome 书签管理器删除“${node.title || node.url || "未命名项目"}”`;
+  const batch = createUndoBatch({
+    source: "chrome",
+    label,
+    destructive: true,
+    at: input.at,
+    mutations: [
+      {
+        id: crypto.randomUUID(),
+        kind: "restore_subtree",
+        label,
+        destructive: true,
+        applied: true,
+        node
+      }
+    ]
+  });
+  return { ...batch, status: "ready" };
+}
+
 export async function snapshotCreatedMutation(input: {
   parentId: string;
   label: string;
@@ -141,7 +172,11 @@ async function recreateSubtree(
   return created;
 }
 
-async function removeCreatedNode(mutation: UndoMutation): Promise<string> {
+async function removeCreatedNode(
+  mutation: UndoMutation,
+  onBeforeRemove?: (nodeId: string) => void,
+  onAfterRemove?: (nodeId: string) => void
+): Promise<string> {
   let target = mutation.createdNodeId
     ? await existingNode(mutation.createdNodeId)
     : undefined;
@@ -159,21 +194,32 @@ async function removeCreatedNode(mutation: UndoMutation): Promise<string> {
   if (!target) {
     throw new Error(`未找到“${mutation.label}”创建的项目，未删除任何内容。`);
   }
-  if (target.url) {
-    await chrome.bookmarks.remove(target.id);
-  } else {
-    await chrome.bookmarks.removeTree(target.id);
+  onBeforeRemove?.(target.id);
+  try {
+    if (target.url) {
+      await chrome.bookmarks.remove(target.id);
+    } else {
+      await chrome.bookmarks.removeTree(target.id);
+    }
+  } finally {
+    onAfterRemove?.(target.id);
   }
   return `已撤销：${mutation.label}`;
 }
 
 async function restoreMutation(
   mutation: UndoMutation,
-  fallbackParentId: () => Promise<string>
+  fallbackParentId: () => Promise<string>,
+  onBeforeRemove?: (nodeId: string) => void,
+  onAfterRemove?: (nodeId: string) => void
 ): Promise<string> {
   if (!mutation.applied) return "";
   if (mutation.kind === "remove_created") {
-    return removeCreatedNode(mutation);
+    return removeCreatedNode(
+      mutation,
+      onBeforeRemove,
+      onAfterRemove
+    );
   }
   if (!mutation.node) {
     throw new Error(`“${mutation.label}”缺少恢复数据。`);
@@ -222,7 +268,11 @@ async function restoreMutation(
 
 export async function undoBookmarkBatch(
   batch: UndoSnapshotBatch,
-  fallbackParentId: () => Promise<string>
+  fallbackParentId: () => Promise<string>,
+  options: {
+    onBeforeRemove?: (nodeId: string) => void;
+    onAfterRemove?: (nodeId: string) => void;
+  } = {}
 ): Promise<UndoBatchResult> {
   if (batch.status === "undone") {
     throw new Error("这批更改已经撤销过了。");
@@ -237,7 +287,12 @@ export async function undoBookmarkBatch(
   for (const mutation of [...batch.mutations].reverse()) {
     if (!mutation.applied) continue;
     try {
-      const message = await restoreMutation(mutation, fallbackParentId);
+      const message = await restoreMutation(
+        mutation,
+        fallbackParentId,
+        options.onBeforeRemove,
+        options.onAfterRemove
+      );
       if (message) messages.push(message);
       restored += 1;
     } catch (error) {

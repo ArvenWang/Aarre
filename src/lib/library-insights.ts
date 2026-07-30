@@ -1,4 +1,8 @@
-import { searchLocalResources } from "./search";
+import {
+  buildLocalSearchIndex,
+  searchLocalIndex,
+  type LocalSearchIndexItem
+} from "./search";
 import type {
   BookmarkAgentActionProposal,
   BookmarkAgentCatalog,
@@ -129,6 +133,104 @@ function normalizeTopic(value: string): string {
   return value.toLocaleLowerCase().normalize("NFKC").trim();
 }
 
+interface ScoredFolderCandidate extends FolderSuggestion {
+  similarCount: number;
+  lexicalMatch: boolean;
+}
+
+function folderQuery(parts: Array<string | string[] | undefined>): string {
+  return parts
+    .flatMap((part) => (Array.isArray(part) ? part : [part || ""]))
+    .filter(Boolean)
+    .join(" ")
+    .slice(0, 1_500);
+}
+
+function folderQueryForResource(resource: ResourceRecord): string {
+  return folderQuery([
+    resource.title,
+    resource.summary,
+    resource.contentExcerpt,
+    resource.userNote,
+    resource.siteName,
+    resource.tags,
+    resource.topics,
+    resource.aliases
+  ]);
+}
+
+function folderQueryForCapture(capture: PageCapture): string {
+  return folderQuery([
+    capture.title,
+    capture.description,
+    capture.excerpt,
+    capture.selectedText,
+    capture.siteName
+  ]);
+}
+
+/**
+ * 保存时建议和批量整理必须共用这一层评分，避免同一条收藏在两个入口
+ * 得到互相冲突的目标文件夹。
+ */
+export function scoreFolderCandidates(input: {
+  query: string;
+  resources: ResourceRecord[];
+  folders: NativeFolderOption[];
+  excludedResourceKeys?: Set<string>;
+  searchIndex?: LocalSearchIndexItem[];
+  limit?: number;
+}): ScoredFolderCandidate[] {
+  const excluded = input.excludedResourceKeys || new Set<string>();
+  const searchIndex =
+    input.searchIndex || buildLocalSearchIndex(input.resources);
+  const similar = searchLocalIndex(
+    searchIndex,
+    input.query
+  )
+    .filter(({ resource }) => !excluded.has(resource.resourceKey))
+    .slice(0, 20);
+  const folderCounts = new Map<string, number>();
+  for (const { resource } of similar) {
+    const key = resource.nativeFolderPath.join("\n");
+    if (key) folderCounts.set(key, (folderCounts.get(key) || 0) + 1);
+  }
+  const normalizedQuery = input.query
+    .toLocaleLowerCase()
+    .normalize("NFKC");
+  return input.folders
+    .map((folder) => {
+      const key = folder.path.join("\n");
+      const similarCount = folderCounts.get(key) || 0;
+      const lexicalMatch = folder.path.some((part) =>
+        normalizedQuery.includes(
+          part.toLocaleLowerCase().normalize("NFKC")
+        )
+      );
+      return {
+        folderId: folder.id,
+        name: folder.name,
+        path: folder.path,
+        score:
+          similarCount * 10 +
+          (lexicalMatch ? 6 : 0) -
+          folder.depth * 0.1,
+        reason: similarCount
+          ? `与 ${similarCount} 条相似收藏同目录`
+          : "目录名称与页面主题匹配",
+        similarCount,
+        lexicalMatch
+      };
+    })
+    .filter((folder) => folder.score > 0)
+    .sort(
+      (left, right) =>
+        right.score - left.score ||
+        left.path.join("/").localeCompare(right.path.join("/"))
+    )
+    .slice(0, input.limit ?? input.folders.length);
+}
+
 function classificationProposals(
   resources: ResourceRecord[],
   catalog: BookmarkAgentCatalog,
@@ -157,57 +259,103 @@ function classificationProposals(
 
   const candidates: OrganizationProposal[] = [];
   const alreadyMoved = new Set<string>();
+  const searchIndex = buildLocalSearchIndex(resources);
+  const selectableFolders = catalog.folders
+    .filter((folder) => folder.writable && folder.path.length > 1)
+    .map((folder) => ({
+      id: folder.id,
+      name: folder.title,
+      path: folder.path,
+      depth: folder.path.length - 1
+    }));
   for (const [topic, group] of topicGroups) {
     if (group.length < 3) continue;
-    const countByParent = new Map<string, number>();
-    for (const { node } of group) {
-      countByParent.set(
-        node.parentId,
-        (countByParent.get(node.parentId) || 0) + 1
+    const movesByDestination = new Map<
+      string,
+      {
+        destination: NativeFolderOption;
+        support: number;
+        moves: Array<{
+          resource: ResourceRecord;
+          node: BookmarkAgentCatalogBookmark;
+        }>;
+      }
+    >();
+    for (const { resource, node } of group) {
+      if (!node.writable || alreadyMoved.has(resource.resourceKey)) continue;
+      const preferred = scoreFolderCandidates({
+        query: folderQueryForResource(resource),
+        resources,
+        folders: selectableFolders,
+        excludedResourceKeys: new Set([resource.resourceKey]),
+        searchIndex,
+        limit: 1
+      })[0];
+      if (
+        !preferred ||
+        preferred.folderId === node.parentId ||
+        preferred.similarCount < 2
+      ) {
+        continue;
+      }
+      const destination = folderById.get(preferred.folderId);
+      if (!destination) continue;
+      const moveGroup = movesByDestination.get(preferred.folderId) || {
+        destination: {
+          id: destination.id,
+          name: destination.title,
+          path: destination.path,
+          depth: destination.path.length - 1
+        },
+        support: 0,
+        moves: []
+      };
+      moveGroup.support = Math.max(
+        moveGroup.support,
+        preferred.similarCount
       );
+      moveGroup.moves.push({ resource, node });
+      movesByDestination.set(preferred.folderId, moveGroup);
     }
-    const [destinationId, dominantCount] = [...countByParent.entries()].sort(
-      (left, right) => right[1] - left[1]
-    )[0] || ["", 0];
-    const destination = folderById.get(destinationId);
-    if (!destination || dominantCount < 2 || countByParent.size < 2) continue;
 
-    const moves = group.filter(
-      ({ resource, node }) =>
-        node.parentId !== destinationId &&
-        node.writable &&
-        !alreadyMoved.has(resource.resourceKey)
-    );
-    if (!moves.length) continue;
-    for (const { resource } of moves) alreadyMoved.add(resource.resourceKey);
-    candidates.push({
-      id: `classify:${topic}:${destinationId}`,
-      kind: "classify",
-      title: `把“${topic}”主题归到一起`,
-      description: `${dominantCount} 条同主题收藏已在「${pathLabel(destination.path)}」，建议移动 ${moves.length} 条散落收藏。`,
-      destructive: false,
-      selectedByDefault: true,
-      actions: moves.map(({ resource, node }) => ({
-        id: actionId(`move:${destinationId}`, node.id),
-        type: "move_bookmark",
-        label: `移动「${resource.title}」`,
-        description: `从 ${pathLabel(node.path)} 移到 ${pathLabel(destination.path)}`,
+    for (const [destinationId, moveGroup] of movesByDestination) {
+      const moves = moveGroup.moves.filter(
+        ({ resource }) => !alreadyMoved.has(resource.resourceKey)
+      );
+      if (!moves.length) continue;
+      for (const { resource } of moves) alreadyMoved.add(resource.resourceKey);
+      const destination = moveGroup.destination;
+      candidates.push({
+        id: `classify:${topic}:${destinationId}`,
+        kind: "classify",
+        title: `把“${topic}”主题归到一起`,
+        description: `${moveGroup.support} 条相似收藏已在「${pathLabel(destination.path)}」，建议移动 ${moves.length} 条散落收藏。`,
         destructive: false,
-        status: "pending",
-        targetId: node.id,
-        destinationId,
-        expectedTitle: node.title,
-        expectedUrl: node.url,
-        expectedParentId: node.parentId
-      })),
-      resourceKeys: moves.map(({ resource }) => resource.resourceKey),
-      beforePaths: moves.map(({ node }) => pathLabel(node.path, node.title)),
-      afterPath: pathLabel(destination.path),
-      previewLines: moves.map(
-        ({ node }) =>
-          `${pathLabel(node.path, node.title)} → ${pathLabel(destination.path, node.title)}`
-      )
-    });
+        selectedByDefault: true,
+        actions: moves.map(({ resource, node }) => ({
+          id: actionId(`move:${destinationId}`, node.id),
+          type: "move_bookmark",
+          label: `移动「${resource.title}」`,
+          description: `从 ${pathLabel(node.path)} 移到 ${pathLabel(destination.path)}`,
+          destructive: false,
+          status: "pending",
+          targetId: node.id,
+          destinationId,
+          expectedTitle: node.title,
+          expectedUrl: node.url,
+          expectedParentId: node.parentId
+        })),
+        resourceKeys: moves.map(({ resource }) => resource.resourceKey),
+        beforePaths: moves.map(({ node }) =>
+          pathLabel(node.path, node.title)
+        ),
+        afterPath: pathLabel(destination.path),
+        previewLines: moves.map(
+          ({ node }) =>
+            `${pathLabel(node.path, node.title)} → ${pathLabel(destination.path, node.title)}`
+        )
+      });
+    }
   }
   return candidates;
 }
@@ -341,46 +489,20 @@ export function suggestFolders(
   folders: NativeFolderOption[],
   limit = 3
 ): FolderSuggestion[] {
-  const query = [
-    capture.title,
-    capture.description,
-    capture.excerpt,
-    capture.siteName
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .slice(0, 1_500);
-  const similar = searchLocalResources(resources, query).slice(0, 20);
-  const folderCounts = new Map<string, number>();
-  for (const { resource } of similar) {
-    const key = resource.nativeFolderPath.join("\n");
-    if (key) folderCounts.set(key, (folderCounts.get(key) || 0) + 1);
-  }
-  const normalizedQuery = query.toLocaleLowerCase().normalize("NFKC");
-  return folders
-    .map((folder) => {
-      const key = folder.path.join("\n");
-      const similarCount = folderCounts.get(key) || 0;
-      const lexicalMatch = folder.path.some((part) =>
-        normalizedQuery.includes(
-          part.toLocaleLowerCase().normalize("NFKC")
-        )
-      );
-      return {
-        folderId: folder.id,
-        name: folder.name,
-        path: folder.path,
-        score: similarCount * 10 + (lexicalMatch ? 6 : 0) - folder.depth * 0.1,
-        reason: similarCount
-          ? `与 ${similarCount} 条相似收藏同目录`
-          : "目录名称与页面主题匹配"
-      };
-    })
-    .filter((folder) => folder.score > 0)
-    .sort(
-      (left, right) =>
-        right.score - left.score ||
-        left.path.join("/").localeCompare(right.path.join("/"))
-    )
-    .slice(0, limit);
+  const excludedResourceKeys = new Set(
+    resources
+      .filter(
+        (resource) =>
+          resource.canonicalUrl === capture.canonicalUrl ||
+          resource.url === capture.url
+      )
+      .map((resource) => resource.resourceKey)
+  );
+  return scoreFolderCandidates({
+    query: folderQueryForCapture(capture),
+    resources,
+    folders,
+    excludedResourceKeys,
+    limit
+  });
 }

@@ -50,7 +50,7 @@ describe("scan scheduler", () => {
     ]);
   });
 
-  it("serializes a domain and leaves at least one second between starts", async () => {
+  it("serializes a domain and waits from the previous task completion", async () => {
     let clock = 10_000;
     const starts: number[] = [];
     const limiter = new DomainRateLimiter(
@@ -70,5 +70,78 @@ describe("scan scheduler", () => {
     ]);
     expect(starts).toEqual([10_000, 11_000]);
   });
-});
 
+  it("waits one second after a slow same-domain task finishes", async () => {
+    let clock = 10_000;
+    const starts: number[] = [];
+    const limiter = new DomainRateLimiter(
+      1_000,
+      () => clock,
+      async (milliseconds) => {
+        clock += milliseconds;
+      }
+    );
+
+    await Promise.all([
+      limiter.run("https://docs.example.com/a", async () => {
+        starts.push(clock);
+        clock += 3_000;
+      }),
+      limiter.run("https://www.example.com/b", async () => {
+        starts.push(clock);
+      })
+    ]);
+
+    expect(starts).toEqual([10_000, 14_000]);
+  });
+
+  it("still throttles the next same-domain task after a failure", async () => {
+    let clock = 10_000;
+    const starts: number[] = [];
+    const limiter = new DomainRateLimiter(
+      1_000,
+      () => clock,
+      async (milliseconds) => {
+        clock += milliseconds;
+      }
+    );
+
+    const results = await Promise.allSettled([
+      limiter.run("https://docs.example.com/a", async () => {
+        starts.push(clock);
+        clock += 250;
+        throw new Error("request failed");
+      }),
+      limiter.run("https://www.example.com/b", async () => {
+        starts.push(clock);
+      })
+    ]);
+
+    expect(results[0]?.status).toBe("rejected");
+    expect(results[1]?.status).toBe("fulfilled");
+    expect(starts).toEqual([10_000, 11_250]);
+  });
+
+  it("does not make different domains wait for each other", async () => {
+    const order: string[] = [];
+    let finishFirst: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => {
+      finishFirst = resolve;
+    });
+    const limiter = new DomainRateLimiter(1_000);
+
+    const first = limiter.run("https://example.com/a", async () => {
+      order.push("a:start");
+      await gate;
+      order.push("a:end");
+    });
+    const second = limiter.run("https://example.org/b", async () => {
+      order.push("b:start");
+    });
+
+    await second;
+    expect(order).toEqual(["a:start", "b:start"]);
+    finishFirst?.();
+    await first;
+  });
+});

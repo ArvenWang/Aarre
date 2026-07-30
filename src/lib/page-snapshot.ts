@@ -75,6 +75,17 @@ export function isSnapshotSensitiveUrl(
   }
 }
 
+export function matchesSnapshotTargetUrl(
+  targetUrl: string,
+  loadedUrl: string
+): boolean {
+  try {
+    return canonicalizeUrl(targetUrl) === canonicalizeUrl(loadedUrl);
+  } catch {
+    return false;
+  }
+}
+
 function blobToDataUrl(blob: Blob): Promise<string> {
   return blob.arrayBuffer().then((buffer) => {
     const bytes = new Uint8Array(buffer);

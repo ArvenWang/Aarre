@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { undoBookmarkBatch } from "../src/lib/bookmark-undo";
+import {
+  createRemovedNodeUndoBatch,
+  undoBookmarkBatch
+} from "../src/lib/bookmark-undo";
 import type { UndoSnapshotBatch } from "../src/lib/types";
 
 const get = vi.fn();
@@ -41,6 +44,66 @@ function batch(
 }
 
 describe("bookmark undo", () => {
+  it("turns a Chrome folder removal event into one restorable subtree batch", async () => {
+    const removed = createRemovedNodeUndoBatch({
+      parentId: "bookmarks-bar",
+      index: 3,
+      at: new Date("2026-07-30T00:00:00.000Z"),
+      node: {
+        id: "old-folder",
+        title: "资料",
+        syncing: true,
+        children: Array.from({ length: 5 }, (_, index) => ({
+          id: `old-${index}`,
+          parentId: "old-folder",
+          index,
+          title: `资料 ${index + 1}`,
+          url: `https://example.com/${index + 1}`,
+          syncing: true
+        }))
+      }
+    });
+
+    expect(removed).toMatchObject({
+      source: "chrome",
+      status: "ready",
+      destructive: true,
+      createdAt: "2026-07-30T00:00:00.000Z",
+      expiresAt: "2026-08-29T00:00:00.000Z"
+    });
+    expect(removed.mutations).toHaveLength(1);
+    expect(removed.mutations[0]).toMatchObject({
+      kind: "restore_subtree",
+      applied: true,
+      node: {
+        parentId: "bookmarks-bar",
+        index: 3,
+        title: "资料"
+      }
+    });
+    expect(removed.mutations[0]?.node?.children).toHaveLength(5);
+
+    get.mockResolvedValue([
+      {
+        id: "bookmarks-bar",
+        title: "书签栏",
+        syncing: true
+      }
+    ]);
+    let createdIndex = 0;
+    create.mockImplementation(async (input) => ({
+      id: `restored-${++createdIndex}`,
+      syncing: true,
+      ...input
+    }));
+    const restored = await undoBookmarkBatch(
+      removed,
+      async () => "fallback"
+    );
+    expect(restored).toMatchObject({ restored: 1, failed: 0 });
+    expect(create).toHaveBeenCalledTimes(6);
+  });
+
   it("recreates a deleted folder subtree in its original order", async () => {
     get.mockImplementation(async (id: string) =>
       id === "parent"
@@ -120,6 +183,8 @@ describe("bookmark undo", () => {
       }
     ]);
 
+    const onBeforeRemove = vi.fn();
+    const onAfterRemove = vi.fn();
     const result = await undoBookmarkBatch(
       batch([
         {
@@ -134,10 +199,13 @@ describe("bookmark undo", () => {
           expectedUrl: "https://example.com/new"
         }
       ]),
-      async () => "fallback"
+      async () => "fallback",
+      { onBeforeRemove, onAfterRemove }
     );
 
     expect(result.failed).toBe(0);
+    expect(onBeforeRemove).toHaveBeenCalledWith("created");
+    expect(onAfterRemove).toHaveBeenCalledWith("created");
     expect(remove).toHaveBeenCalledWith("created");
   });
 });

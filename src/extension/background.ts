@@ -39,10 +39,12 @@ import {
 } from "../lib/cover-registry";
 import {
   createPageSnapshot,
-  isSnapshotSensitiveUrl
+  isSnapshotSensitiveUrl,
+  matchesSnapshotTargetUrl
 } from "../lib/page-snapshot";
 import { getDisplaySettings } from "../lib/display-settings";
 import {
+  createRemovedNodeUndoBatch,
   createUndoBatch,
   snapshotCreatedMutation,
   snapshotNodeMutation,
@@ -152,6 +154,7 @@ const internalBookmarkIds = new Set<string>();
 const internalBookmarkTargets = new Set<string>();
 const pendingSaveDrafts = new Map<number, PendingSaveDraft>();
 const pageSnapshotTimers = new Map<number, number>();
+const immediatePageSnapshotTargets = new Map<number, string>();
 let libraryScanRunning = false;
 const libraryScanRateLimiter = new DomainRateLimiter(1_000);
 const LIBRARY_SCAN_CONCURRENCY = 4;
@@ -243,6 +246,16 @@ function releaseInternalBookmarkWrite(id: string, target: string) {
   }, 1_000);
 }
 
+function markInternalBookmarkRemoval(id: string) {
+  internalBookmarkIds.add(id);
+}
+
+function releaseInternalBookmarkRemoval(id: string) {
+  setTimeout(() => {
+    internalBookmarkIds.delete(id);
+  }, 1_000);
+}
+
 function now(): string {
   return new Date().toISOString();
 }
@@ -296,7 +309,11 @@ async function runProtectedBookmarkMutation<T>(input: {
   } catch {
     const rolledBack = await undoBookmarkBatch(
       ready,
-      defaultFolderId
+      defaultFolderId,
+      {
+        onBeforeRemove: markInternalBookmarkRemoval,
+        onAfterRemove: releaseInternalBookmarkRemoval
+      }
     ).catch(() => null);
     if (rolledBack) {
       await putUndoSnapshot(rolledBack.batch).catch(() => undefined);
@@ -527,14 +544,51 @@ async function getNavigationSuggestions(
   return results.slice(0, 14);
 }
 
-async function navigate(input: NavigationInput): Promise<{ opened: true }> {
+function captureImmediateSnapshotIfReady(
+  tab: chrome.tabs.Tab
+): boolean {
+  if (
+    typeof tab.id !== "number" ||
+    tab.status !== "complete" ||
+    !tab.url
+  ) {
+    return false;
+  }
+  const targetUrl = immediatePageSnapshotTargets.get(tab.id);
+  if (!targetUrl) return false;
+  immediatePageSnapshotTargets.delete(tab.id);
+  if (!matchesSnapshotTargetUrl(targetUrl, tab.url)) return false;
+
+  clearPageSnapshotTimers();
+  void capturePageSnapshotForTab(tab).catch(() => undefined);
+  return true;
+}
+
+function rememberImmediateSnapshotTarget(
+  tab: chrome.tabs.Tab,
+  targetUrl: string
+) {
+  if (typeof tab.id !== "number" || !isSupportedPageUrl(targetUrl)) {
+    return;
+  }
+  immediatePageSnapshotTargets.set(tab.id, targetUrl);
+  captureImmediateSnapshotIfReady(tab);
+}
+
+async function navigate(
+  input: NavigationInput,
+  openedFromAarre = false
+): Promise<{ opened: true }> {
   const disposition = input.disposition || "current";
 
   if (typeof input.tabId === "number") {
     if (typeof input.windowId === "number") {
       await chrome.windows.update(input.windowId, { focused: true });
     }
-    await chrome.tabs.update(input.tabId, { active: true });
+    const tab = await chrome.tabs.update(input.tabId, { active: true });
+    if (openedFromAarre && tab?.url) {
+      rememberImmediateSnapshotTarget(tab, input.url || tab.url);
+    }
     return { opened: true };
   }
 
@@ -544,13 +598,24 @@ async function navigate(input: NavigationInput): Promise<{ opened: true }> {
 
   if (parsed.kind === "url") {
     if (disposition === "new") {
-      await chrome.tabs.create({ url: parsed.url });
+      const tab = await chrome.tabs.create({ url: parsed.url });
+      if (openedFromAarre) {
+        rememberImmediateSnapshotTarget(tab, parsed.url);
+      }
     } else {
       const tab = await activeTab();
       if (tab?.id) {
-        await chrome.tabs.update(tab.id, { url: parsed.url });
+        const updated = await chrome.tabs.update(tab.id, {
+          url: parsed.url
+        });
+        if (openedFromAarre && updated) {
+          rememberImmediateSnapshotTarget(updated, parsed.url);
+        }
       } else {
-        await chrome.tabs.create({ url: parsed.url });
+        const created = await chrome.tabs.create({ url: parsed.url });
+        if (openedFromAarre) {
+          rememberImmediateSnapshotTarget(created, parsed.url);
+        }
       }
     }
     return { opened: true };
@@ -708,12 +773,19 @@ async function deleteNativeBookmark(input: {
     throw new Error("这个项目由 Chrome 管理，无法删除。");
   }
   const perform = async () => {
-    if (node.url) {
-      await chrome.bookmarks.remove(input.id);
-    } else if (input.recursive) {
-      await chrome.bookmarks.removeTree(input.id);
-    } else {
-      await chrome.bookmarks.remove(input.id);
+    markInternalBookmarkRemoval(input.id);
+    try {
+      if (node.url) {
+        await chrome.bookmarks.remove(input.id);
+      } else if (input.recursive) {
+        await chrome.bookmarks.removeTree(input.id);
+      } else {
+        await chrome.bookmarks.remove(input.id);
+      }
+      releaseInternalBookmarkRemoval(input.id);
+    } catch (error) {
+      internalBookmarkIds.delete(input.id);
+      throw error;
     }
     return { deleted: true as const };
   };
@@ -1125,7 +1197,10 @@ async function undoStoredBookmarkBatch(batchId: string) {
   if (!batch) {
     throw new Error("没有找到这批更改，可能已超过 30 天保留期。");
   }
-  const result = await undoBookmarkBatch(batch, defaultFolderId);
+  const result = await undoBookmarkBatch(batch, defaultFolderId, {
+    onBeforeRemove: markInternalBookmarkRemoval,
+    onAfterRemove: releaseInternalBookmarkRemoval
+  });
   await putUndoSnapshot(result.batch);
   await importNativeBookmarks();
   return result;
@@ -3040,7 +3115,7 @@ async function handleRequest(request: ExtensionRequest): Promise<unknown> {
     case "GET_NAVIGATION_SUGGESTIONS":
       return getNavigationSuggestions(request.query);
     case "NAVIGATE":
-      return navigate(request.payload);
+      return navigate(request.payload, true);
     case "GET_FOLDERS":
       return getFolderOptions();
     case "CAPTURE_ACTIVE_PAGE":
@@ -3284,7 +3359,9 @@ chrome.omnibox.onInputEntered.addListener((text, disposition) => {
 
 chrome.tabs.onUpdated.addListener((_tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete" && tab.active) {
-    schedulePageSnapshotForTab(tab);
+    if (!captureImmediateSnapshotIfReady(tab)) {
+      schedulePageSnapshotForTab(tab);
+    }
   }
 });
 
@@ -3293,7 +3370,12 @@ chrome.tabs.onActivated.addListener(({ tabId }) => {
   void chrome.tabs
     .get(tabId)
     .then((tab) => {
-      if (tab.status === "complete") schedulePageSnapshotForTab(tab);
+      if (
+        tab.status === "complete" &&
+        !captureImmediateSnapshotIfReady(tab)
+      ) {
+        schedulePageSnapshotForTab(tab);
+      }
     })
     .catch(() => undefined);
 });
@@ -3302,6 +3384,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   const timer = pageSnapshotTimers.get(tabId);
   if (timer !== undefined) globalThis.clearTimeout(timer);
   pageSnapshotTimers.delete(tabId);
+  immediatePageSnapshotTargets.delete(tabId);
 });
 
 chrome.windows.onFocusChanged.addListener((windowId) => {
@@ -3310,7 +3393,12 @@ chrome.windows.onFocusChanged.addListener((windowId) => {
   void chrome.tabs
     .query({ active: true, windowId })
     .then(([tab]) => {
-      if (tab?.status === "complete") schedulePageSnapshotForTab(tab);
+      if (
+        tab?.status === "complete" &&
+        !captureImmediateSnapshotIfReady(tab)
+      ) {
+        schedulePageSnapshotForTab(tab);
+      }
     })
     .catch(() => undefined);
 });
@@ -3348,23 +3436,60 @@ chrome.bookmarks.onMoved.addListener((id) => {
     .catch(() => undefined);
 });
 
-chrome.bookmarks.onRemoved.addListener((id) => {
-  void getLocalResources().then(async (resources) => {
-    const resource = resources.find((item) =>
-      item.nativeBookmarkIds.includes(id)
-    );
-    if (!resource) {
-      return;
-    }
+function bookmarkSubtreeIds(
+  node: chrome.bookmarks.BookmarkTreeNode
+): Set<string> {
+  const ids = new Set<string>();
+  const visit = (current: chrome.bookmarks.BookmarkTreeNode) => {
+    ids.add(current.id);
+    for (const child of current.children || []) visit(child);
+  };
+  visit(node);
+  return ids;
+}
 
-    await upsertLocalResource({
-      ...resource,
-      nativeBookmarkIds: resource.nativeBookmarkIds.filter(
-        (bookmarkId) => bookmarkId !== id
-      ),
-      updatedAt: now()
-    });
-  });
+async function handleRemovedNativeBookmark(
+  id: string,
+  removeInfo: {
+    parentId: string;
+    index: number;
+    node: chrome.bookmarks.BookmarkTreeNode;
+  }
+): Promise<void> {
+  const internal = internalBookmarkIds.has(id);
+  if (!internal) {
+    await putUndoSnapshot(
+      createRemovedNodeUndoBatch({
+        node: removeInfo.node,
+        parentId: removeInfo.parentId,
+        index: removeInfo.index
+      })
+    );
+  }
+
+  const removedIds = bookmarkSubtreeIds(removeInfo.node);
+  const resources = await getLocalResources();
+  await Promise.all(
+    resources
+      .filter((resource) =>
+        resource.nativeBookmarkIds.some((bookmarkId) =>
+          removedIds.has(bookmarkId)
+        )
+      )
+      .map((resource) =>
+        upsertLocalResource({
+          ...resource,
+          nativeBookmarkIds: resource.nativeBookmarkIds.filter(
+            (bookmarkId) => !removedIds.has(bookmarkId)
+          ),
+          updatedAt: now()
+        })
+      )
+  );
+}
+
+chrome.bookmarks.onRemoved.addListener((id, removeInfo) => {
+  void handleRemovedNativeBookmark(id, removeInfo).catch(() => undefined);
 });
 
 chrome.runtime.onStartup.addListener(() => {

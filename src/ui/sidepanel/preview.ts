@@ -1031,7 +1031,23 @@ export function installSidePanelPreview() {
           case "GET_AGENT_CONVERSATIONS":
             return { ok: true, data: structuredClone(previewConversations) };
           case "GET_UNDO_SNAPSHOTS":
-            return { ok: true, data: [] };
+            return {
+              ok: true,
+              data: [
+                {
+                  batchId: "preview-chrome-removal",
+                  source: "chrome",
+                  label: "Chrome 书签管理器删除“产品资料”",
+                  destructive: true,
+                  createdAt: new Date().toISOString(),
+                  expiresAt: new Date(
+                    Date.now() + 30 * 86_400_000
+                  ).toISOString(),
+                  status: "ready",
+                  mutations: []
+                }
+              ]
+            };
           case "UNDO_BOOKMARK_BATCH":
             return {
               ok: true,
