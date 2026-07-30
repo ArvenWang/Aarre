@@ -6072,7 +6072,8 @@ main.native-panel:has(> .library-search) > .agent-composer {
   right: 12px;
   width: min(340px, calc(100vw - 24px));
   max-height: calc(100vh - 24px);
-  overflow: auto;
+  overflow: hidden;
+  pointer-events: none;
   border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
   border-radius: 18px;
   color: var(--ink);
@@ -6123,7 +6124,6 @@ main.native-panel:has(> .library-search) > .agent-composer {
 }
 
 .bookmark-preview-info > header {
-  justify-content: space-between;
   gap: 10px;
 }
 
@@ -6151,26 +6151,6 @@ main.native-panel:has(> .library-search) > .agent-composer {
   margin-top: 2px;
   color: var(--muted);
   font-size: 7px;
-}
-
-.bookmark-preview-info > header > button {
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  border: 0;
-  border-radius: 8px;
-  color: var(--muted);
-  background: transparent;
-}
-
-.bookmark-preview-info > header > button:hover {
-  background: var(--component);
-}
-
-.bookmark-preview-info > header > button svg {
-  width: 13px;
 }
 
 .bookmark-preview-info h2 {

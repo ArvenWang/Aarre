@@ -1877,12 +1877,9 @@ interface BookmarkPreviewCardProps {
   node: NativeBookmarkNode;
   resource?: ResourceRecord;
   siteBrand?: SiteBrandRecord;
-  snapshot: PageSnapshot | null;
+  snapshot: PageSnapshot;
   flip: boolean;
   offset: number;
-  onKeepOpen: () => void;
-  onLeave: () => void;
-  onClose: () => void;
 }
 
 function relativeSnapshotDate(value: string): string {
@@ -1912,10 +1909,7 @@ function BookmarkPreviewCard({
   siteBrand,
   snapshot,
   flip,
-  offset,
-  onKeepOpen,
-  onLeave,
-  onClose
+  offset
 }: BookmarkPreviewCardProps) {
   return (
     <aside
@@ -1933,21 +1927,17 @@ function BookmarkPreviewCard({
             }
       }
       aria-label={`${node.title} 的预览`}
-      onPointerEnter={onKeepOpen}
-      onPointerLeave={onLeave}
     >
-      {snapshot ? (
-        <div className="bookmark-preview-visual">
-          <img src={snapshot.imageDataUrl} alt="" />
-          <span>
-            快照 · {relativeSnapshotDate(snapshot.capturedAt)}
-            {Date.now() - Date.parse(snapshot.capturedAt) >
-            90 * 86_400_000
-              ? " · 可能已过期"
-              : ""}
-          </span>
-        </div>
-      ) : null}
+      <div className="bookmark-preview-visual">
+        <img src={snapshot.imageDataUrl} alt="" />
+        <span>
+          快照 · {relativeSnapshotDate(snapshot.capturedAt)}
+          {Date.now() - Date.parse(snapshot.capturedAt) >
+          90 * 86_400_000
+            ? " · 可能已过期"
+            : ""}
+        </span>
+      </div>
       <div className="bookmark-preview-info">
         <header>
           <div>
@@ -1965,13 +1955,6 @@ function BookmarkPreviewCard({
               <small>{hostFromUrl(node.url || "")}</small>
             </span>
           </div>
-          <button
-            type="button"
-            aria-label="关闭预览"
-            onClick={onClose}
-          >
-            <CloseIcon />
-          </button>
         </header>
         <h2>{node.title || "未命名"}</h2>
         <p>
@@ -3025,13 +3008,14 @@ export function SidePanelApp() {
   }
 
   function closeBookmarkPreview() {
+    // 离开书签行后立即取消尚未完成的快照查询，避免异步结果晚到时闪出卡片。
+    previewCanonicalUrl.current = "";
     if (previewCloseTimer.current !== undefined) {
       window.clearTimeout(previewCloseTimer.current);
     }
     previewCloseTimer.current = window.setTimeout(() => {
       setBookmarkPreview(null);
       setPreviewSnapshot(null);
-      previewCanonicalUrl.current = "";
       previewCloseTimer.current = undefined;
     }, 200);
   }
@@ -3042,14 +3026,7 @@ export function SidePanelApp() {
   ) {
     if (!node.url) return;
     keepBookmarkPreviewOpen();
-    const flip = rect.top > window.innerHeight * 0.54;
-    setBookmarkPreview({
-      node,
-      flip,
-      offset: flip
-        ? Math.max(12, window.innerHeight - rect.bottom)
-        : Math.max(12, rect.top - 6)
-    });
+    setBookmarkPreview(null);
     setPreviewSnapshot(null);
     let canonicalUrl = "";
     try {
@@ -3063,7 +3040,23 @@ export function SidePanelApp() {
       canonicalUrl
     })
       .then((next) => {
-        if (previewCanonicalUrl.current === canonicalUrl) {
+        if (
+          previewCanonicalUrl.current === canonicalUrl &&
+          next
+        ) {
+          const gap = 14;
+          const spaceBelow = window.innerHeight - rect.bottom - gap;
+          const spaceAbove = rect.top - gap;
+          const flip = spaceBelow < 360 && spaceAbove > spaceBelow;
+          setBookmarkPreview({
+            node,
+            flip,
+            // 默认放在鼠标所在书签行的下方；空间不足时放到行上方，
+            // 两种情况都保留间隔，绝不覆盖当前鼠标热区。
+            offset: flip
+              ? Math.max(12, window.innerHeight - rect.top + gap)
+              : Math.max(12, rect.bottom + gap)
+          });
           setPreviewSnapshot(next);
         }
       })
@@ -4237,7 +4230,7 @@ export function SidePanelApp() {
         ) : null}
       </div>
 
-      {bookmarkPreview ? (
+      {bookmarkPreview && previewSnapshot ? (
         <BookmarkPreviewCard
           node={bookmarkPreview.node}
           resource={
@@ -4259,13 +4252,6 @@ export function SidePanelApp() {
           snapshot={previewSnapshot}
           flip={bookmarkPreview.flip}
           offset={bookmarkPreview.offset}
-          onKeepOpen={keepBookmarkPreviewOpen}
-          onLeave={closeBookmarkPreview}
-          onClose={() => {
-            setBookmarkPreview(null);
-            setPreviewSnapshot(null);
-            previewCanonicalUrl.current = "";
-          }}
         />
       ) : null}
 
