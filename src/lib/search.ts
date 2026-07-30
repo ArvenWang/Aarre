@@ -1,5 +1,18 @@
-import { pinyin } from "pinyin-pro";
 import type { ResourceRecord, SearchResult } from "./types";
+
+type PinyinConverter = (
+  value: string,
+  options: {
+    pattern?: "first";
+    toneType: "none";
+    type: "array";
+    nonZh: "consecutive";
+  }
+) => string[];
+
+export type PinyinLoader = () => Promise<PinyinConverter>;
+
+let defaultPinyinLoader: Promise<PinyinConverter | null> | undefined;
 
 interface IndexedFields {
   title: string;
@@ -18,6 +31,7 @@ export interface LocalSearchIndexItem {
   fields: IndexedFields;
   pinyinInitials: string;
   pinyinFull: string;
+  pinyinReady: boolean;
   chineseBigrams: Set<string>;
 }
 
@@ -74,24 +88,66 @@ export function buildLocalSearchIndex(
     return {
       resource,
       fields,
-      pinyinInitials: compact(
-        pinyin(text, {
-          pattern: "first",
-          toneType: "none",
-          type: "array",
-          nonZh: "consecutive"
-        }).join("")
-      ),
-      pinyinFull: compact(
-        pinyin(text, {
-          toneType: "none",
-          type: "array",
-          nonZh: "consecutive"
-        }).join("")
-      ),
+      pinyinInitials: "",
+      pinyinFull: "",
+      pinyinReady: false,
       chineseBigrams: bigrams(text)
     };
   });
+}
+
+export function isPinyinSearchQuery(query: string): boolean {
+  const candidate = compact(query.trim());
+  return /^[a-z]+$/i.test(candidate) && candidate.length >= 2;
+}
+
+async function loadDefaultPinyin(): Promise<PinyinConverter | null> {
+  if (!defaultPinyinLoader) {
+    defaultPinyinLoader = import("pinyin-pro")
+      .then((module) => module.pinyin as PinyinConverter)
+      .catch(() => null);
+  }
+  return defaultPinyinLoader;
+}
+
+/**
+ * 拼音索引只在用户首次输入疑似拼音时生成。调用方可以先使用同步搜索
+ * 呈现标题、标签和中文二元组结果，加载完成后再重跑一次合并拼音结果。
+ */
+export async function hydratePinyinSearchIndex(
+  index: LocalSearchIndexItem[],
+  loader?: PinyinLoader
+): Promise<boolean> {
+  if (index.every((item) => item.pinyinReady)) return true;
+  let convert: PinyinConverter | null = null;
+  try {
+    convert = loader ? await loader() : await loadDefaultPinyin();
+  } catch {
+    convert = null;
+  }
+  if (!convert) return false;
+
+  for (const item of index) {
+    if (item.pinyinReady) continue;
+    const text = searchableText(item.fields);
+    item.pinyinInitials = compact(
+      convert(text, {
+        pattern: "first",
+        toneType: "none",
+        type: "array",
+        nonZh: "consecutive"
+      }).join("")
+    );
+    item.pinyinFull = compact(
+      convert(text, {
+        toneType: "none",
+        type: "array",
+        nonZh: "consecutive"
+      }).join("")
+    );
+    item.pinyinReady = true;
+  }
+  return true;
 }
 
 function matchScore(
@@ -127,7 +183,7 @@ function matchScore(
   scoreField("url", 3, "网址");
 
   const compactQuery = compact(normalizedQuery);
-  if (/^[a-z0-9]+$/i.test(compactQuery) && compactQuery.length >= 2) {
+  if (isPinyinSearchQuery(compactQuery) && item.pinyinReady) {
     if (item.pinyinInitials.includes(compactQuery)) {
       score += 22;
       if (!reason) reason = "拼音首字母";
@@ -183,4 +239,16 @@ export function searchLocalResources(
   query: string
 ): SearchResult[] {
   return searchLocalIndex(buildLocalSearchIndex(resources), query);
+}
+
+export async function searchLocalResourcesWithPinyin(
+  resources: ResourceRecord[],
+  query: string,
+  loader?: PinyinLoader
+): Promise<SearchResult[]> {
+  const index = buildLocalSearchIndex(resources);
+  if (isPinyinSearchQuery(query)) {
+    await hydratePinyinSearchIndex(index, loader);
+  }
+  return searchLocalIndex(index, query);
 }

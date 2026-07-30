@@ -24,6 +24,8 @@ import {
 } from "../../lib/folder-options";
 import {
   buildLocalSearchIndex,
+  hydratePinyinSearchIndex,
+  isPinyinSearchQuery,
   searchLocalIndex
 } from "../../lib/search";
 import { canonicalizeUrl } from "../../lib/url";
@@ -84,6 +86,7 @@ import {
   StarIcon
 } from "../components/Icons";
 import { SiteThumbnail } from "../components/SiteThumbnail";
+import { useDebouncedSearchQuery } from "../hooks/useDebouncedSearchQuery";
 
 type EditorState =
   | {
@@ -2479,6 +2482,9 @@ export function SidePanelApp() {
     useState<AgentConversation | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [libraryQuery, setLibraryQuery] = useState("");
+  const debouncedLibraryQuery =
+    useDebouncedSearchQuery(libraryQuery);
+  const [pinyinIndexRevision, setPinyinIndexRevision] = useState(0);
   const [librarySearchMode, setLibrarySearchMode] = useState<
     "tree" | "ranked"
   >("tree");
@@ -3003,12 +3009,28 @@ export function SidePanelApp() {
     () => buildLocalSearchIndex(resources),
     [resources]
   );
+  useEffect(() => {
+    let cancelled = false;
+    if (!isPinyinSearchQuery(debouncedLibraryQuery)) return;
+    void hydratePinyinSearchIndex(localSearchIndex).then((loaded) => {
+      if (loaded && !cancelled) {
+        setPinyinIndexRevision((value) => value + 1);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedLibraryQuery, localSearchIndex]);
   const rankedSearchResults = useMemo(
     () =>
-      libraryQuery.trim()
-        ? searchLocalIndex(localSearchIndex, libraryQuery)
+      debouncedLibraryQuery.trim()
+        ? searchLocalIndex(localSearchIndex, debouncedLibraryQuery)
         : [],
-    [libraryQuery, localSearchIndex]
+    [
+      debouncedLibraryQuery,
+      localSearchIndex,
+      pinyinIndexRevision
+    ]
   );
   const nativeNodeByUrl = useMemo(
     () => bookmarkNodesByUrl(bookmarkRoots),
@@ -3026,23 +3048,30 @@ export function SidePanelApp() {
   );
   const filteredBookmarkNodes = useMemo(
     () =>
-      libraryQuery.trim()
+      debouncedLibraryQuery.trim()
         ? filterBookmarkTree(
             bookmarkRoots,
-            libraryQuery,
+            debouncedLibraryQuery,
             bookmarkMatchUrls(
               rankedSearchResults.map((result) => result.resource.url)
             )
           )
         : bookmarkRoots,
-    [bookmarkRoots, libraryQuery, rankedSearchResults]
+    [
+      bookmarkRoots,
+      debouncedLibraryQuery,
+      rankedSearchResults
+    ]
   );
   const visibleBookmarkNodes =
     librarySearchMode === "ranked" && libraryQuery.trim()
       ? []
       : filteredBookmarkNodes;
   const visibleExpanded = useMemo(() => {
-    if (!libraryQuery.trim() || librarySearchMode === "ranked") {
+    if (
+      !debouncedLibraryQuery.trim() ||
+      librarySearchMode === "ranked"
+    ) {
       return expanded;
     }
     return new Set([
@@ -3052,7 +3081,7 @@ export function SidePanelApp() {
   }, [
     expanded,
     filteredBookmarkNodes,
-    libraryQuery,
+    debouncedLibraryQuery,
     librarySearchMode
   ]);
   const hasVisibleFolders = visibleBookmarkNodes.some(
@@ -4205,7 +4234,7 @@ export function SidePanelApp() {
                           <strong>
                             {highlightTextMatches(
                               result.resource.title,
-                              libraryQuery
+                              debouncedLibraryQuery
                             )}
                           </strong>
                           <small>
@@ -4298,7 +4327,7 @@ export function SidePanelApp() {
                   resourceByUrl={resourceByUrl}
                   siteBrandByHost={siteBrandByHost}
                   coverStyle={listCoverStyle}
-                  highlightQuery={libraryQuery}
+                  highlightQuery={debouncedLibraryQuery}
                   onPreviewIntent={showBookmarkPreview}
                   onPreviewLeave={closeBookmarkPreview}
                   expanded={visibleExpanded}

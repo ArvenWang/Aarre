@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { searchLocalResources } from "../src/lib/search";
+import {
+  buildLocalSearchIndex,
+  searchLocalResources,
+  searchLocalResourcesWithPinyin
+} from "../src/lib/search";
 import type { ResourceRecord } from "../src/lib/types";
 
 function resource(
@@ -79,19 +83,46 @@ describe("searchLocalResources", () => {
     expect(results[0]?.matchReason).toBe("检索别名");
   });
 
-  it("matches Chinese titles using pinyin initials", () => {
-    const results = searchLocalResources(
-      [
-        resource({
-          resourceKey: "cn-ml",
-          title: "机器学习实践"
-        })
-      ],
+  it("loads pinyin only when an ASCII query needs it", async () => {
+    const resources = [
+      resource({
+        resourceKey: "cn-ml",
+        title: "机器学习实践"
+      })
+    ];
+    const index = buildLocalSearchIndex(resources);
+    expect(index[0]?.pinyinReady).toBe(false);
+
+    const results = await searchLocalResourcesWithPinyin(
+      resources,
       "jqxx"
     );
 
     expect(results[0]?.resource.resourceKey).toBe("cn-ml");
     expect(results[0]?.matchReason).toBe("拼音首字母");
+  });
+
+  it("keeps lexical results when the optional pinyin chunk fails", async () => {
+    const results = await searchLocalResourcesWithPinyin(
+      [
+        resource({
+          resourceKey: "lexical",
+          title: "JQXX reference"
+        }),
+        resource({
+          resourceKey: "pinyin-only",
+          title: "机器学习实践"
+        })
+      ],
+      "jqxx",
+      async () => {
+        throw new Error("chunk-unavailable");
+      }
+    );
+
+    expect(results.map((item) => item.resource.resourceKey)).toEqual([
+      "lexical"
+    ]);
   });
 
   it("recalls descriptive questions through generated aliases", () => {

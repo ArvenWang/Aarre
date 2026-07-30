@@ -15,6 +15,11 @@ export default defineConfig({
         background: resolve(__dirname, "src/extension/background.ts")
       },
       output: {
+        manualChunks(id) {
+          return id.includes("/node_modules/pinyin-pro/")
+            ? "pinyin-search"
+            : undefined;
+        },
         entryFileNames(chunkInfo) {
           return chunkInfo.name === "background"
             ? "background.js"
