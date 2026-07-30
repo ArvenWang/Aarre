@@ -8,8 +8,22 @@ const MAX_SVG_BYTES = 256 * 1024;
 const SITE_ICON_SIZE = 192;
 const PAGE_COVER_LONG_EDGE = 512;
 
+export interface SiteIconSurface {
+  red: number;
+  green: number;
+  blue: number;
+}
+
+export const SITE_ICON_SURFACES = {
+  light: { red: 246, green: 247, blue: 250 },
+  dark: { red: 36, green: 36, blue: 38 }
+} as const satisfies Record<"light" | "dark", SiteIconSurface>;
+
 export interface CachedSiteIcon {
+  /** 浅色版本的兼容别名，供旧数据与旧调用方平滑迁移。 */
   iconDataUrl?: string;
+  iconDataUrlLight?: string;
+  iconDataUrlDark?: string;
   iconSource?: SiteIconSource;
   iconRejectReason?: string;
   nativeWidth?: number;
@@ -130,6 +144,119 @@ function inspectPixels(
   };
 }
 
+function channelLuminance(value: number): number {
+  const normalized = value / 255;
+  return normalized <= 0.04045
+    ? normalized / 12.92
+    : ((normalized + 0.055) / 1.055) ** 2.4;
+}
+
+function relativeLuminance(
+  red: number,
+  green: number,
+  blue: number
+): number {
+  return (
+    0.2126 * channelLuminance(red) +
+    0.7152 * channelLuminance(green) +
+    0.0722 * channelLuminance(blue)
+  );
+}
+
+function contrastRatio(
+  red: number,
+  green: number,
+  blue: number,
+  surface: SiteIconSurface
+): number {
+  const foreground = relativeLuminance(red, green, blue);
+  const background = relativeLuminance(
+    surface.red,
+    surface.green,
+    surface.blue
+  );
+  return (
+    (Math.max(foreground, background) + 0.05) /
+    (Math.min(foreground, background) + 0.05)
+  );
+}
+
+export interface CompositedSiteIcon {
+  pixels: Uint8ClampedArray;
+  inkCoverage: number;
+}
+
+/**
+ * 把透明站点图标合成到真实承载色上。只对接近承载色、会消失的像素
+ * 做中性前景色补偿；本来已有足够对比度的品牌色保持不变。
+ */
+export function composeSiteIconPixels(
+  sourcePixels: Uint8ClampedArray,
+  surface: SiteIconSurface
+): CompositedSiteIcon {
+  const output = new Uint8ClampedArray(sourcePixels.length);
+  const surfaceLuminance = relativeLuminance(
+    surface.red,
+    surface.green,
+    surface.blue
+  );
+  const fallback = surfaceLuminance < 0.5 ? 242 : 24;
+  let ink = 0;
+
+  for (let index = 0; index < sourcePixels.length; index += 4) {
+    const alpha = (sourcePixels[index + 3] || 0) / 255;
+    const sourceRed = sourcePixels[index] || 0;
+    const sourceGreen = sourcePixels[index + 1] || 0;
+    const sourceBlue = sourcePixels[index + 2] || 0;
+    const renderedRed = Math.round(
+      sourceRed * alpha + surface.red * (1 - alpha)
+    );
+    const renderedGreen = Math.round(
+      sourceGreen * alpha + surface.green * (1 - alpha)
+    );
+    const renderedBlue = Math.round(
+      sourceBlue * alpha + surface.blue * (1 - alpha)
+    );
+    const needsContrastLift =
+      alpha >= 24 / 255 &&
+      contrastRatio(
+        renderedRed,
+        renderedGreen,
+        renderedBlue,
+        surface
+      ) < 1.8;
+    const red = needsContrastLift
+      ? Math.round(fallback * alpha + surface.red * (1 - alpha))
+      : renderedRed;
+    const green = needsContrastLift
+      ? Math.round(fallback * alpha + surface.green * (1 - alpha))
+      : renderedGreen;
+    const blue = needsContrastLift
+      ? Math.round(fallback * alpha + surface.blue * (1 - alpha))
+      : renderedBlue;
+
+    output[index] = red;
+    output[index + 1] = green;
+    output[index + 2] = blue;
+    output[index + 3] = 255;
+    if (
+      alpha >= 24 / 255 &&
+      Math.max(
+        Math.abs(red - surface.red),
+        Math.abs(green - surface.green),
+        Math.abs(blue - surface.blue)
+      ) >= 28
+    ) {
+      ink += 1;
+    }
+  }
+
+  return {
+    pixels: output,
+    inkCoverage: ink / (sourcePixels.length / 4)
+  };
+}
+
 async function bitmapFromBlob(blob: Blob): Promise<ImageBitmap> {
   return Promise.race([
     createImageBitmap(blob),
@@ -175,31 +302,80 @@ async function cacheSiteIconCandidate(
       };
     }
 
-    const canvas = new OffscreenCanvas(SITE_ICON_SIZE, SITE_ICON_SIZE);
-    const context = canvas.getContext("2d", {
+    const sourceCanvas = new OffscreenCanvas(
+      SITE_ICON_SIZE,
+      SITE_ICON_SIZE
+    );
+    const sourceContext = sourceCanvas.getContext("2d", {
       willReadFrequently: true
     });
-    if (!context) throw new Error("image-processing-unavailable");
-    context.clearRect(0, 0, SITE_ICON_SIZE, SITE_ICON_SIZE);
+    if (!sourceContext) throw new Error("image-processing-unavailable");
+    sourceContext.clearRect(0, 0, SITE_ICON_SIZE, SITE_ICON_SIZE);
     const scale = Math.min(
       1,
       SITE_ICON_SIZE / Math.max(nativeWidth, nativeHeight)
     );
     const width = nativeWidth * scale;
     const height = nativeHeight * scale;
-    context.drawImage(
+    sourceContext.drawImage(
       bitmap,
       (SITE_ICON_SIZE - width) / 2,
       (SITE_ICON_SIZE - height) / 2,
       width,
       height
     );
-    const quality = inspectPixels(
-      context,
+    const sourcePixels = sourceContext.getImageData(
+      0,
+      0,
       SITE_ICON_SIZE,
       SITE_ICON_SIZE
-    );
-    if (quality.inkCoverage < 0.15) {
+    ).data;
+
+    const renderVariant = async (
+      surface: SiteIconSurface
+    ): Promise<{ dataUrl: string; inkCoverage: number }> => {
+      const canvas = new OffscreenCanvas(
+        SITE_ICON_SIZE,
+        SITE_ICON_SIZE
+      );
+      const context = canvas.getContext("2d", {
+        willReadFrequently: true
+      });
+      if (!context) throw new Error("image-processing-unavailable");
+
+      // 输出图像必须自带与 UI 相同的承载色，不能依赖透明底碰巧可见。
+      context.fillStyle = `rgb(${surface.red} ${surface.green} ${surface.blue})`;
+      context.fillRect(0, 0, SITE_ICON_SIZE, SITE_ICON_SIZE);
+      context.drawImage(
+        bitmap,
+        (SITE_ICON_SIZE - width) / 2,
+        (SITE_ICON_SIZE - height) / 2,
+        width,
+        height
+      );
+      const composed = composeSiteIconPixels(sourcePixels, surface);
+      const imageData = context.createImageData(
+        SITE_ICON_SIZE,
+        SITE_ICON_SIZE
+      );
+      imageData.data.set(composed.pixels);
+      context.putImageData(imageData, 0, 0);
+      return {
+        dataUrl: await blobToDataUrl(
+          await canvas.convertToBlob({
+            type: "image/webp",
+            quality: 0.85
+          })
+        ),
+        inkCoverage: composed.inkCoverage
+      };
+    };
+
+    const [light, dark] = await Promise.all([
+      renderVariant(SITE_ICON_SURFACES.light),
+      renderVariant(SITE_ICON_SURFACES.dark)
+    ]);
+    if (light.inkCoverage < 0.15 || dark.inkCoverage < 0.15) {
       return {
         iconRejectReason: "low-ink-or-contrast",
         nativeWidth,
@@ -207,12 +383,9 @@ async function cacheSiteIconCandidate(
       };
     }
     return {
-      iconDataUrl: await blobToDataUrl(
-        await canvas.convertToBlob({
-          type: "image/webp",
-          quality: 0.85
-        })
-      ),
+      iconDataUrl: light.dataUrl,
+      iconDataUrlLight: light.dataUrl,
+      iconDataUrlDark: dark.dataUrl,
       iconSource: candidate.source,
       nativeWidth,
       nativeHeight
@@ -229,7 +402,7 @@ export async function cacheSiteBrandIcon(
   for (const candidate of candidates) {
     try {
       const result = await cacheSiteIconCandidate(candidate);
-      if (result.iconDataUrl) return result;
+      if (result.iconDataUrlLight && result.iconDataUrlDark) return result;
       lastRejection = result.iconRejectReason || lastRejection;
     } catch (error) {
       lastRejection =
@@ -259,8 +432,10 @@ export async function cacheRepresentativeImage(
       Math.min(bitmap.width, bitmap.height);
     if (ratio > 4) throw new Error("extreme-aspect-ratio");
 
-    const scale =
-      PAGE_COVER_LONG_EDGE / Math.max(bitmap.width, bitmap.height);
+    const scale = Math.min(
+      1,
+      PAGE_COVER_LONG_EDGE / Math.max(bitmap.width, bitmap.height)
+    );
     const width = Math.max(1, Math.round(bitmap.width * scale));
     const height = Math.max(1, Math.round(bitmap.height * scale));
     const canvas = new OffscreenCanvas(width, height);

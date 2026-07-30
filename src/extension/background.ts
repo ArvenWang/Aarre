@@ -1828,6 +1828,8 @@ async function scanSiteBrand(
   const existing = await getSiteBrand(host);
   const cacheFresh =
     existing &&
+    existing.iconDataUrlLight &&
+    existing.iconDataUrlDark &&
     Date.now() - Date.parse(existing.updatedAt) <
       30 * 24 * 60 * 60 * 1_000;
   if (cacheFresh && !force) return existing;
@@ -1860,9 +1862,17 @@ async function scanSiteBrand(
   let result = await cacheSiteBrandIcon(candidates);
 
   const baseHost = registrableHost(host);
-  if (!result.iconDataUrl && baseHost && baseHost !== host) {
+  if (
+    (!result.iconDataUrlLight || !result.iconDataUrlDark) &&
+    baseHost &&
+    baseHost !== host
+  ) {
     const base = await getSiteBrand(baseHost);
-    if (base?.iconDataUrl && !force) {
+    if (
+      base?.iconDataUrlLight &&
+      base.iconDataUrlDark &&
+      !force
+    ) {
       const aliased = { ...base, host, updatedAt: now() };
       await putSiteBrand(aliased);
       return aliased;
@@ -1878,7 +1888,7 @@ async function scanSiteBrand(
       updatedAt: now()
     };
     await putSiteBrand(baseRecord);
-    if (result.iconDataUrl) {
+    if (result.iconDataUrlLight && result.iconDataUrlDark) {
       const aliased = { ...baseRecord, host, updatedAt: now() };
       await putSiteBrand(aliased);
       return aliased;

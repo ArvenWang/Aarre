@@ -83,7 +83,6 @@ import {
   SettingsIcon,
   StarIcon
 } from "../components/Icons";
-import { SiteIcon } from "../components/SiteIcon";
 import { SiteThumbnail } from "../components/SiteThumbnail";
 
 type EditorState =
@@ -1861,7 +1860,17 @@ function BookmarkTree({
                       siteBrandForUrl(
                         siteBrandByHost,
                         node.url || ""
+                      )?.iconDataUrlLight ||
+                      siteBrandForUrl(
+                        siteBrandByHost,
+                        node.url || ""
                       )?.iconDataUrl
+                    }
+                    brandImageUrlDark={
+                      siteBrandForUrl(
+                        siteBrandByHost,
+                        node.url || ""
+                      )?.iconDataUrlDark
                     }
                     categoryCoverId={metadata?.categoryCoverId}
                     coverStyle={coverStyle}
@@ -2065,6 +2074,8 @@ function organizationNoticeDetails(
 
 interface AgentChatPageProps {
   conversation: AgentConversation;
+  resourceByUrl: Map<string, ResourceRecord>;
+  siteBrandByHost: Map<string, SiteBrandRecord>;
   prompt: string;
   busy: boolean;
   configured: boolean;
@@ -2081,6 +2092,8 @@ interface AgentChatPageProps {
 
 function AgentChatPage({
   conversation,
+  resourceByUrl,
+  siteBrandByHost,
   prompt,
   busy,
   configured,
@@ -2153,11 +2166,29 @@ function AgentChatPage({
                     key={source.resourceKey}
                     onClick={() => onOpenSource(source.url)}
                   >
-                    <SiteIcon
+                    <SiteThumbnail
                       url={source.url}
-                      faviconUrl={source.faviconUrl}
+                      imageUrl={
+                        resourceForUrl(resourceByUrl, source.url)
+                          ?.thumbnailDataUrl
+                      }
+                      brandImageUrl={
+                        siteBrandForUrl(siteBrandByHost, source.url)
+                          ?.iconDataUrlLight ||
+                        siteBrandForUrl(siteBrandByHost, source.url)
+                          ?.iconDataUrl
+                      }
+                      brandImageUrlDark={
+                        siteBrandForUrl(siteBrandByHost, source.url)
+                          ?.iconDataUrlDark
+                      }
+                      categoryCoverId={
+                        resourceForUrl(resourceByUrl, source.url)
+                          ?.categoryCoverId
+                      }
+                      forceSiteBrand
                       label={source.siteName || source.title}
-                      size={26}
+                      className="agent-source-thumbnail"
                     />
                     <span>
                       <strong>{source.title}</strong>
@@ -3818,6 +3849,8 @@ export function SidePanelApp() {
     return (
       <AgentChatPage
         conversation={activeConversation}
+        resourceByUrl={resourceByUrl}
+        siteBrandByHost={siteBrandByHost}
         prompt={agentPrompt}
         busy={busy === "agent" || busy === "agent-actions"}
         configured={aiConfigured}
@@ -4149,7 +4182,17 @@ export function SidePanelApp() {
                             siteBrandForUrl(
                               siteBrandByHost,
                               result.resource.url
+                            )?.iconDataUrlLight ||
+                            siteBrandForUrl(
+                              siteBrandByHost,
+                              result.resource.url
                             )?.iconDataUrl
+                          }
+                          brandImageUrlDark={
+                            siteBrandForUrl(
+                              siteBrandByHost,
+                              result.resource.url
+                            )?.iconDataUrlDark
                           }
                           categoryCoverId={
                             result.resource.categoryCoverId

@@ -922,7 +922,13 @@ export function ManagerApp() {
                     imageUrl={resource.thumbnailDataUrl}
                     brandImageUrl={
                       brandForUrl(siteBrandByHost, resource.url)
+                        ?.iconDataUrlLight ||
+                      brandForUrl(siteBrandByHost, resource.url)
                         ?.iconDataUrl
+                    }
+                    brandImageUrlDark={
+                      brandForUrl(siteBrandByHost, resource.url)
+                        ?.iconDataUrlDark
                     }
                     categoryCoverId={resource.categoryCoverId}
                     coverStyle={listCoverStyle}

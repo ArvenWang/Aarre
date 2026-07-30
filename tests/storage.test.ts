@@ -95,6 +95,8 @@ describe("IndexedDB storage", () => {
       host: "Docs.Example.com",
       iconSource: "manifest",
       iconDataUrl: "data:image/webp;base64,BRAND",
+      iconDataUrlLight: "data:image/webp;base64,LIGHT",
+      iconDataUrlDark: "data:image/webp;base64,DARK",
       nativeWidth: 512,
       nativeHeight: 512,
       updatedAt: "2026-07-30T00:00:00.000Z"
@@ -103,6 +105,8 @@ describe("IndexedDB storage", () => {
     expect(await getSiteBrand("docs.example.com")).toMatchObject({
       host: "docs.example.com",
       iconSource: "manifest",
+      iconDataUrlLight: "data:image/webp;base64,LIGHT",
+      iconDataUrlDark: "data:image/webp;base64,DARK",
       nativeWidth: 512
     });
     expect(

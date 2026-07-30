@@ -9,6 +9,7 @@ import {
   registrableHost,
   resolveRuleAsset
 } from "../src/lib/cover-registry";
+import { COVER_RULES } from "../src/lib/cover-rules";
 
 describe("cover registry", () => {
   it("resolves structured YouTube covers without scraping HTML", () => {
@@ -71,6 +72,25 @@ describe("cover registry", () => {
       );
       samples = next.samples;
       expect(next.isCommonBanner).toBe(key === "three");
+    }
+  });
+
+  it("matches every declared host to its own tested rule", () => {
+    for (const rule of COVER_RULES) {
+      for (const host of rule.hosts) {
+        expect(
+          matchCoverRule(`https://${host}/`)?.id,
+          `${host} should match ${rule.id}`
+        ).toBe(rule.id);
+      }
+      expect(
+        Boolean(
+          rule.brandAsset ||
+            rule.categoryCoverId ||
+            rule.pageImage
+        ),
+        `${rule.id} must provide a real cover outcome`
+      ).toBe(true);
     }
   });
 });

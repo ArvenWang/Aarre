@@ -16,6 +16,7 @@
     "check": "npm run check:node && npm run typecheck && npm run test && npm run build",
     "verify:artifacts": "node scripts/verify-artifacts.mjs",
     "verify:store-assets": "node scripts/verify-store-assets.mjs",
+    "measure:covers": "tsx scripts/measure-cover-fallback.ts",
     "package:artifacts": "npm run check && node scripts/package-artifacts.mjs"
   },
   "dependencies": {
@@ -36,6 +37,8 @@
     "esbuild": "0.28.1",
     "fake-indexeddb": "6.2.5",
     "jsdom": "30.0.0",
+    "sharp": "0.35.0",
+    "tsx": "4.20.6",
     "typescript": "7.0.2",
     "vite": "8.1.5",
     "vitest": "4.1.10"

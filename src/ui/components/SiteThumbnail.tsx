@@ -10,8 +10,10 @@ interface SiteThumbnailProps {
   url: string;
   imageUrl?: string;
   brandImageUrl?: string;
+  brandImageUrlDark?: string;
   categoryCoverId?: string;
   coverStyle?: ListCoverStyle;
+  forceSiteBrand?: boolean;
   label?: string;
   className?: string;
 }
@@ -20,23 +22,29 @@ export function SiteThumbnail({
   url,
   imageUrl = "",
   brandImageUrl = "",
+  brandImageUrlDark = "",
   categoryCoverId = "",
   coverStyle = "site",
+  forceSiteBrand = false,
   label = "",
   className = ""
 }: SiteThumbnailProps) {
   const categoryImageUrl = categoryCoverUrl(categoryCoverId);
   const preferredImageUrl =
-    (coverStyle === "page" ||
-      listCoverPipeline(url) === "page-image") &&
+    !forceSiteBrand &&
+    (coverStyle === "page" || listCoverPipeline(url) === "page-image") &&
     imageUrl
       ? imageUrl
       : brandImageUrl || categoryImageUrl;
+  const preferredDarkImageUrl =
+    preferredImageUrl === brandImageUrl && brandImageUrlDark
+      ? brandImageUrlDark
+      : preferredImageUrl;
   const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
     setImageFailed(false);
-  }, [preferredImageUrl]);
+  }, [preferredDarkImageUrl, preferredImageUrl]);
 
   const displayImageUrl =
     imageFailed && preferredImageUrl !== categoryImageUrl
@@ -50,21 +58,30 @@ export function SiteThumbnail({
       aria-hidden="true"
       title={label || undefined}
     >
-      <img
-        className="site-thumbnail-image"
-        src={displayImageUrl}
-        alt=""
-        loading="lazy"
-        data-cover-kind={usingCategory ? "category" : "site"}
-        style={
-          usingCategory
-            ? {
-                filter: `brightness(${coverBrightnessForHost(url)})`
-              }
-            : undefined
-        }
-        onError={() => setImageFailed(true)}
-      />
+      <picture>
+        {!usingCategory &&
+        preferredDarkImageUrl !== displayImageUrl ? (
+          <source
+            media="(prefers-color-scheme: dark)"
+            srcSet={preferredDarkImageUrl}
+          />
+        ) : null}
+        <img
+          className="site-thumbnail-image"
+          src={displayImageUrl}
+          alt=""
+          loading="lazy"
+          data-cover-kind={usingCategory ? "category" : "site"}
+          style={
+            usingCategory
+              ? {
+                  filter: `brightness(${coverBrightnessForHost(url)})`
+                }
+              : undefined
+          }
+          onError={() => setImageFailed(true)}
+        />
+      </picture>
     </span>
   );
 }

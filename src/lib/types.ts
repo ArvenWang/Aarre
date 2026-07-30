@@ -139,7 +139,10 @@ export interface SiteIconCandidate {
 
 export interface SiteBrandRecord {
   host: string;
+  /** 兼容 0.3.4 及更早版本；新记录与浅色主题值相同。 */
   iconDataUrl?: string;
+  iconDataUrlLight?: string;
+  iconDataUrlDark?: string;
   iconSource?: SiteIconSource;
   iconRejectReason?: string;
   nativeWidth?: number;

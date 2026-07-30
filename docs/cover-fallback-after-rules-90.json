@@ -1,0 +1,297 @@
+{
+  "schemaVersion": 1,
+  "measuredAt": "2026-07-30T06:16:28.991Z",
+  "inputLabel": "Bookmarks + Bookmarks",
+  "composition": "themed",
+  "availableUrlCount": 414,
+  "sampleCount": 300,
+  "sources": {
+    "registry": {
+      "count": 2,
+      "percent": 0.67
+    },
+    "apple-touch-icon": {
+      "count": 98,
+      "percent": 32.67
+    },
+    "manifest": {
+      "count": 9,
+      "percent": 3
+    },
+    "high-resolution-rel-icon": {
+      "count": 17,
+      "percent": 5.67
+    },
+    "og-image": {
+      "count": 2,
+      "percent": 0.67
+    },
+    "category-fallback": {
+      "count": 172,
+      "percent": 57.33
+    }
+  },
+  "fallback": {
+    "count": 172,
+    "percent": 57.33
+  },
+  "maxScale": 1,
+  "zeroUpsamplePassed": true,
+  "rejections": {
+    "below-128px": {
+      "count": 42,
+      "samples": [
+        {
+          "pageUrl": "http://www.jeffhandesign.com/[path-8a5edab2]",
+          "assetUrl": "https://cdn.myportfolio.com/[path-edf6e9b7].jpg",
+          "source": "large-icon",
+          "nativeWidth": 32,
+          "nativeHeight": 32
+        },
+        {
+          "pageUrl": "https://devouringdetails.com/[path-8a5edab2]",
+          "assetUrl": "https://devouringdetails.com/[path-78108a7d].png",
+          "source": "apple-touch-icon",
+          "nativeWidth": 100,
+          "nativeHeight": 100
+        },
+        {
+          "pageUrl": "https://godly.website/[path-8a5edab2]",
+          "assetUrl": "http://recent.design/[path-641b7316].svg",
+          "source": "svg-icon",
+          "nativeWidth": 32,
+          "nativeHeight": 32
+        },
+        {
+          "pageUrl": "https://variant.ai/[path-8a5edab2]",
+          "assetUrl": "https://variant.com/[path-e7e89b10].svg",
+          "source": "apple-touch-icon",
+          "nativeWidth": 32,
+          "nativeHeight": 32
+        },
+        {
+          "pageUrl": "https://variant.ai/[path-8a5edab2]",
+          "assetUrl": "https://variant.com/[path-a1c1a05c].svg",
+          "source": "apple-touch-icon",
+          "nativeWidth": 32,
+          "nativeHeight": 32
+        },
+        {
+          "pageUrl": "https://artifacts.deeo.studio/[path-8a5edab2]",
+          "assetUrl": "https://cdn.sanity.io/[path-2362031a].png",
+          "source": "svg-icon",
+          "nativeWidth": 32,
+          "nativeHeight": 32
+        },
+        {
+          "pageUrl": "https://diana.lu/[path-26223c06]",
+          "assetUrl": "https://framerusercontent.com/[path-63eb4dbc].png",
+          "source": "large-icon",
+          "nativeWidth": 32,
+          "nativeHeight": 32
+        },
+        {
+          "pageUrl": "https://www.voxflow.studio/[path-85d8ec78]",
+          "assetUrl": "https://www.voxflow.studio/[path-641b7316].svg",
+          "source": "svg-icon",
+          "nativeWidth": 32,
+          "nativeHeight": 32
+        },
+        {
+          "pageUrl": "https://collectui.com/[path-8a5edab2]",
+          "assetUrl": "https://collectui.com/[path-78108a7d].png",
+          "source": "large-icon",
+          "nativeWidth": 80,
+          "nativeHeight": 80
+        },
+        {
+          "pageUrl": "https://recent.design/[path-8a5edab2]",
+          "assetUrl": "https://recent.design/[path-641b7316].svg",
+          "source": "svg-icon",
+          "nativeWidth": 32,
+          "nativeHeight": 32
+        },
+        {
+          "pageUrl": "https://github.com/[path-91e96fa8]",
+          "assetUrl": "https://github.com/[path-43f0533a].png",
+          "source": "registry",
+          "nativeWidth": 120,
+          "nativeHeight": 120
+        },
+        {
+          "pageUrl": "https://textmotion.dev/[path-8a5edab2]",
+          "assetUrl": "https://textmotion.dev/[path-a2e3916d].svg",
+          "source": "svg-icon",
+          "nativeWidth": 32,
+          "nativeHeight": 32
+        }
+      ]
+    },
+    "non-square": {
+      "count": 0,
+      "samples": []
+    },
+    "low-ink-or-contrast": {
+      "count": 5,
+      "samples": [
+        {
+          "pageUrl": "https://artifacts.deeo.studio/[path-8a5edab2]",
+          "assetUrl": "https://artifacts.deeo.studio/[path-641b7316].svg",
+          "source": "svg-icon",
+          "nativeWidth": 128,
+          "nativeHeight": 128
+        },
+        {
+          "pageUrl": "https://kasumi-docs.vercel.app/[path-8a5edab2]",
+          "assetUrl": "https://kasumi-docs.vercel.app/[path-78108a7d].png",
+          "source": "large-icon",
+          "nativeWidth": 1024,
+          "nativeHeight": 1024
+        },
+        {
+          "pageUrl": "https://www.fluidfunctionalism.com/[path-8a5edab2]",
+          "assetUrl": "https://www.fluidfunctionalism.com/[path-ea055fc9].png",
+          "source": "apple-touch-icon",
+          "nativeWidth": 180,
+          "nativeHeight": 180
+        },
+        {
+          "pageUrl": "https://www.fluidfunctionalism.com/[path-8a5edab2]",
+          "assetUrl": "https://www.fluidfunctionalism.com/[path-8944cfea].png",
+          "source": "manifest",
+          "nativeWidth": 512,
+          "nativeHeight": 512
+        },
+        {
+          "pageUrl": "https://www.fluidfunctionalism.com/[path-8a5edab2]",
+          "assetUrl": "https://www.fluidfunctionalism.com/[path-597ba47b].png",
+          "source": "manifest",
+          "nativeWidth": 192,
+          "nativeHeight": 192
+        }
+      ]
+    }
+  },
+  "fallbackTopDomains": [
+    {
+      "host": "3dpresso.ai",
+      "count": 2
+    },
+    {
+      "host": "animejs.com",
+      "count": 2
+    },
+    {
+      "host": "app.artflow.ai",
+      "count": 2
+    },
+    {
+      "host": "app.exactly.ai",
+      "count": 2
+    },
+    {
+      "host": "app.meshy.ai",
+      "count": 2
+    },
+    {
+      "host": "blog.sina.com.cn",
+      "count": 2
+    },
+    {
+      "host": "book.douban.com",
+      "count": 2
+    },
+    {
+      "host": "cli.im",
+      "count": 2
+    },
+    {
+      "host": "clipdrop.co",
+      "count": 2
+    },
+    {
+      "host": "cowtransfer.com",
+      "count": 2
+    },
+    {
+      "host": "designsparks.io",
+      "count": 2
+    },
+    {
+      "host": "doc.weixin.qq.com",
+      "count": 2
+    },
+    {
+      "host": "generative-dynamics.github.io",
+      "count": 2
+    },
+    {
+      "host": "home.blusea.cn",
+      "count": 2
+    },
+    {
+      "host": "huggingface.co",
+      "count": 2
+    },
+    {
+      "host": "iconly.pro",
+      "count": 2
+    },
+    {
+      "host": "mcp.composio.dev",
+      "count": 2
+    },
+    {
+      "host": "mockuphone.com",
+      "count": 2
+    },
+    {
+      "host": "moonvy.com",
+      "count": 2
+    },
+    {
+      "host": "openxlab.org.cn",
+      "count": 2
+    },
+    {
+      "host": "prompts.chat",
+      "count": 2
+    },
+    {
+      "host": "rotato.app",
+      "count": 2
+    },
+    {
+      "host": "useyourinterface.com",
+      "count": 2
+    },
+    {
+      "host": "v.mp3juices.click",
+      "count": 2
+    },
+    {
+      "host": "weavesilk.com",
+      "count": 2
+    },
+    {
+      "host": "www.aicpb.com",
+      "count": 2
+    },
+    {
+      "host": "www.futuretools.io",
+      "count": 2
+    },
+    {
+      "host": "www.gizma.com",
+      "count": 2
+    },
+    {
+      "host": "www.howzhi.com",
+      "count": 2
+    },
+    {
+      "host": "www.iconfont.cn",
+      "count": 2
+    }
+  ]
+}

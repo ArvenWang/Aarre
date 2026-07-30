@@ -8,7 +8,8 @@ import type {
   BookmarkBarSnapshot,
   NativeBookmarkNode,
   NavigationSuggestion,
-  ResourceRecord
+  ResourceRecord,
+  SiteBrandRecord
 } from "../../lib/types";
 import { categoryCoverForResource } from "../../lib/cover-registry";
 import aiAutomationCover from "../../../design-assets/bookmark-covers/taxonomy-pilot/ai-automation-v1.png";
@@ -513,6 +514,29 @@ const previewResources: ResourceRecord[] = [
   )
 ];
 
+function previewBrandDataUrl(surface: string, foreground: string): string {
+  const svg = [
+    '<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">',
+    `<rect width="192" height="192" rx="42" fill="${surface}"/>`,
+    `<path fill="${foreground}" d="M48 142 83 50h27l35 92h-27l-7-21H80l-7 21H48Zm40-44h16L96 73l-8 25Z"/>`,
+    "</svg>"
+  ].join("");
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+const previewSiteBrands: SiteBrandRecord[] = [
+  {
+    host: "example.com",
+    iconDataUrl: previewBrandDataUrl("#f6f7fa", "#18191c"),
+    iconDataUrlLight: previewBrandDataUrl("#f6f7fa", "#18191c"),
+    iconDataUrlDark: previewBrandDataUrl("#242426", "#f2f2f3"),
+    iconSource: "registry",
+    nativeWidth: 192,
+    nativeHeight: 192,
+    updatedAt: "2026-07-30T08:00:00.000Z"
+  }
+];
+
 let previewConversations: AgentConversation[] = [];
 let previewOrganizationNoticeDismissed = false;
 
@@ -710,9 +734,6 @@ export function installSidePanelPreview() {
         };
       },
       getURL(path: string) {
-        if (path === "/_favicon/") {
-          return new URL("/icons/icon-32.png", window.location.origin).toString();
-        }
         return new URL(path, window.location.origin).toString();
       },
       onMessage: previewEvent,
@@ -1025,7 +1046,10 @@ export function installSidePanelPreview() {
               }
             };
           case "GET_SITE_BRANDS":
-            return { ok: true, data: [] };
+            return {
+              ok: true,
+              data: structuredClone(previewSiteBrands)
+            };
           case "GET_PAGE_SNAPSHOT":
             return { ok: true, data: null };
           case "GET_AGENT_CONVERSATIONS":

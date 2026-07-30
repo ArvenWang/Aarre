@@ -1,17 +1,19 @@
 import type { ResourceRecord } from "./types";
+import {
+  COVER_RULES,
+  matchCoverRule,
+  resolveRuleAsset,
+  type CoverRule
+} from "./cover-rules";
 
 export type CoverPipeline = "site-brand" | "page-image" | "category";
 
-export interface CoverRule {
-  id: string;
-  hosts: string[];
-  hostSuffixes?: string[];
-  brandAsset?: string | ((url: URL) => string);
-  pageImage?: (url: URL) => string;
-  skipPageImage?: boolean;
-  listUsesPageImage?: boolean;
-  categoryCoverId?: string | ((url: URL) => string);
-}
+export {
+  COVER_RULES,
+  matchCoverRule,
+  resolveRuleAsset,
+  type CoverRule
+} from "./cover-rules";
 
 const coverModules = import.meta.glob<string>(
   "../assets/covers/*.webp",
@@ -66,167 +68,6 @@ export const CATEGORY_COVER_FILES = {
 } as const;
 
 export type CategoryCoverId = keyof typeof CATEGORY_COVER_FILES;
-
-function youtubeVideoId(url: URL): string {
-  if (url.hostname === "youtu.be") {
-    return url.pathname.split("/").filter(Boolean)[0] || "";
-  }
-  if (url.pathname === "/watch") return url.searchParams.get("v") || "";
-  const match = url.pathname.match(/^\/(?:shorts|embed)\/([^/?#]+)/);
-  return match?.[1] || "";
-}
-
-export const COVER_RULES: CoverRule[] = [
-  {
-    id: "github",
-    hosts: ["github.com", "www.github.com", "gist.github.com"],
-    brandAsset: "https://github.com/apple-touch-icon.png",
-    pageImage: (url) => {
-      const [owner, repository] = url.pathname.split("/").filter(Boolean);
-      return owner && repository
-        ? `https://opengraph.githubassets.com/aarre/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}`
-        : "";
-    },
-    categoryCoverId: "code-repository"
-  },
-  {
-    id: "youtube",
-    hosts: ["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"],
-    brandAsset: "https://www.youtube.com/apple-touch-icon.png",
-    pageImage: (url) => {
-      const id = youtubeVideoId(url);
-      return id ? `https://i.ytimg.com/vi/${id}/maxresdefault.jpg` : "";
-    },
-    listUsesPageImage: true,
-    categoryCoverId: "video"
-  },
-  {
-    id: "bilibili",
-    hosts: ["bilibili.com", "www.bilibili.com", "m.bilibili.com"],
-    brandAsset: "https://www.bilibili.com/apple-touch-icon.png",
-    listUsesPageImage: true,
-    categoryCoverId: "video"
-  },
-  {
-    id: "xiaohongshu",
-    hosts: ["xiaohongshu.com", "www.xiaohongshu.com"],
-    brandAsset: "https://www.xiaohongshu.com/apple-touch-icon.png",
-    skipPageImage: true,
-    categoryCoverId: "news-society"
-  },
-  {
-    id: "x-twitter",
-    hosts: ["x.com", "www.x.com", "twitter.com", "www.twitter.com"],
-    brandAsset: (url) => `${url.origin}/apple-touch-icon.png`,
-    skipPageImage: true,
-    categoryCoverId: "news-society"
-  },
-  {
-    id: "zhihu",
-    hosts: ["zhihu.com", "www.zhihu.com"],
-    brandAsset: "https://www.zhihu.com/apple-touch-icon.png",
-    skipPageImage: true,
-    categoryCoverId: "news-society"
-  },
-  {
-    id: "zhihu-column",
-    hosts: ["zhuanlan.zhihu.com"],
-    brandAsset: "https://www.zhihu.com/apple-touch-icon.png",
-    categoryCoverId: "news-society"
-  },
-  {
-    id: "wechat-article",
-    hosts: ["mp.weixin.qq.com"],
-    categoryCoverId: "newsletter-rss"
-  },
-  {
-    id: "npm",
-    hosts: ["npmjs.com", "www.npmjs.com"],
-    skipPageImage: true,
-    categoryCoverId: "code-repository"
-  },
-  {
-    id: "mdn",
-    hosts: ["developer.mozilla.org"],
-    skipPageImage: true,
-    categoryCoverId: "documentation-api"
-  },
-  {
-    id: "stackoverflow",
-    hosts: ["stackoverflow.com", "www.stackoverflow.com"],
-    skipPageImage: true,
-    categoryCoverId: "development-software"
-  },
-  {
-    id: "notion",
-    hosts: ["notion.so", "www.notion.so"],
-    skipPageImage: true,
-    categoryCoverId: "work-productivity"
-  },
-  {
-    id: "figma",
-    hosts: ["figma.com", "www.figma.com"],
-    skipPageImage: true,
-    categoryCoverId: "design-creation"
-  },
-  {
-    id: "google-docs",
-    hosts: ["docs.google.com"],
-    skipPageImage: true,
-    categoryCoverId: (url) =>
-      url.pathname.startsWith("/spreadsheets/")
-        ? "data-chart"
-        : url.pathname.startsWith("/presentation/")
-          ? "portfolio-gallery"
-          : "documentation-api"
-  },
-  {
-    id: "arxiv",
-    hosts: ["arxiv.org", "www.arxiv.org"],
-    skipPageImage: true,
-    categoryCoverId: "paper-research"
-  },
-  {
-    id: "readthedocs",
-    hosts: [],
-    hostSuffixes: [".readthedocs.io"],
-    skipPageImage: true,
-    categoryCoverId: "documentation-api"
-  },
-  {
-    id: "documentation-subdomain",
-    hosts: [],
-    hostSuffixes: [".docs.com", ".docs.dev"],
-    skipPageImage: true,
-    categoryCoverId: "documentation-api"
-  }
-];
-
-export function matchCoverRule(input: string): CoverRule | undefined {
-  try {
-    const host = new URL(input).hostname.toLocaleLowerCase();
-    return COVER_RULES.find(
-      (rule) =>
-        rule.hosts.includes(host) ||
-        rule.hostSuffixes?.some((suffix) => host.endsWith(suffix))
-    );
-  } catch {
-    return undefined;
-  }
-}
-
-export function resolveRuleAsset(
-  input: string,
-  field: "brandAsset" | "pageImage"
-): string {
-  try {
-    const url = new URL(input);
-    const value = matchCoverRule(input)?.[field];
-    return typeof value === "function" ? value(url) : value || "";
-  } catch {
-    return "";
-  }
-}
 
 export function ruleCategoryCoverId(
   input: string

@@ -264,6 +264,12 @@ function normalizeSiteBrand(value: SiteBrandRecord): SiteBrandRecord {
   return {
     host: value.host.toLocaleLowerCase(),
     ...(value.iconDataUrl ? { iconDataUrl: value.iconDataUrl } : {}),
+    ...(value.iconDataUrlLight
+      ? { iconDataUrlLight: value.iconDataUrlLight }
+      : {}),
+    ...(value.iconDataUrlDark
+      ? { iconDataUrlDark: value.iconDataUrlDark }
+      : {}),
     ...(value.iconSource ? { iconSource: value.iconSource } : {}),
     ...(value.iconRejectReason
       ? { iconRejectReason: value.iconRejectReason }
