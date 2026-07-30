@@ -723,6 +723,7 @@ export function installSidePanelPreview() {
         force?: boolean;
         id?: string;
         batchId?: string;
+        tabId?: number;
         canonicalUrl?: string;
         conversation?: AgentConversation;
         actions?: BookmarkAgentActionProposal[];

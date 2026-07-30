@@ -17,6 +17,7 @@ import {
 import { findBookmarkByUrl } from "../../lib/bookmark-tree";
 import { registrableHost } from "../../lib/cover-registry";
 import { sendExtensionRequest } from "../../lib/messages";
+import { pendingSaveReadyTabId } from "../../lib/pending-save";
 import {
   buildLocalSearchIndex,
   searchLocalIndex
@@ -2399,6 +2400,7 @@ export function SidePanelApp() {
     atEnd: false
   });
   const pendingDraftInFlight = useRef(false);
+  const pendingDraftTabQueue = useRef<number[]>([]);
   const persistentStateLoaded = useRef(false);
   const scrollSaveTimer = useRef<number | undefined>(undefined);
   const previewCloseTimer = useRef<number | undefined>(undefined);
@@ -2698,42 +2700,59 @@ export function SidePanelApp() {
   }, [bookmarkPreview]);
 
   useEffect(() => {
-    const tabId = appState?.activeTab?.id;
-    if (typeof tabId !== "number") return;
-
-    const consume = async () => {
+    const consumeQueue = async () => {
       if (pendingDraftInFlight.current) return;
       pendingDraftInFlight.current = true;
       try {
-        const draft = await sendExtensionRequest({
-          type: "GET_PENDING_SAVE",
-          tabId
-        });
-        if (draft) {
-          await startSave(draft);
+        while (pendingDraftTabQueue.current.length) {
+          const tabId = pendingDraftTabQueue.current.shift()!;
+          try {
+            const draft = await sendExtensionRequest({
+              type: "GET_PENDING_SAVE",
+              tabId
+            });
+            if (draft) {
+              await startSave(draft);
+            }
+          } catch (caught) {
+            setError(
+              caught instanceof Error
+                ? caught.message
+                : "无法打开收藏表单"
+            );
+          }
         }
-      } catch (caught) {
-        setError(
-          caught instanceof Error ? caught.message : "无法打开收藏表单"
-        );
       } finally {
         pendingDraftInFlight.current = false;
+        if (pendingDraftTabQueue.current.length) {
+          void consumeQueue();
+        }
       }
     };
 
-    void consume();
-    const handlePendingSave = (message: {
-      type?: string;
-      tabId?: number;
-    }) => {
-      if (
-        message.type === "PENDING_SAVE_READY" &&
-        message.tabId === tabId
-      ) {
-        void consume();
+    const enqueue = (tabId: number) => {
+      if (!pendingDraftTabQueue.current.includes(tabId)) {
+        pendingDraftTabQueue.current.push(tabId);
       }
+      void consumeQueue();
+    };
+
+    const handlePendingSave = (message: unknown) => {
+      const tabId = pendingSaveReadyTabId(
+        message && typeof message === "object"
+          ? message
+          : {}
+      );
+      // Chrome 的全局侧边栏会跨标签页保持开启，因此必须以消息里的
+      // tabId 为准，不能用侧边栏启动时缓存的活动标签页 ID 过滤。
+      if (tabId !== null) enqueue(tabId);
     };
     chrome.runtime.onMessage.addListener(handlePendingSave);
+
+    const activeTabId = appState?.activeTab?.id;
+    if (typeof activeTabId === "number") {
+      enqueue(activeTabId);
+    }
     return () => {
       chrome.runtime.onMessage.removeListener(handlePendingSave);
     };
@@ -3400,7 +3419,8 @@ export function SidePanelApp() {
         );
       } else try {
         const page = await sendExtensionRequest({
-          type: "CAPTURE_ACTIVE_PAGE"
+          type: "CAPTURE_ACTIVE_PAGE",
+          tabId: draft?.tabId
         });
         const merged = draft
           ? {

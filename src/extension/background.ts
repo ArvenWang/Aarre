@@ -1159,8 +1159,11 @@ async function folderPathForId(folderId: string): Promise<string[]> {
   return options.find((item) => item.id === folderId)?.path || [];
 }
 
-async function captureActivePage(): Promise<PageCapture> {
-  const tab = await activeTab();
+async function captureActivePage(tabId?: number): Promise<PageCapture> {
+  const tab =
+    typeof tabId === "number"
+      ? await chrome.tabs.get(tabId).catch(() => null)
+      : await activeTab();
   if (!tab?.id || !tab.url || !isSupportedPageUrl(tab.url)) {
     throw new Error("当前页面受 Chrome 保护，无法读取网页内容。");
   }
@@ -2966,7 +2969,7 @@ async function handleRequest(request: ExtensionRequest): Promise<unknown> {
     case "GET_FOLDERS":
       return getFolderOptions();
     case "CAPTURE_ACTIVE_PAGE":
-      return captureActivePage();
+      return captureActivePage(request.tabId);
     case "GET_FOLDER_SUGGESTIONS":
       return getFolderSuggestions(request.capture);
     case "SAVE_BOOKMARK":
@@ -3123,7 +3126,10 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
-chrome.contextMenus.onClicked.addListener((info, tab) => {
+async function handleContextMenuSave(
+  info: chrome.contextMenus.OnClickData,
+  tab?: chrome.tabs.Tab
+): Promise<void> {
   if (
     info.menuItemId !== CONTEXT_MENU_PAGE_ID &&
     info.menuItemId !== CONTEXT_MENU_LINK_ID
@@ -3133,16 +3139,14 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   try {
     const draft = buildPendingSaveDraft(info, tab);
     pendingSaveDrafts.set(draft.tabId, draft);
-    void chrome.storage.session.set({
+    // 必须在右键用户手势仍有效时立即调用 sidePanel.open；持久化与打开
+    // 同步发起，随后等草稿落盘后再通知已存在的侧边栏实例。
+    const storeDraft = chrome.storage.session.set({
       [pendingSaveKey(draft.tabId)]: draft
     });
-    void chrome.runtime
-      .sendMessage({
-        type: "PENDING_SAVE_READY",
-        tabId: draft.tabId
-      })
-      .catch(() => undefined);
-    void chrome.sidePanel.open({ tabId: draft.tabId }).catch((error) => {
+    const openPanel = chrome.sidePanel.open({ tabId: draft.tabId });
+    await storeDraft;
+    await openPanel.catch((error) => {
       flashActionBadge(
         tab?.id,
         "!",
@@ -3150,6 +3154,12 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
         errorMessage(error)
       );
     });
+    await chrome.runtime
+      .sendMessage({
+        type: "PENDING_SAVE_READY",
+        tabId: draft.tabId
+      })
+      .catch(() => undefined);
   } catch (error) {
     flashActionBadge(
       tab?.id,
@@ -3158,6 +3168,10 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
       errorMessage(error)
     );
   }
+}
+
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  void handleContextMenuSave(info, tab);
 });
 
 function escapeOmniboxText(value: string): string {

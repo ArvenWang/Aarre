@@ -42,7 +42,7 @@ export type ExtensionRequest =
   | { type: "GET_NAVIGATION_SUGGESTIONS"; query: string }
   | { type: "NAVIGATE"; payload: NavigationInput }
   | { type: "GET_FOLDERS" }
-  | { type: "CAPTURE_ACTIVE_PAGE" }
+  | { type: "CAPTURE_ACTIVE_PAGE"; tabId?: number }
   | { type: "GET_FOLDER_SUGGESTIONS"; capture: PageCapture }
   | { type: "SAVE_BOOKMARK"; payload: SaveBookmarkInput }
   | {

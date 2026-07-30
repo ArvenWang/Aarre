@@ -10,6 +10,25 @@ export interface PendingSaveInput {
   createdAt?: string;
 }
 
+export interface PendingSaveReadyMessage {
+  type?: string;
+  tabId?: number;
+}
+
+export function pendingSaveReadyTabId(
+  message: PendingSaveReadyMessage
+): number | null {
+  if (
+    message.type !== "PENDING_SAVE_READY" ||
+    typeof message.tabId !== "number" ||
+    !Number.isInteger(message.tabId) ||
+    message.tabId < 0
+  ) {
+    return null;
+  }
+  return message.tabId;
+}
+
 export function createPendingSaveDraft(
   input: PendingSaveInput
 ): PendingSaveDraft {

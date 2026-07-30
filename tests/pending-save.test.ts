@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { createPendingSaveDraft } from "../src/lib/pending-save";
+import {
+  createPendingSaveDraft,
+  pendingSaveReadyTabId
+} from "../src/lib/pending-save";
 
 describe("createPendingSaveDraft", () => {
   it("preserves page context for the side panel form", () => {
@@ -41,5 +44,28 @@ describe("createPendingSaveDraft", () => {
         url: "javascript:alert(1)"
       })
     ).toThrow("无法保存");
+  });
+
+  it("uses the tab id carried by a ready message", () => {
+    expect(
+      pendingSaveReadyTabId({
+        type: "PENDING_SAVE_READY",
+        tabId: 42
+      })
+    ).toBe(42);
+  });
+
+  it("ignores unrelated or malformed ready messages", () => {
+    expect(
+      pendingSaveReadyTabId({
+        type: "LIBRARY_SCAN_UPDATED",
+        tabId: 42
+      })
+    ).toBeNull();
+    expect(
+      pendingSaveReadyTabId({
+        type: "PENDING_SAVE_READY"
+      })
+    ).toBeNull();
   });
 });
