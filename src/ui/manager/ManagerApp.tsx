@@ -10,6 +10,7 @@ import {
   requestPageSnapshotPermission
 } from "../../lib/display-settings";
 import { sendExtensionRequest } from "../../lib/messages";
+import { isSnapshotSensitiveUrl } from "../../lib/page-snapshot";
 import { searchLocalResources } from "../../lib/search";
 import type {
   AppState,
@@ -119,6 +120,9 @@ export function ManagerApp() {
     useState(false);
   const [siteBrands, setSiteBrands] = useState<SiteBrandRecord[]>([]);
   const [pageSnapshotsEnabled, setPageSnapshotsEnabled] = useState(true);
+  const [snapshotExcludedHosts, setSnapshotExcludedHosts] = useState<
+    string[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [action, setAction] = useState("");
   const [error, setError] = useState("");
@@ -143,9 +147,9 @@ export function ManagerApp() {
       setSiteBrands(
         await sendExtensionRequest({ type: "GET_SITE_BRANDS" })
       );
-      setPageSnapshotsEnabled(
-        (await getDisplaySettings()).pageSnapshotsEnabled
-      );
+      const displaySettings = await getDisplaySettings();
+      setPageSnapshotsEnabled(displaySettings.pageSnapshotsEnabled);
+      setSnapshotExcludedHosts(displaySettings.snapshotExcludedHosts);
       const nextInsights = await sendExtensionRequest({
         type: "GET_LIBRARY_INSIGHTS"
       });
@@ -264,6 +268,16 @@ export function ManagerApp() {
     [folderScopedResults]
   );
   const pendingCount = folderScopedResults.length - readyCount;
+  const missingSnapshotCount = useMemo(
+    () =>
+      libraryResults.filter(
+        ({ resource }) =>
+          resource.nativeBookmarkIds.length > 0 &&
+          !resource.snapshotAt &&
+          !isSnapshotSensitiveUrl(resource.url, snapshotExcludedHosts)
+      ).length,
+    [libraryResults, snapshotExcludedHosts]
+  );
   const visibleResults = useMemo(
     () =>
       filterAndSortLibraryResults(
@@ -523,6 +537,7 @@ export function ManagerApp() {
             query={appliedQuery}
             action={action}
             siteBrandByHost={siteBrandByHost}
+            missingSnapshotCount={missingSnapshotCount}
             onFilterChange={(value) =>
               updateLibraryControls({ filter: value })
             }
@@ -543,6 +558,7 @@ export function ManagerApp() {
             onSearch={handleSearch}
             onClearSearch={clearSearch}
             onResourceChanged={handleLibraryResourceChanged}
+            onSnapshotBackfillChanged={() => void loadResources()}
             onOpenResource={(url) => void openResource(url)}
             onRefresh={() => void refresh()}
           />
@@ -552,44 +568,46 @@ export function ManagerApp() {
 
   return (
     <main className="manager-shell">
-      <header className="manager-topbar">
-        <div className="manager-brand">
-          <div className="brand-mark">
-            <BookmarkIcon />
+      <header className="manager-header">
+        <div className="manager-topbar">
+          <div className="manager-brand">
+            <div className="brand-mark">
+              <BookmarkIcon />
+            </div>
+            <strong>Aarre</strong>
           </div>
-          <strong>Aarre</strong>
         </div>
+
+        <nav className="manager-view-tabs" aria-label="收藏管理功能">
+          {(
+            [
+              ["library", "收藏库", libraryResults.length],
+              [
+                "organize",
+                "整理提案",
+                insights?.organizationPlan.proposalCount || 0
+              ],
+              ["reading", "待读队列", insights?.readingQueue.length || 0],
+              ["report", "报告", dashboard?.weekly.createdCount || 0],
+              ["topics", "主题图谱", dashboard?.topicGraph.nodes.length || 0],
+              ["resurface", "重新发现", dashboard?.resurfacing.length || 0]
+            ] as const
+          ).map(([value, label, count]) => (
+            <button
+              type="button"
+              key={value}
+              data-active={view === value}
+              aria-current={view === value ? "page" : undefined}
+              onClick={() => selectView(value)}
+            >
+              {label}
+              <span>{count}</span>
+            </button>
+          ))}
+        </nav>
       </header>
 
       <h1 className="visually-hidden">{`Aarre · ${VIEW_LABELS[view]}`}</h1>
-
-      <nav className="manager-view-tabs" aria-label="收藏管理功能">
-        {(
-          [
-            ["library", "收藏库", libraryResults.length],
-            [
-              "organize",
-              "整理提案",
-              insights?.organizationPlan.proposalCount || 0
-            ],
-            ["reading", "待读队列", insights?.readingQueue.length || 0],
-            ["report", "报告", dashboard?.weekly.createdCount || 0],
-            ["topics", "主题图谱", dashboard?.topicGraph.nodes.length || 0],
-            ["resurface", "重新发现", dashboard?.resurfacing.length || 0]
-          ] as const
-        ).map(([value, label, count]) => (
-          <button
-            type="button"
-            key={value}
-            data-active={view === value}
-            aria-current={view === value ? "page" : undefined}
-            onClick={() => selectView(value)}
-          >
-            {label}
-            <span>{count}</span>
-          </button>
-        ))}
-      </nav>
 
       {appState?.auth.accountMatches === false ? (
         <div className="notice notice-error">

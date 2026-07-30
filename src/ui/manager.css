@@ -17,21 +17,26 @@
   border: 0;
 }
 
-.manager-topbar,
-.manager-view-tabs,
+.manager-header,
 .manager-view,
 .manager-shell > .notice {
   width: min(1184px, calc(100% - 48px));
   margin-inline: auto;
 }
 
-.manager-topbar {
+.manager-header {
   min-height: 64px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-6);
+  align-items: stretch;
+  gap: var(--sp-7);
   border-bottom: 1px solid var(--line);
+}
+
+.manager-topbar {
+  min-height: 63px;
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
 }
 
 .manager-brand {
@@ -137,10 +142,12 @@
 }
 
 .manager-view-tabs {
+  min-width: 0;
   display: flex;
   gap: var(--sp-5);
+  align-items: stretch;
+  flex: 1 1 auto;
   overflow-x: auto;
-  border-bottom: 1px solid var(--line);
   scrollbar-width: none;
 }
 
@@ -150,7 +157,7 @@
 
 .manager-view-tabs button {
   position: relative;
-  min-height: 48px;
+  min-height: 63px;
   padding: 0;
   display: inline-flex;
   align-items: center;
@@ -281,23 +288,32 @@
   font-size: var(--fs-caption);
 }
 
-.library-scope-summary {
-  margin: var(--sp-2) 0 0;
-  color: var(--ink-faint);
-  font-size: var(--fs-caption);
-}
-
 .refresh-button {
   flex: 0 0 auto;
 }
 
-.library-controls {
+.library-toolbar-secondary {
   margin-top: var(--sp-4);
-  padding-top: var(--sp-4);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-5);
+}
+
+.library-controls {
+  min-width: 0;
   display: flex;
   align-items: flex-end;
   gap: var(--sp-3);
-  border-top: 1px solid var(--line);
+  flex: 1 1 auto;
+}
+
+.library-scope-summary {
+  margin: 0 0 var(--sp-2);
+  flex: 0 0 auto;
+  color: var(--ink-faint);
+  font-size: var(--fs-caption);
+  text-align: right;
 }
 
 .library-select-control {
@@ -348,6 +364,232 @@
   flex: 0 0 auto;
 }
 
+.snapshot-backfill-trigger {
+  min-height: 40px;
+  margin-left: auto;
+  padding-inline: var(--sp-2);
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.snapshot-backfill-status {
+  position: fixed;
+  right: var(--sp-5);
+  bottom: var(--sp-5);
+  z-index: 12;
+  width: min(420px, calc(100% - 40px));
+  max-height: min(560px, calc(100dvh - 40px));
+  padding: var(--sp-4);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+}
+
+.snapshot-backfill-status-heading,
+.snapshot-backfill-status-heading > div,
+.snapshot-backfill-metrics,
+.snapshot-backfill-actions {
+  display: flex;
+  align-items: center;
+}
+
+.snapshot-backfill-status-heading {
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.snapshot-backfill-status-heading > div {
+  min-width: 0;
+  gap: var(--sp-2);
+}
+
+.snapshot-backfill-status-heading strong {
+  font-size: var(--fs-small);
+  font-weight: var(--fw-strong);
+}
+
+.snapshot-backfill-status-heading span {
+  padding: 3px var(--sp-2);
+  border-radius: var(--radius-sm);
+  color: var(--ink-muted);
+  background: var(--surface-sunken);
+  font-size: var(--fs-caption);
+}
+
+.snapshot-backfill-status-heading b {
+  flex: 0 0 auto;
+  font-size: var(--fs-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.snapshot-backfill-status progress {
+  width: 100%;
+  height: 5px;
+  margin-top: var(--sp-3);
+  display: block;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  accent-color: var(--ink);
+}
+
+.snapshot-backfill-status progress::-webkit-progress-bar {
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+
+.snapshot-backfill-status progress::-webkit-progress-value {
+  border-radius: var(--radius-sm);
+  background: var(--ink);
+}
+
+.snapshot-backfill-metrics {
+  margin-top: var(--sp-3);
+  gap: var(--sp-4);
+  color: var(--ink-faint);
+  font-size: var(--fs-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.snapshot-backfill-current,
+.snapshot-backfill-last-error,
+.snapshot-backfill-error,
+.snapshot-backfill-privacy {
+  margin: var(--sp-3) 0 0;
+  font-size: var(--fs-caption);
+  line-height: 1.5;
+}
+
+.snapshot-backfill-current {
+  color: var(--ink-muted);
+}
+
+.snapshot-backfill-last-error {
+  color: var(--ink-faint);
+}
+
+.snapshot-backfill-error {
+  color: var(--negative);
+}
+
+.snapshot-backfill-actions {
+  margin-top: var(--sp-4);
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}
+
+.snapshot-backfill-cancel {
+  min-height: 34px;
+  padding-inline: var(--sp-2);
+  color: var(--negative);
+}
+
+.snapshot-backfill-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 24;
+  padding: var(--sp-5);
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--ink) 40%, transparent);
+}
+
+.snapshot-backfill-dialog {
+  width: min(560px, 100%);
+  max-height: calc(100dvh - 40px);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  outline: 0;
+}
+
+.snapshot-backfill-dialog > header,
+.snapshot-backfill-dialog > footer {
+  padding: var(--sp-4) var(--sp-5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.snapshot-backfill-dialog > header {
+  align-items: flex-start;
+  border-bottom: 1px solid var(--line);
+}
+
+.snapshot-backfill-dialog h2,
+.snapshot-backfill-dialog header p {
+  margin: 0;
+}
+
+.snapshot-backfill-dialog h2 {
+  font-size: var(--fs-h3);
+  font-weight: var(--fw-strong);
+  letter-spacing: -0.02em;
+}
+
+.snapshot-backfill-dialog header p {
+  margin-top: var(--sp-1);
+  color: var(--ink-faint);
+  font-size: var(--fs-caption);
+}
+
+.snapshot-backfill-dialog-close {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--ink-muted);
+  background: var(--surface);
+}
+
+.snapshot-backfill-dialog-body {
+  padding: var(--sp-5);
+}
+
+.snapshot-backfill-dialog-body > p:first-child {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--fs-small);
+  line-height: 1.6;
+}
+
+.snapshot-backfill-foreground-note {
+  margin-top: var(--sp-4);
+  padding: var(--sp-4);
+  display: grid;
+  gap: var(--sp-1);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.snapshot-backfill-foreground-note strong {
+  font-size: var(--fs-small);
+  font-weight: var(--fw-strong);
+}
+
+.snapshot-backfill-foreground-note span,
+.snapshot-backfill-privacy {
+  color: var(--ink-muted);
+  font-size: var(--fs-caption);
+  line-height: 1.55;
+}
+
+.snapshot-backfill-dialog > footer {
+  justify-content: flex-end;
+  border-top: 1px solid var(--line);
+}
+
 .library-masonry {
   column-width: 240px;
   column-gap: var(--sp-5);
@@ -356,6 +598,7 @@
 .library-card {
   --reveal: 89px;
   --cover-height: 232px;
+  position: relative;
   width: 100%;
   margin-bottom: var(--sp-6);
   display: inline-block;
@@ -380,13 +623,11 @@
   border-radius: var(--radius-lg);
   background: var(--surface-sunken);
   transition:
-    height 340ms var(--ease),
     border-color var(--dur-base) var(--ease);
 }
 
 .library-card:hover .library-card-cover,
 .library-card:focus-within .library-card-cover {
-  height: calc(var(--cover-height) - var(--reveal));
   border-color: var(--line-strong);
 }
 
@@ -475,24 +716,47 @@
   font-size: var(--fs-caption);
 }
 
+/* Multi-column masonry rebalances whenever a descendant changes height.
+   Keep hover details out of flow so the pointer target never moves. */
 .library-card-extra {
-  height: 0;
+  position: absolute;
+  top: calc(var(--cover-height) - var(--reveal));
+  right: 1px;
+  left: 1px;
+  z-index: 1;
+  height: var(--reveal);
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
   overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+  border-radius: 0 0 calc(var(--radius-lg) - 1px)
+    calc(var(--radius-lg) - 1px);
   opacity: 0;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--surface) 76%, transparent),
+    color-mix(in srgb, var(--surface) 97%, transparent) 32%
+  );
+  transform: translateY(8px);
   transition:
-    height 340ms var(--ease),
-    opacity var(--dur-base) var(--ease);
+    visibility 0s linear var(--dur-base),
+    opacity var(--dur-base) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .library-card:hover .library-card-extra,
 .library-card:focus-within .library-card-extra {
-  height: var(--reveal);
+  visibility: visible;
   opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0s;
 }
 
 .library-card-extra p {
   margin: 0;
-  padding-top: var(--sp-3);
   display: -webkit-box;
   overflow: hidden;
   color: var(--ink-muted);
@@ -503,7 +767,7 @@
 }
 
 .library-card-extra > div {
-  margin-top: var(--sp-2);
+  margin-top: var(--sp-1);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1186,12 +1450,6 @@
   font-size: var(--fs-small);
 }
 
-/* Card editor: the trigger stays secondary to the cover; the modal owns the
-   complete Chrome bookmark + Aarre metadata editing flow. */
-.library-card {
-  position: relative;
-}
-
 .library-card-editor-trigger {
   position: absolute;
   top: var(--sp-2);
@@ -1547,15 +1805,19 @@
 }
 
 @media (max-width: 640px) {
-  .manager-topbar,
-  .manager-view-tabs,
+  .manager-header,
   .manager-view,
   .manager-shell > .notice {
     width: calc(100% - 32px);
   }
 
-  .manager-topbar {
-    min-height: 58px;
+  .manager-header {
+    display: block;
+  }
+
+  .manager-topbar,
+  .manager-view-tabs button {
+    min-height: 52px;
   }
 
   .manager-view-tabs {
@@ -1620,6 +1882,18 @@
     flex-direction: column;
   }
 
+  .library-toolbar-secondary {
+    align-items: stretch;
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+
+  .library-scope-summary {
+    order: -1;
+    margin: 0;
+    text-align: left;
+  }
+
   .library-select-control:first-child,
   .library-select-control:nth-child(2) {
     width: 100%;
@@ -1628,6 +1902,60 @@
   .library-clear-filters {
     align-self: flex-start;
     margin: 0;
+  }
+
+  .snapshot-backfill-trigger {
+    align-self: flex-start;
+    min-height: 44px;
+    margin: 0;
+    padding: 0;
+  }
+
+  .snapshot-backfill-status {
+    right: var(--sp-2);
+    bottom: var(--sp-2);
+    width: calc(100% - 16px);
+    max-height: calc(100dvh - 16px);
+    padding: var(--sp-4);
+  }
+
+  .snapshot-backfill-status-heading {
+    align-items: flex-start;
+  }
+
+  .snapshot-backfill-metrics,
+  .snapshot-backfill-actions {
+    gap: var(--sp-3);
+    flex-wrap: wrap;
+  }
+
+  .snapshot-backfill-actions .button {
+    min-height: 44px;
+  }
+
+  .snapshot-backfill-backdrop {
+    padding: var(--sp-2);
+  }
+
+  .snapshot-backfill-dialog {
+    max-height: calc(100dvh - 16px);
+  }
+
+  .snapshot-backfill-dialog > header,
+  .snapshot-backfill-dialog-body,
+  .snapshot-backfill-dialog > footer {
+    padding-right: var(--sp-4);
+    padding-left: var(--sp-4);
+  }
+
+  .snapshot-backfill-dialog > footer {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .snapshot-backfill-dialog > footer .button {
+    width: 100%;
+    min-height: 44px;
   }
 
   .organization-toolbar > div:last-child {
@@ -1708,11 +2036,8 @@
   }
 
   .library-card-extra {
-    height: var(--reveal);
+    visibility: visible;
     opacity: 1;
-  }
-
-  .library-card-cover {
-    height: calc(var(--cover-height) - var(--reveal));
+    transform: none;
   }
 }

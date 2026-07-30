@@ -529,6 +529,49 @@ export interface LibraryScanEstimate {
   priceAvailable: boolean;
 }
 
+export type SnapshotBackfillState =
+  | "idle"
+  | "running"
+  | "waiting_focus"
+  | "paused"
+  | "completed"
+  | "cancelled"
+  | "failed";
+
+export interface SnapshotBackfillError {
+  resourceKey: string;
+  title: string;
+  message: string;
+}
+
+/**
+ * 页面截图只能通过 captureVisibleTab 获取当前可见标签页，因此批量补拍
+ * 永远是用户主动启动的单并发前台任务。waiting_focus 表示任务仍可继续，
+ * 但 Aarre 不会擅自把标签页或窗口抢回前台。
+ */
+export interface SnapshotBackfillStatus {
+  id: string;
+  state: SnapshotBackfillState;
+  /**
+   * 仅在管理页显式请求时按 pageSnapshots 实存计算，不写入任务状态。
+   * 这样即使旧快照被容量策略淘汰，也不会被陈旧 snapshotAt 隐藏入口。
+   */
+  candidateCount?: number;
+  total: number;
+  processed: number;
+  succeeded: number;
+  failed: number;
+  skipped: number;
+  currentTitle: string;
+  startedAt?: string;
+  updatedAt?: string;
+  completedAt?: string;
+  errors: SnapshotBackfillError[];
+  concurrency: 1;
+  requiresForeground: true;
+  tabId?: number;
+}
+
 export type OrganizationProposalKind =
   | "classify"
   | "duplicate"

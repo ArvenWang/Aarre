@@ -27,6 +27,7 @@ import type {
   ResurfacingItem,
   ResourceRecord,
   RestoreResult,
+  SnapshotBackfillStatus,
   SaveBookmarkInput,
   SaveBookmarkResult,
   SearchResult,
@@ -79,6 +80,14 @@ export type ExtensionRequest =
   | { type: "START_LIBRARY_SCAN"; force?: boolean }
   | { type: "GET_LIBRARY_SCAN_ESTIMATE"; force?: boolean }
   | { type: "GET_LIBRARY_SCAN" }
+  | { type: "START_SNAPSHOT_BACKFILL" }
+  | {
+      type: "GET_SNAPSHOT_BACKFILL";
+      includeCandidateCount?: boolean;
+    }
+  | { type: "PAUSE_SNAPSHOT_BACKFILL" }
+  | { type: "RESUME_SNAPSHOT_BACKFILL" }
+  | { type: "CANCEL_SNAPSHOT_BACKFILL" }
   | { type: "GET_AI_USAGE" }
   | { type: "PAUSE_LIBRARY_SCAN" }
   | { type: "RESUME_LIBRARY_SCAN" }
@@ -157,6 +166,11 @@ export type ResponseDataByRequest = {
   START_LIBRARY_SCAN: LibraryScanStatus;
   GET_LIBRARY_SCAN_ESTIMATE: LibraryScanEstimate;
   GET_LIBRARY_SCAN: LibraryScanStatus;
+  START_SNAPSHOT_BACKFILL: SnapshotBackfillStatus;
+  GET_SNAPSHOT_BACKFILL: SnapshotBackfillStatus;
+  PAUSE_SNAPSHOT_BACKFILL: SnapshotBackfillStatus;
+  RESUME_SNAPSHOT_BACKFILL: SnapshotBackfillStatus;
+  CANCEL_SNAPSHOT_BACKFILL: SnapshotBackfillStatus;
   GET_AI_USAGE: AiUsageStats;
   PAUSE_LIBRARY_SCAN: LibraryScanStatus;
   RESUME_LIBRARY_SCAN: LibraryScanStatus;

@@ -42,4 +42,30 @@ describe("extension message compatibility", () => {
       sendExtensionRequest({ type: "GET_LOCAL_RESOURCES" })
     ).rejects.toThrow("界面与后台版本不一致");
   });
+
+  it("keeps the foreground backfill status contract typed end to end", async () => {
+    const status = {
+      id: "backfill-1",
+      state: "waiting_focus" as const,
+      candidateCount: 9,
+      total: 12,
+      processed: 3,
+      succeeded: 2,
+      failed: 1,
+      skipped: 0,
+      currentTitle: "Example",
+      errors: [],
+      concurrency: 1 as const,
+      requiresForeground: true as const,
+      tabId: 42
+    };
+    sendMessage.mockResolvedValue({ ok: true, data: status });
+
+    await expect(
+      sendExtensionRequest({
+        type: "GET_SNAPSHOT_BACKFILL",
+        includeCandidateCount: true
+      })
+    ).resolves.toEqual(status);
+  });
 });

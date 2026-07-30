@@ -3,6 +3,7 @@ import {
   acceptsSnapshotNavigationCommit,
   completeEnhancementPart,
   deferEnhancementJob,
+  enhancementTriggerAllowsRenderedAi,
   isEnhancementJobDue,
   mergeEnhancementJob,
   snapshotCapturePolicy,
@@ -11,6 +12,16 @@ import {
 } from "../src/lib/bookmark-enhancement";
 
 describe("bookmark enhancement jobs", () => {
+  it("never turns an explicit cover backfill into hidden AI work", () => {
+    expect(enhancementTriggerAllowsRenderedAi("batch_backfill")).toBe(
+      false
+    );
+    expect(enhancementTriggerAllowsRenderedAi("normal_browse")).toBe(
+      true
+    );
+    expect(enhancementTriggerAllowsRenderedAi("aarre_save")).toBe(true);
+  });
+
   it("keeps first capture silent, confirms old-bookmark recovery, and refreshes stale covers silently", () => {
     expect(
       snapshotCapturePolicy({
@@ -28,6 +39,17 @@ describe("bookmark enhancement jobs", () => {
         hasSnapshot: false,
         snapshotIsStale: true,
         trigger: "aarre_save"
+      })
+    ).toEqual({
+      capture: true,
+      refreshExisting: false,
+      showToast: false
+    });
+    expect(
+      snapshotCapturePolicy({
+        hasSnapshot: false,
+        snapshotIsStale: true,
+        trigger: "batch_backfill"
       })
     ).toEqual({
       capture: true,

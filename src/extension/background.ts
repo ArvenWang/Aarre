@@ -61,6 +61,7 @@ import {
   acceptsSnapshotNavigationCommit,
   completeEnhancementPart,
   deferEnhancementJob,
+  enhancementTriggerAllowsRenderedAi,
   isEnhancementJobDue,
   mergeEnhancementJob,
   snapshotCapturePolicy,
@@ -109,6 +110,15 @@ import {
   runConcurrentTasks
 } from "../lib/scan-scheduler";
 import {
+  emptySnapshotBackfillStatus,
+  recordSnapshotBackfillOutcome,
+  snapshotBackfillCandidates,
+  snapshotBackfillLeaseAllowsCapture,
+  snapshotBackfillStateAfterFocusCheck,
+  type SnapshotBackfillLease,
+  type SnapshotBackfillOutcome
+} from "../lib/snapshot-backfill";
+import {
   completeOutboxItem,
   cleanupExpiredUndoSnapshots,
   deferOutboxItem,
@@ -120,6 +130,7 @@ import {
   getLocalResources,
   getOutbox,
   getPageSnapshot,
+  getPageSnapshots,
   getSiteBrand,
   getSiteBrands,
   getUndoSnapshot,
@@ -165,12 +176,14 @@ import type {
   OutboxItem,
   PendingSaveDraft,
   PageCapture,
+  PageSnapshot,
   ResourceRecord,
   RestoreResult,
   SaveBookmarkInput,
   SaveBookmarkResult,
   SiteBrandRecord,
   SiteIconCandidate,
+  SnapshotBackfillStatus,
   UpdateBookmarkDetailsInput,
   UpdateBookmarkDetailsResult,
   UndoMutation,
@@ -191,6 +204,9 @@ const LIBRARY_SCAN_ALARM = "aarre-library-scan";
 const BOOKMARK_ENHANCEMENT_KEY = "aarre:bookmark-enhancements:v1";
 const BOOKMARK_ENHANCEMENT_ALARM = "aarre-bookmark-enhancements";
 const IMMEDIATE_SNAPSHOT_PREFIX = "aarre:immediate-snapshot:";
+const SNAPSHOT_BACKFILL_KEY = "aarre:snapshot-backfill:v1";
+const SNAPSHOT_BACKFILL_TIMEOUT_ALARM =
+  "aarre-snapshot-backfill-timeout";
 const ORGANIZATION_INSIGHTS_KEY = "aarre:organization-insights";
 const MAX_SCAN_HTML_BYTES = 600_000;
 const internalBookmarkIds = new Set<string>();
@@ -199,6 +215,8 @@ const pendingSaveDrafts = new Map<number, PendingSaveDraft>();
 const pageSnapshotTimers = new Map<number, number>();
 const AARRE_OPEN_PAGE_SNAPSHOT_DELAY_MS = 1_500;
 const SAVED_PAGE_SNAPSHOT_DELAY_MS = 250;
+const SNAPSHOT_BACKFILL_PAGE_TIMEOUT_MINUTES = 0.75;
+const SNAPSHOT_BACKFILL_MAX_ATTEMPTS = 2;
 let bookmarkedResourceLookupCache: Map<string, string> | null = null;
 let bookmarkedResourceLookupRevision = 0;
 interface ImmediatePageSnapshotTarget {
@@ -212,6 +230,8 @@ interface ImmediatePageSnapshotTarget {
   refreshExisting?: boolean;
   documentId?: string;
   trigger: SnapshotEnhancementProgress["trigger"];
+  backfillJobId?: string;
+  backfillLease?: string;
 }
 const immediatePageSnapshotTargets = new Map<
   number,
@@ -219,6 +239,9 @@ const immediatePageSnapshotTargets = new Map<
 >();
 let libraryScanRunning = false;
 let bookmarkEnhancementRunning = false;
+let snapshotBackfillDriving = false;
+let snapshotBackfillRetrying = false;
+let snapshotBackfillMutation: Promise<void> = Promise.resolve();
 let bookmarkEnhancementMutation: Promise<void> = Promise.resolve();
 const renderedPageEnhancementRunning = new Set<string>();
 let pageContextMenuRevision = 0;
@@ -234,6 +257,15 @@ interface StoredLibraryScanJob extends LibraryScanStatus {
   provider?: AiProviderId;
   actualUsageEstimated?: boolean;
   usageRecorded?: boolean;
+}
+
+interface StoredSnapshotBackfillJob extends SnapshotBackfillStatus {
+  resourceKeys: string[];
+  nextIndex: number;
+  currentResourceKey?: string;
+  currentAttempt: number;
+  currentLease?: string;
+  windowId?: number;
 }
 
 function emptyLibraryScan(): StoredLibraryScanJob {
@@ -300,6 +332,103 @@ async function setStoredLibraryScan(
       status: publicLibraryScan(job)
     })
     .catch(() => undefined);
+}
+
+function emptyStoredSnapshotBackfill(): StoredSnapshotBackfillJob {
+  return {
+    ...emptySnapshotBackfillStatus(),
+    resourceKeys: [],
+    nextIndex: 0,
+    currentAttempt: 0
+  };
+}
+
+function publicSnapshotBackfill(
+  job: StoredSnapshotBackfillJob
+): SnapshotBackfillStatus {
+  const {
+    resourceKeys: _resourceKeys,
+    nextIndex: _nextIndex,
+    currentResourceKey: _currentResourceKey,
+    currentAttempt: _currentAttempt,
+    currentLease: _currentLease,
+    windowId: _windowId,
+    ...status
+  } = job;
+  return status;
+}
+
+async function getStoredSnapshotBackfill(): Promise<StoredSnapshotBackfillJob> {
+  const stored = (await chrome.storage.local.get(SNAPSHOT_BACKFILL_KEY))[
+    SNAPSHOT_BACKFILL_KEY
+  ];
+  if (!stored || typeof stored !== "object") {
+    return emptyStoredSnapshotBackfill();
+  }
+  const value = stored as Partial<StoredSnapshotBackfillJob>;
+  return {
+    ...emptyStoredSnapshotBackfill(),
+    ...value,
+    concurrency: 1,
+    requiresForeground: true,
+    errors: Array.isArray(value.errors) ? value.errors.slice(-20) : [],
+    resourceKeys: Array.isArray(value.resourceKeys)
+      ? value.resourceKeys.filter(
+          (item): item is string => typeof item === "string"
+        )
+      : [],
+    nextIndex:
+      typeof value.nextIndex === "number" && value.nextIndex >= 0
+        ? Math.floor(value.nextIndex)
+        : 0,
+    currentAttempt:
+      typeof value.currentAttempt === "number" &&
+      value.currentAttempt >= 0
+        ? Math.floor(value.currentAttempt)
+        : 0,
+    currentLease:
+      typeof value.currentLease === "string"
+        ? value.currentLease
+        : undefined
+  };
+}
+
+async function setStoredSnapshotBackfill(
+  job: StoredSnapshotBackfillJob
+): Promise<void> {
+  await chrome.storage.local.set({ [SNAPSHOT_BACKFILL_KEY]: job });
+  void chrome.runtime
+    .sendMessage({
+      type: "SNAPSHOT_BACKFILL_UPDATED",
+      status: publicSnapshotBackfill(job)
+    })
+    .catch(() => undefined);
+}
+
+async function mutateStoredSnapshotBackfill<T>(
+  mutate: (
+    job: StoredSnapshotBackfillJob
+  ) => T | Promise<T>
+): Promise<T> {
+  let resolveResult!: (value: T | PromiseLike<T>) => void;
+  let rejectResult!: (reason?: unknown) => void;
+  const result = new Promise<T>((resolve, reject) => {
+    resolveResult = resolve;
+    rejectResult = reject;
+  });
+  snapshotBackfillMutation = snapshotBackfillMutation
+    .catch(() => undefined)
+    .then(async () => {
+      try {
+        const job = await getStoredSnapshotBackfill();
+        const value = await mutate(job);
+        await setStoredSnapshotBackfill(job);
+        resolveResult(value);
+      } catch (error) {
+        rejectResult(error);
+      }
+    });
+  return result;
 }
 
 function bookmarkTarget(parentId: string, url: string): string {
@@ -441,7 +570,8 @@ async function readImmediateSnapshotTarget(
       target.trigger === "chrome_bookmark" ||
       target.trigger === "aarre_save" ||
       target.trigger === "aarre_open" ||
-      target.trigger === "normal_browse"
+      target.trigger === "normal_browse" ||
+      target.trigger === "batch_backfill"
         ? target.trigger
         : "recovery",
     ...(typeof target.documentId === "string"
@@ -455,6 +585,12 @@ async function readImmediateSnapshotTarget(
       : {}),
     ...(typeof target.redirectedUrl === "string"
       ? { redirectedUrl: target.redirectedUrl }
+      : {}),
+    ...(typeof target.backfillJobId === "string"
+      ? { backfillJobId: target.backfillJobId }
+      : {}),
+    ...(typeof target.backfillLease === "string"
+      ? { backfillLease: target.backfillLease }
       : {}),
     ...(target.refreshExisting === true ? { refreshExisting: true } : {})
   };
@@ -1054,6 +1190,16 @@ async function scheduleImmediateSnapshotIfReady(
     documentId: target.documentId,
     trigger: target.trigger,
     refreshExisting: target.refreshExisting,
+    ...(target.backfillJobId && target.backfillLease
+      ? {
+          backfillLease: {
+            jobId: target.backfillJobId,
+            resourceKey: target.resourceKey,
+            tabId: tab.id,
+            token: target.backfillLease
+          }
+        }
+      : {}),
     onSettled: (succeeded) => {
       if (succeeded && typeof tab.id === "number") {
         void removeImmediateSnapshotTarget(tab.id, target);
@@ -1086,7 +1232,8 @@ async function rememberImmediateSnapshotTarget(
   showToast = true,
   resourceKeyHint?: string,
   documentId?: string,
-  trigger: SnapshotEnhancementProgress["trigger"] = "recovery"
+  trigger: SnapshotEnhancementProgress["trigger"] = "recovery",
+  backfillLease?: SnapshotBackfillLease
 ): Promise<void> {
   if (typeof tab.id !== "number" || !isSupportedPageUrl(targetUrl)) {
     return;
@@ -1137,6 +1284,18 @@ async function rememberImmediateSnapshotTarget(
       : {}),
     ...(sameResourceTarget?.redirectedUrl
       ? { redirectedUrl: sameResourceTarget.redirectedUrl }
+      : {}),
+    ...(backfillLease?.jobId || sameResourceTarget?.backfillJobId
+      ? {
+          backfillJobId:
+            backfillLease?.jobId || sameResourceTarget?.backfillJobId
+        }
+      : {}),
+    ...(backfillLease?.token || sameResourceTarget?.backfillLease
+      ? {
+          backfillLease:
+            backfillLease?.token || sameResourceTarget?.backfillLease
+        }
       : {})
   };
   await storeImmediateSnapshotTarget(tab.id, target);
@@ -1161,7 +1320,8 @@ async function prepareImmediateSnapshotTargetForNavigation(
   resource: ResourceRecord,
   targetUrl: string,
   trigger: SnapshotEnhancementProgress["trigger"],
-  showToast: boolean
+  showToast: boolean,
+  backfillLease?: SnapshotBackfillLease
 ): Promise<ImmediatePageSnapshotTarget | undefined> {
   if (!resource.nativeBookmarkIds.length) {
     return undefined;
@@ -1178,12 +1338,18 @@ async function prepareImmediateSnapshotTargetForNavigation(
     targetUrl,
     navigationStartUrl: targetUrl,
     delayMs:
-      trigger === "aarre_open"
+      trigger === "aarre_open" || trigger === "batch_backfill"
         ? AARRE_OPEN_PAGE_SNAPSHOT_DELAY_MS
         : SAVED_PAGE_SNAPSHOT_DELAY_MS,
     resourceKey: resource.resourceKey,
     showToast: showToast && policy.showToast,
     trigger,
+    ...(backfillLease
+      ? {
+          backfillJobId: backfillLease.jobId,
+          backfillLease: backfillLease.token
+        }
+      : {}),
     ...(policy.refreshExisting ? { refreshExisting: true } : {})
   };
   await storeImmediateSnapshotTarget(tabId, target);
@@ -2427,6 +2593,7 @@ async function coordinateActiveBookmarkedPage(
       ? immediateResource
       : await bookmarkedResourceForLoadedUrl(tab.url);
   if (!resource?.nativeBookmarkIds.length) return;
+  const effectiveTrigger = immediateTarget?.trigger || trigger;
   const settings = await getDisplaySettings();
   const privacyBlocked = isSnapshotSensitiveUrl(
     tab.url,
@@ -2436,7 +2603,7 @@ async function coordinateActiveBookmarkedPage(
   const snapshotPolicy = snapshotCapturePolicy({
     hasSnapshot: Boolean(existingSnapshot),
     snapshotIsStale: isPageSnapshotStale(existingSnapshot),
-    trigger
+    trigger: effectiveTrigger
   });
   const needsAi =
     resource.aiStatus !== "ready" ||
@@ -2446,7 +2613,7 @@ async function coordinateActiveBookmarkedPage(
   if (snapshotPolicy.capture && !privacyBlocked) {
     await enqueueBookmarkEnhancement(resource, ["snapshot"], {
       state: "queued",
-      trigger,
+      trigger: effectiveTrigger,
       tabId: tab.id,
       ...(documentId ? { documentId } : {}),
       loadedUrl: tab.url,
@@ -2456,16 +2623,18 @@ async function coordinateActiveBookmarkedPage(
     await rememberImmediateSnapshotTarget(
       tab,
       resource.canonicalUrl,
-      trigger === "aarre_open"
+      effectiveTrigger === "aarre_open" ||
+        effectiveTrigger === "batch_backfill"
         ? AARRE_OPEN_PAGE_SNAPSHOT_DELAY_MS
         : SAVED_PAGE_SNAPSHOT_DELAY_MS,
       snapshotPolicy.showToast,
       resource.resourceKey,
       documentId,
-      trigger
+      effectiveTrigger
     );
   }
 
+  if (!enhancementTriggerAllowsRenderedAi(effectiveTrigger)) return;
   if (!needsAi) return;
   if (privacyBlocked) {
     await upsertLocalResource({
@@ -2482,7 +2651,7 @@ async function coordinateActiveBookmarkedPage(
     });
     await updateStoredSnapshotProgress(resource.resourceKey, {
       state: "privacy_blocked",
-      trigger,
+      trigger: effectiveTrigger,
       lastError: "隐私保护网站不生成页面截图。"
     });
     await completeStoredEnhancementPart(resource.resourceKey, "ai");
@@ -2556,6 +2725,116 @@ function clearPageSnapshotTimer(tabId: number) {
   pageSnapshotTimers.delete(tabId);
 }
 
+interface SnapshotBackfillCommitResult {
+  accepted: boolean;
+  stored: boolean;
+  job?: StoredSnapshotBackfillJob;
+}
+
+async function commitSnapshotBackfillCapture(input: {
+  lease: SnapshotBackfillLease;
+  canonicalUrl: string;
+  snapshot: PageSnapshot;
+  capturedAt: string;
+}): Promise<SnapshotBackfillCommitResult> {
+  const result = await mutateStoredSnapshotBackfill(async (job) => {
+    if (
+      !snapshotBackfillLeaseAllowsCapture(
+        {
+          state: job.state,
+          jobId: job.id,
+          currentResourceKey: job.currentResourceKey,
+          expectedTabId: job.tabId,
+          currentLease: job.currentLease
+        },
+        input.lease
+      )
+    ) {
+      return {
+        accepted: false,
+        stored: false
+      } satisfies SnapshotBackfillCommitResult;
+    }
+
+    let stored = false;
+    let outcome: SnapshotBackfillOutcome = "skipped";
+    const resource = await getLocalResource(input.lease.resourceKey);
+    const existingSnapshot = await getPageSnapshot(input.canonicalUrl);
+    if (resource?.nativeBookmarkIds.length && !existingSnapshot) {
+      await putPageSnapshot(input.snapshot);
+      stored = true;
+      try {
+        const latestResource = await getLocalResource(
+          input.lease.resourceKey
+        );
+        if (!latestResource?.nativeBookmarkIds.length) {
+          await deletePageSnapshot(input.canonicalUrl);
+          stored = false;
+        } else {
+          await upsertLocalResource({
+            ...latestResource,
+            snapshotAt: input.capturedAt,
+            updatedAt: latestResource.updatedAt
+          });
+          outcome = "succeeded";
+        }
+      } catch (error) {
+        const currentSnapshot = await getPageSnapshot(
+          input.canonicalUrl
+        ).catch(() => undefined);
+        if (currentSnapshot?.capturedAt === input.capturedAt) {
+          await deletePageSnapshot(input.canonicalUrl).catch(
+            () => undefined
+          );
+        }
+        throw error;
+      }
+    }
+
+    const status = recordSnapshotBackfillOutcome(
+      publicSnapshotBackfill(job),
+      outcome,
+      undefined,
+      now()
+    );
+    Object.assign(job, status);
+    job.nextIndex = Math.min(
+      job.resourceKeys.length,
+      job.nextIndex + 1
+    );
+    job.currentResourceKey = undefined;
+    job.currentAttempt = 0;
+    job.currentLease = undefined;
+    return {
+      accepted: true,
+      stored,
+      job: { ...job }
+    } satisfies SnapshotBackfillCommitResult;
+  });
+
+  if (!result.accepted || !result.job) return result;
+  await clearSnapshotBackfillTimeouts(result.job.id);
+  await completeStoredEnhancementPart(
+    input.lease.resourceKey,
+    "snapshot"
+  );
+  if (result.stored) {
+    void chrome.runtime
+      .sendMessage({
+        type: "PAGE_SNAPSHOT_UPDATED",
+        canonicalUrl: input.canonicalUrl,
+        capturedAt: input.capturedAt
+      })
+      .catch(() => undefined);
+  }
+  if (result.job.state === "completed") {
+    await cleanupSnapshotBackfillRuntime(result.job, true);
+  } else {
+    void driveSnapshotBackfill();
+  }
+  return result;
+}
+
 async function capturePageSnapshotForTab(
   tabId: number,
   expectedLoadedUrl: string,
@@ -2566,6 +2845,7 @@ async function capturePageSnapshotForTab(
     refreshExisting?: boolean;
     documentId?: string;
     trigger?: SnapshotEnhancementProgress["trigger"];
+    backfillLease?: SnapshotBackfillLease;
   } = {}
 ): Promise<boolean> {
   const tab = await chrome.tabs.get(tabId).catch(() => null);
@@ -2589,10 +2869,26 @@ async function capturePageSnapshotForTab(
     options.resourceKey || (await resourceKeyForUrl(fallbackCanonicalUrl));
   const resource = await getLocalResource(resourceKey);
   if (!resource?.nativeBookmarkIds.length) return false;
+  if (
+    options.trigger === "batch_backfill" &&
+    (!options.backfillLease ||
+      !(await snapshotBackfillAllowsCapture(options.backfillLease)))
+  ) {
+    return false;
+  }
   const canonicalUrl = resource.canonicalUrl || fallbackCanonicalUrl;
 
-  const focusedWindow = await chrome.windows.getLastFocused();
-  if (focusedWindow.id !== tab.windowId) return false;
+  const [targetWindow, focusedWindow] = await Promise.all([
+    chrome.windows.get(tab.windowId),
+    chrome.windows.getLastFocused()
+  ]);
+  if (
+    targetWindow.focused !== true ||
+    focusedWindow.id !== tab.windowId ||
+    focusedWindow.focused !== true
+  ) {
+    return false;
+  }
   const [active] = await chrome.tabs.query({
     active: true,
     windowId: tab.windowId
@@ -2635,8 +2931,17 @@ async function capturePageSnapshotForTab(
   ) {
     return false;
   }
-  const stableFocusedWindow = await chrome.windows.getLastFocused();
-  if (stableFocusedWindow.id !== stableTab.windowId) return false;
+  const [stableTargetWindow, stableFocusedWindow] = await Promise.all([
+    chrome.windows.get(stableTab.windowId),
+    chrome.windows.getLastFocused()
+  ]);
+  if (
+    stableTargetWindow.focused !== true ||
+    stableFocusedWindow.id !== stableTab.windowId ||
+    stableFocusedWindow.focused !== true
+  ) {
+    return false;
+  }
   const [stableActive] = await chrome.tabs.query({
     active: true,
     windowId: stableTab.windowId
@@ -2660,6 +2965,13 @@ async function capturePageSnapshotForTab(
   }
   const resourceBeforeCapture = await getLocalResource(resourceKey);
   if (!resourceBeforeCapture?.nativeBookmarkIds.length) return false;
+  if (
+    options.trigger === "batch_backfill" &&
+    (!options.backfillLease ||
+      !(await snapshotBackfillAllowsCapture(options.backfillLease)))
+  ) {
+    return false;
+  }
 
   await updateStoredSnapshotProgress(resourceKey, {
     state: "capturing",
@@ -2676,7 +2988,10 @@ async function capturePageSnapshotForTab(
   // 截图调用本身是异步的。返回后再次确认同一文档仍是前台页，避免把用户
   // 刚切换到的页面按旧收藏 URL 落库。
   const capturedTab = await chrome.tabs.get(tabId).catch(() => null);
-  const capturedWindow = await chrome.windows.getLastFocused();
+  const [capturedTargetWindow, capturedWindow] = await Promise.all([
+    chrome.windows.get(tab.windowId),
+    chrome.windows.getLastFocused()
+  ]);
   const [capturedActive] = await chrome.tabs.query({
     active: true,
     windowId: tab.windowId
@@ -2687,7 +3002,9 @@ async function capturePageSnapshotForTab(
   });
   if (
     !capturedTab ||
+    capturedTargetWindow.focused !== true ||
     capturedWindow.id !== tab.windowId ||
+    capturedWindow.focused !== true ||
     capturedActive?.id !== tabId ||
     !isLoadedSnapshotTab(capturedTab, expectedLoadedUrl) ||
     capturedDocument?.result !== capturedTab.url ||
@@ -2701,6 +3018,19 @@ async function capturePageSnapshotForTab(
     pngDataUrl,
     capturedAt
   );
+  if (options.trigger === "batch_backfill") {
+    if (!options.backfillLease) return false;
+    const committed = await commitSnapshotBackfillCapture({
+      lease: options.backfillLease,
+      canonicalUrl,
+      snapshot,
+      capturedAt
+    });
+    // accepted=true 也包含“另一路已经先写入截图”的安全跳过；该项已结算，
+    // 定时器应停止且目标可以释放。
+    return committed.accepted;
+  }
+
   const resourceImmediatelyBeforeStore = await getLocalResource(resourceKey);
   if (!resourceImmediatelyBeforeStore?.nativeBookmarkIds.length) return false;
   await putPageSnapshot(snapshot);
@@ -2746,6 +3076,7 @@ interface PageSnapshotScheduleOptions {
   refreshExisting?: boolean;
   documentId?: string;
   trigger?: SnapshotEnhancementProgress["trigger"];
+  backfillLease?: SnapshotBackfillLease;
   onSettled?: (succeeded: boolean) => void;
 }
 
@@ -2774,7 +3105,8 @@ function schedulePageSnapshotForTab(
         showToast: options.showToast,
         documentId: options.documentId,
         trigger: options.trigger,
-        refreshExisting: options.refreshExisting
+        refreshExisting: options.refreshExisting,
+        backfillLease: options.backfillLease
       }
     )
       .catch(async (error) => {
@@ -2819,6 +3151,778 @@ function schedulePageSnapshotForTab(
   }, options.delayMs ?? AARRE_OPEN_PAGE_SNAPSHOT_DELAY_MS) as unknown as number;
   pageSnapshotTimers.set(tab.id, timer);
   return true;
+}
+
+async function snapshotBackfillForegroundTab(
+  job: StoredSnapshotBackfillJob
+): Promise<chrome.tabs.Tab | null> {
+  if (
+    typeof job.tabId !== "number" ||
+    typeof job.windowId !== "number"
+  ) {
+    return null;
+  }
+  const tab = await chrome.tabs.get(job.tabId).catch(() => null);
+  if (!tab || tab.windowId !== job.windowId) return null;
+  const [targetWindow, focusedWindow] = await Promise.all([
+    chrome.windows.get(job.windowId).catch(() => null),
+    chrome.windows.getLastFocused().catch(() => null)
+  ]);
+  // getLastFocused() 在 Chrome 整体退到后台后仍可能返回最近窗口，因此必须
+  // 同时核对 Window.focused。否则 Service Worker 恢复或超时 Alarm 会在
+  // 用户使用其他 App 时继续截图。
+  if (
+    targetWindow?.focused !== true ||
+    focusedWindow?.id !== job.windowId ||
+    focusedWindow.focused !== true
+  ) {
+    return null;
+  }
+  const [active] = await chrome.tabs.query({
+    active: true,
+    windowId: job.windowId
+  });
+  return active?.id === job.tabId ? tab : null;
+}
+
+function snapshotBackfillLeaseFromJob(
+  job: StoredSnapshotBackfillJob
+): SnapshotBackfillLease | undefined {
+  if (
+    !job.id ||
+    !job.currentResourceKey ||
+    typeof job.tabId !== "number" ||
+    !job.currentLease
+  ) {
+    return undefined;
+  }
+  return {
+    jobId: job.id,
+    resourceKey: job.currentResourceKey,
+    tabId: job.tabId,
+    token: job.currentLease
+  };
+}
+
+function snapshotBackfillTimeoutAlarmName(
+  lease: SnapshotBackfillLease
+): string {
+  return `${SNAPSHOT_BACKFILL_TIMEOUT_ALARM}:${lease.jobId}:${lease.token}`;
+}
+
+function snapshotBackfillTimeoutIdentity(
+  alarmName: string
+): { jobId: string; token: string } | undefined {
+  const prefix = `${SNAPSHOT_BACKFILL_TIMEOUT_ALARM}:`;
+  if (!alarmName.startsWith(prefix)) return undefined;
+  const [jobId, token, extra] = alarmName.slice(prefix.length).split(":");
+  if (!jobId || !token || extra) return undefined;
+  return { jobId, token };
+}
+
+async function clearSnapshotBackfillTimeouts(
+  jobId: string
+): Promise<void> {
+  await chrome.alarms.clear(SNAPSHOT_BACKFILL_TIMEOUT_ALARM);
+  const prefix = `${SNAPSHOT_BACKFILL_TIMEOUT_ALARM}:${jobId}:`;
+  const alarms = await chrome.alarms.getAll().catch(() => []);
+  await Promise.all(
+    alarms
+      .filter((alarm) => alarm.name.startsWith(prefix))
+      .map((alarm) => chrome.alarms.clear(alarm.name))
+  );
+}
+
+async function scheduleSnapshotBackfillTimeout(
+  lease: SnapshotBackfillLease
+): Promise<void> {
+  await clearSnapshotBackfillTimeouts(lease.jobId);
+  await chrome.alarms.create(snapshotBackfillTimeoutAlarmName(lease), {
+    delayInMinutes: SNAPSHOT_BACKFILL_PAGE_TIMEOUT_MINUTES
+  });
+}
+
+async function invalidateSnapshotBackfillCapture(
+  job: Pick<StoredSnapshotBackfillJob, "id" | "tabId">
+): Promise<void> {
+  if (typeof job.tabId === "number") {
+    clearPageSnapshotTimer(job.tabId);
+    await removeImmediateSnapshotTarget(job.tabId).catch(
+      () => undefined
+    );
+  }
+  if (job.id) await clearSnapshotBackfillTimeouts(job.id);
+}
+
+async function reserveSnapshotBackfillAttempt(
+  expected: StoredSnapshotBackfillJob,
+  resource: ResourceRecord,
+  forceNewLease: boolean
+): Promise<SnapshotBackfillLease | undefined> {
+  const nextToken = crypto.randomUUID();
+  return mutateStoredSnapshotBackfill((current) => {
+    if (
+      current.id !== expected.id ||
+      current.currentResourceKey !== resource.resourceKey ||
+      current.tabId !== expected.tabId ||
+      current.state !== "running" ||
+      typeof current.tabId !== "number"
+    ) {
+      return undefined;
+    }
+    if (!current.currentLease || forceNewLease) {
+      // 失焦/暂停只会撤销 capture lease，不应消耗网络重试次数。
+      // 首次真正导航计一次；只有超时/加载失败的 retry 才继续递增。
+      if (forceNewLease || current.currentAttempt === 0) {
+        current.currentAttempt += 1;
+      }
+      current.currentLease = nextToken;
+    }
+    current.currentTitle = resource.title || resource.url;
+    current.updatedAt = now();
+    return snapshotBackfillLeaseFromJob(current);
+  });
+}
+
+async function snapshotBackfillAllowsCapture(
+  lease: SnapshotBackfillLease
+): Promise<boolean> {
+  const job = await getStoredSnapshotBackfill();
+  return snapshotBackfillLeaseAllowsCapture(
+    {
+      state: job.state,
+      jobId: job.id,
+      currentResourceKey: job.currentResourceKey,
+      expectedTabId: job.tabId,
+      currentLease: job.currentLease
+    },
+    lease
+  );
+}
+
+async function setSnapshotBackfillWaitingFocus(): Promise<void> {
+  await mutateStoredSnapshotBackfill(async (job) => {
+    if (!["running", "waiting_focus"].includes(job.state)) return;
+    job.state = snapshotBackfillStateAfterFocusCheck(job.state, false);
+    // 立即吊销旧截图 promise 的提交资格。用户很快切回时会生成新 lease，
+    // 旧 promise 不能因为状态再次变为 running 而恢复写入权限。
+    job.currentLease = undefined;
+    job.updatedAt = now();
+    await invalidateSnapshotBackfillCapture(job);
+  });
+}
+
+async function cleanupSnapshotBackfillRuntime(
+  job: StoredSnapshotBackfillJob,
+  closeTab: boolean
+): Promise<void> {
+  await invalidateSnapshotBackfillCapture(job);
+  if (typeof job.tabId !== "number") return;
+  if (closeTab) {
+    await chrome.tabs.remove(job.tabId).catch(() => undefined);
+    await mutateStoredSnapshotBackfill((current) => {
+      if (
+        current.id !== job.id ||
+        !["completed", "cancelled", "failed"].includes(current.state)
+      ) {
+        return;
+      }
+      current.tabId = undefined;
+      current.windowId = undefined;
+      current.updatedAt = now();
+    });
+  }
+}
+
+async function recordSnapshotBackfillItem(
+  outcome: SnapshotBackfillOutcome,
+  message?: string,
+  expected?: {
+    jobId: string;
+    resourceKey: string;
+    leaseToken?: string;
+  }
+): Promise<StoredSnapshotBackfillJob> {
+  let recorded = false;
+  let recordedJobId = "";
+  const next = await mutateStoredSnapshotBackfill((job) => {
+    const resourceKey = job.currentResourceKey;
+    if (
+      job.state !== "running" ||
+      !resourceKey ||
+      (expected &&
+        (job.id !== expected.jobId ||
+          resourceKey !== expected.resourceKey ||
+          (expected.leaseToken !== undefined &&
+            job.currentLease !== expected.leaseToken)))
+    ) {
+      return { ...job };
+    }
+    const status = recordSnapshotBackfillOutcome(
+      publicSnapshotBackfill(job),
+      outcome,
+      outcome === "failed" && message
+        ? {
+            resourceKey,
+            title: job.currentTitle || "网页封面",
+            message
+          }
+        : undefined,
+      now()
+    );
+    Object.assign(job, status);
+    job.nextIndex = Math.min(
+      job.resourceKeys.length,
+      job.nextIndex + 1
+    );
+    job.currentResourceKey = undefined;
+    job.currentAttempt = 0;
+    job.currentLease = undefined;
+    recorded = true;
+    recordedJobId = job.id;
+    return { ...job };
+  });
+  if (recordedJobId) {
+    await clearSnapshotBackfillTimeouts(recordedJobId);
+  }
+  if (recorded && next.state === "completed") {
+    await cleanupSnapshotBackfillRuntime(next, true);
+  }
+  return next;
+}
+
+async function navigateSnapshotBackfillCurrent(
+  job: StoredSnapshotBackfillJob,
+  resource: ResourceRecord,
+  retry: boolean
+): Promise<"scheduled" | "waiting" | "settled"> {
+  if (typeof job.tabId !== "number") {
+    throw new Error("补拍标签页不存在。");
+  }
+  const foregroundTab = await snapshotBackfillForegroundTab(job);
+  if (!foregroundTab) {
+    await setSnapshotBackfillWaitingFocus();
+    return "waiting";
+  }
+  const lease = await reserveSnapshotBackfillAttempt(
+    job,
+    resource,
+    retry
+  );
+  if (!lease) return "waiting";
+  let prepared: ImmediatePageSnapshotTarget | undefined;
+  try {
+    prepared = await prepareImmediateSnapshotTargetForNavigation(
+      job.tabId,
+      resource,
+      resource.url,
+      "batch_backfill",
+      false,
+      lease
+    );
+    if (!prepared) {
+      await recordSnapshotBackfillItem("skipped", undefined, {
+        jobId: lease.jobId,
+        resourceKey: lease.resourceKey,
+        leaseToken: lease.token
+      });
+      return "settled";
+    }
+    if (!(await snapshotBackfillAllowsCapture(lease))) {
+      await removeImmediateSnapshotTarget(job.tabId, prepared).catch(
+        () => undefined
+      );
+      return "waiting";
+    }
+    await scheduleSnapshotBackfillTimeout(lease);
+    let navigated: chrome.tabs.Tab;
+    if (
+      retry &&
+      foregroundTab.url &&
+      resourceMatchesLoadedUrl(resource, foregroundTab.url)
+    ) {
+      await chrome.tabs.reload(job.tabId);
+      navigated = await chrome.tabs.get(job.tabId);
+    } else {
+      const updated = await chrome.tabs.update(job.tabId, {
+        url: resource.url
+      });
+      if (!updated) throw new Error("Chrome 未能打开待补拍网页。");
+      navigated = updated;
+    }
+    await rememberImmediateSnapshotTarget(
+      navigated,
+      resource.canonicalUrl,
+      AARRE_OPEN_PAGE_SNAPSHOT_DELAY_MS,
+      false,
+      resource.resourceKey,
+      undefined,
+      "batch_backfill",
+      lease
+    );
+    return "scheduled";
+  } catch (error) {
+    if (prepared) {
+      await removeImmediateSnapshotTarget(job.tabId, prepared).catch(
+        () => undefined
+      );
+    }
+    await recordSnapshotBackfillItem("failed", errorMessage(error), {
+      jobId: lease.jobId,
+      resourceKey: lease.resourceKey,
+      leaseToken: lease.token
+    });
+    return "settled";
+  }
+}
+
+async function driveSnapshotBackfill(): Promise<void> {
+  if (snapshotBackfillDriving) return;
+  snapshotBackfillDriving = true;
+  try {
+    while (true) {
+      let job = await getStoredSnapshotBackfill();
+      if (!["running", "waiting_focus"].includes(job.state)) return;
+      const foregroundTab = await snapshotBackfillForegroundTab(job);
+      if (!foregroundTab) {
+        await setSnapshotBackfillWaitingFocus();
+        return;
+      }
+      if (job.state === "waiting_focus") {
+        await mutateStoredSnapshotBackfill((current) => {
+          if (
+            current.id === job.id &&
+            current.state === "waiting_focus"
+          ) {
+            current.state = snapshotBackfillStateAfterFocusCheck(
+              current.state,
+              true
+            );
+            current.updatedAt = now();
+          }
+        });
+        job = await getStoredSnapshotBackfill();
+      }
+      if (!job.currentResourceKey) {
+        if (job.nextIndex >= job.resourceKeys.length) {
+          await mutateStoredSnapshotBackfill((current) => {
+            if (current.id !== job.id) return;
+            current.state = "completed";
+            current.currentTitle = "";
+            current.completedAt = now();
+            current.updatedAt = now();
+          });
+          const completed = await getStoredSnapshotBackfill();
+          await cleanupSnapshotBackfillRuntime(completed, true);
+          return;
+        }
+        const resourceKey = job.resourceKeys[job.nextIndex]!;
+        const resource = await getLocalResource(resourceKey);
+        await mutateStoredSnapshotBackfill((current) => {
+          if (
+            current.id !== job.id ||
+            current.nextIndex !== job.nextIndex ||
+            current.currentResourceKey
+          ) {
+            return;
+          }
+          current.currentResourceKey = resourceKey;
+          current.currentTitle =
+            resource?.title || resource?.url || "检查网页";
+          current.currentAttempt = 0;
+          current.currentLease = undefined;
+          current.updatedAt = now();
+        });
+        continue;
+      }
+
+      const resource = await getLocalResource(job.currentResourceKey);
+      if (!resource?.nativeBookmarkIds.length) {
+        await recordSnapshotBackfillItem(
+          "skipped",
+          "书签已被移除。",
+          {
+            jobId: job.id,
+            resourceKey: job.currentResourceKey
+          }
+        );
+        continue;
+      }
+      const settings = await getDisplaySettings();
+      if (
+        !settings.pageSnapshotsEnabled ||
+        isSnapshotSensitiveUrl(
+          resource.url,
+          settings.snapshotExcludedHosts
+        )
+      ) {
+        await recordSnapshotBackfillItem(
+          "skipped",
+          "内部、隐私保护或用户排除页面不会截图。",
+          {
+            jobId: job.id,
+            resourceKey: job.currentResourceKey
+          }
+        );
+        continue;
+      }
+      if (await getPageSnapshot(resource.canonicalUrl)) {
+        await recordSnapshotBackfillItem("skipped", undefined, {
+          jobId: job.id,
+          resourceKey: job.currentResourceKey
+        });
+        continue;
+      }
+
+      if (
+        foregroundTab.status === "complete" &&
+        foregroundTab.url &&
+        resourceMatchesLoadedUrl(resource, foregroundTab.url)
+      ) {
+        const lease = await reserveSnapshotBackfillAttempt(
+          job,
+          resource,
+          false
+        );
+        if (!lease) return;
+        await rememberImmediateSnapshotTarget(
+          foregroundTab,
+          resource.canonicalUrl,
+          AARRE_OPEN_PAGE_SNAPSHOT_DELAY_MS,
+          false,
+          resource.resourceKey,
+          undefined,
+          "batch_backfill",
+          lease
+        );
+        await scheduleSnapshotBackfillTimeout(lease);
+        return;
+      }
+
+      try {
+        const navigation = await navigateSnapshotBackfillCurrent(
+          job,
+          resource,
+          false
+        );
+        if (navigation === "waiting") {
+          const latest = await getStoredSnapshotBackfill();
+          if (latest.state !== "running") return;
+          return;
+        }
+        if (navigation === "settled") continue;
+      } catch (error) {
+        await recordSnapshotBackfillItem(
+          "failed",
+          errorMessage(error),
+          {
+            jobId: job.id,
+            resourceKey: job.currentResourceKey
+          }
+        );
+        continue;
+      }
+      return;
+    }
+  } finally {
+    snapshotBackfillDriving = false;
+  }
+}
+
+async function startSnapshotBackfill(): Promise<SnapshotBackfillStatus> {
+  const existing = await getStoredSnapshotBackfill();
+  if (
+    ["running", "waiting_focus", "paused"].includes(existing.state)
+  ) {
+    return publicSnapshotBackfill(existing);
+  }
+  // 先与真实 Chrome 书签树对齐，避免旧的本地绑定让已删除书签进入任务，
+  // 也确保安装前已有的原生收藏全部成为候选。
+  await importNativeBookmarks();
+  const candidates = await currentSnapshotBackfillCandidates();
+  const timestamp = now();
+  const job: StoredSnapshotBackfillJob = {
+    ...emptyStoredSnapshotBackfill(),
+    id: crypto.randomUUID(),
+    state: candidates.length ? "running" : "completed",
+    total: candidates.length,
+    startedAt: timestamp,
+    updatedAt: timestamp,
+    ...(candidates.length ? {} : { completedAt: timestamp }),
+    resourceKeys: candidates.map((resource) => resource.resourceKey)
+  };
+  await setStoredSnapshotBackfill(job);
+  if (!candidates.length) return publicSnapshotBackfill(job);
+
+  try {
+    // 只有用户点击“补齐缺失封面”才会新建并激活此专用标签页。
+    // 后续状态机不会主动激活标签或聚焦窗口。
+    const tab = await chrome.tabs.create({ active: true });
+    if (
+      typeof tab.id !== "number" ||
+      typeof tab.windowId !== "number"
+    ) {
+      throw new Error("Chrome 未能创建补拍标签页。");
+    }
+    const mutedTab =
+      (await chrome.tabs.update(tab.id, { muted: true })) || tab;
+    const withTab: StoredSnapshotBackfillJob = {
+      ...job,
+      tabId: mutedTab.id,
+      windowId: mutedTab.windowId,
+      updatedAt: now()
+    };
+    await setStoredSnapshotBackfill(withTab);
+    await driveSnapshotBackfill();
+    return publicSnapshotBackfill(
+      await getStoredSnapshotBackfill()
+    );
+  } catch (error) {
+    const failed = await mutateStoredSnapshotBackfill((current) => {
+      if (current.id !== job.id) return { ...current };
+      current.state = "failed";
+      current.updatedAt = now();
+      current.completedAt = now();
+      current.errors = [
+        ...current.errors,
+        {
+          resourceKey: current.currentResourceKey || "",
+          title: current.currentTitle || "批量补拍",
+          message: errorMessage(error)
+        }
+      ].slice(-20);
+      return { ...current };
+    });
+    await cleanupSnapshotBackfillRuntime(failed, true);
+    return publicSnapshotBackfill(failed);
+  }
+}
+
+async function currentSnapshotBackfillCandidates(): Promise<
+  ResourceRecord[]
+> {
+  const [resources, snapshots, settings] = await Promise.all([
+    getLocalResources(),
+    getPageSnapshots(),
+    getDisplaySettings()
+  ]);
+  return settings.pageSnapshotsEnabled
+    ? snapshotBackfillCandidates(
+        resources,
+        new Set(snapshots.map((snapshot) => snapshot.canonicalUrl)),
+        settings.snapshotExcludedHosts
+      )
+    : [];
+}
+
+async function getSnapshotBackfillStatus(
+  includeCandidateCount = false
+): Promise<SnapshotBackfillStatus> {
+  const status = publicSnapshotBackfill(
+    await getStoredSnapshotBackfill()
+  );
+  if (!includeCandidateCount) return status;
+  if (
+    ["running", "waiting_focus", "paused"].includes(status.state)
+  ) {
+    return {
+      ...status,
+      candidateCount: Math.max(0, status.total - status.processed)
+    };
+  }
+  return {
+    ...status,
+    candidateCount: (await currentSnapshotBackfillCandidates()).length
+  };
+}
+
+async function updateSnapshotBackfillState(
+  state: "paused" | "running" | "cancelled"
+): Promise<SnapshotBackfillStatus> {
+  let job = await getStoredSnapshotBackfill();
+  if (!job.id) {
+    throw new Error("当前没有封面补拍任务。");
+  }
+  if (state === "running") {
+    if (!["paused", "waiting_focus", "failed"].includes(job.state)) {
+      return publicSnapshotBackfill(job);
+    }
+    let createdTab = false;
+    let tab =
+      typeof job.tabId === "number"
+        ? await chrome.tabs.get(job.tabId).catch(() => null)
+        : null;
+    if (!tab) {
+      // “继续”是明确用户手势；仅此处可以重新创建并激活任务标签页。
+      tab = await chrome.tabs.create({ active: true });
+      createdTab = true;
+    } else {
+      if (typeof tab.windowId === "number") {
+        await chrome.windows.update(tab.windowId, { focused: true });
+      }
+      tab =
+        (await chrome.tabs.update(tab.id!, { active: true })) || null;
+    }
+    if (
+      !tab ||
+      typeof tab.id !== "number" ||
+      typeof tab.windowId !== "number"
+    ) {
+      throw new Error("Chrome 未能恢复补拍标签页。");
+    }
+    tab =
+      (await chrome.tabs.update(tab.id, { muted: true })) || tab;
+    const expectedJobId = job.id;
+    let resumed = false;
+    job = await mutateStoredSnapshotBackfill((current) => {
+      if (
+        current.id !== expectedJobId ||
+        !["paused", "waiting_focus", "failed"].includes(current.state)
+      ) {
+        return { ...current };
+      }
+      current.state = "running";
+      current.currentLease = undefined;
+      current.tabId = tab!.id;
+      current.windowId = tab!.windowId;
+      current.updatedAt = now();
+      current.completedAt = undefined;
+      resumed = true;
+      return { ...current };
+    });
+    if (resumed) {
+      void driveSnapshotBackfill();
+    } else if (createdTab && typeof tab.id === "number") {
+      await chrome.tabs.remove(tab.id).catch(() => undefined);
+    }
+    return publicSnapshotBackfill(job);
+  }
+
+  if (!["running", "waiting_focus", "paused"].includes(job.state)) {
+    return publicSnapshotBackfill(job);
+  }
+  const expectedJobId = job.id;
+  let changed = false;
+  job = await mutateStoredSnapshotBackfill(async (current) => {
+    if (
+      current.id !== expectedJobId ||
+      !["running", "waiting_focus", "paused"].includes(current.state)
+    ) {
+      return { ...current };
+    }
+    current.state = state;
+    current.currentLease = undefined;
+    current.currentTitle = state === "paused"
+      ? current.currentTitle
+      : "";
+    current.updatedAt = now();
+    if (state === "cancelled") current.completedAt = now();
+    await invalidateSnapshotBackfillCapture(current);
+    changed = true;
+    return { ...current };
+  });
+  if (changed && state === "cancelled") {
+    await cleanupSnapshotBackfillRuntime(job, true);
+  }
+  return publicSnapshotBackfill(job);
+}
+
+async function retryOrFailSnapshotBackfillCurrent(
+  reason: string,
+  expectedTimeout: { jobId: string; token: string }
+): Promise<void> {
+  if (snapshotBackfillRetrying) return;
+  snapshotBackfillRetrying = true;
+  try {
+    const job = await getStoredSnapshotBackfill();
+    if (
+      job.state !== "running" ||
+      job.id !== expectedTimeout.jobId ||
+      job.currentLease !== expectedTimeout.token ||
+      !job.currentResourceKey ||
+      typeof job.tabId !== "number"
+    ) {
+      return;
+    }
+    const foregroundTab = await snapshotBackfillForegroundTab(job);
+    if (!foregroundTab) {
+      await setSnapshotBackfillWaitingFocus();
+      return;
+    }
+    const resource = await getLocalResource(job.currentResourceKey);
+    if (!resource?.nativeBookmarkIds.length) {
+      await recordSnapshotBackfillItem("skipped", "书签已被移除。", {
+        jobId: job.id,
+        resourceKey: job.currentResourceKey,
+        leaseToken: expectedTimeout.token
+      });
+      void driveSnapshotBackfill();
+      return;
+    }
+    if (job.currentAttempt >= SNAPSHOT_BACKFILL_MAX_ATTEMPTS) {
+      await recordSnapshotBackfillItem("failed", reason, {
+        jobId: job.id,
+        resourceKey: job.currentResourceKey,
+        leaseToken: expectedTimeout.token
+      });
+      void driveSnapshotBackfill();
+      return;
+    }
+    try {
+      const navigation = await navigateSnapshotBackfillCurrent(
+        job,
+        resource,
+        true
+      );
+      if (navigation === "settled") void driveSnapshotBackfill();
+    } catch (error) {
+      await recordSnapshotBackfillItem(
+        "failed",
+        errorMessage(error),
+        {
+          jobId: job.id,
+          resourceKey: job.currentResourceKey,
+          leaseToken: expectedTimeout.token
+        }
+      );
+      void driveSnapshotBackfill();
+    }
+  } finally {
+    snapshotBackfillRetrying = false;
+  }
+}
+
+async function recoverSnapshotBackfill(): Promise<void> {
+  const job = await getStoredSnapshotBackfill();
+  if (!["running", "waiting_focus"].includes(job.state)) return;
+  const tab =
+    typeof job.tabId === "number"
+      ? await chrome.tabs.get(job.tabId).catch(() => null)
+      : null;
+  if (!tab) {
+    await mutateStoredSnapshotBackfill((current) => {
+      if (!["running", "waiting_focus"].includes(current.state)) {
+        return;
+      }
+      current.state = "paused";
+      current.updatedAt = now();
+      current.errors = [
+        ...current.errors,
+        {
+          resourceKey: current.currentResourceKey || "",
+          title: current.currentTitle || "批量补拍",
+          message:
+            "补拍标签页已关闭。请在收藏库中点击继续后恢复。"
+        }
+      ].slice(-20);
+    });
+    return;
+  }
+  if (await snapshotBackfillForegroundTab(job)) {
+    void driveSnapshotBackfill();
+  } else {
+    await setSnapshotBackfillWaitingFocus();
+  }
 }
 
 async function findOrCreateNativeBookmark(
@@ -5180,6 +6284,18 @@ async function handleRequest(request: ExtensionRequest): Promise<unknown> {
       return getLibraryScanEstimate(Boolean(request.force));
     case "GET_LIBRARY_SCAN":
       return publicLibraryScan(await getStoredLibraryScan());
+    case "START_SNAPSHOT_BACKFILL":
+      return startSnapshotBackfill();
+    case "GET_SNAPSHOT_BACKFILL":
+      return getSnapshotBackfillStatus(
+        Boolean(request.includeCandidateCount)
+      );
+    case "PAUSE_SNAPSHOT_BACKFILL":
+      return updateSnapshotBackfillState("paused");
+    case "RESUME_SNAPSHOT_BACKFILL":
+      return updateSnapshotBackfillState("running");
+    case "CANCEL_SNAPSHOT_BACKFILL":
+      return updateSnapshotBackfillState("cancelled");
     case "GET_AI_USAGE":
       return getAiUsageStats();
     case "PAUSE_LIBRARY_SCAN":
@@ -5300,6 +6416,7 @@ chrome.runtime.onInstalled.addListener(() => {
       void runLibraryScan();
     }
   });
+  void recoverSnapshotBackfill();
   void chrome.omnibox.setDefaultSuggestion({
     description:
       "搜索 Chrome 书签、历史记录和标签页，或使用默认搜索引擎"
@@ -5512,7 +6629,17 @@ chrome.webNavigation.onCommitted.addListener((details) => {
     });
     if (!directMatch) {
       // 只有 Chrome 明确认定为 server/client redirect 才登记别名；
-      // 普通用户导航绝不会借用原收藏任务。
+      // 普通用户导航绝不会借用原收藏任务。隐私保护目标也不写入资源身份，
+      // 避免把银行、支付或医疗落地页永久关联到普通收藏。
+      const display = await getDisplaySettings();
+      if (
+        isSnapshotSensitiveUrl(
+          details.url,
+          display.snapshotExcludedHosts
+        )
+      ) {
+        return;
+      }
       const latest = await getLocalResource(target.resourceKey);
       if (latest?.nativeBookmarkIds.length) {
         await upsertLocalResource({
@@ -5524,6 +6651,80 @@ chrome.webNavigation.onCommitted.addListener((details) => {
         });
       }
     }
+  })().catch(() => undefined);
+});
+
+chrome.webNavigation.onCommitted.addListener((details) => {
+  if (details.frameId !== 0) return;
+  void (async () => {
+    const job = await getStoredSnapshotBackfill();
+    if (
+      job.state !== "running" ||
+      job.tabId !== details.tabId ||
+      !job.currentResourceKey
+    ) {
+      return;
+    }
+    const resource = await getLocalResource(job.currentResourceKey);
+    if (!resource?.nativeBookmarkIds.length) return;
+    const privacySettings = await getDisplaySettings();
+    if (
+      isSnapshotSensitiveUrl(
+        details.url,
+        privacySettings.snapshotExcludedHosts
+      )
+    ) {
+      const lease = snapshotBackfillLeaseFromJob(job);
+      await recordSnapshotBackfillItem(
+        "skipped",
+        "重定向后的网页属于隐私保护范围。",
+        {
+          jobId: job.id,
+          resourceKey: job.currentResourceKey,
+          ...(lease ? { leaseToken: lease.token } : {})
+        }
+      );
+      void driveSnapshotBackfill();
+      return;
+    }
+    const target = await readImmediateSnapshotTarget(details.tabId);
+    const directMatch = resourceMatchesLoadedUrl(resource, details.url);
+    const redirectSourceMatches = resourceMatchesLoadedUrl(
+      resource,
+      target?.navigationStartUrl || target?.targetUrl || resource.url
+    );
+    if (
+      acceptsSnapshotNavigationCommit({
+        directMatch,
+        redirectSourceMatches,
+        transitionQualifiers: details.transitionQualifiers
+      })
+    ) {
+      return;
+    }
+    await mutateStoredSnapshotBackfill(async (current) => {
+      if (
+        current.id !== job.id ||
+        current.state !== "running" ||
+        current.tabId !== details.tabId ||
+        current.currentResourceKey !== job.currentResourceKey
+      ) {
+        return;
+      }
+      current.state = "paused";
+      current.currentLease = undefined;
+      current.updatedAt = now();
+      current.errors = [
+        ...current.errors,
+        {
+          resourceKey: current.currentResourceKey || "",
+          title: current.currentTitle || "批量补拍",
+          message:
+            "补拍标签页被导航到其他网页，任务已暂停，避免覆盖错误封面。"
+        }
+      ].slice(-20);
+      await invalidateSnapshotBackfillCapture(current);
+    });
   })().catch(() => undefined);
 });
 
@@ -5540,6 +6741,39 @@ chrome.webNavigation.onCompleted.addListener((details) => {
       );
     })
     .catch(() => undefined);
+});
+
+chrome.webNavigation.onErrorOccurred.addListener((details) => {
+  if (details.frameId !== 0) return;
+  void (async () => {
+    // Chrome 在用户主动切换导航、重定向或刷新时常用 ERR_ABORTED
+    // 终止旧请求。它不是可重试的站点失败；新 committed 事件会负责
+    // 接受合法重定向或暂停被用户改作他用的补拍标签。
+    if (details.error === "net::ERR_ABORTED") return;
+    const job = await getStoredSnapshotBackfill();
+    if (
+      job.state === "running" &&
+      job.tabId === details.tabId &&
+      job.currentResourceKey
+    ) {
+      const resource = await getLocalResource(job.currentResourceKey);
+      if (
+        !resource?.nativeBookmarkIds.length ||
+        !resourceMatchesLoadedUrl(resource, details.url)
+      ) {
+        return;
+      }
+      const lease = snapshotBackfillLeaseFromJob(job);
+      if (lease) {
+        await retryOrFailSnapshotBackfillCurrent(
+          `网页加载失败：${details.error || "未知网络错误"}`,
+          { jobId: lease.jobId, token: lease.token }
+        );
+      } else {
+        await recoverSnapshotBackfill();
+      }
+    }
+  })().catch(() => undefined);
 });
 
 chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
@@ -5560,11 +6794,23 @@ chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
 chrome.tabs.onActivated.addListener(({ tabId }) => {
   void chrome.tabs
     .get(tabId)
-    .then((tab) => {
+    .then(async (tab) => {
       void refreshPageContextMenuState(tab);
       if (tab.status === "complete") {
         void scheduleImmediateSnapshotIfReady(tab);
         void coordinateActiveBookmarkedPage(tab);
+      }
+      const job = await getStoredSnapshotBackfill();
+      if (
+        ["running", "waiting_focus"].includes(job.state) &&
+        typeof job.windowId === "number" &&
+        tab.windowId === job.windowId
+      ) {
+        if (job.tabId === tabId) {
+          void driveSnapshotBackfill();
+        } else {
+          await setSnapshotBackfillWaitingFocus();
+        }
       }
     })
     .catch(() => undefined);
@@ -5573,17 +6819,51 @@ chrome.tabs.onActivated.addListener(({ tabId }) => {
 chrome.tabs.onRemoved.addListener((tabId) => {
   clearPageSnapshotTimer(tabId);
   void removeImmediateSnapshotTarget(tabId);
+  void (async () => {
+    const job = await getStoredSnapshotBackfill();
+    if (
+      job.tabId !== tabId ||
+      !["running", "waiting_focus", "paused"].includes(job.state)
+    ) {
+      return;
+    }
+    await mutateStoredSnapshotBackfill(async (current) => {
+      if (current.id !== job.id || current.tabId !== tabId) return;
+      current.state = "cancelled";
+      current.currentLease = undefined;
+      current.currentTitle = "";
+      current.updatedAt = now();
+      current.completedAt = now();
+      await invalidateSnapshotBackfillCapture(current);
+    });
+  })().catch(() => undefined);
 });
 
 chrome.windows.onFocusChanged.addListener((windowId) => {
-  if (windowId === chrome.windows.WINDOW_ID_NONE) return;
+  if (windowId === chrome.windows.WINDOW_ID_NONE) {
+    void (async () => {
+      const job = await getStoredSnapshotBackfill();
+      if (["running", "waiting_focus"].includes(job.state)) {
+        await setSnapshotBackfillWaitingFocus();
+      }
+    })().catch(() => undefined);
+    return;
+  }
   void chrome.tabs
     .query({ active: true, windowId })
-    .then(([tab]) => {
+    .then(async ([tab]) => {
       void refreshPageContextMenuState(tab);
       if (tab?.status === "complete") {
         void scheduleImmediateSnapshotIfReady(tab);
         void coordinateActiveBookmarkedPage(tab);
+      }
+      const job = await getStoredSnapshotBackfill();
+      if (["running", "waiting_focus"].includes(job.state)) {
+        if (job.windowId === windowId && job.tabId === tab?.id) {
+          void driveSnapshotBackfill();
+        } else {
+          await setSnapshotBackfillWaitingFocus();
+        }
       }
     })
     .catch(() => undefined);
@@ -5773,6 +7053,7 @@ chrome.runtime.onStartup.addListener(() => {
       await scheduleLibraryScan();
       void runLibraryScan();
     }
+    await recoverSnapshotBackfill();
     void processBookmarkEnhancements();
   })().catch(() => undefined);
 });
@@ -5784,5 +7065,17 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     void runLibraryScan();
   } else if (alarm.name === BOOKMARK_ENHANCEMENT_ALARM) {
     void processBookmarkEnhancements();
+  } else if (alarm.name === SNAPSHOT_BACKFILL_TIMEOUT_ALARM) {
+    // 兼容升级前遗留的无身份 alarm：只恢复状态，不允许它直接推进任何
+    // 新 job/attempt。新的 alarm 一律携带 jobId + lease。
+    void recoverSnapshotBackfill();
+  } else {
+    const timeout = snapshotBackfillTimeoutIdentity(alarm.name);
+    if (timeout) {
+      void retryOrFailSnapshotBackfillCurrent(
+        "网页在限定时间内没有完成稳定加载。",
+        timeout
+      );
+    }
   }
 });

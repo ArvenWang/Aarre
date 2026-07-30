@@ -18,6 +18,7 @@ import {
 import { ResourceIdentity } from "../../components/ResourceIdentity";
 import { LibraryCardEditor } from "../components/LibraryCardEditor";
 import { LibraryCardCover } from "../components/LibraryCardCover";
+import { SnapshotBackfillControl } from "../components/SnapshotBackfillControl";
 import {
   ALL_LIBRARY_FOLDERS,
   resourceFolderLabel,
@@ -51,6 +52,7 @@ interface LibraryViewProps {
   query: string;
   action: string;
   siteBrandByHost: Map<string, SiteBrandRecord>;
+  missingSnapshotCount?: number;
   onFilterChange: (filter: LibraryFilter) => void;
   onFolderChange: (folderId: string) => void;
   onSortChange: (sort: LibrarySort) => void;
@@ -59,6 +61,7 @@ interface LibraryViewProps {
   onSearch: () => void;
   onClearSearch: () => void;
   onResourceChanged: (message: string) => void;
+  onSnapshotBackfillChanged?: () => void;
   onOpenResource: (url: string) => void;
   onRefresh: () => void;
 }
@@ -167,6 +170,7 @@ export function LibraryView({
   query,
   action,
   siteBrandByHost,
+  missingSnapshotCount = 0,
   onFilterChange,
   onFolderChange,
   onSortChange,
@@ -175,6 +179,7 @@ export function LibraryView({
   onSearch,
   onClearSearch,
   onResourceChanged,
+  onSnapshotBackfillChanged,
   onOpenResource,
   onRefresh
 }: LibraryViewProps) {
@@ -294,62 +299,69 @@ export function LibraryView({
           </div>
         </div>
 
-        <p className="library-scope-summary" aria-live="polite">
-          {scopeParts.length
-            ? `${scopeParts.join(" · ")} · 当前显示 ${visibleResults.length} 项`
-            : `直接读取 Chrome 原生书签 · ${libraryCount} 项`}
-        </p>
-
-        <div className="library-controls" aria-label="收藏筛选与排序">
-          <label className="library-select-control">
-            <span>文件夹</span>
-            <select
-              value={folderId}
-              onChange={(event) =>
-                onFolderChange(event.currentTarget.value)
-              }
-              aria-label="按 Chrome 书签文件夹筛选"
-            >
-              <option value={ALL_LIBRARY_FOLDERS}>
-                所有文件夹（{libraryCount}）
-              </option>
-              {folders.map((folder) => (
-                <option value={folder.id} key={folder.id}>
-                  {folder.label}（{folder.count}）
+        <div className="library-toolbar-secondary">
+          <div className="library-controls" aria-label="收藏筛选与排序">
+            <label className="library-select-control">
+              <span>文件夹</span>
+              <select
+                value={folderId}
+                onChange={(event) =>
+                  onFolderChange(event.currentTarget.value)
+                }
+                aria-label="按 Chrome 书签文件夹筛选"
+              >
+                <option value={ALL_LIBRARY_FOLDERS}>
+                  所有文件夹（{libraryCount}）
                 </option>
-              ))}
-            </select>
-          </label>
+                {folders.map((folder) => (
+                  <option value={folder.id} key={folder.id}>
+                    {folder.label}（{folder.count}）
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          <label className="library-select-control">
-            <span>排序</span>
-            <select
-              value={sort}
-              onChange={(event) =>
-                onSortChange(event.currentTarget.value as LibrarySort)
-              }
-              aria-label="收藏排序方式"
-            >
-              <option value="default">
-                {query ? "搜索相关度" : "Chrome 顺序"}
-              </option>
-              <option value="bookmarked-desc">最近收藏</option>
-              <option value="bookmarked-asc">最早收藏</option>
-              <option value="used-desc">最近使用</option>
-              <option value="updated-desc">最近更新</option>
-              <option value="title-asc">标题 A–Z</option>
-            </select>
-          </label>
+            <label className="library-select-control">
+              <span>排序</span>
+              <select
+                value={sort}
+                onChange={(event) =>
+                  onSortChange(event.currentTarget.value as LibrarySort)
+                }
+                aria-label="收藏排序方式"
+              >
+                <option value="default">
+                  {query ? "搜索相关度" : "Chrome 顺序"}
+                </option>
+                <option value="bookmarked-desc">最近收藏</option>
+                <option value="bookmarked-asc">最早收藏</option>
+                <option value="used-desc">最近使用</option>
+                <option value="updated-desc">最近更新</option>
+                <option value="title-asc">标题 A–Z</option>
+              </select>
+            </label>
 
-          {hasControlFilters ? (
-            <button
-              type="button"
-              className="text-button library-clear-filters"
-              onClick={onClearFilters}
-            >
-              清除筛选
-            </button>
-          ) : null}
+            {hasControlFilters ? (
+              <button
+                type="button"
+                className="text-button library-clear-filters"
+                onClick={onClearFilters}
+              >
+                清除筛选
+              </button>
+            ) : null}
+
+            <SnapshotBackfillControl
+              missingCount={missingSnapshotCount}
+              onCollectionChanged={onSnapshotBackfillChanged}
+            />
+          </div>
+
+          <p className="library-scope-summary" aria-live="polite">
+            {scopeParts.length
+              ? `${scopeParts.join(" · ")} · 当前显示 ${visibleResults.length} 项`
+              : `直接读取 Chrome 原生书签 · ${libraryCount} 项`}
+          </p>
         </div>
       </section>
 

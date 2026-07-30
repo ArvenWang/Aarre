@@ -32,6 +32,7 @@ export interface SnapshotEnhancementProgress {
     | "aarre_save"
     | "aarre_open"
     | "normal_browse"
+    | "batch_backfill"
     | "recovery";
   updatedAt: string;
   tabId?: number;
@@ -53,6 +54,14 @@ export interface BookmarkEnhancementJob {
   lastError?: string;
   snapshot?: SnapshotEnhancementProgress;
   ai?: AiEnhancementProgress;
+}
+
+export function enhancementTriggerAllowsRenderedAi(
+  trigger: SnapshotEnhancementProgress["trigger"]
+): boolean {
+  // “补齐缺失封面”是零 AI 费用的截图任务。AI 全目录增强必须继续走
+  // 另一个显式扫描入口、费用预估和用户确认，不能被截图队列暗中触发。
+  return trigger !== "batch_backfill";
 }
 
 export function snapshotCapturePolicy(input: {
