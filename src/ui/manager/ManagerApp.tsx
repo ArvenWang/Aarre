@@ -6,6 +6,7 @@ import {
   getDisplaySettings,
   type ListCoverStyle
 } from "../../lib/display-settings";
+import { visibleFolderLabel } from "../../lib/folder-options";
 import type {
   AppState,
   BookmarkAgentActionExecutionResult,
@@ -753,7 +754,7 @@ export function ManagerApp() {
                       {item.title}
                     </a>
                   </h3>
-                  <p>{item.path.join(" / ") || "书签栏"}</p>
+                  <p>{visibleFolderLabel(item.path)}</p>
                   <small>
                     {item.dateLastUsed
                       ? `上次通过书签打开：${displayTimestamp(item.dateLastUsed)}`
@@ -901,7 +902,7 @@ export function ManagerApp() {
                   </a>
                 </h3>
                 <p>{item.reason}</p>
-                <small>{item.path.join(" / ") || "书签栏"}</small>
+                <small>{visibleFolderLabel(item.path)}</small>
               </article>
             ))}
           </section>
@@ -1008,7 +1009,7 @@ export function ManagerApp() {
               ? "切换到“全部”查看当前收藏。"
               : query
                 ? "换一种标题、标签、摘要描述或拼音首字母再试。"
-                : "Chrome 书签栏中的内容会自动出现在这里，无需导入。"}
+                : "Chrome 书签中的内容会自动出现在这里，无需导入。"}
           </p>
         </div>
       )}

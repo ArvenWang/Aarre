@@ -3,6 +3,7 @@ import {
   searchLocalIndex,
   type LocalSearchIndexItem
 } from "./search";
+import { visibleFolderLabel } from "./folder-options";
 import type {
   BookmarkAgentActionProposal,
   BookmarkAgentCatalog,
@@ -20,7 +21,8 @@ const LARGE_FOLDER_THRESHOLD = 150;
 const MAX_READING_QUEUE = 200;
 
 function pathLabel(path: string[], title?: string): string {
-  return [...path, ...(title ? [title] : [])].join(" / ") || "书签栏";
+  const folder = visibleFolderLabel(path);
+  return title ? `${folder} / ${title}` : folder;
 }
 
 function actionId(prefix: string, nodeId: string): string {
@@ -66,25 +68,41 @@ function duplicateProposal(
     (node) => node.id !== keep.id && node.writable
   );
   if (!removable.length) return null;
+  const keepFolder = pathLabel(keep.path);
+  const sameFolder = removable.every(
+    (node) => pathLabel(node.path) === keepFolder
+  );
   return {
     id: `duplicate:${resource.resourceKey}`,
     kind: "duplicate",
     title: `合并 ${nodes.length} 个重复收藏`,
-    description: `保留最早收藏的「${resource.title}」，其余副本默认不勾选，需你明确确认后才会删除。`,
+    description: sameFolder
+      ? `同一位置存在 ${nodes.length} 个完全相同的收藏。将保留较早的 1 个，删除 ${removable.length} 个副本。`
+      : `同一网页收藏了 ${nodes.length} 次。将保留较早的一条，其余副本需你确认后才会删除。`,
     destructive: true,
     selectedByDefault: false,
     actions: removable.map((node) =>
-      deleteAction(node, `保留 ${pathLabel(keep.path, keep.title)} 中更早的收藏`)
+      deleteAction(
+        node,
+        `保留较早副本；删除 ${pathLabel(node.path)} 中的重复记录`
+      )
     ),
     resourceKeys: [resource.resourceKey],
     beforePaths: ordered.map((node) => pathLabel(node.path, node.title)),
     afterPath: pathLabel(keep.path, keep.title),
-    previewLines: [
-      `保留：${pathLabel(keep.path, keep.title)}`,
-      ...removable.map(
-        (node) => `待删除：${pathLabel(node.path, node.title)}`
-      )
-    ]
+    previewLines: sameFolder
+      ? [
+          `网页：「${keep.title}」`,
+          `位置：${keepFolder}`,
+          `处理：保留 1 个，删除 ${removable.length} 个完全相同的副本`
+        ]
+      : [
+          `网页：「${keep.title}」`,
+          `保留位置：${keepFolder}`,
+          ...removable.map(
+            (node) => `删除副本：${pathLabel(node.path)}`
+          )
+        ]
   };
 }
 
@@ -352,7 +370,7 @@ function classificationProposals(
         afterPath: pathLabel(destination.path),
         previewLines: moves.map(
           ({ node }) =>
-            `${pathLabel(node.path, node.title)} → ${pathLabel(destination.path, node.title)}`
+            `${pathLabel(node.path)} / 「${node.title}」 → ${pathLabel(destination.path)}`
         )
       });
     }

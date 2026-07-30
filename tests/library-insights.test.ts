@@ -93,6 +93,38 @@ describe("buildLibraryInsights", () => {
         expectedParentId: "f2"
       })
     ]);
+    expect(proposal?.previewLines).toEqual([
+      "网页：「设计系统」",
+      "保留位置：设计",
+      "删除副本：稍后"
+    ]);
+    expect(proposal?.previewLines.join("\n")).not.toContain("书签栏");
+  });
+
+  it("把同一位置的完全相同副本合并成一条易懂说明", () => {
+    const sameFolderCatalog: BookmarkAgentCatalog = {
+      ...catalog,
+      bookmarks: catalog.bookmarks.map((node) => ({
+        ...node,
+        parentId: "f1",
+        path: ["书签栏", "设计"]
+      }))
+    };
+    const proposal = buildLibraryInsights(
+      [resource()],
+      sameFolderCatalog
+    ).organizationPlan.proposals.find(
+      (item) => item.kind === "duplicate"
+    );
+
+    expect(proposal?.description).toContain(
+      "同一位置存在 2 个完全相同的收藏"
+    );
+    expect(proposal?.previewLines).toEqual([
+      "网页：「设计系统」",
+      "位置：设计",
+      "处理：保留 1 个，删除 1 个完全相同的副本"
+    ]);
   });
 
   it("只根据实际链接检查结果提出失效删除，不采信 AI 猜测", () => {
@@ -278,15 +310,24 @@ describe("suggestFolders", () => {
       resources,
       folders
     )[0]?.folderId;
-    const organizeTarget = buildLibraryInsights(
+    const organizationPlan = buildLibraryInsights(
       resources,
       sameCatalog
-    ).organizationPlan.proposals
-      .find((proposal) => proposal.kind === "classify")
-      ?.actions.find((action) => action.targetId === "design-node-3")
-      ?.destinationId;
+    ).organizationPlan;
+    const classification = organizationPlan.proposals.find(
+      (proposal) => proposal.kind === "classify"
+    );
+    const organizeTarget = classification?.actions.find(
+      (action) => action.targetId === "design-node-3"
+    )?.destinationId;
 
     expect(saveTarget).toBe("f1");
     expect(organizeTarget).toBe(saveTarget);
+    expect(classification?.previewLines).toContain(
+      "稍后 / 「设计系统实践」 → 设计"
+    );
+    expect(classification?.previewLines.join("\n")).not.toContain(
+      "书签栏"
+    );
   });
 });

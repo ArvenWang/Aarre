@@ -235,7 +235,7 @@ async function restoreMutation(
       parent.fellBack ? undefined : mutation.node.index
     );
     return parent.fellBack
-      ? `已恢复“${mutation.node.title}”，原文件夹不存在，已放回主书签栏。`
+      ? `已恢复“${mutation.node.title}”，原文件夹不存在，已放回默认位置。`
       : `已恢复“${mutation.node.title}”及其全部内容。`;
   }
 
@@ -262,7 +262,7 @@ async function restoreMutation(
       : { index: mutation.node.index })
   });
   return parent.fellBack
-    ? `已恢复“${mutation.node.title}”，原文件夹不存在，已移到主书签栏。`
+    ? `已恢复“${mutation.node.title}”，原文件夹不存在，已移到默认位置。`
     : `已将“${mutation.node.title}”移回原位置。`;
 }
 

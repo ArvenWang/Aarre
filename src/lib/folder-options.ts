@@ -73,5 +73,14 @@ export function initialSaveFolderId(
 }
 
 export function visibleFolderPath(path: string[]): string[] {
-  return path.length > 1 ? path.slice(1) : path;
+  // Chrome 书签目录路径的第一段始终是浏览器维护的系统根目录。
+  // 它仍保留在内部数据中用于移动、撤销和同步，但不应出现在用户界面。
+  return path.slice(1);
+}
+
+export function visibleFolderLabel(
+  path: string[],
+  fallback = "根目录"
+): string {
+  return visibleFolderPath(path).join(" / ") || fallback;
 }

@@ -14,12 +14,16 @@ import {
   collectFolderIds,
   filterBookmarkTree
 } from "../../lib/bookmark-search";
-import { findBookmarkByUrl } from "../../lib/bookmark-tree";
+import {
+  findBookmarkByUrl,
+  visibleBookmarkRootChildren
+} from "../../lib/bookmark-tree";
 import { registrableHost } from "../../lib/cover-registry";
 import { sendExtensionRequest } from "../../lib/messages";
 import { pendingSaveReadyTabId } from "../../lib/pending-save";
 import {
   initialSaveFolderId,
+  visibleFolderLabel,
   visibleFolderPath
 } from "../../lib/folder-options";
 import {
@@ -2626,7 +2630,7 @@ export function SidePanelApp() {
         setOnboardingVisible(false);
       });
     void refresh().catch((caught) => {
-      setError(caught instanceof Error ? caught.message : "书签栏读取失败");
+      setError(caught instanceof Error ? caught.message : "书签读取失败");
     });
     void loadConversations().catch((caught) => {
       setError(
@@ -2637,7 +2641,7 @@ export function SidePanelApp() {
     const handleChange = () => {
       void refresh().catch((caught) => {
         setError(
-          caught instanceof Error ? caught.message : "书签栏刷新失败"
+          caught instanceof Error ? caught.message : "书签刷新失败"
         );
       });
     };
@@ -2914,18 +2918,7 @@ export function SidePanelApp() {
   const currentSaved = Boolean(currentSavedNode);
   const bookmarkRoots = useMemo(() => {
     if (!snapshot) return [];
-    const roots = snapshot.roots?.length
-      ? snapshot.roots
-      : [snapshot.root];
-    const primaryRoot =
-      roots.find((root) => root.id === snapshot.primaryRootId) ||
-      snapshot.root;
-
-    return roots.flatMap((root) =>
-      root.id === primaryRoot.id
-        ? root.children || []
-        : [{ ...root, unmodifiable: true }]
-    );
+    return visibleBookmarkRootChildren(snapshot);
   }, [snapshot]);
   const resourceByUrl = useMemo(() => {
     const map = new Map<string, ResourceRecord>();
@@ -4106,7 +4099,7 @@ export function SidePanelApp() {
           ref={contentRef}
           className="native-content"
           data-has-folders={hasVisibleFolders}
-          aria-label="Chrome 书签栏"
+          aria-label="Chrome 书签"
           onScroll={handleContentScroll}
           onDragOver={(event) => event.preventDefault()}
           onDrop={(event) => {
@@ -4197,9 +4190,10 @@ export function SidePanelApp() {
                             )}
                           </strong>
                           <small>
-                            {result.resource.nativeFolderPath.join(
-                              " / "
-                            ) || hostFromUrl(result.resource.url)}
+                            {visibleFolderLabel(
+                              result.resource.nativeFolderPath,
+                              hostFromUrl(result.resource.url)
+                            )}
                             {result.matchReason
                               ? ` · 匹配${result.matchReason}`
                               : ""}
@@ -4346,7 +4340,7 @@ export function SidePanelApp() {
               </div>
             )
           ) : (
-            <div className="native-loading">正在读取 Chrome 书签栏…</div>
+            <div className="native-loading">正在读取 Chrome 书签…</div>
           )}
         </section>
         {scrollThumb.scrollable ? (

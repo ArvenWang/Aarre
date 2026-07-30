@@ -792,7 +792,7 @@ export function installSidePanelPreview() {
                       kind: "classify",
                       title: "把“前端性能”主题归到一起",
                       description:
-                        "8 条同主题收藏已在「书签栏 / 前端代码」，建议移动 2 条散落收藏。",
+                        "8 条同主题收藏已在「前端代码」，建议移动 2 条散落收藏。",
                       destructive: false,
                       selectedByDefault: true,
                       actions: [
@@ -808,10 +808,10 @@ export function installSidePanelPreview() {
                         }
                       ],
                       resourceKeys: ["preview-0"],
-                      beforePaths: ["书签栏 / 稍后读 / Web Vitals 实践"],
-                      afterPath: "书签栏 / 前端代码",
+                      beforePaths: ["稍后读 / Web Vitals 实践"],
+                      afterPath: "前端代码",
                       previewLines: [
-                        "书签栏 / 稍后读 / Web Vitals 实践 → 书签栏 / 前端代码 / Web Vitals 实践"
+                        "稍后读 / 「Web Vitals 实践」 → 前端代码"
                       ]
                     },
                     {
@@ -819,7 +819,7 @@ export function installSidePanelPreview() {
                       kind: "duplicate",
                       title: "合并 3 个重复收藏",
                       description:
-                        "保留最早收藏的版本，其余副本默认不勾选。",
+                        "同一网页收藏了 3 次。将保留较早的一条，其余副本需你确认后才会删除。",
                       destructive: true,
                       selectedByDefault: false,
                       actions: [
@@ -840,8 +840,9 @@ export function installSidePanelPreview() {
                       ],
                       afterPath: "书签栏 / 设计 / 示例",
                       previewLines: [
-                        "保留：书签栏 / 设计 / 示例",
-                        "待删除：书签栏 / 稍后 / 示例"
+                        "网页：「示例」",
+                        "保留位置：设计",
+                        "删除副本：稍后"
                       ]
                     },
                     {
@@ -868,7 +869,7 @@ export function installSidePanelPreview() {
                       previewLines: [
                         "网址：https://example.com/old-guide",
                         "检测：服务器返回 404",
-                        "待删除：书签栏 / 稍后 / 旧版性能指南"
+                        "待删除：稍后 / 旧版性能指南"
                       ],
                       recoveryLinks: [
                         {
@@ -1226,7 +1227,7 @@ export function installSidePanelPreview() {
                       type: "delete_bookmark",
                       label: "删除书签「生活与娱乐示例收藏」",
                       description:
-                        "书签栏 / 生活与娱乐 · https://example.com/3/0",
+                        "生活与娱乐 · https://example.com/3/0",
                       destructive: true,
                       status: "pending",
                       targetId: "preview-folder-3-0"

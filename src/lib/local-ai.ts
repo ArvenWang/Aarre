@@ -4,6 +4,7 @@ import {
 } from "./settings";
 import { runAiGatewayCall } from "./ai-gateway";
 import { searchLocalResources } from "./search";
+import { visibleFolderLabel } from "./folder-options";
 import type {
   AiProviderId,
   BookmarkAgentActionProposal,
@@ -97,7 +98,7 @@ function essenceEnrichmentPrompt(
 
 名称：${resource.title}
 网址：${resource.url}
-所在文件夹：${resource.nativeFolderPath.join(" / ") || "（根目录）"}
+所在文件夹：${visibleFolderLabel(resource.nativeFolderPath, "（根目录）")}
 用户备注：${resource.userNote || "（无）"}
 页面描述：${essence.description || "（无）"}
 站点名称：${essence.siteName || resource.siteName || "（无）"}
@@ -397,7 +398,7 @@ function bookmarkContext(
       `[${id}]`,
       `名称=${resource.title.slice(0, 72)}`,
       `网址=${resource.url.slice(0, 110)}`,
-      `文件夹=${resource.nativeFolderPath.join("/").slice(0, 64) || "根目录"}`,
+      `文件夹=${visibleFolderLabel(resource.nativeFolderPath).slice(0, 64)}`,
       `简介=${(resource.summary || resource.contentExcerpt || "尚未扫描").slice(0, 130)}`,
       `备注=${resource.userNote.slice(0, 56) || "无"}`,
       `标签=${resource.tags.join("、").slice(0, 72) || "无"}`,
@@ -444,7 +445,7 @@ function actionCatalogContext(catalog: BookmarkAgentCatalog): string {
           "[folder]",
           `id=${folder.id}`,
           `名称=${folder.title.slice(0, 72)}`,
-          `路径=${folder.path.join("/").slice(0, 120)}`,
+          `路径=${visibleFolderLabel(folder.path).slice(0, 120)}`,
           `可写=${folder.writable ? "是" : "否"}`
         ].join(" | ")
       )
@@ -460,7 +461,7 @@ function actionCatalogContext(catalog: BookmarkAgentCatalog): string {
           `id=${bookmark.id}`,
           `名称=${bookmark.title.slice(0, 72)}`,
           `网址=${bookmark.url.slice(0, 120)}`,
-          `文件夹=${bookmark.path.join("/").slice(0, 96)}`,
+          `文件夹=${visibleFolderLabel(bookmark.path).slice(0, 96)}`,
           `可写=${bookmark.writable ? "是" : "否"}`
         ].join(" | ")
       )
@@ -586,7 +587,7 @@ function parseAgentActions(
           id: crypto.randomUUID(),
           type,
           label: actionLabel(type, requestedTitle),
-          description: `将在「${parent.path.join(" / ")}」中创建 ${requestedUrl}`,
+          description: `将在「${visibleFolderLabel(parent.path)}」中创建 ${requestedUrl}`,
           destructive: false,
           status: "pending",
           parentId: parent.id,
@@ -600,7 +601,7 @@ function parseAgentActions(
           id: crypto.randomUUID(),
           type,
           label: actionLabel(type, requestedTitle),
-          description: `将在「${parent.path.join(" / ")}」中创建`,
+          description: `将在「${visibleFolderLabel(parent.path)}」中创建`,
           destructive: false,
           status: "pending",
           parentId: parent.id,
@@ -612,7 +613,7 @@ function parseAgentActions(
         id: crypto.randomUUID(),
         type,
         label: actionLabel(type, bookmark.title),
-        description: `${bookmark.path.join(" / ")} · ${bookmark.url}`,
+        description: `${visibleFolderLabel(bookmark.path)} · ${bookmark.url}`,
         destructive: true,
         status: "pending",
         targetId: bookmark.id,
@@ -625,7 +626,7 @@ function parseAgentActions(
         id: crypto.randomUUID(),
         type,
         label: actionLabel(type, folder.title),
-        description: folder.path.join(" / "),
+        description: visibleFolderLabel(folder.path),
         destructive: true,
         status: "pending",
         targetId: folder.id,
@@ -676,7 +677,7 @@ function parseAgentActions(
         id: crypto.randomUUID(),
         type,
         label: actionLabel(type, bookmark.title, destination.title),
-        description: destination.path.join(" / "),
+        description: visibleFolderLabel(destination.path),
         destructive: false,
         status: "pending",
         targetId: bookmark.id,
@@ -700,7 +701,7 @@ function parseAgentActions(
         id: crypto.randomUUID(),
         type,
         label: actionLabel(type, folder.title, destination.title),
-        description: destination.path.join(" / "),
+        description: visibleFolderLabel(destination.path),
         destructive: false,
         status: "pending",
         targetId: folder.id,

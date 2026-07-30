@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildSelectableFolderOptions,
   initialSaveFolderId,
+  visibleFolderLabel,
   visibleFolderPath
 } from "../src/lib/folder-options";
 
@@ -90,5 +91,10 @@ describe("visibleFolderPath", () => {
     expect(
       visibleFolderPath(["书签栏", "设计赏析", "案例"])
     ).toEqual(["设计赏析", "案例"]);
+  });
+
+  it("does not expose a root name for bookmarks saved directly under it", () => {
+    expect(visibleFolderPath(["书签栏"])).toEqual([]);
+    expect(visibleFolderLabel(["书签栏"])).toBe("根目录");
   });
 });
