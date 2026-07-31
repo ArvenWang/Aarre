@@ -690,10 +690,19 @@
 }
 
 .library-masonry {
+  --masonry-column-count: 4;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns:
+    repeat(var(--masonry-column-count), minmax(0, 1fr));
   align-items: start;
-  gap: var(--sp-6) var(--sp-5);
+  column-gap: var(--sp-5);
+}
+
+.library-masonry-column {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
 }
 
 .library-card {
@@ -738,7 +747,7 @@
 }
 
 .library-card-cover .site-thumbnail-image {
-  object-position: top center;
+  object-position: center;
   transition: transform 340ms var(--ease);
 }
 

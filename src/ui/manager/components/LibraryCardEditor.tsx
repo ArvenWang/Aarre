@@ -8,6 +8,7 @@ import {
   type FormEvent,
   type KeyboardEvent
 } from "react";
+import { createPortal } from "react-dom";
 import { sendExtensionRequest } from "../../../lib/messages";
 import type {
   BookmarkBarSnapshot,
@@ -260,8 +261,9 @@ export function LibraryCardEditor({
         </Button>
       </Tooltip>
 
-      {open ? (
-        <div
+      {open
+        ? createPortal(
+          <div
           className="library-card-editor-backdrop"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) closeEditor();
@@ -559,8 +561,10 @@ export function LibraryCardEditor({
               )}
             </form>
           </div>
-        </div>
-      ) : null}
+          </div>,
+          document.body
+        )
+        : null}
     </>
   );
 }

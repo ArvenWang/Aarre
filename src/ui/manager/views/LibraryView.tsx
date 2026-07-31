@@ -28,6 +28,7 @@ import { ResourceIdentity } from "../../components/ResourceIdentity";
 import { LibraryCardEditor } from "../components/LibraryCardEditor";
 import { LibraryCardCover } from "../components/LibraryCardCover";
 import { SnapshotBackfillControl } from "../components/SnapshotBackfillControl";
+import { StableMasonry } from "../components/StableMasonry";
 import {
   ALL_LIBRARY_FOLDERS,
   resourceFolderLabel,
@@ -357,7 +358,10 @@ export function LibraryView({
       </section>
 
       {visibleResults.length ? (
-        <section className="library-masonry" aria-label="收藏列表">
+        <StableMasonry
+          className="library-masonry"
+          aria-label="收藏列表"
+        >
           {visibleResults.map(
             ({ resource, matchReason }) => {
               const brand = brandForUrl(siteBrandByHost, resource.url);
@@ -452,7 +456,7 @@ export function LibraryView({
               );
             }
           )}
-        </section>
+        </StableMasonry>
       ) : (
         <div className="empty-state">
           <strong>

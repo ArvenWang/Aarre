@@ -149,8 +149,12 @@ describe("LibraryCardEditor", () => {
     await act(async () => {
       editorTrigger(container)?.click();
     });
+    expect(
+      document.body.querySelector(".library-card-editor-backdrop")
+        ?.parentElement
+    ).toBe(document.body);
 
-    const selects = container.querySelectorAll(
+    const selects = document.body.querySelectorAll(
       ".library-card-editor-field select"
     );
     const locationSelect = selects[0] as HTMLSelectElement;
@@ -159,7 +163,7 @@ describe("LibraryCardEditor", () => {
       setControlValue(locationSelect, "bookmark-b");
     });
 
-    const nativeInputs = container.querySelectorAll(
+    const nativeInputs = document.body.querySelectorAll(
       ".library-card-editor-grid input"
     );
     await act(async () => {
@@ -173,21 +177,21 @@ describe("LibraryCardEditor", () => {
       );
       setControlValue(folderSelect, "folder-a");
       setControlValue(
-        container.querySelector(
+        document.body.querySelector(
           "[aria-label='添加标签']"
         ) as HTMLInputElement,
         "research"
       );
     });
     await act(async () => {
-      buttonWithText(container, "添加")?.click();
+      buttonWithText(document.body, "添加")?.click();
       setControlValue(
-        container.querySelector("textarea") as HTMLTextAreaElement,
+        document.body.querySelector("textarea") as HTMLTextAreaElement,
         "updated note"
       );
     });
     await act(async () => {
-      buttonWithText(container, "保存修改")?.click();
+      buttonWithText(document.body, "保存修改")?.click();
     });
 
     expect(sendMessage).toHaveBeenCalledWith({
@@ -237,12 +241,12 @@ describe("LibraryCardEditor", () => {
     });
     await act(async () => {
       setControlValue(
-        container.querySelector("textarea") as HTMLTextAreaElement,
+        document.body.querySelector("textarea") as HTMLTextAreaElement,
         "note only"
       );
     });
     await act(async () => {
-      buttonWithText(container, "保存修改")?.click();
+      buttonWithText(document.body, "保存修改")?.click();
     });
 
     expect(sendMessage).toHaveBeenCalledWith({
@@ -288,7 +292,7 @@ describe("LibraryCardEditor", () => {
       editorTrigger(container)?.click();
     });
 
-    const locationSelect = container.querySelector(
+    const locationSelect = document.body.querySelector(
       ".library-card-editor-field select"
     ) as HTMLSelectElement;
     await act(async () => {
@@ -298,14 +302,14 @@ describe("LibraryCardEditor", () => {
       );
     });
     await act(async () => {
-      buttonWithText(container, "删除")?.click();
+      buttonWithText(document.body, "删除")?.click();
     });
-    expect(container.textContent).toContain(
+    expect(document.body.textContent).toContain(
       "只会删除当前选中的 Chrome 收藏位置"
     );
 
     await act(async () => {
-      buttonWithText(container, "确认删除")?.click();
+      buttonWithText(document.body, "确认删除")?.click();
     });
 
     expect(sendMessage).toHaveBeenCalledWith({
@@ -339,9 +343,9 @@ describe("LibraryCardEditor", () => {
       editorTrigger(container)?.click();
     });
     await act(async () => {
-      buttonWithText(container, "删除")?.click();
+      buttonWithText(document.body, "删除")?.click();
     });
-    const dialog = container.querySelector(
+    const dialog = document.body.querySelector(
       '[role="dialog"]'
     ) as HTMLElement;
     await act(async () => {
@@ -353,8 +357,8 @@ describe("LibraryCardEditor", () => {
       );
     });
 
-    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
-    expect(buttonWithText(container, "确认删除")).toBeUndefined();
+    expect(document.body.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(buttonWithText(document.body, "确认删除")).toBeUndefined();
 
     await act(async () => {
       dialog.dispatchEvent(
@@ -364,7 +368,7 @@ describe("LibraryCardEditor", () => {
         })
       );
     });
-    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
   });
 
   it("keeps managed Chrome fields read-only while saving Aarre tags and notes", async () => {
@@ -426,20 +430,20 @@ describe("LibraryCardEditor", () => {
       editorTrigger(container)?.click();
     });
 
-    const nativeInputs = container.querySelectorAll(
+    const nativeInputs = document.body.querySelectorAll(
       ".library-card-editor-grid input"
     );
-    const folderSelect = container.querySelector(
+    const folderSelect = document.body.querySelector(
       ".library-card-editor-grid select"
     ) as HTMLSelectElement;
-    const deleteButton = buttonWithText(container, "删除")!;
-    const tagInput = container.querySelector(
+    const deleteButton = buttonWithText(document.body, "删除")!;
+    const tagInput = document.body.querySelector(
       "[aria-label='添加标签']"
     ) as HTMLInputElement;
-    const note = container.querySelector("textarea") as HTMLTextAreaElement;
-    const saveButton = buttonWithText(container, "保存修改")!;
+    const note = document.body.querySelector("textarea") as HTMLTextAreaElement;
+    const saveButton = buttonWithText(document.body, "保存修改")!;
 
-    expect(container.textContent).toContain(
+    expect(document.body.textContent).toContain(
       "名称、网址、文件夹和删除操作不可用"
     );
     expect(
@@ -457,7 +461,7 @@ describe("LibraryCardEditor", () => {
       setControlValue(tagInput, "policy");
     });
     await act(async () => {
-      buttonWithText(container, "添加")?.click();
+      buttonWithText(document.body, "添加")?.click();
       setControlValue(note, "managed bookmark note");
     });
     await act(async () => {

@@ -6,6 +6,10 @@ const libraryViewUrl = new URL(
   "../src/ui/manager/views/LibraryView.tsx",
   import.meta.url
 );
+const stableMasonryUrl = new URL(
+  "../src/ui/manager/components/StableMasonry.tsx",
+  import.meta.url
+);
 const managerAppUrl = new URL(
   "../src/ui/manager/ManagerApp.tsx",
   import.meta.url
@@ -20,13 +24,19 @@ function rule(css: string, selector: string): string {
 
 describe("manager layout stability", () => {
   it("keeps masonry siblings top-aligned while revealing details", async () => {
-    const [css, source] = await Promise.all([
+    const [css, source, masonrySource] = await Promise.all([
       readFile(managerCssUrl, "utf8"),
-      readFile(libraryViewUrl, "utf8")
+      readFile(libraryViewUrl, "utf8"),
+      readFile(stableMasonryUrl, "utf8")
     ]);
     const masonryRule = rule(css, ".library-masonry");
+    const masonryColumnRule = rule(css, ".library-masonry-column");
     const cardRule = rule(css, ".library-card");
     const coverRule = rule(css, ".library-card-cover");
+    const coverImageRule = rule(
+      css,
+      ".library-card-cover .site-thumbnail-image"
+    );
     const hoverCoverRule = rule(
       css,
       ".library-card:hover .library-card-cover,\n.library-card:focus-within .library-card-cover"
@@ -39,10 +49,14 @@ describe("manager layout stability", () => {
 
     expect(masonryRule).toContain("display: grid");
     expect(masonryRule).toContain("align-items: start");
+    expect(masonryRule).toContain("--masonry-column-count");
+    expect(masonryColumnRule).toContain("display: flex");
+    expect(masonryColumnRule).toContain("flex-direction: column");
     expect(cardRule).toContain("align-self: start");
     expect(cardRule).not.toContain("display: inline-block");
     expect(coverRule).toContain("aspect-ratio: 16 / 9");
     expect(coverRule).toContain("height: auto");
+    expect(coverImageRule).toContain("object-position: center");
     expect(coverRule).not.toMatch(/transition:[^}]*\bheight\b/s);
     expect(hoverCoverRule).not.toMatch(/\bheight\s*:/);
     expect(extraRule).toContain("position: static");
@@ -53,6 +67,9 @@ describe("manager layout stability", () => {
     expect(css).not.toContain(".library-card[data-cover-size=");
     expect(source).not.toContain("data-cover-size");
     expect(source).not.toContain("coverSize(");
+    expect(source).toContain("StableMasonry");
+    expect(masonrySource).toContain("index % safeColumnCount");
+    expect(masonrySource).toContain("ResizeObserver");
   });
 
   it("uses one integrated header divider around brand and navigation", async () => {
