@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   detectBotChallengeInDocument,
+  imageIsReadyForCapture,
   isLoadedSnapshotTab,
   isPageSnapshotStale,
   isSnapshotSensitiveUrl,
@@ -10,7 +11,9 @@ import {
   mergePageSnapshotSchedule,
   PAGE_SNAPSHOT_REFRESH_INTERVAL_MS,
   PAGE_SNAPSHOT_WIDTH,
-  showSnapshotUpdatedToastInDocument
+  prepareBackgroundPageForCaptureInDocument,
+  showSnapshotUpdatedToastInDocument,
+  waitForStablePageInDocument
 } from "../src/lib/page-snapshot";
 import { normalizeSnapshotExcludedHost } from "../src/lib/display-settings";
 
@@ -154,6 +157,68 @@ describe("page snapshot privacy", () => {
       showToast: true,
       completedUrl: "https://example.com/guide"
     });
+  });
+
+  it("treats unstarted lazy images as pending instead of capture-ready", () => {
+    const loaded = document.createElement("img");
+    loaded.setAttribute("src", "https://example.com/loaded.png");
+    // jsdom 不执行真实加载：complete 为 false 时必须视为未就绪。
+    expect(imageIsReadyForCapture(loaded)).toBe(false);
+
+    const empty = document.createElement("img");
+    expect(imageIsReadyForCapture(empty)).toBe(true);
+
+    const lazyPlaceholder = document.createElement("img");
+    lazyPlaceholder.setAttribute(
+      "data-src",
+      "https://example.com/lazy.png"
+    );
+    // 懒加载库的 data-src 占位：虽然当前没有 src，也必须等待真实地址加载。
+    expect(imageIsReadyForCapture(lazyPlaceholder)).toBe(false);
+  });
+
+  it("forces lazy images and content-visibility before a background capture", async () => {
+    document.body.innerHTML =
+      '<img loading="lazy" src="https://example.com/a.png" />' +
+      '<img data-src="https://example.com/b.png" />' +
+      '<img data-srcset="https://example.com/c.png 1x" />' +
+      '<img alt="empty" />' +
+      '<div style="content-visibility: auto">card</div>';
+    const result = await prepareBackgroundPageForCaptureInDocument({
+      scrollSteps: 2
+    });
+    const images = Array.from(document.querySelectorAll("img"));
+    expect(images[0]!.loading).toBe("eager");
+    expect(images[0]!.decoding).toBe("async");
+    expect(images[1]!.getAttribute("src")).toBe(
+      "https://example.com/b.png"
+    );
+    expect(images[2]!.getAttribute("srcset")).toBe(
+      "https://example.com/c.png 1x"
+    );
+    // 只有 3 张真正需要加载的图被强制触发，空占位图不算。
+    expect(result.forcedImages).toBe(3);
+    expect(
+      document.getElementById("aarre-capture-force-visibility")
+    ).not.toBeNull();
+  });
+
+  it("resolves the batch stability wait when no content is pending", async () => {
+    vi.useFakeTimers();
+    Object.defineProperty(document, "readyState", {
+      value: "complete",
+      configurable: true
+    });
+    const pending = waitForStablePageInDocument(600, 4_000, {
+      fontTimeoutMs: 1_500,
+      imageTimeoutMs: 1_000,
+      rAFTimeoutMs: 1_000,
+      waitForPendingImages: true,
+      resourceQuietMs: 600,
+      resourceQuietMaxMs: 6_000
+    });
+    await vi.advanceTimersByTimeAsync(8_000);
+    await expect(pending).resolves.toBe(true);
   });
 
   it("stores enough pixels for a Retina masonry cover", () => {

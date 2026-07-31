@@ -40,6 +40,7 @@ import {
 import {
   createPageSnapshot,
   detectBotChallengeInDocument,
+  prepareBackgroundPageForCaptureInDocument,
   isLoadedSnapshotTab,
   isPageSnapshotStale,
   isSnapshotSensitiveUrl,
@@ -223,7 +224,10 @@ const SNAPSHOT_BACKFILL_PAGE_TIMEOUT_MINUTES = 0.75;
 const SNAPSHOT_BACKFILL_READY_TIMEOUT_MINUTES = 0.75;
 const SNAPSHOT_BACKFILL_MAX_ATTEMPTS = 2;
 // executeScript 本身没有超时；页面无响应时可能长期挂起，必须自行兜底。
-const SNAPSHOT_BACKFILL_STABILITY_TIMEOUT_MS = 8_000;
+// 后台补拍现在要等懒加载图片与网络安静，上限放宽到 20 秒（只是兜底，
+// 正常页面几秒内就会通过；45 秒“就绪预算”仍约束单页总时长）。
+const SNAPSHOT_BACKFILL_STABILITY_TIMEOUT_MS = 20_000;
+const SNAPSHOT_BACKFILL_PREPARE_TIMEOUT_MS = 8_000;
 const SNAPSHOT_BACKFILL_CHALLENGE_TIMEOUT_MS = 3_000;
 const SNAPSHOT_BACKFILL_CAPTURE_RETRY_DELAY_MS = 2_000;
 const SNAPSHOT_BACKFILL_MAX_CAPTURE_ATTEMPTS = 3;
@@ -2934,6 +2938,22 @@ async function capturePageSnapshotViaDebugger(
   }
 }
 
+/** 批量补拍遇到 Cloudflare 等安全验证页时立即结算失败并推进队列。 */
+async function settleBatchChallenge(
+  lease: SnapshotBackfillLease
+): Promise<void> {
+  await recordSnapshotBackfillItem(
+    "failed",
+    "网站要求安全验证（如 Cloudflare），无法获取真实页面截图。",
+    {
+      jobId: lease.jobId,
+      resourceKey: lease.resourceKey,
+      leaseToken: lease.token
+    }
+  );
+  void driveSnapshotBackfill();
+}
+
 async function capturePageSnapshotForTab(
   tabId: number,
   expectedLoadedUrl: string,
@@ -3012,6 +3032,36 @@ async function capturePageSnapshotForTab(
     ...(options.showToast ? { showToast: true } : {}),
     ...(options.refreshExisting ? { refreshExisting: true } : {})
   });
+  if (isBatch && options.backfillLease) {
+    // 挑战页识别前置：这类页面常常持续轮询或自行跳转，先快速结算失败，
+    // 避免进入耗时的加载等待后仍然只能得到无价值的截图。
+    const [challengeResult] =
+      (await executeScriptWithTimeout(
+        {
+          target: { tabId },
+          func: detectBotChallengeInDocument
+        },
+        SNAPSHOT_BACKFILL_CHALLENGE_TIMEOUT_MS
+      )) || [];
+    if (challengeResult?.result === true) {
+      await settleBatchChallenge(options.backfillLease);
+      return false;
+    }
+    // 隐藏标签页不会触发 IntersectionObserver 懒加载，content-visibility
+    // 的内容也不会按需渲染；先强制页面把内容加载出来，再进入稳定等待，
+    // 否则截图会拿到空白或半成品封面。
+    const [prepared] =
+      (await executeScriptWithTimeout(
+        {
+          target: { tabId },
+          func: prepareBackgroundPageForCaptureInDocument
+        },
+        SNAPSHOT_BACKFILL_PREPARE_TIMEOUT_MS
+      )) || [];
+    if (!prepared?.result) {
+      return false;
+    }
+  }
   const [stabilityResult] =
     (await executeScriptWithTimeout(
       {
@@ -3019,11 +3069,15 @@ async function capturePageSnapshotForTab(
         func: waitForStablePageInDocument,
         args: isBatch
           ? [
-              500,
-              2_000,
+              600,
+              4_000,
               {
                 fontTimeoutMs: 1_500,
-                imageTimeoutMs: 1_500
+                imageTimeoutMs: 2_500,
+                rAFTimeoutMs: 1_000,
+                waitForPendingImages: true,
+                resourceQuietMs: 600,
+                resourceQuietMaxMs: 6_000
               }
             ]
           : [900, 4_000]
@@ -3050,16 +3104,7 @@ async function capturePageSnapshotForTab(
         SNAPSHOT_BACKFILL_CHALLENGE_TIMEOUT_MS
       )) || [];
     if (challengeResult?.result === true) {
-      await recordSnapshotBackfillItem(
-        "failed",
-        "网站要求安全验证（如 Cloudflare），无法获取真实页面截图。",
-        {
-          jobId: options.backfillLease.jobId,
-          resourceKey: options.backfillLease.resourceKey,
-          leaseToken: options.backfillLease.token
-        }
-      );
-      void driveSnapshotBackfill();
+      await settleBatchChallenge(options.backfillLease);
       return false;
     }
   }

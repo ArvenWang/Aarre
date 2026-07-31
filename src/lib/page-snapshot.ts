@@ -156,6 +156,16 @@ export async function waitForStablePageInDocument(
     fontTimeoutMs?: number;
     imageTimeoutMs?: number;
     rAFTimeoutMs?: number;
+    /**
+     * 后台补拍专用：未开始加载的懒加载图片也要等待。
+     * 隐藏标签页不会触发 IntersectionObserver 懒加载，这类图片的
+     * complete 也是 true 但 naturalWidth 为 0，旧逻辑会错误跳过。
+     */
+    waitForPendingImages?: boolean;
+    /** 网络活动安静窗口。后台补拍专用：DOM 安静不代表 fetch/XHR 渲染完成。 */
+    resourceQuietMs?: number;
+    /** 网络安静等待上限，避免站点持续加载拖住整个队列。 */
+    resourceQuietMaxMs?: number;
   } = {}
 ): Promise<boolean> {
   if (
@@ -179,7 +189,11 @@ export async function waitForStablePageInDocument(
 
   const visibleImages = Array.from(document.images)
     .filter((image) => {
-      if (image.complete) return false;
+      // 非后台路径保持旧行为：complete 的图片（含已失败、空图）不再等待。
+      if (!options.waitForPendingImages && image.complete) return false;
+      // 已成功解码或根本没有资源的空图视为就绪；未开始的懒加载图
+      // complete=true 但 naturalWidth=0，必须继续等待。
+      if (imageIsReadyForCapture(image)) return false;
       const rect = image.getBoundingClientRect();
       return (
         rect.width > 0 &&
@@ -207,6 +221,34 @@ export async function waitForStablePageInDocument(
         })
     )
   );
+
+  // DOM 安静不代表页面渲染完成：SPA 的数据请求、CSS 背景图和
+  // 接口驱动的区块都可能在 load 事件之后才到达。用 resource timing
+  // 判断“最近没有资源完成传输”，安静一段时间再继续。环境不支持时跳过。
+  if (options.resourceQuietMs && options.resourceQuietMaxMs) {
+    const quietMs = options.resourceQuietMs;
+    const startAt = performance.now();
+    const latestResourceEnd = (): number => {
+      try {
+        const entries = performance.getEntriesByType(
+          "resource"
+        ) as PerformanceResourceTiming[];
+        let latest = 0;
+        for (const entry of entries) {
+          if (entry.responseEnd > latest) latest = entry.responseEnd;
+        }
+        return latest;
+      } catch {
+        return performance.now();
+      }
+    };
+    // 已经安静（最近 quietMs 内没有资源完成）时直接通过，不加额外等待；
+    // 还在下载时才按窗口轮询，上限防止站点无限加载拖住批量任务。
+    while (performance.now() - startAt < options.resourceQuietMaxMs) {
+      if (performance.now() - latestResourceEnd() >= quietMs) break;
+      await wait(quietMs);
+    }
+  }
 
   await new Promise<void>((resolve) => {
     let finished = false;
@@ -248,6 +290,135 @@ export async function waitForStablePageInDocument(
     wait(options.rAFTimeoutMs ?? 1_000)
   ]);
   return document.readyState === "complete";
+}
+
+/**
+ * 判断图片是否真正可用于截图：
+ * - 已成功加载（naturalWidth/naturalHeight > 0）；
+ * - 或者根本没有 src/srcset（占位空图，无需等待）。
+ * 未开始的懒加载图片 complete 也为 true 但 naturalWidth 为 0，
+ * 必须视为“待加载”，否则后台补拍会在图片空白时提前截图。
+ */
+export function imageIsReadyForCapture(
+  image: HTMLImageElement
+): boolean {
+  if (!image.complete) return false;
+  // data-src 等占位属性说明懒加载库还没把真实地址写进 src，
+  // 即使当前没有可加载资源也必须视为“待加载”。
+  const hasPendingSource = Boolean(
+    image.getAttribute("src") ||
+      image.getAttribute("srcset") ||
+      image.getAttribute("data-src") ||
+      image.getAttribute("data-srcset") ||
+      image.getAttribute("data-lazy-src") ||
+      image.getAttribute("data-original")
+  );
+  return (
+    image.naturalWidth > 0 ||
+    image.naturalHeight > 0 ||
+    !hasPendingSource
+  );
+}
+
+/**
+ * 批量后台补拍专用：隐藏标签页不会触发 IntersectionObserver 懒加载，
+ * content-visibility 的内容也不会按需渲染，必须在截图前强制触发。
+ * 函数会被序列化到网页上下文执行，因此必须保持自包含，不能引用模块外变量。
+ */
+export async function prepareBackgroundPageForCaptureInDocument(
+  options: {
+    maxImages?: number;
+    scrollSteps?: number;
+  } = {}
+): Promise<{ forcedImages: number }> {
+  const maxImages = options.maxImages ?? 80;
+  const scrollSteps = options.scrollSteps ?? 16;
+  let forcedImages = 0;
+
+  const forceImage = (image: HTMLImageElement): void => {
+    if (forcedImages >= maxImages || imageIsReadyForCapture(image)) {
+      return;
+    }
+    const src = image.getAttribute("src");
+    const srcset = image.getAttribute("srcset");
+    // 很多懒加载库（lozad、vanilla-lazyload 等）用 data-src 等属性占位，
+    // 到视口时才写入真实地址；隐藏标签页里它们永远不会触发，需要代劳。
+    const dataSrc =
+      image.getAttribute("data-src") ||
+      image.getAttribute("data-lazy-src") ||
+      image.getAttribute("data-original");
+    const dataSrcset = image.getAttribute("data-srcset");
+    if (!src && !srcset && !dataSrc && !dataSrcset) return;
+    image.loading = "eager";
+    image.decoding = "async";
+    // 先移除再写回 src/srcset，保证属性真正变化并重新发起请求；
+    // 直接赋相同值不会触发加载。
+    const nextSrc = src || dataSrc || "";
+    const nextSrcset = srcset || dataSrcset || "";
+    if (nextSrcset) {
+      image.removeAttribute("srcset");
+      image.setAttribute("srcset", nextSrcset);
+    }
+    if (nextSrc) {
+      image.removeAttribute("src");
+      image.setAttribute("src", nextSrc);
+    }
+    forcedImages += 1;
+  };
+
+  // 遍历普通 DOM 与开放 shadow root，尽量覆盖组件库内懒加载图片。
+  const walk = (root: ParentNode, budget: { elements: number }): void => {
+    if (budget.elements >= 10_000) return;
+    // document / shadow root / 元素都通过 children 进入下一层；
+    // 入口传 document 时它本身不是 Element，必须单独放行。
+    const children =
+      root instanceof Document ||
+      root instanceof DocumentFragment ||
+      root instanceof Element
+        ? Array.from(root.children)
+        : [];
+    for (const child of children) {
+      if (budget.elements >= 10_000) return;
+      budget.elements += 1;
+      if (child instanceof HTMLImageElement) {
+        forceImage(child);
+      }
+      if (child.shadowRoot) walk(child.shadowRoot, budget);
+      walk(child, budget);
+    }
+  };
+  walk(document, { elements: 0 });
+
+  // content-visibility: auto 的内容在隐藏标签页里不会渲染，
+  // 临时用一条全局规则强制可见；导航后文档销毁，无需清理。
+  const hostId = "aarre-capture-force-visibility";
+  if (!document.getElementById(hostId)) {
+    const style = document.createElement("style");
+    style.id = hostId;
+    style.textContent = "*{content-visibility:visible!important}";
+    (document.head || document.documentElement).appendChild(style);
+  }
+
+  // 滚动整页触发依赖 scroll/IntersectionObserver 的懒加载库，
+  // 最后回到顶部，保证截图内容仍是页面顶部视口。
+  document.documentElement.style.scrollBehavior = "auto";
+  const viewportHeight = globalThis.innerHeight || 800;
+  const maxY = Math.max(
+    0,
+    document.documentElement.scrollHeight - viewportHeight
+  );
+  const steps =
+    maxY > 0
+      ? Math.min(scrollSteps, Math.ceil(maxY / viewportHeight) + 1)
+      : 1;
+  if (typeof globalThis.scrollTo === "function") {
+    for (let i = 0; i < steps; i += 1) {
+      globalThis.scrollTo(0, Math.min(maxY, i * viewportHeight));
+    }
+    globalThis.scrollTo(0, 0);
+  }
+
+  return { forcedImages };
 }
 
 /**
