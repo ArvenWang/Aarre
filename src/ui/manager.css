@@ -690,32 +690,26 @@
 }
 
 .library-masonry {
-  column-width: 240px;
-  column-gap: var(--sp-5);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  align-items: start;
+  gap: var(--sp-6) var(--sp-5);
 }
 
 .library-card {
-  --reveal: 89px;
-  --cover-height: 232px;
   position: relative;
+  min-width: 0;
   width: 100%;
-  margin-bottom: var(--sp-6);
-  display: inline-block;
-  break-inside: avoid;
-  vertical-align: top;
-}
-
-.library-card[data-cover-size="short"] {
-  --cover-height: 200px;
-}
-
-.library-card[data-cover-size="tall"] {
-  --cover-height: 272px;
+  margin: 0;
+  display: block;
+  align-self: start;
 }
 
 .library-card-cover {
   position: relative;
-  height: var(--cover-height);
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
   display: block;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -732,9 +726,9 @@
 
 .library-card-cover > .library-card-cover-loader {
   position: absolute;
-  inset: 0 0 auto;
+  inset: 0;
   width: 100%;
-  height: var(--cover-height);
+  height: 100%;
 }
 
 .library-card-cover-loader > .site-thumbnail {
@@ -820,8 +814,8 @@
   font-size: var(--fs-caption);
 }
 
-/* Multi-column masonry rebalances whenever a descendant changes height.
-   Keep hover details out of flow so the pointer target never moves. */
+/* Cards are top-aligned grid items, so revealing one card's details cannot
+   stretch its siblings in the same row. */
 .library-card-extra {
   position: static;
   height: auto;

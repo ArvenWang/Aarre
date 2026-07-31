@@ -103,12 +103,6 @@ function highlightMatches(value: string, query: string): ReactNode {
   );
 }
 
-function coverSize(index: number): "short" | "regular" | "tall" {
-  if (index % 5 === 1 || index % 5 === 4) return "tall";
-  if (index % 5 === 2) return "short";
-  return "regular";
-}
-
 interface LibrarySearchFormProps {
   queryDraft: string;
   appliedQuery: string;
@@ -365,7 +359,7 @@ export function LibraryView({
       {visibleResults.length ? (
         <section className="library-masonry" aria-label="收藏列表">
           {visibleResults.map(
-            ({ resource, matchReason }, index) => {
+            ({ resource, matchReason }) => {
               const brand = brandForUrl(siteBrandByHost, resource.url);
               const host = resource.siteName || hostFromUrl(resource.url);
               const location = locations.get(resource.resourceKey);
@@ -378,7 +372,6 @@ export function LibraryView({
                 <Card
                   role="article"
                   className="library-card"
-                  data-cover-size={coverSize(index)}
                   key={resource.resourceKey}
                 >
                   {bookmarkSnapshot ? (

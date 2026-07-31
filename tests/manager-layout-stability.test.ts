@@ -2,6 +2,10 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 const managerCssUrl = new URL("../src/ui/manager.css", import.meta.url);
+const libraryViewUrl = new URL(
+  "../src/ui/manager/views/LibraryView.tsx",
+  import.meta.url
+);
 const managerAppUrl = new URL(
   "../src/ui/manager/ManagerApp.tsx",
   import.meta.url
@@ -15,8 +19,13 @@ function rule(css: string, selector: string): string {
 }
 
 describe("manager layout stability", () => {
-  it("reveals masonry details below the existing card content", async () => {
-    const css = await readFile(managerCssUrl, "utf8");
+  it("keeps masonry siblings top-aligned while revealing details", async () => {
+    const [css, source] = await Promise.all([
+      readFile(managerCssUrl, "utf8"),
+      readFile(libraryViewUrl, "utf8")
+    ]);
+    const masonryRule = rule(css, ".library-masonry");
+    const cardRule = rule(css, ".library-card");
     const coverRule = rule(css, ".library-card-cover");
     const hoverCoverRule = rule(
       css,
@@ -28,6 +37,12 @@ describe("manager layout stability", () => {
       ".library-card:hover .library-card-extra,\n.library-card:focus-within .library-card-extra"
     );
 
+    expect(masonryRule).toContain("display: grid");
+    expect(masonryRule).toContain("align-items: start");
+    expect(cardRule).toContain("align-self: start");
+    expect(cardRule).not.toContain("display: inline-block");
+    expect(coverRule).toContain("aspect-ratio: 16 / 9");
+    expect(coverRule).toContain("height: auto");
     expect(coverRule).not.toMatch(/transition:[^}]*\bheight\b/s);
     expect(hoverCoverRule).not.toMatch(/\bheight\s*:/);
     expect(extraRule).toContain("position: static");
@@ -35,6 +50,9 @@ describe("manager layout stability", () => {
     expect(extraRule).not.toContain("position: absolute");
     expect(hoverExtraRule).toContain("max-height: 160px");
     expect(hoverExtraRule).not.toContain("position: absolute");
+    expect(css).not.toContain(".library-card[data-cover-size=");
+    expect(source).not.toContain("data-cover-size");
+    expect(source).not.toContain("coverSize(");
   });
 
   it("uses one integrated header divider around brand and navigation", async () => {
