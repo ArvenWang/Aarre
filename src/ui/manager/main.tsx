@@ -1,12 +1,14 @@
 import { StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { ManagerApp } from "./ManagerApp";
+import { initializeTheme } from "../../lib/theme";
 import "../styles.css";
 
 async function bootstrap(): Promise<void> {
+  initializeTheme();
   if (
     import.meta.env.DEV &&
-    new URLSearchParams(window.location.search).get("preview") === "1"
+    new URLSearchParams(window.location.search).get("preview") !== "0"
   ) {
     const { installSidePanelPreview } = await import(
       "../sidepanel/preview"

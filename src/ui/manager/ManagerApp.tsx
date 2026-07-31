@@ -1,3 +1,5 @@
+import { Button } from "../../components/ui/button";
+import { TabsSubtle, TabsSubtleItem } from "../../components/ui/tabs-subtle";
 import {
   useCallback,
   useEffect,
@@ -12,6 +14,7 @@ import {
 import { sendExtensionRequest } from "../../lib/messages";
 import { isSnapshotSensitiveUrl } from "../../lib/page-snapshot";
 import { searchLocalResources } from "../../lib/search";
+import { applyTheme, initializeTheme, type ThemeMode } from "../../lib/theme";
 import type {
   AppState,
   BookmarkBarSnapshot,
@@ -22,9 +25,7 @@ import type {
   SearchResult,
   SiteBrandRecord
 } from "../../lib/types";
-import {
-  BookmarkIcon
-} from "../components/Icons";
+import { BookmarkIcon, MoonIcon, SunIcon } from "../components/Icons";
 import type {
   LibraryFilter,
   LibrarySort,
@@ -93,6 +94,7 @@ function initialLocationState(): {
 
 export function ManagerApp() {
   const initial = useMemo(initialLocationState, []);
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => initializeTheme());
   const [appState, setAppState] = useState<AppState | null>(null);
   const [queryDraft, setQueryDraft] = useState(initial.query);
   const [appliedQuery, setAppliedQuery] = useState(initial.query);
@@ -321,6 +323,12 @@ export function ManagerApp() {
     window.history.replaceState(null, "", url);
   }
 
+  function toggleTheme() {
+    const next: ThemeMode = themeMode === "dark" ? "light" : "dark";
+    applyTheme(next);
+    setThemeMode(next);
+  }
+
   function updateLibraryControls(next: {
     filter?: LibraryFilter;
     folderId?: string;
@@ -547,20 +555,12 @@ export function ManagerApp() {
             onSortChange={(value) =>
               updateLibraryControls({ sort: value })
             }
-            onClearFilters={() =>
-              updateLibraryControls({
-                filter: "all",
-                folderId: ALL_LIBRARY_FOLDERS,
-                sort: "default"
-              })
-            }
             onQueryDraftChange={setQueryDraft}
             onSearch={handleSearch}
             onClearSearch={clearSearch}
             onResourceChanged={handleLibraryResourceChanged}
             onSnapshotBackfillChanged={() => void loadResources()}
             onOpenResource={(url) => void openResource(url)}
-            onRefresh={() => void refresh()}
           />
         );
     }
@@ -578,7 +578,15 @@ export function ManagerApp() {
           </div>
         </div>
 
-        <nav className="manager-view-tabs" aria-label="收藏管理功能">
+        <TabsSubtle
+          selectedIndex={VALID_VIEWS.indexOf(view)}
+          onSelect={(index) => {
+            const nextView = VALID_VIEWS[index];
+            if (nextView) selectView(nextView);
+          }}
+          className="manager-view-tabs"
+          aria-label="收藏管理功能"
+        >
           {(
             [
               ["library", "收藏库", libraryResults.length],
@@ -592,19 +600,26 @@ export function ManagerApp() {
               ["topics", "主题图谱", dashboard?.topicGraph.nodes.length || 0],
               ["resurface", "重新发现", dashboard?.resurfacing.length || 0]
             ] as const
-          ).map(([value, label, count]) => (
-            <button
-              type="button"
+          ).map(([value, label, count], index) => (
+            <TabsSubtleItem
               key={value}
-              data-active={view === value}
-              aria-current={view === value ? "page" : undefined}
-              onClick={() => selectView(value)}
-            >
-              {label}
-              <span>{count}</span>
-            </button>
+              label={`${label} ${count}`}
+              index={index}
+            />
           ))}
-        </nav>
+        </TabsSubtle>
+
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="manager-theme-button"
+        aria-label={themeMode === "dark" ? "切换到日间模式" : "切换到夜间模式"}
+        title={themeMode === "dark" ? "切换到日间模式" : "切换到夜间模式"}
+        onClick={toggleTheme}
+      >
+        {themeMode === "dark" ? <MoonIcon aria-hidden="true" /> : <SunIcon aria-hidden="true" />}
+      </Button>
       </header>
 
       <h1 className="visually-hidden">{`Aarre · ${VIEW_LABELS[view]}`}</h1>

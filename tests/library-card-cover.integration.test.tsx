@@ -200,6 +200,6 @@ describe("manager masonry cover policy", () => {
     expect(markup).toContain("按 Chrome 书签文件夹筛选");
     expect(markup).toContain("收藏排序方式");
     expect(markup).toContain("设计 / 灵感");
-    expect(markup).toContain("清除筛选");
+    expect(markup).not.toContain("清除筛选");
   });
 });

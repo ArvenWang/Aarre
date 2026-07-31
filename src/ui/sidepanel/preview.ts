@@ -1594,19 +1594,56 @@ export function installSidePanelPreview() {
     }
   };
 
-  const previewGlobal = globalThis as unknown as {
-    chrome?: Record<string, unknown>;
-  };
+  const previewGlobals = [
+    globalThis as unknown as { chrome?: Record<string, unknown> },
+    window as unknown as { chrome?: Record<string, unknown> }
+  ];
+  const previewChromeTargets = [
+    ...(typeof chrome !== "undefined"
+      ? [chrome as unknown as Record<string, unknown>]
+      : []),
+    ...previewGlobals
+      .map((previewGlobal) => previewGlobal.chrome)
+      .filter((value): value is Record<string, unknown> => Boolean(value))
+  ];
 
-  // 普通 Chrome 网页也会暴露一个不可替换的 window.chrome；
-  // 开发预览只补齐扩展依赖的接口，避免覆盖浏览器自身对象。
-  if (previewGlobal.chrome) {
-    Object.assign(previewGlobal.chrome, previewChrome);
-    return;
+  // 普通 Chrome 网页与内置预览浏览器可能暴露不同的全局对象；
+  // 开发预览同时补齐两侧，避免依赖具体浏览器的全局对象实现。
+  for (const existingChrome of previewChromeTargets) {
+    for (const [namespace, previewApi] of Object.entries(previewChrome)) {
+      const existingApi = existingChrome[namespace];
+      try {
+        Object.defineProperty(existingChrome, namespace, {
+          configurable: true,
+          enumerable: true,
+          value: previewApi,
+          writable: true
+        });
+      } catch {
+        if (
+          existingApi &&
+          typeof existingApi === "object" &&
+          typeof previewApi === "object"
+        ) {
+          Object.assign(existingApi, previewApi);
+        } else {
+          try {
+            existingChrome[namespace] = previewApi;
+          } catch {
+            // Some browser shells expose a non-configurable `chrome` object;
+            // the normal development preview path still uses the object above.
+          }
+        }
+      }
+    }
   }
 
-  Object.defineProperty(previewGlobal, "chrome", {
-    configurable: true,
-    value: previewChrome
-  });
+  for (const previewGlobal of previewGlobals) {
+    if (previewGlobal.chrome) continue;
+    Object.defineProperty(previewGlobal, "chrome", {
+      configurable: true,
+      value: previewChrome,
+      writable: true
+    });
+  }
 }

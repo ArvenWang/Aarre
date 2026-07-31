@@ -1,3 +1,4 @@
+import { FluidInput, FluidTextarea, FluidSelect } from "../../components/FluidControls";
 import {
   useEffect,
   useMemo,
@@ -17,6 +18,8 @@ import {
   EllipsisIcon,
   TrashIcon
 } from "../../components/Icons";
+import { Button } from "../../../components/ui/button";
+import { Tooltip } from "../../../components/ui/tooltip";
 import {
   buildLibraryBookmarkEditorModel,
   mergeLibraryEditorTags
@@ -242,18 +245,20 @@ export function LibraryCardEditor({
 
   return (
     <>
-      <button
-        ref={triggerRef}
-        type="button"
-        className="library-card-editor-trigger"
-        aria-haspopup="dialog"
-        aria-label={`编辑 ${resource.title}`}
-        title="编辑收藏"
-        onClick={openEditor}
-      >
-        <EllipsisIcon />
-        <span>编辑</span>
-      </button>
+      <Tooltip content="编辑收藏" side="left">
+        <Button
+          ref={triggerRef}
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="library-card-editor-trigger"
+          aria-haspopup="dialog"
+          aria-label={`编辑 ${resource.title}`}
+          onClick={openEditor}
+        >
+          <EllipsisIcon />
+        </Button>
+      </Tooltip>
 
       {open ? (
         <div
@@ -285,22 +290,24 @@ export function LibraryCardEditor({
                   Chrome 保存名称、网址和文件夹；Aarre 保存备注与自定义标签。
                 </p>
               </div>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon-sm"
                 className="library-card-editor-close"
                 aria-label="关闭编辑窗口"
                 onClick={closeEditor}
                 disabled={Boolean(action)}
               >
                 <CloseIcon />
-              </button>
+              </Button>
             </header>
 
             <form onSubmit={(event) => void save(event)}>
               {model.locations.length > 1 ? (
                 <label className="library-card-editor-field">
                   <span>收藏位置</span>
-                  <select
+                  <FluidSelect
                     value={selectedLocation?.bookmarkId || ""}
                     onChange={changeLocation}
                     disabled={Boolean(action)}
@@ -314,7 +321,7 @@ export function LibraryCardEditor({
                         {location.writable ? "" : "（只读）"}
                       </option>
                     ))}
-                  </select>
+                  </FluidSelect>
                   <small>
                     这个网站在 Chrome 中保存了 {model.locations.length} 次。编辑和删除只作用于当前选中的位置。
                   </small>
@@ -337,7 +344,7 @@ export function LibraryCardEditor({
               <div className="library-card-editor-grid">
                 <label className="library-card-editor-field">
                   <span>名称</span>
-                  <input
+                  <FluidInput
                     ref={titleRef}
                     value={title}
                     maxLength={240}
@@ -349,7 +356,7 @@ export function LibraryCardEditor({
 
                 <label className="library-card-editor-field">
                   <span>网址</span>
-                  <input
+                  <FluidInput
                     type="url"
                     value={url}
                     required
@@ -365,7 +372,7 @@ export function LibraryCardEditor({
 
                 <label className="library-card-editor-field">
                   <span>文件夹</span>
-                  <select
+                  <FluidSelect
                     value={parentId}
                     required
                     disabled={!writable || Boolean(action)}
@@ -382,7 +389,7 @@ export function LibraryCardEditor({
                         {folder.label}
                       </option>
                     ))}
-                  </select>
+                  </FluidSelect>
                 </label>
               </div>
 
@@ -412,7 +419,7 @@ export function LibraryCardEditor({
                       tags.map((tag) => (
                         <span key={tag}>
                           {tag}
-                          <button
+                          <Button
                             type="button"
                             aria-label={`移除标签 ${tag}`}
                             disabled={Boolean(action)}
@@ -424,7 +431,7 @@ export function LibraryCardEditor({
                             }}
                           >
                             <CloseIcon />
-                          </button>
+                          </Button>
                         </span>
                       ))
                     ) : (
@@ -432,7 +439,7 @@ export function LibraryCardEditor({
                     )}
                   </div>
                   <div>
-                    <input
+                    <FluidInput
                       value={tagInput}
                       maxLength={120}
                       disabled={Boolean(action)}
@@ -452,19 +459,19 @@ export function LibraryCardEditor({
                         }
                       }}
                     />
-                    <button
+                    <Button
                       type="button"
                       onClick={addTags}
                       disabled={!tagInput.trim() || Boolean(action)}
                     >
                       添加
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
                 <label className="library-card-editor-field">
                   <span>备注</span>
-                  <textarea
+                  <FluidTextarea
                     value={userNote}
                     rows={4}
                     maxLength={2_000}
@@ -494,15 +501,15 @@ export function LibraryCardEditor({
                       : "将删除这条 Chrome 收藏。Aarre 会保留恢复所需记录，30 天内可从侧边栏设置撤销。"}
                   </p>
                   <div>
-                    <button
+                    <Button
                       type="button"
                       className="button button-quiet"
                       disabled={Boolean(action)}
                       onClick={() => setConfirmDelete(false)}
                     >
                       取消删除
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
                       className="button button-danger"
                       disabled={Boolean(action)}
@@ -511,12 +518,12 @@ export function LibraryCardEditor({
                       {action === "deleting"
                         ? "正在删除…"
                         : "确认删除"}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : (
                 <footer className="library-card-editor-actions">
-                  <button
+                  <Button
                     type="button"
                     className="button button-danger"
                     disabled={!writable || Boolean(action)}
@@ -524,17 +531,17 @@ export function LibraryCardEditor({
                   >
                     <TrashIcon />
                     删除
-                  </button>
+                  </Button>
                   <div>
-                    <button
+                    <Button
                       type="button"
                       className="button button-quiet"
                       onClick={closeEditor}
                       disabled={Boolean(action)}
                     >
                       取消
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="submit"
                       className="button button-dark"
                       disabled={
@@ -546,7 +553,7 @@ export function LibraryCardEditor({
                       }
                     >
                       {action === "saving" ? "正在保存…" : "保存修改"}
-                    </button>
+                    </Button>
                   </div>
                 </footer>
               )}

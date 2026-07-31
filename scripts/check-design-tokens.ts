@@ -2,6 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 const UI_DIRECTORY = new URL("../src/ui/", import.meta.url);
+const SOURCE_DIRECTORY = new URL("../src/", import.meta.url);
 const TOKEN_FILE = "tokens.css";
 const ALLOWED_TOKEN_COLORS = new Set([
   "#ffffff",
@@ -98,7 +99,7 @@ for (const file of entries) {
       }
 
       if (
-        /--(?:paper|card|lime|component|muted|danger|success)\b/.test(
+        /--(?:paper|card|lime|component|muted|danger|success)\s*:/.test(
           line
         )
       ) {
@@ -110,6 +111,49 @@ for (const file of entries) {
 
     if (line.includes("!important")) {
       errors.push(`${file}:${lineNumber} 不允许使用 !important`);
+    }
+
+    if (
+      />\s*span\.relative\b|span\[aria-hidden=(?:"true"|'true')\]/.test(
+        line
+      )
+    ) {
+      errors.push(
+        `${file}:${lineNumber} 不得依赖共享 Button 的匿名内部标签，请使用 data-slot`
+      );
+    }
+  }
+}
+
+async function collectTsxFiles(directory: string): Promise<string[]> {
+  const files: string[] = [];
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await collectTsxFiles(path)));
+    } else if (entry.name.endsWith(".tsx")) {
+      files.push(path);
+    }
+  }
+  return files;
+}
+
+for (const file of await collectTsxFiles(SOURCE_DIRECTORY.pathname)) {
+  const source = await readFile(file, "utf8");
+  const buttonPattern = /<Button\b([\s\S]*?)>([\s\S]*?)<\/Button>/g;
+  for (const match of source.matchAll(buttonPattern)) {
+    const attributes = match[1];
+    const children = match[2].trim();
+    if (
+      /^<[A-Z][A-Za-z0-9]*Icon\b[^>]*\/>$/.test(children) &&
+      !/\bsize=(?:"icon(?:-sm|-lg)?"|\{"icon(?:-sm|-lg)?"\})/.test(
+        attributes
+      )
+    ) {
+      const lineNumber = source.slice(0, match.index).split(/\r?\n/).length;
+      errors.push(
+        `${file}:${lineNumber} 纯图标 Button 必须显式使用 icon 尺寸`
+      );
     }
   }
 }

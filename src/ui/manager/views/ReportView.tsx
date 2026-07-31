@@ -1,3 +1,5 @@
+import { Button } from "../../../components/ui/button";
+import { FluidInput, FluidTextarea, FluidSelect } from "../../components/FluidControls";
 import type {
   KnowledgeDashboard,
   LibraryReport
@@ -71,20 +73,24 @@ export function ReportView({
   return (
     <section className="report-shell">
       <div className="report-period-tabs" aria-label="报告周期">
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           data-active={period === "week"}
           onClick={() => onPeriodChange("week")}
         >
           周报
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           data-active={period === "month"}
           onClick={() => onPeriodChange("month")}
         >
           月报
-        </button>
+        </Button>
       </div>
 
       <header className="report-lead">
@@ -183,13 +189,14 @@ export function ReportView({
             <span className="section-eyebrow">重新浮现</span>
             <h3>值得再看一次</h3>
           </div>
-          <button
+          <Button
             type="button"
+            variant="tertiary"
             className="button button-quiet"
             onClick={onOpenOrganize}
           >
             查看整理提案
-          </button>
+          </Button>
         </header>
         {report.resurfacing.length ? (
           <div>

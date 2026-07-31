@@ -1,3 +1,5 @@
+import { Button } from "../../../components/ui/button";
+import { FluidInput, FluidTextarea, FluidSelect } from "../../components/FluidControls";
 import {
   useCallback,
   useEffect,
@@ -176,10 +178,12 @@ export function SnapshotBackfillControl({
       const next = (message as { status?: SnapshotBackfillStatus }).status;
       if (next) acceptStatus(next);
     };
-    chrome.runtime.onMessage.addListener(handleStatusUpdate);
+    const runtimeMessageEvent =
+      typeof chrome !== "undefined" ? chrome.runtime?.onMessage : undefined;
+    runtimeMessageEvent?.addListener(handleStatusUpdate);
     return () => {
       mountedRef.current = false;
-      chrome.runtime.onMessage.removeListener(handleStatusUpdate);
+      runtimeMessageEvent?.removeListener(handleStatusUpdate);
     };
   }, [acceptStatus, readStatus]);
 
@@ -326,7 +330,7 @@ export function SnapshotBackfillControl({
   if (!showStatus) {
     return (
       <>
-        <button
+        <Button
           ref={triggerRef}
           type="button"
           className="text-button snapshot-backfill-trigger"
@@ -336,7 +340,7 @@ export function SnapshotBackfillControl({
           }}
         >
           补齐缺失封面
-        </button>
+        </Button>
 
         {confirmOpen ? (
           <div
@@ -362,15 +366,17 @@ export function SnapshotBackfillControl({
                   </h2>
                   <p>仅处理尚无真实网页截图的收藏。</p>
                 </div>
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon-sm"
                   className="snapshot-backfill-dialog-close"
                   aria-label="关闭批量补拍确认"
                   disabled={Boolean(action)}
                   onClick={closeConfirmation}
                 >
                   <CloseIcon />
-                </button>
+                </Button>
               </header>
 
               <div className="snapshot-backfill-dialog-body">
@@ -394,15 +400,15 @@ export function SnapshotBackfillControl({
               </div>
 
               <footer>
-                <button
+                <Button
                   type="button"
                   className="button button-quiet"
                   disabled={Boolean(action)}
                   onClick={closeConfirmation}
                 >
                   暂不补拍
-                </button>
-                <button
+                </Button>
+                <Button
                   ref={confirmButtonRef}
                   type="button"
                   className="button button-dark"
@@ -410,7 +416,7 @@ export function SnapshotBackfillControl({
                   onClick={() => void runAction("start")}
                 >
                   {action === "start" ? "正在启动…" : "开始补拍"}
-                </button>
+                </Button>
               </footer>
             </div>
           </div>
@@ -475,17 +481,17 @@ export function SnapshotBackfillControl({
 
       <div className="snapshot-backfill-actions">
         {canPause ? (
-          <button
+          <Button
             type="button"
             className="button button-quiet button-small"
             disabled={Boolean(action)}
             onClick={() => void runAction("pause")}
           >
             {action === "pause" ? "正在暂停…" : "暂停"}
-          </button>
+          </Button>
         ) : null}
         {canResume ? (
-          <button
+          <Button
             type="button"
             className="button button-dark button-small"
             disabled={Boolean(action)}
@@ -498,26 +504,26 @@ export function SnapshotBackfillControl({
                 : currentStatus.state === "failed"
                   ? "继续未完成项"
                   : "继续"}
-          </button>
+          </Button>
         ) : null}
         {canCancel ? (
-          <button
+          <Button
             type="button"
             className="text-button snapshot-backfill-cancel"
             disabled={Boolean(action)}
             onClick={() => void runAction("cancel")}
           >
             {action === "cancel" ? "正在取消…" : "取消任务"}
-          </button>
+          </Button>
         ) : null}
         {canDismiss ? (
-          <button
+          <Button
             type="button"
             className="button button-quiet button-small"
             onClick={dismissStatus}
           >
             关闭
-          </button>
+          </Button>
         ) : null}
       </div>
     </section>

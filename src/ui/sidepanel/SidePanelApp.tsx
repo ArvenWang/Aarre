@@ -1,3 +1,6 @@
+import { Button } from "../../components/ui/button";
+import { TabsSubtle, TabsSubtleItem } from "../../components/ui/tabs-subtle";
+import { FluidInput, FluidTextarea, FluidSelect } from "../components/FluidControls";
 import {
   useCallback,
   useEffect,
@@ -309,7 +312,7 @@ function FolderSelect({
       data-open={open}
       onKeyDown={handleKeyDown}
     >
-      <button
+      <Button
         ref={triggerRef}
         type="button"
         className="folder-select-trigger"
@@ -324,7 +327,7 @@ function FolderSelect({
             (options.length ? "选择文件夹" : "暂无自建文件夹")}
         </span>
         <ChevronDownIcon />
-      </button>
+      </Button>
       {open ? (
         <div
           id={listboxId}
@@ -333,7 +336,7 @@ function FolderSelect({
           aria-label="文件夹"
         >
           {options.map((option, index) => (
-            <button
+            <Button
               key={option.id}
               ref={(element) => {
                 optionRefs.current[index] = element;
@@ -353,7 +356,7 @@ function FolderSelect({
               <FolderIcon />
               <span>{option.name}</span>
               {option.id === value ? <span aria-hidden="true">✓</span> : null}
-            </button>
+            </Button>
           ))}
         </div>
       ) : null}
@@ -439,14 +442,14 @@ function OnboardingPage({
     <main className="native-panel onboarding-panel">
       <header>
         <span className="eyebrow">AARRE · {step + 1}/3</span>
-        <button
+        <Button
           type="button"
           className="text-button"
           disabled={Boolean(busy)}
           onClick={() => void finish(true, false)}
         >
           跳过引导
-        </button>
+        </Button>
       </header>
       <section className="onboarding-card">
         {step === 0 ? (
@@ -466,13 +469,13 @@ function OnboardingPage({
                 新收藏和正常打开的缺图旧收藏会在本机补齐真实预览快照
               </span>
             </div>
-            <button
+            <Button
               type="button"
               className="button button-dark"
               onClick={() => setStep(1)}
             >
               继续
-            </button>
+            </Button>
           </>
         ) : step === 1 ? (
           <>
@@ -481,28 +484,31 @@ function OnboardingPage({
               API Key 只保存在当前 Chrome 配置文件中，扩展直接调用服务商；Aarre
               不经手你的 Key。
             </p>
-            <div
+            <TabsSubtle
+              selectedIndex={Math.max(
+                0,
+                AI_PROVIDER_PRESETS.findIndex((item) => item.id === provider)
+              )}
+              onSelect={(index) => {
+                const next = AI_PROVIDER_PRESETS[index];
+                if (next) setProvider(next.id);
+              }}
+              equalWidth
               className="settings-provider-tabs"
-              role="radiogroup"
               aria-label="AI 服务商"
             >
-              {AI_PROVIDER_PRESETS.map((item) => (
-                <button
+              {AI_PROVIDER_PRESETS.map((item, index) => (
+                <TabsSubtleItem
                   key={item.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={provider === item.id}
-                  data-active={provider === item.id}
+                  index={index}
+                  label={item.name}
                   className="settings-provider-tab"
-                  onClick={() => setProvider(item.id)}
-                >
-                  {item.name}
-                </button>
+                />
               ))}
-            </div>
+            </TabsSubtle>
             <label className="settings-field">
               <span>模型</span>
-              <input
+              <FluidInput
                 value={models[provider]}
                 onChange={(event) =>
                   setModels((current) => ({
@@ -514,7 +520,7 @@ function OnboardingPage({
             </label>
             <label className="settings-field">
               <span>{preset.name} API Key</span>
-              <input
+              <FluidInput
                 type="password"
                 value={apiKey}
                 autoComplete="off"
@@ -528,15 +534,15 @@ function OnboardingPage({
               </div>
             ) : null}
             <div className="onboarding-actions">
-              <button
+              <Button
                 type="button"
                 className="button button-quiet"
                 disabled={Boolean(busy)}
                 onClick={() => setStep(2)}
               >
                 先跳过，只管理书签
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 className="button button-dark"
                 disabled={
@@ -555,7 +561,7 @@ function OnboardingPage({
                   : configured && !apiKey.trim()
                     ? "使用现有配置继续"
                     : "验证并继续"}
-              </button>
+              </Button>
             </div>
           </>
         ) : (
@@ -585,22 +591,22 @@ function OnboardingPage({
               </div>
             ) : null}
             <div className="onboarding-actions">
-              <button
+              <Button
                 type="button"
                 className="button button-quiet"
                 disabled={Boolean(busy)}
                 onClick={() => void finish(false, false)}
               >
                 以后再说
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 className="button button-dark"
                 disabled={!resourceCount || Boolean(busy)}
                 onClick={() => void finish(false, true)}
               >
                 {busy === "scan" ? "正在启动…" : "现在扫描"}
-              </button>
+              </Button>
             </div>
           </>
         )}
@@ -886,16 +892,18 @@ function SettingsPage({
   return (
     <main className="native-panel native-settings-panel">
       <header className="settings-page-header">
-        <button
+        <Button
           ref={backButtonRef}
           type="button"
+          variant="ghost"
+          size="icon-sm"
           className="icon-button settings-back-button"
           aria-label="返回我的书签"
           title="返回"
           onClick={onClose}
         >
           <ArrowLeftIcon />
-        </button>
+        </Button>
         <div>
           <h1>设置</h1>
         </div>
@@ -927,34 +935,35 @@ function SettingsPage({
             </span>
           </div>
 
-          <div
+          <TabsSubtle
+            selectedIndex={Math.max(
+              0,
+              AI_PROVIDER_PRESETS.findIndex((preset) => preset.id === provider)
+            )}
+            onSelect={(index) => {
+              const preset = AI_PROVIDER_PRESETS[index];
+              if (!preset) return;
+              setProvider(preset.id);
+              setModel(
+                settings?.providerModels[preset.id] || preset.defaultModel
+              );
+              setApiKey("");
+              setError("");
+              setMessage("");
+            }}
+            equalWidth
             className="settings-provider-tabs"
-            role="radiogroup"
             aria-label="AI 服务商"
           >
-            {AI_PROVIDER_PRESETS.map((preset) => (
-              <button
+            {AI_PROVIDER_PRESETS.map((preset, index) => (
+              <TabsSubtleItem
                 key={preset.id}
-                type="button"
-                role="radio"
-                aria-checked={provider === preset.id}
+                index={index}
+                label={preset.name}
                 className="settings-provider-tab"
-                data-active={provider === preset.id}
-                onClick={() => {
-                  setProvider(preset.id);
-                  setModel(
-                    settings?.providerModels[preset.id] ||
-                      preset.defaultModel
-                  );
-                  setApiKey("");
-                  setError("");
-                  setMessage("");
-                }}
-              >
-                {preset.name}
-              </button>
+              />
             ))}
-          </div>
+          </TabsSubtle>
           <p className="settings-provider-help">
             {settings?.provider === provider &&
             settings.apiKeyConfigured &&
@@ -965,7 +974,7 @@ function SettingsPage({
 
           <label className="settings-field">
             <span>模型</span>
-            <input
+            <FluidInput
               type="text"
               value={model}
               onChange={(event) => setModel(event.target.value)}
@@ -977,7 +986,7 @@ function SettingsPage({
 
           <label className="settings-field">
             <span>API Key</span>
-            <input
+            <FluidInput
               type="password"
               value={apiKey}
               onChange={(event) => setApiKey(event.target.value)}
@@ -992,7 +1001,7 @@ function SettingsPage({
           </label>
           <div className="settings-field-footer">
             <p>Key 仅保存在当前 Chrome 配置文件。</p>
-            <button
+            <Button
               type="button"
               className="button button-dark button-small"
               disabled={!canSaveProvider || Boolean(action)}
@@ -1001,7 +1010,7 @@ function SettingsPage({
               {action === "save-key"
                 ? "正在验证…"
                 : "验证并保存"}
-            </button>
+            </Button>
           </div>
         </section>
 
@@ -1015,34 +1024,26 @@ function SettingsPage({
               <p>选择列表中优先显示的图片类型。</p>
             </div>
           </div>
-          <div
+          <TabsSubtle
+            selectedIndex={listCoverStyle === "site" ? 0 : 1}
+            onSelect={(index) =>
+              void handleCoverStyle(index === 0 ? "site" : "page")
+            }
+            equalWidth
             className="settings-provider-tabs settings-cover-tabs"
-            role="radiogroup"
             aria-label="列表封面风格"
           >
-            <button
-              type="button"
-              role="radio"
-              aria-checked={listCoverStyle === "site"}
-              data-active={listCoverStyle === "site"}
+            <TabsSubtleItem
+              index={0}
+              label="站点标识"
               className="settings-provider-tab"
-              disabled={Boolean(action)}
-              onClick={() => void handleCoverStyle("site")}
-            >
-              站点标识
-            </button>
-            <button
-              type="button"
-              role="radio"
-              aria-checked={listCoverStyle === "page"}
-              data-active={listCoverStyle === "page"}
+            />
+            <TabsSubtleItem
+              index={1}
+              label="页面封面"
               className="settings-provider-tab"
-              disabled={Boolean(action)}
-              onClick={() => void handleCoverStyle("page")}
-            >
-              页面封面
-            </button>
-          </div>
+            />
+          </TabsSubtle>
         </section>
 
         <section
@@ -1135,7 +1136,7 @@ function SettingsPage({
               </dl>
               <label className="settings-scan-limit">
                 <span>单次 AI 费用上限（人民币）</span>
-                <input
+                <FluidInput
                   type="number"
                   min="0.01"
                   max="10000"
@@ -1161,35 +1162,35 @@ function SettingsPage({
           </p>
           <div className="settings-scan-actions">
             {appState?.libraryScan.state === "running" ? (
-              <button
+              <Button
                 type="button"
                 className="button button-quiet button-small"
                 disabled={Boolean(action)}
                 onClick={() => void handleLibraryScan("pause")}
               >
                 暂停
-              </button>
+              </Button>
             ) : appState?.libraryScan.state === "paused" ? (
               <>
-                <button
+                <Button
                   type="button"
                   className="button button-quiet button-small"
                   disabled={Boolean(action)}
                   onClick={() => void handleLibraryScan("cancel")}
                 >
                   取消
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   className="button button-dark button-small"
                   disabled={Boolean(action)}
                   onClick={() => void handleLibraryScan("resume")}
                 >
                   继续扫描
-                </button>
+                </Button>
               </>
             ) : (
-              <button
+              <Button
                 type="button"
                 className="button button-dark button-small"
                 disabled={
@@ -1214,11 +1215,11 @@ function SettingsPage({
                     : settings?.apiKeyConfigured
                       ? "扫描全部书签"
                       : "更新站点标识"}
-              </button>
+              </Button>
             )}
           </div>
           {scanEstimate ? (
-            <button
+            <Button
               type="button"
               className="text-button"
               disabled={Boolean(action)}
@@ -1228,7 +1229,7 @@ function SettingsPage({
               }}
             >
               取消本次扫描
-            </button>
+            </Button>
           ) : null}
           {usageStats ? (
             <div className="settings-usage-summary">
@@ -1272,14 +1273,14 @@ function SettingsPage({
                       {batch.destructive ? " · 回收站" : ""}
                     </small>
                   </div>
-                  <button
+                  <Button
                     type="button"
                     className="button button-quiet button-small"
                     disabled={Boolean(action)}
                     onClick={() => void handleUndoBatch(batch.batchId)}
                   >
                     {action === `undo-${batch.batchId}` ? "恢复中…" : "撤销"}
-                  </button>
+                  </Button>
                 </article>
               ))}
             </div>
@@ -1293,14 +1294,14 @@ function SettingsPage({
             <h2>首次使用引导</h2>
             <p>重新查看主要功能说明。</p>
           </div>
-          <button
+          <Button
             type="button"
             className="button button-quiet button-small"
             disabled={Boolean(action)}
             onClick={onRestartOnboarding}
           >
             重新查看引导
-          </button>
+          </Button>
         </section>
 
         <section
@@ -1322,14 +1323,14 @@ function SettingsPage({
             >
               查看隐私政策
             </a>
-            <button
+            <Button
               type="button"
               className="button button-dark button-small"
               disabled={Boolean(action)}
               onClick={() => void exportLocalData()}
             >
               {action === "export-data" ? "正在打包…" : "导出全部本地数据"}
-            </button>
+            </Button>
           </div>
         </section>
 
@@ -1364,7 +1365,7 @@ function SettingsPage({
               </small>
             </div>
             {appState?.auth.configured ? (
-              <button
+              <Button
                 type="button"
                 className="button button-quiet button-small"
                 disabled={Boolean(action)}
@@ -1381,7 +1382,7 @@ function SettingsPage({
                     : appState.auth.signedIn
                       ? "退出"
                       : "登录"}
-              </button>
+              </Button>
             ) : null}
           </div>
         </section>
@@ -1736,7 +1737,7 @@ function BookmarkTree({
               }}
               onPointerLeave={cancelPreview}
             >
-              <button
+              <Button
                 type="button"
                 className="bookmark-main"
                 aria-expanded={folder ? isExpanded : undefined}
@@ -1818,18 +1819,20 @@ function BookmarkTree({
                     thumbnailClassName="bookmark-thumbnail"
                   />
                 )}
-              </button>
+              </Button>
 
               {!node.unmodifiable && !node.folderType ? (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon-sm"
                   className="row-menu"
                   aria-label={`编辑 ${node.title}`}
                   title="编辑"
                   onClick={() => onEdit(node)}
                 >
                   <EllipsisIcon />
-                </button>
+                </Button>
               ) : null}
             </div>
 
@@ -1966,13 +1969,13 @@ function AgentComposer({
   if (!configured) {
     return (
       <div className="agent-composer agent-composer-setup">
-        <button type="button" onClick={onConfigure}>
+        <Button type="button" variant="ghost" onClick={onConfigure}>
           <span>
             <strong>配置 AI 后可以直接问你的收藏</strong>
             <small>选择服务商并填写自己的 API Key</small>
           </span>
           <ChevronRightIcon />
-        </button>
+        </Button>
       </div>
     );
   }
@@ -1981,7 +1984,7 @@ function AgentComposer({
       className="agent-composer"
       onSubmit={(event) => onSubmit(event)}
     >
-      <textarea
+      <FluidTextarea
         ref={textareaRef}
         id="bookmark-agent-prompt"
         value={value}
@@ -2001,15 +2004,16 @@ function AgentComposer({
         aria-label={placeholder}
       />
       <div className="agent-composer-toolbar">
-        <button
+        <Button
           type="submit"
+          size="icon-sm"
           className="agent-send-button"
           aria-label="发送给 Aarre"
           title="发送"
           disabled={!value.trim() || busy}
         >
           <ArrowUpIcon />
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -2024,26 +2028,6 @@ function conversationDate(value: string): string {
     hour: "2-digit",
     minute: "2-digit"
   }).format(date);
-}
-
-function organizationNoticeDetails(
-  notice: OrganizationNotice
-): string {
-  // 量词按提案粒度区分：重复提案一条对应一组同 URL 收藏，归类和失效提案
-  // 都是一条对应一个书签。
-  const details = [
-    notice.counts.duplicate
-      ? `${notice.counts.duplicate} 组重复`
-      : "",
-    notice.counts.dead ? `${notice.counts.dead} 条失效` : "",
-    notice.counts.classify
-      ? `${notice.counts.classify} 条可归类`
-      : "",
-    notice.counts.largeFolder
-      ? `${notice.counts.largeFolder} 个大文件夹`
-      : ""
-  ].filter(Boolean);
-  return details.join("、") || `${notice.actionableCount} 条可执行建议`;
 }
 
 interface AgentChatPageProps {
@@ -2095,15 +2079,17 @@ function AgentChatPage({
   return (
     <main className="native-panel agent-chat-panel">
       <header className="agent-page-header">
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-sm"
           className="icon-button"
           aria-label="返回收藏列表"
           title="返回"
           onClick={onBack}
         >
           <ArrowLeftIcon />
-        </button>
+        </Button>
         <div>
           <h1>收藏对话</h1>
         </div>
@@ -2135,7 +2121,7 @@ function AgentChatPage({
               <div className="agent-message-sources">
                 <span>相关收藏</span>
                 {message.sources.map((source) => (
-                  <button
+                  <Button
                     type="button"
                     key={source.resourceKey}
                     onClick={() => onOpenSource(source.url)}
@@ -2168,7 +2154,7 @@ function AgentChatPage({
                       <strong>{source.title}</strong>
                       <small>{hostFromUrl(source.url)}</small>
                     </span>
-                  </button>
+                  </Button>
                 ))}
               </div>
             ) : null}
@@ -2208,15 +2194,15 @@ function AgentChatPage({
                   (action) => action.status === "pending"
                 ) ? (
                   <footer>
-                    <button
+                    <Button
                       type="button"
                       className="button-quiet"
                       disabled={busy}
                       onClick={() => onCancelActions(message.id)}
                     >
                       取消
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
                       className={
                         message.actions.some(
@@ -2229,20 +2215,20 @@ function AgentChatPage({
                       onClick={() => onConfirmActions(message.id)}
                     >
                       {busy ? "正在执行…" : "确认执行"}
-                    </button>
+                    </Button>
                   </footer>
                 ) : null}
               </section>
             ) : null}
             {message.undoBatchId ? (
-              <button
+              <Button
                 type="button"
                 className="agent-undo-button"
                 disabled={busy}
                 onClick={() => onUndoBatch(message.id, message.undoBatchId || "")}
               >
                 {busy ? "正在恢复…" : "撤销这批操作"}
-              </button>
+              </Button>
             ) : null}
           </article>
         ))}
@@ -2304,15 +2290,17 @@ function AgentHistoryPage({
   return (
     <main className="native-panel agent-history-panel">
       <header className="agent-page-header">
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-sm"
           className="icon-button"
           aria-label="返回收藏列表"
           title="返回"
           onClick={onBack}
         >
           <ArrowLeftIcon />
-        </button>
+        </Button>
         <div>
           <h1>历史会话</h1>
         </div>
@@ -2333,7 +2321,7 @@ function AgentHistoryPage({
                       void saveTitle(conversation);
                     }}
                   >
-                    <input
+                    <FluidInput
                       autoFocus
                       value={editingTitle}
                       maxLength={80}
@@ -2342,23 +2330,23 @@ function AgentHistoryPage({
                         setEditingTitle(event.target.value)
                       }
                     />
-                    <button
+                    <Button
                       type="button"
                       disabled={Boolean(busyId)}
                       onClick={() => setEditingId("")}
                     >
                       取消
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="submit"
                       disabled={!editingTitle.trim() || Boolean(busyId)}
                     >
                       保存
-                    </button>
+                    </Button>
                   </form>
                 ) : (
                   <>
-                    <button
+                    <Button
                       type="button"
                       className="agent-history-open"
                       onClick={() => onOpen(conversation)}
@@ -2369,9 +2357,9 @@ function AgentHistoryPage({
                       </span>
                       <small>{preview || "尚未生成回答"}</small>
                       <ChevronRightIcon />
-                    </button>
+                    </Button>
                     <div className="agent-history-actions">
-                      <button
+                      <Button
                         type="button"
                         onClick={() => {
                           setEditingId(conversation.id);
@@ -2380,8 +2368,8 @@ function AgentHistoryPage({
                         }}
                       >
                         改名
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
                         data-danger={confirmDeleteId === conversation.id}
                         disabled={busyId === conversation.id}
@@ -2400,7 +2388,7 @@ function AgentHistoryPage({
                         {confirmDeleteId === conversation.id
                           ? "确认删除"
                           : "删除"}
-                      </button>
+                      </Button>
                     </div>
                   </>
                 )}
@@ -2682,17 +2670,19 @@ export function SidePanelApp() {
         );
       });
     };
-    chrome.bookmarks.onCreated.addListener(handleChange);
-    chrome.bookmarks.onChanged.addListener(handleChange);
-    chrome.bookmarks.onMoved.addListener(handleChange);
-    chrome.bookmarks.onRemoved.addListener(handleChange);
-    chrome.bookmarks.onChildrenReordered.addListener(handleChange);
+    const bookmarks =
+      typeof chrome !== "undefined" ? chrome.bookmarks : undefined;
+    bookmarks?.onCreated.addListener(handleChange);
+    bookmarks?.onChanged.addListener(handleChange);
+    bookmarks?.onMoved.addListener(handleChange);
+    bookmarks?.onRemoved.addListener(handleChange);
+    bookmarks?.onChildrenReordered.addListener(handleChange);
     return () => {
-      chrome.bookmarks.onCreated.removeListener(handleChange);
-      chrome.bookmarks.onChanged.removeListener(handleChange);
-      chrome.bookmarks.onMoved.removeListener(handleChange);
-      chrome.bookmarks.onRemoved.removeListener(handleChange);
-      chrome.bookmarks.onChildrenReordered.removeListener(handleChange);
+      bookmarks?.onCreated.removeListener(handleChange);
+      bookmarks?.onChanged.removeListener(handleChange);
+      bookmarks?.onMoved.removeListener(handleChange);
+      bookmarks?.onRemoved.removeListener(handleChange);
+      bookmarks?.onChildrenReordered.removeListener(handleChange);
     };
   }, [loadConversations, refresh]);
 
@@ -2734,9 +2724,11 @@ export function SidePanelApp() {
         })
         .catch(() => undefined);
     };
-    chrome.runtime.onMessage.addListener(handleScanUpdate);
+    const runtimeMessageEvent =
+      typeof chrome !== "undefined" ? chrome.runtime?.onMessage : undefined;
+    runtimeMessageEvent?.addListener(handleScanUpdate);
     return () =>
-      chrome.runtime.onMessage.removeListener(handleScanUpdate);
+      runtimeMessageEvent?.removeListener(handleScanUpdate);
   }, []);
 
   useEffect(() => {
@@ -2744,9 +2736,11 @@ export function SidePanelApp() {
       if (message.type !== "ORGANIZATION_INSIGHTS_UPDATED") return;
       void loadOrganizationNotice().catch(() => undefined);
     };
-    chrome.runtime.onMessage.addListener(handleOrganizationUpdate);
+    const runtimeMessageEvent =
+      typeof chrome !== "undefined" ? chrome.runtime?.onMessage : undefined;
+    runtimeMessageEvent?.addListener(handleOrganizationUpdate);
     return () =>
-      chrome.runtime.onMessage.removeListener(handleOrganizationUpdate);
+      runtimeMessageEvent?.removeListener(handleOrganizationUpdate);
   }, [loadOrganizationNotice]);
 
   useEffect(() => {
@@ -2868,14 +2862,16 @@ export function SidePanelApp() {
       // tabId 为准，不能用侧边栏启动时缓存的活动标签页 ID 过滤。
       if (tabId !== null) enqueue(tabId);
     };
-    chrome.runtime.onMessage.addListener(handlePendingSave);
+    const runtimeMessageEvent =
+      typeof chrome !== "undefined" ? chrome.runtime?.onMessage : undefined;
+    runtimeMessageEvent?.addListener(handlePendingSave);
 
     const activeTabId = appState?.activeTab?.id;
     if (typeof activeTabId === "number") {
       enqueue(activeTabId);
     }
     return () => {
-      chrome.runtime.onMessage.removeListener(handlePendingSave);
+      runtimeMessageEvent?.removeListener(handlePendingSave);
     };
   }, [appState?.activeTab?.id]);
 
@@ -3951,8 +3947,10 @@ export function SidePanelApp() {
           <h1>我的书签</h1>
         </div>
         <div className="native-actions">
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-sm"
             className="icon-button"
             title="新建文件夹"
             aria-label="新建文件夹"
@@ -3965,9 +3963,11 @@ export function SidePanelApp() {
             disabled={!snapshot}
           >
             <PlusIcon />
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-sm"
             className="icon-button star-button"
             data-saved={currentSaved}
             title={currentSaved ? "管理当前页面收藏" : "添加到收藏"}
@@ -3978,9 +3978,11 @@ export function SidePanelApp() {
             disabled={!appState?.activeTab?.url}
           >
             <StarIcon filled={currentSaved} />
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-sm"
             className="icon-button history-button"
             title="历史会话"
             aria-label="打开历史会话"
@@ -3990,9 +3992,11 @@ export function SidePanelApp() {
             }}
           >
             <HistoryIcon />
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-sm"
             className="icon-button"
             title="打开批量整理工作台"
             aria-label="打开批量整理工作台"
@@ -4001,19 +4005,21 @@ export function SidePanelApp() {
             }
           >
             <ExternalLinkIcon />
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-sm"
             className="icon-button settings-button"
             title="设置"
             aria-label="打开设置"
             onClick={() => setPanelView("settings")}
           >
             <SettingsIcon />
-          </button>
+          </Button>
         </div>
         {appState?.libraryScan.state === "running" ? (
-          <button
+          <Button
             type="button"
             className="library-scan-indicator"
             aria-label={`扫描进度 ${appState.libraryScan.processed}/${appState.libraryScan.total}`}
@@ -4030,7 +4036,7 @@ export function SidePanelApp() {
                 }%`
               }}
             />
-          </button>
+          </Button>
         ) : null}
       </header>
 
@@ -4043,10 +4049,9 @@ export function SidePanelApp() {
             <strong>
               发现 {organizationNotice.proposalCount} 条可以整理的地方
             </strong>
-            <small>{organizationNoticeDetails(organizationNotice)}</small>
           </div>
           <div>
-            <button
+            <Button
               type="button"
               className="button button-quiet button-small"
               disabled={organizationNoticeBusy}
@@ -4067,8 +4072,8 @@ export function SidePanelApp() {
               }}
             >
               暂不
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               className="button button-dark button-small"
               disabled={organizationNoticeBusy}
@@ -4086,8 +4091,48 @@ export function SidePanelApp() {
               }
             >
               去处理
-            </button>
+            </Button>
           </div>
+        </section>
+      ) : null}
+
+      {!libraryQuery.trim() && contextResurfacing.length ? (
+        <section
+          className="context-resurfacing context-resurfacing-top"
+          aria-label="这会儿值得重看"
+        >
+          <header>
+            <strong>这会儿值得重看</strong>
+            <Button
+              type="button"
+              onClick={() =>
+                void sendExtensionRequest({
+                  type: "OPEN_MANAGER",
+                  view: "resurface"
+                })
+              }
+            >
+              打开工作台
+            </Button>
+          </header>
+          {contextResurfacing.map((item) => (
+            <Button
+              type="button"
+              key={item.resourceKey}
+              onClick={() =>
+                void openNavigation({
+                  text: item.url,
+                  url: item.url
+                })
+              }
+            >
+              <span>
+                <strong>{item.title}</strong>
+                <small>{item.reason}</small>
+              </span>
+              <em>{item.ageDays} 天</em>
+            </Button>
+          ))}
         </section>
       ) : null}
 
@@ -4100,7 +4145,7 @@ export function SidePanelApp() {
         }}
       >
         <SearchIcon aria-hidden="true" />
-        <input
+        <FluidInput
           type="search"
           value={libraryQuery}
           onChange={(event) =>
@@ -4116,14 +4161,16 @@ export function SidePanelApp() {
           aria-label="搜索 Chrome 书签"
         />
         {libraryQuery ? (
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-sm"
             aria-label="清空搜索"
             title="清空搜索"
             onClick={clearLibrarySearch}
           >
             <CloseIcon />
-          </button>
+          </Button>
         ) : (
           <kbd>↵</kbd>
         )}
@@ -4134,7 +4181,7 @@ export function SidePanelApp() {
           <span>{error}</span>
           <div>
             {!snapshot ? (
-              <button
+              <Button
                 type="button"
                 className="native-error-retry"
                 onClick={() =>
@@ -4148,28 +4195,28 @@ export function SidePanelApp() {
                 }
               >
                 重试
-              </button>
+              </Button>
             ) : null}
-            <button
+            <Button
               type="button"
               aria-label="关闭错误提示"
               onClick={() => setError("")}
             >
               <CloseIcon />
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}
       {notice && !error ? (
         <div className="native-notice" role="status">
           <span>{notice}</span>
-          <button
+          <Button
             type="button"
             aria-label="关闭提示"
             onClick={() => setNotice("")}
           >
             <CloseIcon />
-          </button>
+          </Button>
         </div>
       ) : null}
 
@@ -4207,19 +4254,19 @@ export function SidePanelApp() {
                     <span>
                       找到 {rankedNativeResults.length} 条相关收藏
                     </span>
-                    <button
+                    <Button
                       type="button"
                       onClick={() => setLibrarySearchMode("tree")}
                     >
                       在文件夹中查看
-                    </button>
+                    </Button>
                   </div>
                   {rankedNativeResults.map((result) => (
                     <div
                       className="library-search-result"
                       key={result.node.id}
                     >
-                      <button
+                      <Button
                         type="button"
                         className="library-search-result-main"
                         onClick={() =>
@@ -4283,17 +4330,19 @@ export function SidePanelApp() {
                               : ""}
                           </small>
                         </span>
-                      </button>
+                      </Button>
                       {!result.node.unmodifiable ? (
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="icon-sm"
                           className="row-menu"
                           aria-label={`编辑 ${result.node.title}`}
                           title="编辑"
                           onClick={() => startEdit(result.node)}
                         >
                           <EllipsisIcon />
-                        </button>
+                        </Button>
                       ) : null}
                     </div>
                   ))}
@@ -4305,7 +4354,7 @@ export function SidePanelApp() {
                   </span>
                   <strong>没有找到相关收藏</strong>
                   <p>可以换个关键词，或让 AI 理解你的描述。</p>
-                  <button
+                  <Button
                     type="button"
                     className="button button-dark button-small"
                     disabled={Boolean(busy)}
@@ -4318,47 +4367,11 @@ export function SidePanelApp() {
                     {aiConfigured
                       ? "让 AI 帮我找"
                       : "配置 AI 后可以让它帮你找"}
-                  </button>
+                  </Button>
                 </div>
               )
             ) : visibleBookmarkNodes.length ? (
               <>
-                {!libraryQuery.trim() && contextResurfacing.length ? (
-                  <section className="context-resurfacing">
-                    <header>
-                      <strong>这会儿值得重看</strong>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void sendExtensionRequest({
-                            type: "OPEN_MANAGER",
-                            view: "resurface"
-                          })
-                        }
-                      >
-                        打开工作台
-                      </button>
-                    </header>
-                    {contextResurfacing.map((item) => (
-                      <button
-                        type="button"
-                        key={item.resourceKey}
-                        onClick={() =>
-                          void openNavigation({
-                            text: item.url,
-                            url: item.url
-                          })
-                        }
-                      >
-                        <span>
-                          <strong>{item.title}</strong>
-                          <small>{item.reason}</small>
-                        </span>
-                        <em>{item.ageDays} 天</em>
-                      </button>
-                    ))}
-                  </section>
-                ) : null}
                 <BookmarkTree
                   nodes={visibleBookmarkNodes}
                   resourceByUrl={resourceByUrl}
@@ -4399,7 +4412,7 @@ export function SidePanelApp() {
                 </span>
                 <strong>没有找到相关收藏</strong>
                 <p>按回车查看完整排序，或让 AI 理解你的描述。</p>
-                <button
+                <Button
                   type="button"
                   className="button button-dark button-small"
                   disabled={Boolean(busy)}
@@ -4412,7 +4425,7 @@ export function SidePanelApp() {
                   {aiConfigured
                     ? "让 AI 帮我找"
                     : "配置 AI 后可以让它帮你找"}
-                </button>
+                </Button>
               </div>
             ) : (
               <div className="empty-state">
@@ -4511,7 +4524,7 @@ export function SidePanelApp() {
                         : "编辑文件夹"}
                 </h2>
               </div>
-              <button
+              <Button
                 className="dialog-close"
                 onClick={() => {
                   setEditor(null);
@@ -4521,7 +4534,7 @@ export function SidePanelApp() {
                 aria-label="关闭"
               >
                 <CloseIcon />
-              </button>
+              </Button>
             </div>
 
             {editor.kind === "save" && busy === "capture" ? (
@@ -4532,7 +4545,7 @@ export function SidePanelApp() {
               <>
                 <label className="native-field">
                   <span>名称</span>
-                  <input
+                  <FluidInput
                     value={editTitle}
                     onChange={(event) => setEditTitle(event.target.value)}
                     maxLength={240}
@@ -4549,7 +4562,7 @@ export function SidePanelApp() {
                   <>
                     <label className="native-field">
                       <span>网址</span>
-                      <input
+                      <FluidInput
                         value={editUrl}
                         onChange={(event) => setEditUrl(event.target.value)}
                       />
@@ -4609,7 +4622,7 @@ export function SidePanelApp() {
                             editTags.map((tag) => (
                               <span key={tag}>
                                 {tag}
-                                <button
+                                <Button
                                   type="button"
                                   aria-label={`移除标签 ${tag}`}
                                   onClick={() =>
@@ -4621,7 +4634,7 @@ export function SidePanelApp() {
                                   }
                                 >
                                   <CloseIcon />
-                                </button>
+                                </Button>
                               </span>
                             ))
                           ) : (
@@ -4629,7 +4642,7 @@ export function SidePanelApp() {
                           )}
                         </div>
                         <div className="tag-entry">
-                          <input
+                          <FluidInput
                             value={editTagInput}
                             onChange={(event) =>
                               setEditTagInput(event.target.value)
@@ -4648,13 +4661,13 @@ export function SidePanelApp() {
                             aria-label="添加标签"
                             placeholder="输入标签，按回车添加"
                           />
-                          <button
+                          <Button
                             type="button"
                             onClick={() => addEditTags()}
                             disabled={!editTagInput.trim()}
                           >
                             添加
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     </section>
@@ -4691,7 +4704,7 @@ export function SidePanelApp() {
                         </legend>
                         {bookmarkSaveState.matches.map((match) => (
                           <label key={match.id}>
-                            <input
+                            <FluidInput
                               type="radio"
                               name="save-target"
                               checked={
@@ -4717,7 +4730,7 @@ export function SidePanelApp() {
                           </label>
                         ))}
                         <label>
-                          <input
+                          <FluidInput
                             type="radio"
                             name="save-target"
                             checked={saveDisposition === "new"}
@@ -4758,7 +4771,7 @@ export function SidePanelApp() {
                         >
                           <small>本地推荐</small>
                           {folderSuggestions.map((suggestion) => (
-                            <button
+                            <Button
                               type="button"
                               key={suggestion.folderId}
                               data-selected={
@@ -4773,14 +4786,14 @@ export function SidePanelApp() {
                                 suggestion.path
                               ).join(" / ")}
                               <span>{suggestion.reason}</span>
-                            </button>
+                            </Button>
                           ))}
                         </div>
                       ) : null}
                     </div>
                     <label className="native-field">
                       <span>备注（智能增强层）</span>
-                      <textarea
+                      <FluidTextarea
                         value={note}
                         onChange={(event) => setNote(event.target.value)}
                         rows={3}
@@ -4818,15 +4831,15 @@ export function SidePanelApp() {
                           : `将删除整个文件夹及其中 ${countBookmarks(editor.node)} 个书签。30 天内可以在设置页「最近的更改」里恢复。`}
                       </p>
                       <div>
-                        <button
+                        <Button
                           type="button"
                           className="button button-quiet"
                           onClick={() => setConfirmDeleteId("")}
                           disabled={Boolean(busy)}
                         >
                           取消
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
                           className="button button-danger"
                           data-confirming="true"
@@ -4836,14 +4849,14 @@ export function SidePanelApp() {
                           {busy === "delete"
                             ? "正在删除…"
                             : "确认"}
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   ) : (
                     <>
                       {editor.kind === "bookmark" &&
                       !editor.node.folderType ? (
-                        <button
+                        <Button
                           type="button"
                           className="button button-danger"
                           onClick={() =>
@@ -4854,12 +4867,12 @@ export function SidePanelApp() {
                           {editor.node.url
                             ? "删除书签"
                             : "删除整个文件夹"}
-                        </button>
+                        </Button>
                       ) : (
                         <span />
                       )}
                       <div>
-                        <button
+                        <Button
                           type="button"
                           className="button button-quiet"
                           onClick={() => {
@@ -4869,8 +4882,8 @@ export function SidePanelApp() {
                           disabled={Boolean(busy)}
                         >
                           取消
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
                           className="button button-dark"
                           onClick={() => void saveEditor()}
@@ -4890,7 +4903,7 @@ export function SidePanelApp() {
                                 ? "更新收藏"
                                 : "添加到 Chrome"
                               : "保存"}
-                        </button>
+                        </Button>
                       </div>
                     </>
                   )}

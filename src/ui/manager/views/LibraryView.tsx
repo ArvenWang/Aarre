@@ -1,3 +1,4 @@
+import { FluidInput, FluidTextarea, FluidSelect } from "../../components/FluidControls";
 import {
   Fragment,
   useEffect,
@@ -12,9 +13,17 @@ import type {
 } from "../../../lib/types";
 import {
   CloseIcon,
-  RefreshIcon,
   SearchIcon
 } from "../../components/Icons";
+import { Badge } from "../../components/ui/badge";
+import { Button } from "../../../components/ui/button";
+import { Card } from "../../components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger
+} from "../../../components/ui/select";
 import { ResourceIdentity } from "../../components/ResourceIdentity";
 import { LibraryCardEditor } from "../components/LibraryCardEditor";
 import { LibraryCardCover } from "../components/LibraryCardCover";
@@ -56,14 +65,16 @@ interface LibraryViewProps {
   onFilterChange: (filter: LibraryFilter) => void;
   onFolderChange: (folderId: string) => void;
   onSortChange: (sort: LibrarySort) => void;
-  onClearFilters: () => void;
+  /** Kept for compatibility with older test fixtures; no longer rendered. */
+  onClearFilters?: () => void;
   onQueryDraftChange: (value: string) => void;
   onSearch: () => void;
   onClearSearch: () => void;
   onResourceChanged: (message: string) => void;
   onSnapshotBackfillChanged?: () => void;
   onOpenResource: (url: string) => void;
-  onRefresh: () => void;
+  /** Kept for compatibility with older test fixtures; no longer rendered. */
+  onRefresh?: () => void;
 }
 
 function queryTerms(query: string): string[] {
@@ -127,7 +138,7 @@ export function LibrarySearchForm({
       <label className="visually-hidden" htmlFor="library-search">
         搜索收藏库
       </label>
-      <input
+      <FluidInput
         id="library-search"
         value={queryDraft}
         onChange={(event) =>
@@ -136,19 +147,26 @@ export function LibrarySearchForm({
         placeholder="搜索收藏标题、标签、摘要或文件夹"
       />
       {queryDraft || appliedQuery ? (
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-sm"
           className="library-search-clear"
           aria-label="清除收藏搜索"
           title="清除搜索"
           onClick={onClearSearch}
         >
           <CloseIcon />
-        </button>
+        </Button>
       ) : null}
-      <button type="submit" className="button button-dark button-small">
+      <Button
+        type="submit"
+        variant="primary"
+        size="sm"
+        className="button button-dark button-small library-search-submit"
+      >
         搜索
-      </button>
+      </Button>
     </form>
   );
 }
@@ -174,14 +192,12 @@ export function LibraryView({
   onFilterChange,
   onFolderChange,
   onSortChange,
-  onClearFilters,
   onQueryDraftChange,
   onSearch,
   onClearSearch,
   onResourceChanged,
   onSnapshotBackfillChanged,
-  onOpenResource,
-  onRefresh
+  onOpenResource
 }: LibraryViewProps) {
   const [snapshotRevisions, setSnapshotRevisions] = useState<
     Map<string, string>
@@ -215,11 +231,13 @@ export function LibraryView({
         setFocusRevision((value) => value + 1);
       }
     };
-    chrome.runtime.onMessage.addListener(handleSnapshotUpdated);
+    const runtimeMessageEvent =
+      typeof chrome !== "undefined" ? chrome.runtime?.onMessage : undefined;
+    runtimeMessageEvent?.addListener(handleSnapshotUpdated);
     document.addEventListener("visibilitychange", refreshAfterReturning);
     window.addEventListener("focus", refreshAfterReturning);
     return () => {
-      chrome.runtime.onMessage.removeListener(handleSnapshotUpdated);
+      runtimeMessageEvent?.removeListener(handleSnapshotUpdated);
       document.removeEventListener(
         "visibilitychange",
         refreshAfterReturning
@@ -245,16 +263,6 @@ export function LibraryView({
     onOpenResource(url);
   }
 
-  const activeFolder = folders.find((folder) => folder.id === folderId);
-  const hasControlFilters =
-    filter !== "all" ||
-    folderId !== ALL_LIBRARY_FOLDERS ||
-    sort !== "default";
-  const scopeParts = [
-    ...(query ? [`“${query}”`] : []),
-    ...(activeFolder ? [activeFolder.label] : [])
-  ];
-
   return (
     <>
       <section className="library-toolbar">
@@ -276,26 +284,22 @@ export function LibraryView({
                   ["pending", "待处理", pendingCount]
                 ] as const
               ).map(([value, label, count]) => (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
+                  active={filter === value}
+                  className="library-tab-button"
                   aria-pressed={filter === value}
                   data-active={filter === value}
                   key={value}
                   onClick={() => onFilterChange(value)}
                 >
                   {label}
-                  <span>{count}</span>
-                </button>
+                  <span className="library-tab-count">{count}</span>
+                </Button>
               ))}
             </div>
-            <button
-              className="button button-quiet refresh-button"
-              onClick={onRefresh}
-              disabled={Boolean(action)}
-            >
-              <RefreshIcon />
-              刷新
-            </button>
           </div>
         </div>
 
@@ -303,53 +307,51 @@ export function LibraryView({
           <div className="library-controls" aria-label="收藏筛选与排序">
             <label className="library-select-control">
               <span>文件夹</span>
-              <select
+              <Select
                 value={folderId}
-                onChange={(event) =>
-                  onFolderChange(event.currentTarget.value)
-                }
-                aria-label="按 Chrome 书签文件夹筛选"
+                onValueChange={onFolderChange}
               >
-                <option value={ALL_LIBRARY_FOLDERS}>
-                  所有文件夹（{libraryCount}）
-                </option>
-                {folders.map((folder) => (
-                  <option value={folder.id} key={folder.id}>
-                    {folder.label}（{folder.count}）
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger
+                  className="library-select-trigger"
+                  aria-label="按 Chrome 书签文件夹筛选"
+                  placeholder="所有文件夹"
+                />
+                <SelectContent className="library-select-content">
+                  <SelectItem value={ALL_LIBRARY_FOLDERS} index={0}>
+                    所有文件夹（{libraryCount}）
+                  </SelectItem>
+                  {folders.map((folder, index) => (
+                    <SelectItem value={folder.id} key={folder.id} index={index + 1}>
+                      {folder.label}（{folder.count}）
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </label>
 
             <label className="library-select-control">
               <span>排序</span>
-              <select
+              <Select
                 value={sort}
-                onChange={(event) =>
-                  onSortChange(event.currentTarget.value as LibrarySort)
-                }
-                aria-label="收藏排序方式"
+                onValueChange={(value) => onSortChange(value as LibrarySort)}
               >
-                <option value="default">
-                  {query ? "搜索相关度" : "Chrome 顺序"}
-                </option>
-                <option value="bookmarked-desc">最近收藏</option>
-                <option value="bookmarked-asc">最早收藏</option>
-                <option value="used-desc">最近使用</option>
-                <option value="updated-desc">最近更新</option>
-                <option value="title-asc">标题 A–Z</option>
-              </select>
+                <SelectTrigger
+                  className="library-select-trigger"
+                  aria-label="收藏排序方式"
+                  placeholder={query ? "搜索相关度" : "Chrome 顺序"}
+                />
+                <SelectContent className="library-select-content">
+                  <SelectItem value="default" index={0}>
+                    {query ? "搜索相关度" : "Chrome 顺序"}
+                  </SelectItem>
+                  <SelectItem value="bookmarked-desc" index={1}>最近收藏</SelectItem>
+                  <SelectItem value="bookmarked-asc" index={2}>最早收藏</SelectItem>
+                  <SelectItem value="used-desc" index={3}>最近使用</SelectItem>
+                  <SelectItem value="updated-desc" index={4}>最近更新</SelectItem>
+                  <SelectItem value="title-asc" index={5}>标题 A–Z</SelectItem>
+                </SelectContent>
+              </Select>
             </label>
-
-            {hasControlFilters ? (
-              <button
-                type="button"
-                className="text-button library-clear-filters"
-                onClick={onClearFilters}
-              >
-                清除筛选
-              </button>
-            ) : null}
 
             <SnapshotBackfillControl
               missingCount={missingSnapshotCount}
@@ -357,11 +359,6 @@ export function LibraryView({
             />
           </div>
 
-          <p className="library-scope-summary" aria-live="polite">
-            {scopeParts.length
-              ? `${scopeParts.join(" · ")} · 当前显示 ${visibleResults.length} 项`
-              : `直接读取 Chrome 原生书签 · ${libraryCount} 项`}
-          </p>
         </div>
       </section>
 
@@ -378,7 +375,8 @@ export function LibraryView({
                 resource.contentExcerpt ||
                 "尚未读取网页正文。再次打开该网页，Aarre 会在页面稳定后自动补全。";
               return (
-                <article
+                <Card
+                  role="article"
                   className="library-card"
                   data-cover-size={coverSize(index)}
                   key={resource.resourceKey}
@@ -457,7 +455,7 @@ export function LibraryView({
                       </time>
                     </div>
                   </div>
-                </article>
+                </Card>
               );
             }
           )}
@@ -485,21 +483,13 @@ export function LibraryView({
                   : "切换到“全部”查看当前范围内的收藏。"}
           </p>
           {query ? (
-            <button
+            <Button
               type="button"
               className="button button-quiet"
               onClick={onClearSearch}
             >
               清除搜索
-            </button>
-          ) : libraryCount && hasControlFilters ? (
-            <button
-              type="button"
-              className="button button-quiet"
-              onClick={onClearFilters}
-            >
-              清除筛选
-            </button>
+            </Button>
           ) : null}
         </div>
       )}

@@ -89,6 +89,12 @@ function buttonWithText(container: ParentNode, text: string) {
   ) as HTMLButtonElement | undefined;
 }
 
+function editorTrigger(container: ParentNode) {
+  return container.querySelector(
+    'button[aria-label^="编辑 "]'
+  ) as HTMLButtonElement | null;
+}
+
 function setControlValue(
   control: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
   value: string
@@ -141,7 +147,7 @@ describe("LibraryCardEditor", () => {
       );
     });
     await act(async () => {
-      buttonWithText(container, "编辑")?.click();
+      editorTrigger(container)?.click();
     });
 
     const selects = container.querySelectorAll(
@@ -227,7 +233,7 @@ describe("LibraryCardEditor", () => {
       );
     });
     await act(async () => {
-      buttonWithText(container, "编辑")?.click();
+      editorTrigger(container)?.click();
     });
     await act(async () => {
       setControlValue(
@@ -279,7 +285,7 @@ describe("LibraryCardEditor", () => {
       );
     });
     await act(async () => {
-      buttonWithText(container, "编辑")?.click();
+      editorTrigger(container)?.click();
     });
 
     const locationSelect = container.querySelector(
@@ -330,7 +336,7 @@ describe("LibraryCardEditor", () => {
       );
     });
     await act(async () => {
-      buttonWithText(container, "编辑")?.click();
+      editorTrigger(container)?.click();
     });
     await act(async () => {
       buttonWithText(container, "删除")?.click();
@@ -417,7 +423,7 @@ describe("LibraryCardEditor", () => {
       );
     });
     await act(async () => {
-      buttonWithText(container, "编辑")?.click();
+      editorTrigger(container)?.click();
     });
 
     const nativeInputs = container.querySelectorAll(

@@ -15,7 +15,7 @@ function rule(css: string, selector: string): string {
 }
 
 describe("manager layout stability", () => {
-  it("keeps masonry hover feedback out of multi-column layout calculations", async () => {
+  it("reveals masonry details below the existing card content", async () => {
     const css = await readFile(managerCssUrl, "utf8");
     const coverRule = rule(css, ".library-card-cover");
     const hoverCoverRule = rule(
@@ -30,11 +30,11 @@ describe("manager layout stability", () => {
 
     expect(coverRule).not.toMatch(/transition:[^}]*\bheight\b/s);
     expect(hoverCoverRule).not.toMatch(/\bheight\s*:/);
-    expect(extraRule).toContain("position: absolute");
-    expect(extraRule).toContain("height: var(--reveal)");
-    expect(extraRule).toContain("transform: translateY(8px)");
-    expect(hoverExtraRule).not.toMatch(/\bheight\s*:/);
-    expect(hoverExtraRule).toContain("transform: translateY(0)");
+    expect(extraRule).toContain("position: static");
+    expect(extraRule).toContain("max-height: 0");
+    expect(extraRule).not.toContain("position: absolute");
+    expect(hoverExtraRule).toContain("max-height: 160px");
+    expect(hoverExtraRule).not.toContain("position: absolute");
   });
 
   it("uses one integrated header divider around brand and navigation", async () => {

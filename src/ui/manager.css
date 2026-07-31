@@ -73,13 +73,16 @@
   min-height: 44px;
   padding: var(--sp-1);
   padding-left: var(--sp-3);
+  /* The submit is 4px shorter than the input row, so its visual top/bottom
+     inset is 2px larger than the container padding. Mirror that on the end. */
+  padding-right: calc(var(--sp-1) + 2px);
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: var(--sp-2);
   flex: 1 1 420px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border-radius: 50%;
   background: var(--surface);
   transition:
     border-color var(--dur-fast) var(--ease),
@@ -87,8 +90,8 @@
 }
 
 .library-search:focus-within {
-  border-color: color-mix(in srgb, var(--ink) 32%, transparent);
-  background: var(--surface-sunken);
+  border-color: var(--line);
+  background: var(--surface);
 }
 
 .library-search > svg {
@@ -107,12 +110,36 @@
   font-size: var(--fs-small);
 }
 
+.library-search input:focus,
+.library-search input:focus-visible {
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.library-search:not(:has(.library-search-clear)) {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
 .library-search input::placeholder {
   color: var(--ink-faint);
 }
 
 .library-search .button {
-  min-height: 36px;
+  min-height: 32px;
+  height: 32px;
+}
+
+.library-search-submit {
+  min-height: 34px;
+  height: 34px;
+  min-width: 64px;
+  margin: 0;
+  padding-block: 0;
+  padding-inline: var(--sp-4);
+  align-self: center;
+  border-radius: 50%;
 }
 
 .library-search-clear {
@@ -145,7 +172,11 @@
   min-width: 0;
   display: flex;
   gap: var(--sp-5);
-  align-items: stretch;
+  align-items: center;
+  height: 63px;
+  min-height: 63px;
+  padding-block: 0;
+  margin-block: 0;
   flex: 1 1 auto;
   overflow-x: auto;
   scrollbar-width: none;
@@ -157,8 +188,9 @@
 
 .manager-view-tabs button {
   position: relative;
-  min-height: 63px;
-  padding: 0;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 var(--sp-3);
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
@@ -170,40 +202,39 @@
   font-weight: var(--fw-medium);
 }
 
-.manager-view-tabs button::after {
-  content: "";
-  position: absolute;
-  right: 0;
-  bottom: -1px;
-  left: 0;
-  height: 2px;
-  opacity: 0;
-  background: var(--ink);
-  transform: scaleX(0.72);
-  transition:
-    opacity var(--dur-fast) var(--ease),
-    transform var(--dur-base) var(--ease);
-}
-
-.manager-view-tabs button:hover,
-.manager-view-tabs button[data-active="true"] {
+.manager-view-tabs button:hover {
   color: var(--ink);
 }
 
-.manager-view-tabs button[data-active="true"]::after {
-  opacity: 1;
-  transform: scaleX(1);
+.manager-theme-button {
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  flex: 0 0 auto;
+  align-self: center;
+  border: 1px solid var(--line);
+  color: var(--ink-muted);
+  background: var(--surface);
 }
 
-.manager-view-tabs button span {
-  min-width: 24px;
-  padding-inline: var(--sp-2);
-  border-radius: var(--radius-md);
-  color: var(--ink-faint);
+.manager-theme-button:hover {
+  color: var(--ink);
   background: var(--surface-sunken);
-  font-size: var(--fs-caption);
-  font-variant-numeric: tabular-nums;
-  text-align: center;
+  border-color: var(--line-strong);
+}
+
+.manager-theme-button > [data-slot="button-content"] {
+  width: 100%;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.manager-theme-button svg {
+  width: 16px;
+  height: 16px;
 }
 
 .manager-shell > .notice {
@@ -261,6 +292,10 @@
   background: var(--surface-sunken);
 }
 
+.library-tabs {
+  border-radius: 50%;
+}
+
 .library-tabs button,
 .report-period-tabs button {
   min-height: 34px;
@@ -276,11 +311,32 @@
   font-weight: var(--fw-medium);
 }
 
+.library-tabs button {
+  border-radius: 50%;
+}
+
 .library-tabs button[data-active="true"],
 .report-period-tabs button[data-active="true"] {
   color: var(--ink);
   background: var(--surface);
-  border-bottom-color: var(--line-strong);
+  border-color: transparent;
+}
+
+.library-tabs button[data-active="true"] > [data-slot="button-content"],
+.library-tabs button[data-active="true"] .library-tab-count {
+  color: var(--ink);
+}
+
+.library-tabs button[data-active="true"] span {
+  color: var(--ink);
+}
+
+.report-period-tabs {
+  border-radius: 50%;
+}
+
+.report-period-tabs button {
+  border-radius: 50%;
 }
 
 .library-tabs button span {
@@ -288,8 +344,51 @@
   font-size: var(--fs-caption);
 }
 
-.refresh-button {
+.library-tab-button > [data-slot="button-content"] {
+  min-width: 0;
+  padding: 0;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.library-tab-count {
+  min-width: 0;
+  padding-inline: 0;
+  color: var(--ink-faint);
+  background: transparent;
+  border-radius: 0;
+  font-size: var(--fs-caption);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.manager-theme-button,
+.library-card-editor-trigger,
+.library-search-clear {
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.manager-theme-button > [data-slot="button-content"],
+.library-card-editor-trigger > [data-slot="button-content"],
+.library-search-clear > [data-slot="button-content"] {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  white-space: nowrap;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.manager-theme-button svg,
+.library-card-editor-trigger svg,
+.library-search-clear svg {
+  display: block;
   flex: 0 0 auto;
+  vertical-align: middle;
 }
 
 .library-toolbar-secondary {
@@ -306,14 +405,6 @@
   align-items: flex-end;
   gap: var(--sp-3);
   flex: 1 1 auto;
-}
-
-.library-scope-summary {
-  margin: 0 0 var(--sp-2);
-  flex: 0 0 auto;
-  color: var(--ink-faint);
-  font-size: var(--fs-caption);
-  text-align: right;
 }
 
 .library-select-control {
@@ -336,40 +427,48 @@
   font-weight: var(--fw-medium);
 }
 
-.library-select-control select {
+.library-select-control .library-select-trigger {
   width: 100%;
   min-height: 40px;
-  padding: 0 var(--sp-3);
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  color: var(--ink);
-  background: var(--surface);
+  padding-left: var(--sp-5);
   font-size: var(--fs-small);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  transition:
-    border-color var(--dur-fast) var(--ease),
-    background-color var(--dur-fast) var(--ease);
 }
 
-.library-select-control select:hover,
-.library-select-control select:focus {
-  border-color: var(--line-strong);
-  background: var(--surface-sunken);
+.library-select-content [role="option"] {
+  padding-left: var(--sp-5);
 }
 
-.library-clear-filters {
-  margin: 0 0 var(--sp-2) auto;
-  flex: 0 0 auto;
+.library-select-content .bg-active {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.library-select-content .bg-hover {
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
 }
 
 .snapshot-backfill-trigger {
   min-height: 40px;
+  height: 40px;
   margin-left: auto;
-  padding-inline: var(--sp-2);
+  padding-inline: var(--sp-3);
   flex: 0 0 auto;
   white-space: nowrap;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--ink-muted);
+  background: var(--surface);
+  font-size: var(--fs-caption);
+}
+
+.snapshot-backfill-trigger:hover {
+  color: var(--ink);
+  background: var(--surface-sunken);
+  border-color: var(--line-strong);
+}
+
+.library-toolbar .button > [data-slot="button-background"],
+.snapshot-backfill-trigger > [data-slot="button-background"] {
+  background: transparent;
 }
 
 .snapshot-backfill-status {
@@ -687,7 +786,12 @@
   width: 18px;
   height: 18px;
   flex: 0 0 auto;
-  border-radius: var(--radius-sm);
+  border-radius: 50%;
+}
+
+.library-card-favicon picture,
+.library-card-favicon .site-thumbnail-image {
+  border-radius: 50%;
 }
 
 .library-card-favicon .site-thumbnail-image {
@@ -719,40 +823,35 @@
 /* Multi-column masonry rebalances whenever a descendant changes height.
    Keep hover details out of flow so the pointer target never moves. */
 .library-card-extra {
-  position: absolute;
-  top: calc(var(--cover-height) - var(--reveal));
-  right: 1px;
-  left: 1px;
-  z-index: 1;
-  height: var(--reveal);
-  padding: var(--sp-2) var(--sp-3) var(--sp-3);
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
+  position: static;
+  height: auto;
+  max-height: 0;
+  margin-top: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-1);
   overflow: hidden;
   visibility: hidden;
   pointer-events: none;
-  border-radius: 0 0 calc(var(--radius-lg) - 1px)
-    calc(var(--radius-lg) - 1px);
   opacity: 0;
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--surface) 76%, transparent),
-    color-mix(in srgb, var(--surface) 97%, transparent) 32%
-  );
-  transform: translateY(8px);
+  background: transparent;
   transition:
-    visibility 0s linear var(--dur-base),
+    max-height var(--dur-base) var(--ease),
+    margin-top var(--dur-base) var(--ease),
     opacity var(--dur-base) var(--ease),
-    transform var(--dur-base) var(--ease);
+    visibility 0s linear var(--dur-base);
 }
 
 .library-card:hover .library-card-extra,
 .library-card:focus-within .library-card-extra {
+  max-height: 160px;
+  margin-top: var(--sp-3);
   visibility: visible;
   opacity: 1;
-  transform: translateY(0);
-  transition-delay: 0s;
+  transition:
+    max-height var(--dur-base) var(--ease),
+    margin-top var(--dur-base) var(--ease),
+    opacity var(--dur-base) var(--ease);
 }
 
 .library-card-extra p {
@@ -858,7 +957,8 @@
 .proposal-card input[type="checkbox"] {
   width: 18px;
   height: 18px;
-  margin: 0;
+  margin: var(--sp-1) 0 0;
+  display: block;
   accent-color: var(--ink);
 }
 
@@ -1204,7 +1304,7 @@
 
 .report-resurfacing {
   padding-top: var(--sp-7);
-  border-top: 1px solid var(--line);
+  border-top: 0;
 }
 
 .report-resurfacing > div {
@@ -1215,12 +1315,12 @@
 }
 
 .report-resurfacing a {
-  padding-top: var(--sp-4);
-  border-top: 1px solid var(--line-strong);
+  padding-top: 0;
+  border-top: 0;
 }
 
 .report-resurfacing a:hover {
-  border-color: var(--ink);
+  border-color: transparent;
 }
 
 .report-resurfacing strong,
@@ -1416,12 +1516,12 @@
 }
 
 .resurfacing-grid article {
-  padding-top: var(--sp-4);
-  border-top: 1px solid var(--line-strong);
+  padding-top: 0;
+  border-top: 0;
 }
 
 .resurfacing-grid article:hover {
-  border-color: var(--ink);
+  border-color: transparent;
 }
 
 .resurfacing-grid article > span,
@@ -1452,16 +1552,19 @@
 
 .library-card-editor-trigger {
   position: absolute;
-  top: var(--sp-2);
-  right: var(--sp-2);
+  top: var(--sp-3);
+  right: var(--sp-3);
   z-index: 1;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
   min-height: 32px;
-  padding: 0 var(--sp-2);
+  padding: 0;
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
   border: 1px solid color-mix(in srgb, var(--surface) 62%, transparent);
-  border-radius: var(--radius-md);
+  border-radius: 50%;
   opacity: 0.84;
   color: var(--ink);
   background: color-mix(in srgb, var(--surface) 88%, transparent);
@@ -1477,6 +1580,16 @@
 .library-card-editor-trigger svg {
   width: 15px;
   height: 15px;
+}
+
+.library-card-editor-trigger > [data-slot="button-content"] {
+  width: 100%;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transform: translateY(0);
 }
 
 .library-card:hover .library-card-editor-trigger,
@@ -1817,6 +1930,12 @@
 
   .manager-topbar,
   .manager-view-tabs button {
+    height: 52px;
+    min-height: 52px;
+  }
+
+  .manager-view-tabs {
+    height: 52px;
     min-height: 52px;
   }
 
@@ -1873,10 +1992,6 @@
     min-height: 44px;
   }
 
-  .refresh-button {
-    align-self: flex-start;
-  }
-
   .library-controls {
     align-items: stretch;
     flex-direction: column;
@@ -1888,20 +2003,9 @@
     gap: var(--sp-2);
   }
 
-  .library-scope-summary {
-    order: -1;
-    margin: 0;
-    text-align: left;
-  }
-
   .library-select-control:first-child,
   .library-select-control:nth-child(2) {
     width: 100%;
-  }
-
-  .library-clear-filters {
-    align-self: flex-start;
-    margin: 0;
   }
 
   .snapshot-backfill-trigger {
@@ -2030,14 +2134,19 @@
 
 @media (hover: none) {
   .library-card-editor-trigger {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
     min-height: 44px;
-    padding-inline: var(--sp-3);
+    padding-inline: 0;
+    border-radius: 50%;
     opacity: 1;
   }
 
   .library-card-extra {
+    max-height: 160px;
+    margin-top: var(--sp-3);
     visibility: visible;
     opacity: 1;
-    transform: none;
   }
 }

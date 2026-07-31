@@ -1,4 +1,89 @@
+@import "tailwindcss/theme.css";
+@import "tailwindcss/utilities.css";
 @import "./tokens.css";
 @import "./base.css";
 @import "./sidepanel.css";
 @import "./manager.css";
+
+:root {
+  --background: var(--bg);
+  --foreground: var(--ink);
+  --muted-foreground: var(--ink-muted);
+  --border: var(--line);
+  --hover: color-mix(in srgb, var(--ink) 6%, transparent);
+  --active: color-mix(in srgb, var(--ink) 10%, transparent);
+  --focus-ring: var(--accent);
+  --destructive: var(--negative);
+}
+
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--ink);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--ink);
+  --color-muted: var(--surface-sunken);
+  --color-muted-foreground: var(--ink-muted);
+  --color-accent: var(--surface-sunken);
+  --color-accent-foreground: var(--ink);
+  --color-border: var(--line);
+  --color-input: var(--line);
+  --color-ring: var(--accent);
+  --color-hover: color-mix(in srgb, var(--ink) 6%, transparent);
+  --color-active: color-mix(in srgb, var(--ink) 10%, transparent);
+  --color-surface-1: var(--bg);
+  --color-surface-2: var(--surface);
+  --color-surface-3: var(--surface-sunken);
+  --color-surface-4: color-mix(in srgb, var(--surface-sunken) 92%, var(--ink));
+  --color-surface-5: color-mix(in srgb, var(--surface-sunken) 84%, var(--ink));
+  --color-surface-6: color-mix(in srgb, var(--surface-sunken) 76%, var(--ink));
+  --color-surface-7: color-mix(in srgb, var(--surface-sunken) 68%, var(--ink));
+  --color-surface-8: color-mix(in srgb, var(--surface-sunken) 60%, var(--ink));
+  --shadow-surface-1: 0 2px 8px color-mix(in srgb, var(--ink) 8%, transparent);
+  --shadow-surface-2: 0 8px 24px color-mix(in srgb, var(--ink) 12%, transparent);
+  --shadow-surface-3: 0 14px 34px color-mix(in srgb, var(--ink) 18%, transparent);
+  --shadow-surface-4: 0 20px 44px color-mix(in srgb, var(--ink) 22%, transparent);
+  --shadow-surface-5: 0 24px 52px color-mix(in srgb, var(--ink) 25%, transparent);
+  --shadow-surface-6: 0 28px 60px color-mix(in srgb, var(--ink) 28%, transparent);
+  --shadow-surface-7: 0 32px 68px color-mix(in srgb, var(--ink) 30%, transparent);
+  --shadow-surface-8: 0 36px 76px color-mix(in srgb, var(--ink) 32%, transparent);
+}
+
+.fluid-control:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.fluid-select {
+  min-height: 36px;
+  padding: 8px 12px;
+  border-radius: var(--shape-input-radius, var(--radius-md));
+  line-height: 1.35;
+}
+
+.fluid-textarea {
+  min-height: 88px;
+  padding: 10px 12px;
+  border-radius: var(--shape-input-radius, var(--radius-md));
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.fluid-control[type="checkbox"],
+.fluid-control[type="radio"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+.fluid-control[type="file"] {
+  min-height: 36px;
+  padding: 7px 10px;
+  border-radius: var(--shape-input-radius, var(--radius-md));
+}
+
+.select-content-viewport {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.select-content-viewport::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}

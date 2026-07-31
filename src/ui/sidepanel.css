@@ -17,6 +17,16 @@ main.native-panel:has(> .search-box) {
   grid-template-rows: auto auto auto minmax(0, 1fr) auto;
 }
 
+main.native-panel:has(> .search-box):has(> .context-resurfacing-top) {
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+}
+
+main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
+    > .context-resurfacing-top
+  ) {
+  grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
+}
+
 .sidepanel-recovery {
   padding: var(--sp-6) var(--sp-5);
   display: flex;
@@ -566,7 +576,7 @@ main.native-panel:has(> .search-box) {
 
 .row-menu {
   position: absolute;
-  top: 19px;
+  top: 50%;
   right: var(--sp-2);
   z-index: 2;
   width: 30px;
@@ -582,7 +592,7 @@ main.native-panel:has(> .search-box) {
   background: color-mix(in srgb, var(--surface) 78%, transparent);
   backdrop-filter: blur(12px) saturate(1.18);
   -webkit-backdrop-filter: blur(12px) saturate(1.18);
-  transform: translateY(-2px) scale(0.96);
+  transform: translateY(-50%) scale(0.96);
   transition:
     opacity var(--dur-fast) var(--ease),
     transform var(--dur-base) var(--ease),
@@ -594,13 +604,29 @@ main.native-panel:has(> .search-box) {
   height: 15px;
 }
 
+.native-panel .row-menu > [data-slot="button-content"] {
+  width: 100%;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.native-panel .row-menu > [data-slot="button-content"] > [data-slot="button-icon"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
 .bookmark-row:hover .row-menu,
 .bookmark-row:focus-within .row-menu,
 .row-menu:hover,
 .row-menu:focus-visible {
   opacity: 1;
   pointer-events: auto;
-  transform: none;
+  transform: translateY(-50%);
 }
 
 .row-menu:hover {
@@ -718,6 +744,12 @@ main.native-panel:has(> .search-box) {
   gap: var(--sp-1);
   border-radius: var(--radius-md);
   background: var(--surface-sunken);
+}
+
+.context-resurfacing-top {
+  margin: 0 var(--sp-3) var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
 }
 
 .context-resurfacing > header {
@@ -915,22 +947,25 @@ main.native-panel:has(> .search-box) {
 }
 
 .agent-composer-setup {
+  height: 66px;
   min-height: 66px;
-  padding: var(--sp-2);
+  max-height: 66px;
+  padding: 0;
 }
 
 .agent-composer-setup > button {
   width: 100%;
-  min-height: 48px;
+  height: 100%;
+  min-height: 0;
   padding: var(--sp-2) var(--sp-3);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-2);
   border: 0;
-  border-radius: var(--radius-md);
+  border-radius: inherit;
   color: var(--ink);
-  background: var(--surface-sunken);
+  background: transparent;
   text-align: left;
 }
 
@@ -1656,8 +1691,6 @@ main.native-panel:has(> .search-box) {
 .settings-cover-tabs {
   margin-top: var(--sp-3);
   padding: var(--sp-1);
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--sp-1);
   border-radius: var(--radius-md);
   background: var(--surface-sunken);
@@ -2304,6 +2337,81 @@ main.native-panel:has(> .search-box) {
   .row-menu {
     opacity: 0.72;
     pointer-events: auto;
-    transform: none;
+    transform: translateY(-50%);
   }
+}
+
+/* Fluid Button owns an inner background/content layer. Side-panel controls
+   already have a complete compact visual system, so the generated layer must
+   stay transparent and let the existing button class provide the surface. */
+.native-panel button > [data-slot="button-background"] {
+  background: transparent;
+}
+
+.native-panel button {
+  color: var(--ink);
+}
+
+.native-panel .bookmark-main {
+  border-radius: 0;
+}
+
+.native-panel button.button-dark,
+.native-panel button.button-danger {
+  color: var(--bg);
+}
+
+/* Layout buttons use their original Grid/Flex children rather than a single
+   Fluid label box. `display: contents` keeps the Fluid semantics while
+   restoring the bookmark row geometry. */
+.native-panel .bookmark-main > [data-slot="button-content"],
+.native-panel .library-search-result-main > [data-slot="button-content"],
+.native-panel .agent-history-open > [data-slot="button-content"],
+.native-panel .agent-composer-setup > button > [data-slot="button-content"],
+.native-panel .context-resurfacing > header button > [data-slot="button-content"],
+.native-panel .context-resurfacing > button > [data-slot="button-content"] {
+  display: contents;
+}
+
+.native-panel
+  .bookmark-main
+  > [data-slot="button-content"]
+  > [data-slot="button-label"],
+.native-panel
+  .library-search-result-main
+  > [data-slot="button-content"]
+  > [data-slot="button-label"],
+.native-panel
+  .agent-history-open
+  > [data-slot="button-content"]
+  > [data-slot="button-label"],
+.native-panel
+  .agent-composer-setup
+  > button
+  > [data-slot="button-content"]
+  > [data-slot="button-label"],
+.native-panel
+  .context-resurfacing
+  > header
+  button
+  > [data-slot="button-content"]
+  > [data-slot="button-label"],
+.native-panel
+  .context-resurfacing
+  > button
+  > [data-slot="button-content"]
+  > [data-slot="button-label"] {
+  display: contents;
+}
+
+.native-panel .fluid-control {
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.native-panel .search-box .fluid-control,
+.native-panel .agent-composer > .fluid-control {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
 }

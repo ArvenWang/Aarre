@@ -1,3 +1,5 @@
+import { Button } from "../../../components/ui/button";
+import { FluidInput, FluidTextarea, FluidSelect } from "../../components/FluidControls";
 import type { LibraryInsights } from "../../../lib/types";
 import { ResourceLink } from "../components/ResourceLink";
 
@@ -45,14 +47,15 @@ export function OrganizeView({
           </small>
         </div>
         <div>
-          <button
+          <Button
             type="button"
+            variant="tertiary"
             className="button button-quiet"
             onClick={onSelectSafe}
           >
             全选安全项
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             className={
               confirmDestructiveApply
@@ -67,7 +70,7 @@ export function OrganizeView({
               : confirmDestructiveApply
                 ? `再次确认：应用 ${selectedActionCount} 项`
                 : `应用已选 ${selectedActionCount} 项`}
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -76,14 +79,15 @@ export function OrganizeView({
           <span>
             已执行 {appliedSuccessCount} 项；{appliedFailureCount} 项失败。
           </span>
-          <button
+          <Button
             type="button"
+            variant="tertiary"
             className="button button-quiet"
             disabled={action === "undo-organize"}
             onClick={onUndo}
           >
             {action === "undo-organize" ? "撤销中…" : "撤销本次整理"}
-          </button>
+          </Button>
         </div>
       ) : null}
 
@@ -102,7 +106,7 @@ export function OrganizeView({
               >
                 <header>
                   {actionIds.length ? (
-                    <input
+                    <FluidInput
                       type="checkbox"
                       checked={
                         selectedCount > 0 &&

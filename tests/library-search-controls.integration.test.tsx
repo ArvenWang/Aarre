@@ -156,7 +156,7 @@ describe("manager library search controls", () => {
     );
 
     expect(markup).toContain("搜索收藏库");
-    expect(markup).toContain("“Design” · 设计 · 当前显示 1 项");
+    expect(markup).not.toContain("当前显示 1 项");
     expect(markup).toContain('aria-pressed="true"');
     expect(markup).not.toContain('role="tablist"');
     expect(markup).toContain("<mark>Design</mark>");
