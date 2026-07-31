@@ -20,5 +20,8 @@ describe("commercial enhancement permissions", () => {
     expect(
       (manifest as { permissions?: string[] }).permissions
     ).toContain("webNavigation");
+    expect(
+      (manifest as { permissions?: string[] }).permissions
+    ).toContain("debugger");
   });
 });

@@ -2,6 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  detectBotChallengeInDocument,
   isLoadedSnapshotTab,
   isPageSnapshotStale,
   isSnapshotSensitiveUrl,
@@ -96,6 +97,43 @@ describe("page snapshot privacy", () => {
     expect(
       isLoadedSnapshotTab(readyTab, "https://example.com/another-page")
     ).toBe(false);
+  });
+
+  it("allows a background tab when the batch backfill path opts in", () => {
+    const readyTab = {
+      active: false,
+      incognito: false,
+      status: "complete" as const,
+      url: "https://example.com/guide"
+    };
+    expect(isLoadedSnapshotTab(readyTab, "", false)).toBe(true);
+    expect(
+      isLoadedSnapshotTab(
+        { ...readyTab, status: "loading" },
+        "",
+        false
+      )
+    ).toBe(false);
+    expect(
+      isLoadedSnapshotTab({ ...readyTab, incognito: true }, "", false)
+    ).toBe(false);
+  });
+
+  it("detects Cloudflare-style challenge pages before wasting a capture", () => {
+    document.title = "请稍候…";
+    document.body.innerHTML =
+      "<main><h1>whatismyipaddress.com</h1><p>正在进行安全验证</p></main>" +
+      "<div class='footer'><code>Ray ID: abc123</code></div>";
+    expect(detectBotChallengeInDocument()).toBe(true);
+
+    document.title = "Normal Page";
+    document.body.innerHTML =
+      "<p>Ray ID appears in an article body only, not a challenge.</p>";
+    expect(detectBotChallengeInDocument()).toBe(false);
+
+    document.title = "Example";
+    document.body.innerHTML = "<p>完全正常的网页内容。</p>";
+    expect(detectBotChallengeInDocument()).toBe(false);
   });
 
   it("does not let a silent background retry suppress the Aarre-open success toast", () => {

@@ -56,7 +56,7 @@ describe("extension message compatibility", () => {
       currentTitle: "Example",
       errors: [],
       concurrency: 1 as const,
-      requiresForeground: true as const,
+      requiresForeground: false as const,
       tabId: 42
     };
     sendMessage.mockResolvedValue({ ok: true, data: status });

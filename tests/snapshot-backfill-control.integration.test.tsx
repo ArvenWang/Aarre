@@ -26,7 +26,7 @@ function backfillStatus(
     currentTitle: "",
     errors: [],
     concurrency: 1,
-    requiresForeground: true,
+    requiresForeground: false,
     ...values
   };
 }
@@ -127,8 +127,9 @@ describe("SnapshotBackfillControl", () => {
     expect(dialog.textContent).toContain("约 7 项");
     expect(dialog.textContent).toContain("加载完成并稳定后才截图");
     expect(dialog.textContent).toContain(
-      "保持补拍标签页和 Chrome 窗口在前台"
+      "任务在后台运行，不占用当前页面"
     );
+    expect(dialog.textContent).toContain("后台专用标签页");
     expect(dialog.textContent).toContain("不调用 AI");
     expect(dialog.textContent).toContain("不会上传网页或截图");
 
@@ -169,7 +170,7 @@ describe("SnapshotBackfillControl", () => {
     });
     expect(container.querySelector('[role="dialog"]')).toBeNull();
     expect(container.textContent).toContain("0 / 5");
-    expect(container.textContent).toContain("正在补拍");
+    expect(container.textContent).toContain("正在后台补拍");
   });
 
   it("shows only real background progress and supports pause, resume and cancel", async () => {

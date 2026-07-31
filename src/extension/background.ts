@@ -39,6 +39,7 @@ import {
 } from "../lib/cover-registry";
 import {
   createPageSnapshot,
+  detectBotChallengeInDocument,
   isLoadedSnapshotTab,
   isPageSnapshotStale,
   isSnapshotSensitiveUrl,
@@ -215,8 +216,17 @@ const pendingSaveDrafts = new Map<number, PendingSaveDraft>();
 const pageSnapshotTimers = new Map<number, number>();
 const AARRE_OPEN_PAGE_SNAPSHOT_DELAY_MS = 1_500;
 const SAVED_PAGE_SNAPSHOT_DELAY_MS = 250;
+const BATCH_PAGE_SNAPSHOT_DELAY_MS = 300;
 const SNAPSHOT_BACKFILL_PAGE_TIMEOUT_MINUTES = 0.75;
+// 页面加载完成后，稳定等待 + 截图 + 落库的总预算。成功页面几秒内就会
+// 清除闹钟，因此 45 秒预算不会拖慢正常任务，只限制“卡住”页面的等待上限。
+const SNAPSHOT_BACKFILL_READY_TIMEOUT_MINUTES = 0.75;
 const SNAPSHOT_BACKFILL_MAX_ATTEMPTS = 2;
+// executeScript 本身没有超时；页面无响应时可能长期挂起，必须自行兜底。
+const SNAPSHOT_BACKFILL_STABILITY_TIMEOUT_MS = 8_000;
+const SNAPSHOT_BACKFILL_CHALLENGE_TIMEOUT_MS = 3_000;
+const SNAPSHOT_BACKFILL_CAPTURE_RETRY_DELAY_MS = 2_000;
+const SNAPSHOT_BACKFILL_MAX_CAPTURE_ATTEMPTS = 3;
 let bookmarkedResourceLookupCache: Map<string, string> | null = null;
 let bookmarkedResourceLookupRevision = 0;
 interface ImmediatePageSnapshotTarget {
@@ -370,7 +380,7 @@ async function getStoredSnapshotBackfill(): Promise<StoredSnapshotBackfillJob> {
     ...emptyStoredSnapshotBackfill(),
     ...value,
     concurrency: 1,
-    requiresForeground: true,
+    requiresForeground: false,
     errors: Array.isArray(value.errors) ? value.errors.slice(-20) : [],
     resourceKeys: Array.isArray(value.resourceKeys)
       ? value.resourceKeys.filter(
@@ -1157,14 +1167,16 @@ function snapshotTargetAllowsLoadedUrl(
 async function scheduleImmediateSnapshotIfReady(
   tab: chrome.tabs.Tab
 ): Promise<boolean> {
+  if (typeof tab.id !== "number") return false;
+  const target = await readImmediateSnapshotTarget(tab.id);
+  if (!target) return false;
+  const allowInactive = target.trigger === "batch_backfill";
   if (
-    typeof tab.id !== "number" ||
-    !isLoadedSnapshotTab(tab)
+    // 批量后台补拍允许非活动标签页；普通路径仍要求前台活动页。
+    !isLoadedSnapshotTab(tab, "", !allowInactive)
   ) {
     return false;
   }
-  const target = await readImmediateSnapshotTarget(tab.id);
-  if (!target) return false;
   const resource = await getLocalResource(target.resourceKey);
   if (
     !resource?.nativeBookmarkIds.length ||
@@ -1203,6 +1215,36 @@ async function scheduleImmediateSnapshotIfReady(
     onSettled: (succeeded) => {
       if (succeeded && typeof tab.id === "number") {
         void removeImmediateSnapshotTarget(tab.id, target);
+        return;
+      }
+      if (
+        target.trigger === "batch_backfill" &&
+        target.backfillJobId &&
+        target.backfillLease &&
+        typeof tab.id === "number"
+      ) {
+        // 批量截图失败（页面在稳定等待期间跳走/无响应）时不要干等闹钟，
+        // 2 秒后直接重试；连续失败则快速结算失败并进入下一项。
+        void retryBatchSnapshotCapture(
+          tab.id,
+          tab.url!,
+          {
+            snapshotUrl: target.targetUrl,
+            resourceKey: target.resourceKey,
+            showToast: target.showToast,
+            documentId: target.documentId,
+            trigger: target.trigger,
+            refreshExisting: target.refreshExisting,
+            backfillLease: {
+              jobId: target.backfillJobId,
+              resourceKey: target.resourceKey,
+              tabId: tab.id,
+              token: target.backfillLease
+            }
+          },
+          target,
+          1
+        );
       }
     }
   });
@@ -1338,9 +1380,11 @@ async function prepareImmediateSnapshotTargetForNavigation(
     targetUrl,
     navigationStartUrl: targetUrl,
     delayMs:
-      trigger === "aarre_open" || trigger === "batch_backfill"
-        ? AARRE_OPEN_PAGE_SNAPSHOT_DELAY_MS
-        : SAVED_PAGE_SNAPSHOT_DELAY_MS,
+      trigger === "batch_backfill"
+        ? BATCH_PAGE_SNAPSHOT_DELAY_MS
+        : trigger === "aarre_open"
+          ? AARRE_OPEN_PAGE_SNAPSHOT_DELAY_MS
+          : SAVED_PAGE_SNAPSHOT_DELAY_MS,
     resourceKey: resource.resourceKey,
     showToast: showToast && policy.showToast,
     trigger,
@@ -2625,7 +2669,9 @@ async function coordinateActiveBookmarkedPage(
       resource.canonicalUrl,
       effectiveTrigger === "aarre_open" ||
         effectiveTrigger === "batch_backfill"
-        ? AARRE_OPEN_PAGE_SNAPSHOT_DELAY_MS
+        ? effectiveTrigger === "batch_backfill"
+          ? BATCH_PAGE_SNAPSHOT_DELAY_MS
+          : AARRE_OPEN_PAGE_SNAPSHOT_DELAY_MS
         : SAVED_PAGE_SNAPSHOT_DELAY_MS,
       snapshotPolicy.showToast,
       resource.resourceKey,
@@ -2835,6 +2881,59 @@ async function commitSnapshotBackfillCapture(input: {
   return result;
 }
 
+/**
+ * executeScript 没有自己的超时；网页主线程被占满或页面无响应时，其
+ * Promise 可能长期不返回。这里用 Promise.race 强制兜底，避免批量任务
+ * 一直挂在同一个网站上。超时后旧的注入 Promise 可能仍在后台挂起，但
+ * 不再阻塞本任务流程。
+ */
+async function executeScriptWithTimeout(
+  injection: {
+    target: { tabId: number };
+    func: (...args: any[]) => unknown;
+    args?: unknown[];
+  },
+  timeoutMs: number
+): Promise<chrome.scripting.InjectionResult<unknown>[] | undefined> {
+  return Promise.race([
+    chrome.scripting.executeScript({
+      target: injection.target,
+      func: injection.func as never,
+      ...(injection.args
+        ? { args: injection.args as never[] }
+        : {})
+    }),
+    new Promise<undefined>((resolve) => {
+      globalThis.setTimeout(() => resolve(undefined), timeoutMs);
+    })
+  ]);
+}
+
+/**
+ * 通过 chrome.debugger（CDP）对后台标签页截图。captureVisibleTab 只能截
+ * 当前窗口的活动标签页，这是“批量补拍不占前台”的唯一可行路径。
+ * 页面级截图不读取正文、不上传，仍保持项目既有隐私边界。
+ */
+async function capturePageSnapshotViaDebugger(
+  tabId: number
+): Promise<string> {
+  await chrome.debugger.attach({ tabId }, "1.3");
+  try {
+    await chrome.debugger.sendCommand({ tabId }, "Page.enable");
+    const result = (await chrome.debugger.sendCommand(
+      { tabId },
+      "Page.captureScreenshot",
+      { format: "png" }
+    )) as { data?: string };
+    if (!result?.data) {
+      throw new Error("调试协议未返回截图数据。");
+    }
+    return `data:image/png;base64,${result.data}`;
+  } finally {
+    await chrome.debugger.detach({ tabId }).catch(() => undefined);
+  }
+}
+
 async function capturePageSnapshotForTab(
   tabId: number,
   expectedLoadedUrl: string,
@@ -2848,11 +2947,13 @@ async function capturePageSnapshotForTab(
     backfillLease?: SnapshotBackfillLease;
   } = {}
 ): Promise<boolean> {
+  const isBatch = options.trigger === "batch_backfill";
   const tab = await chrome.tabs.get(tabId).catch(() => null);
   if (
     !tab ||
     typeof tab.windowId !== "number" ||
-    !isLoadedSnapshotTab(tab, expectedLoadedUrl)
+    // 批量后台补拍允许非活动标签页；普通路径仍要求前台活动页。
+    !isLoadedSnapshotTab(tab, expectedLoadedUrl, !isBatch)
   ) {
     return false;
   }
@@ -2878,26 +2979,28 @@ async function capturePageSnapshotForTab(
   }
   const canonicalUrl = resource.canonicalUrl || fallbackCanonicalUrl;
 
-  const [targetWindow, focusedWindow] = await Promise.all([
-    chrome.windows.get(tab.windowId),
-    chrome.windows.getLastFocused()
-  ]);
-  if (
-    targetWindow.focused !== true ||
-    focusedWindow.id !== tab.windowId ||
-    focusedWindow.focused !== true
-  ) {
-    return false;
-  }
-  const [active] = await chrome.tabs.query({
-    active: true,
-    windowId: tab.windowId
-  });
-  if (
-    active?.id !== tab.id ||
-    !isLoadedSnapshotTab(active, expectedLoadedUrl)
-  ) {
-    return false;
+  if (!isBatch) {
+    const [targetWindow, focusedWindow] = await Promise.all([
+      chrome.windows.get(tab.windowId),
+      chrome.windows.getLastFocused()
+    ]);
+    if (
+      targetWindow.focused !== true ||
+      focusedWindow.id !== tab.windowId ||
+      focusedWindow.focused !== true
+    ) {
+      return false;
+    }
+    const [active] = await chrome.tabs.query({
+      active: true,
+      windowId: tab.windowId
+    });
+    if (
+      active?.id !== tab.id ||
+      !isLoadedSnapshotTab(active, expectedLoadedUrl)
+    ) {
+      return false;
+    }
   }
 
   await updateStoredSnapshotProgress(resourceKey, {
@@ -2909,11 +3012,24 @@ async function capturePageSnapshotForTab(
     ...(options.showToast ? { showToast: true } : {}),
     ...(options.refreshExisting ? { refreshExisting: true } : {})
   });
-  const [stabilityResult] = await chrome.scripting.executeScript({
-    target: { tabId },
-    func: waitForStablePageInDocument,
-    args: [900, 4_000]
-  });
+  const [stabilityResult] =
+    (await executeScriptWithTimeout(
+      {
+        target: { tabId },
+        func: waitForStablePageInDocument,
+        args: isBatch
+          ? [
+              500,
+              2_000,
+              {
+                fontTimeoutMs: 1_500,
+                imageTimeoutMs: 1_500
+              }
+            ]
+          : [900, 4_000]
+      },
+      SNAPSHOT_BACKFILL_STABILITY_TIMEOUT_MS
+    )) || [];
   if (
     stabilityResult?.result !== true ||
     (options.documentId &&
@@ -2922,40 +3038,72 @@ async function capturePageSnapshotForTab(
     return false;
   }
 
+  if (isBatch && options.backfillLease) {
+    // Cloudflare 等“安全验证”页截图没有价值，而且常常自行跳转或持续轮询；
+    // 识别后立即结算失败，避免拖住整个队列。
+    const [challengeResult] =
+      (await executeScriptWithTimeout(
+        {
+          target: { tabId },
+          func: detectBotChallengeInDocument
+        },
+        SNAPSHOT_BACKFILL_CHALLENGE_TIMEOUT_MS
+      )) || [];
+    if (challengeResult?.result === true) {
+      await recordSnapshotBackfillItem(
+        "failed",
+        "网站要求安全验证（如 Cloudflare），无法获取真实页面截图。",
+        {
+          jobId: options.backfillLease.jobId,
+          resourceKey: options.backfillLease.resourceKey,
+          leaseToken: options.backfillLease.token
+        }
+      );
+      void driveSnapshotBackfill();
+      return false;
+    }
+  }
+
   // 等待期间用户可能已经切换标签或发起了下一次导航，截图前必须重新核对。
   const stableTab = await chrome.tabs.get(tabId).catch(() => null);
   if (
     !stableTab ||
     stableTab.windowId !== tab.windowId ||
-    !isLoadedSnapshotTab(stableTab, expectedLoadedUrl)
+    !isLoadedSnapshotTab(stableTab, expectedLoadedUrl, !isBatch)
   ) {
     return false;
   }
-  const [stableTargetWindow, stableFocusedWindow] = await Promise.all([
-    chrome.windows.get(stableTab.windowId),
-    chrome.windows.getLastFocused()
-  ]);
-  if (
-    stableTargetWindow.focused !== true ||
-    stableFocusedWindow.id !== stableTab.windowId ||
-    stableFocusedWindow.focused !== true
-  ) {
-    return false;
+  if (!isBatch) {
+    const [stableTargetWindow, stableFocusedWindow] = await Promise.all([
+      chrome.windows.get(stableTab.windowId),
+      chrome.windows.getLastFocused()
+    ]);
+    if (
+      stableTargetWindow.focused !== true ||
+      stableFocusedWindow.id !== stableTab.windowId ||
+      stableFocusedWindow.focused !== true
+    ) {
+      return false;
+    }
+    const [stableActive] = await chrome.tabs.query({
+      active: true,
+      windowId: stableTab.windowId
+    });
+    if (
+      stableActive?.id !== tabId ||
+      !isLoadedSnapshotTab(stableActive, expectedLoadedUrl)
+    ) {
+      return false;
+    }
   }
-  const [stableActive] = await chrome.tabs.query({
-    active: true,
-    windowId: stableTab.windowId
-  });
-  if (
-    stableActive?.id !== tabId ||
-    !isLoadedSnapshotTab(stableActive, expectedLoadedUrl)
-  ) {
-    return false;
-  }
-  const [documentCheck] = await chrome.scripting.executeScript({
-    target: { tabId },
-    func: () => globalThis.location.href
-  });
+  const [documentCheck] =
+    (await executeScriptWithTimeout(
+      {
+        target: { tabId },
+        func: () => globalThis.location.href
+      },
+      SNAPSHOT_BACKFILL_STABILITY_TIMEOUT_MS
+    )) || [];
   if (
     !documentCheck?.result ||
     documentCheck.result !== stableTab.url ||
@@ -2982,31 +3130,46 @@ async function capturePageSnapshotForTab(
     ...(options.showToast ? { showToast: true } : {}),
     ...(options.refreshExisting ? { refreshExisting: true } : {})
   });
-  const pngDataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
-    format: "png"
-  });
+  const pngDataUrl = isBatch
+    ? await capturePageSnapshotViaDebugger(tabId)
+    : await chrome.tabs.captureVisibleTab(tab.windowId, {
+        format: "png"
+      });
   // 截图调用本身是异步的。返回后再次确认同一文档仍是前台页，避免把用户
   // 刚切换到的页面按旧收藏 URL 落库。
   const capturedTab = await chrome.tabs.get(tabId).catch(() => null);
-  const [capturedTargetWindow, capturedWindow] = await Promise.all([
-    chrome.windows.get(tab.windowId),
-    chrome.windows.getLastFocused()
-  ]);
-  const [capturedActive] = await chrome.tabs.query({
-    active: true,
-    windowId: tab.windowId
-  });
-  const [capturedDocument] = await chrome.scripting.executeScript({
-    target: { tabId },
-    func: () => globalThis.location.href
-  });
+  let capturedDocument:
+    | chrome.scripting.InjectionResult<unknown>
+    | undefined;
+  if (!isBatch) {
+    const [capturedTargetWindow, capturedWindow] = await Promise.all([
+      chrome.windows.get(tab.windowId),
+      chrome.windows.getLastFocused()
+    ]);
+    const [capturedActive] = await chrome.tabs.query({
+      active: true,
+      windowId: tab.windowId
+    });
+    if (
+      capturedTargetWindow.focused !== true ||
+      capturedWindow.id !== tab.windowId ||
+      capturedWindow.focused !== true ||
+      capturedActive?.id !== tabId
+    ) {
+      return false;
+    }
+  }
+  [capturedDocument] =
+    (await executeScriptWithTimeout(
+      {
+        target: { tabId },
+        func: () => globalThis.location.href
+      },
+      SNAPSHOT_BACKFILL_STABILITY_TIMEOUT_MS
+    )) || [];
   if (
     !capturedTab ||
-    capturedTargetWindow.focused !== true ||
-    capturedWindow.id !== tab.windowId ||
-    capturedWindow.focused !== true ||
-    capturedActive?.id !== tabId ||
-    !isLoadedSnapshotTab(capturedTab, expectedLoadedUrl) ||
+    !isLoadedSnapshotTab(capturedTab, expectedLoadedUrl, !isBatch) ||
     capturedDocument?.result !== capturedTab.url ||
     capturedDocument.documentId !== stabilityResult.documentId
   ) {
@@ -3087,7 +3250,7 @@ function schedulePageSnapshotForTab(
   if (
     typeof tab.id !== "number" ||
     !tab.url ||
-    !isLoadedSnapshotTab(tab)
+    !isLoadedSnapshotTab(tab, "", options.trigger !== "batch_backfill")
   ) {
     return false;
   }
@@ -3133,7 +3296,10 @@ function schedulePageSnapshotForTab(
       .then(async (succeeded) => {
         if (!succeeded && options.resourceKey) {
           await updateStoredSnapshotProgress(options.resourceKey, {
-            state: "waiting_foreground",
+            state:
+              options.trigger === "batch_backfill"
+                ? "retry"
+                : "waiting_foreground",
             trigger: options.trigger || "recovery",
             tabId,
             loadedUrl: expectedLoadedUrl,
@@ -3143,7 +3309,9 @@ function schedulePageSnapshotForTab(
             ...(options.showToast ? { showToast: true } : {}),
             ...(options.refreshExisting ? { refreshExisting: true } : {}),
             lastError:
-              "页面在稳定等待或截图期间离开前台，等待下次正常访问。"
+              options.trigger === "batch_backfill"
+                ? "批量补拍未能稳定截图，任务会快速重试后继续。"
+                : "页面在稳定等待或截图期间离开前台，等待下次正常访问。"
           }).catch(() => undefined);
         }
         options.onSettled?.(succeeded);
@@ -3153,7 +3321,84 @@ function schedulePageSnapshotForTab(
   return true;
 }
 
-async function snapshotBackfillForegroundTab(
+async function retryBatchSnapshotCapture(
+  tabId: number,
+  expectedLoadedUrl: string,
+  options: PageSnapshotScheduleOptions,
+  target: ImmediatePageSnapshotTarget,
+  attempt: number
+): Promise<void> {
+  await new Promise((resolve) =>
+    globalThis.setTimeout(
+      resolve,
+      SNAPSHOT_BACKFILL_CAPTURE_RETRY_DELAY_MS
+    )
+  );
+  if (!options.backfillLease) return;
+  const job = await getStoredSnapshotBackfill();
+  if (
+    job.state !== "running" ||
+    job.id !== options.backfillLease.jobId ||
+    job.currentLease !== options.backfillLease.token ||
+    job.currentResourceKey !== options.backfillLease.resourceKey
+  ) {
+    // 用户暂停、任务已结算或已推进到下一项时，不再重试旧截图。
+    return;
+  }
+  const tab = await chrome.tabs.get(tabId).catch(() => null);
+  if (!tab || !isLoadedSnapshotTab(tab, expectedLoadedUrl, false)) {
+    return;
+  }
+  const succeeded = await capturePageSnapshotForTab(
+    tabId,
+    expectedLoadedUrl,
+    options.snapshotUrl,
+    {
+      resourceKey: options.resourceKey,
+      showToast: options.showToast,
+      documentId: options.documentId,
+      trigger: options.trigger,
+      refreshExisting: options.refreshExisting,
+      backfillLease: options.backfillLease
+    }
+  );
+  if (succeeded) {
+    await removeImmediateSnapshotTarget(tabId, target).catch(
+      () => undefined
+    );
+    return;
+  }
+  if (attempt < SNAPSHOT_BACKFILL_MAX_CAPTURE_ATTEMPTS - 1) {
+    void retryBatchSnapshotCapture(
+      tabId,
+      expectedLoadedUrl,
+      options,
+      target,
+      attempt + 1
+    );
+    return;
+  }
+  const latest = await getStoredSnapshotBackfill();
+  if (
+    latest.state === "running" &&
+    latest.id === options.backfillLease.jobId &&
+    latest.currentLease === options.backfillLease.token &&
+    latest.currentResourceKey === options.backfillLease.resourceKey
+  ) {
+    await recordSnapshotBackfillItem(
+      "failed",
+      "页面未能在限时内稳定截图（可能是安全验证页、页面持续跳转或调试通道被占用）。",
+      {
+        jobId: options.backfillLease.jobId,
+        resourceKey: options.backfillLease.resourceKey,
+        leaseToken: options.backfillLease.token
+      }
+    );
+    void driveSnapshotBackfill();
+  }
+}
+
+async function snapshotBackfillTargetTab(
   job: StoredSnapshotBackfillJob
 ): Promise<chrome.tabs.Tab | null> {
   if (
@@ -3163,26 +3408,44 @@ async function snapshotBackfillForegroundTab(
     return null;
   }
   const tab = await chrome.tabs.get(job.tabId).catch(() => null);
-  if (!tab || tab.windowId !== job.windowId) return null;
-  const [targetWindow, focusedWindow] = await Promise.all([
-    chrome.windows.get(job.windowId).catch(() => null),
-    chrome.windows.getLastFocused().catch(() => null)
-  ]);
-  // getLastFocused() 在 Chrome 整体退到后台后仍可能返回最近窗口，因此必须
-  // 同时核对 Window.focused。否则 Service Worker 恢复或超时 Alarm 会在
-  // 用户使用其他 App 时继续截图。
+  // 批量补拍使用 chrome.debugger 对后台标签页截图，不再要求窗口聚焦或
+  // 标签活动；用户可以在任务运行时正常使用 Chrome。
+  if (!tab || tab.windowId !== job.windowId || tab.incognito) return null;
+  return tab;
+}
+
+async function isBatchBackfillTab(tabId: number): Promise<boolean> {
+  const job = await getStoredSnapshotBackfill();
+  return (
+    job.tabId === tabId &&
+    ["running", "waiting_focus"].includes(job.state)
+  );
+}
+
+/**
+ * 页面加载完成后把超时重置为“就绪预算”：
+ * 45 秒是导航兜底，complete 之后只给稳定等待 + 截图 + 落库 30 秒。
+ * 这样慢网站只要加载完成，就不会被导航阶段的计时误杀。
+ */
+async function resetSnapshotBackfillTimeoutForTab(
+  tabId: number
+): Promise<void> {
+  const job = await getStoredSnapshotBackfill();
   if (
-    targetWindow?.focused !== true ||
-    focusedWindow?.id !== job.windowId ||
-    focusedWindow.focused !== true
+    job.tabId !== tabId ||
+    job.state !== "running" ||
+    !job.currentLease ||
+    !job.currentResourceKey
   ) {
-    return null;
+    return;
   }
-  const [active] = await chrome.tabs.query({
-    active: true,
-    windowId: job.windowId
-  });
-  return active?.id === job.tabId ? tab : null;
+  const lease = snapshotBackfillLeaseFromJob(job);
+  if (lease) {
+    await scheduleSnapshotBackfillTimeout(
+      lease,
+      SNAPSHOT_BACKFILL_READY_TIMEOUT_MINUTES
+    );
+  }
 }
 
 function snapshotBackfillLeaseFromJob(
@@ -3234,11 +3497,12 @@ async function clearSnapshotBackfillTimeouts(
 }
 
 async function scheduleSnapshotBackfillTimeout(
-  lease: SnapshotBackfillLease
+  lease: SnapshotBackfillLease,
+  delayInMinutes = SNAPSHOT_BACKFILL_PAGE_TIMEOUT_MINUTES
 ): Promise<void> {
   await clearSnapshotBackfillTimeouts(lease.jobId);
   await chrome.alarms.create(snapshotBackfillTimeoutAlarmName(lease), {
-    delayInMinutes: SNAPSHOT_BACKFILL_PAGE_TIMEOUT_MINUTES
+    delayInMinutes
   });
 }
 
@@ -3399,11 +3663,8 @@ async function navigateSnapshotBackfillCurrent(
   if (typeof job.tabId !== "number") {
     throw new Error("补拍标签页不存在。");
   }
-  const foregroundTab = await snapshotBackfillForegroundTab(job);
-  if (!foregroundTab) {
-    await setSnapshotBackfillWaitingFocus();
-    return "waiting";
-  }
+  const targetTab = await snapshotBackfillTargetTab(job);
+  if (!targetTab) return "waiting";
   const lease = await reserveSnapshotBackfillAttempt(
     job,
     resource,
@@ -3438,8 +3699,8 @@ async function navigateSnapshotBackfillCurrent(
     let navigated: chrome.tabs.Tab;
     if (
       retry &&
-      foregroundTab.url &&
-      resourceMatchesLoadedUrl(resource, foregroundTab.url)
+      targetTab.url &&
+      resourceMatchesLoadedUrl(resource, targetTab.url)
     ) {
       await chrome.tabs.reload(job.tabId);
       navigated = await chrome.tabs.get(job.tabId);
@@ -3453,7 +3714,7 @@ async function navigateSnapshotBackfillCurrent(
     await rememberImmediateSnapshotTarget(
       navigated,
       resource.canonicalUrl,
-      AARRE_OPEN_PAGE_SNAPSHOT_DELAY_MS,
+      BATCH_PAGE_SNAPSHOT_DELAY_MS,
       false,
       resource.resourceKey,
       undefined,
@@ -3483,11 +3744,8 @@ async function driveSnapshotBackfill(): Promise<void> {
     while (true) {
       let job = await getStoredSnapshotBackfill();
       if (!["running", "waiting_focus"].includes(job.state)) return;
-      const foregroundTab = await snapshotBackfillForegroundTab(job);
-      if (!foregroundTab) {
-        await setSnapshotBackfillWaitingFocus();
-        return;
-      }
+      const targetTab = await snapshotBackfillTargetTab(job);
+      if (!targetTab) return;
       if (job.state === "waiting_focus") {
         await mutateStoredSnapshotBackfill((current) => {
           if (
@@ -3575,9 +3833,9 @@ async function driveSnapshotBackfill(): Promise<void> {
       }
 
       if (
-        foregroundTab.status === "complete" &&
-        foregroundTab.url &&
-        resourceMatchesLoadedUrl(resource, foregroundTab.url)
+        targetTab.status === "complete" &&
+        targetTab.url &&
+        resourceMatchesLoadedUrl(resource, targetTab.url)
       ) {
         const lease = await reserveSnapshotBackfillAttempt(
           job,
@@ -3586,9 +3844,9 @@ async function driveSnapshotBackfill(): Promise<void> {
         );
         if (!lease) return;
         await rememberImmediateSnapshotTarget(
-          foregroundTab,
+          targetTab,
           resource.canonicalUrl,
-          AARRE_OPEN_PAGE_SNAPSHOT_DELAY_MS,
+          BATCH_PAGE_SNAPSHOT_DELAY_MS,
           false,
           resource.resourceKey,
           undefined,
@@ -3657,7 +3915,8 @@ async function startSnapshotBackfill(): Promise<SnapshotBackfillStatus> {
   try {
     // 只有用户点击“补齐缺失封面”才会新建并激活此专用标签页。
     // 后续状态机不会主动激活标签或聚焦窗口。
-    const tab = await chrome.tabs.create({ active: true });
+    // 后台补拍：创建不抢焦点的专用标签页，用户可继续正常使用 Chrome。
+    const tab = await chrome.tabs.create({ active: false });
     if (
       typeof tab.id !== "number" ||
       typeof tab.windowId !== "number"
@@ -3753,15 +4012,10 @@ async function updateSnapshotBackfillState(
         ? await chrome.tabs.get(job.tabId).catch(() => null)
         : null;
     if (!tab) {
-      // “继续”是明确用户手势；仅此处可以重新创建并激活任务标签页。
-      tab = await chrome.tabs.create({ active: true });
+      // “继续”是明确用户手势；仅此处可以重新创建任务标签页。
+      // 后台补拍不激活、不抢焦点。
+      tab = await chrome.tabs.create({ active: false });
       createdTab = true;
-    } else {
-      if (typeof tab.windowId === "number") {
-        await chrome.windows.update(tab.windowId, { focused: true });
-      }
-      tab =
-        (await chrome.tabs.update(tab.id!, { active: true })) || null;
     }
     if (
       !tab ||
@@ -3844,11 +4098,8 @@ async function retryOrFailSnapshotBackfillCurrent(
     ) {
       return;
     }
-    const foregroundTab = await snapshotBackfillForegroundTab(job);
-    if (!foregroundTab) {
-      await setSnapshotBackfillWaitingFocus();
-      return;
-    }
+    const targetTab = await snapshotBackfillTargetTab(job);
+    if (!targetTab) return;
     const resource = await getLocalResource(job.currentResourceKey);
     if (!resource?.nativeBookmarkIds.length) {
       await recordSnapshotBackfillItem("skipped", "书签已被移除。", {
@@ -3892,6 +4143,32 @@ async function retryOrFailSnapshotBackfillCurrent(
   }
 }
 
+/**
+ * 页面加载/稳定超时后的处理：直接结算失败并进入下一项。
+ * 不再强制重载重试——慢站点重载通常还是超时，只会把单页耗时从 45 秒
+ * 翻倍到 90 秒；网络错误（onErrorOccurred）仍走 retryOrFail 的重载重试。
+ */
+async function timeoutOrFailSnapshotBackfillCurrent(
+  reason: string,
+  expectedTimeout: { jobId: string; token: string }
+): Promise<void> {
+  const job = await getStoredSnapshotBackfill();
+  if (
+    job.state !== "running" ||
+    job.id !== expectedTimeout.jobId ||
+    job.currentLease !== expectedTimeout.token ||
+    !job.currentResourceKey
+  ) {
+    return;
+  }
+  await recordSnapshotBackfillItem("failed", reason, {
+    jobId: job.id,
+    resourceKey: job.currentResourceKey,
+    leaseToken: expectedTimeout.token
+  });
+  void driveSnapshotBackfill();
+}
+
 async function recoverSnapshotBackfill(): Promise<void> {
   const job = await getStoredSnapshotBackfill();
   if (!["running", "waiting_focus"].includes(job.state)) return;
@@ -3918,10 +4195,8 @@ async function recoverSnapshotBackfill(): Promise<void> {
     });
     return;
   }
-  if (await snapshotBackfillForegroundTab(job)) {
+  if (await snapshotBackfillTargetTab(job)) {
     void driveSnapshotBackfill();
-  } else {
-    await setSnapshotBackfillWaitingFocus();
   }
 }
 
@@ -6532,7 +6807,7 @@ chrome.omnibox.onInputEntered.addListener((text, disposition) => {
   });
 });
 
-chrome.tabs.onUpdated.addListener((_tabId, changeInfo, tab) => {
+chrome.tabs.onUpdated.addListener(async (_tabId, changeInfo, tab) => {
   if (tab.active && (changeInfo.url || changeInfo.status)) {
     void refreshPageContextMenuState(tab);
   }
@@ -6543,17 +6818,25 @@ chrome.tabs.onUpdated.addListener((_tabId, changeInfo, tab) => {
     // transitionQualifiers 保留重定向，普通用户导航则会删除。
     return;
   }
+  // 批量补拍标签页现在可以是非活动后台标签页，不能再用 tab.active 过滤。
+  const backfillTab =
+    typeof tab.id === "number"
+      ? await isBatchBackfillTab(tab.id)
+      : false;
   // pushState/replaceState 有时只产生 URL 变更而没有新的 complete 事件。
   // 对已稳定的活动页也重新绑定增强任务，且先清掉旧路由目标。
   if (
     changeInfo.url &&
-    tab.active &&
+    (tab.active || backfillTab) &&
     tab.status === "complete" &&
     changeInfo.status !== "complete"
   ) {
     void coordinateActiveBookmarkedPage(tab);
   }
-  if (changeInfo.status === "complete" && tab.active) {
+  if (changeInfo.status === "complete" && (tab.active || backfillTab)) {
+    if (backfillTab && typeof tab.id === "number") {
+      await resetSnapshotBackfillTimeoutForTab(tab.id);
+    }
     void scheduleImmediateSnapshotIfReady(tab);
     void coordinateActiveBookmarkedPage(tab);
   }
@@ -6702,29 +6985,19 @@ chrome.webNavigation.onCommitted.addListener((details) => {
     ) {
       return;
     }
-    await mutateStoredSnapshotBackfill(async (current) => {
-      if (
-        current.id !== job.id ||
-        current.state !== "running" ||
-        current.tabId !== details.tabId ||
-        current.currentResourceKey !== job.currentResourceKey
-      ) {
-        return;
+    // 标签页被导航到非目标网页（登录页、同意页、地域页等）时不再暂停
+    // 等人手动继续，直接结算失败并自动进入下一项，避免任务卡住。
+    const lease = snapshotBackfillLeaseFromJob(job);
+    await recordSnapshotBackfillItem(
+      "failed",
+      "补拍标签页被导航到其他网页，已跳过该收藏。",
+      {
+        jobId: job.id,
+        resourceKey: job.currentResourceKey,
+        ...(lease ? { leaseToken: lease.token } : {})
       }
-      current.state = "paused";
-      current.currentLease = undefined;
-      current.updatedAt = now();
-      current.errors = [
-        ...current.errors,
-        {
-          resourceKey: current.currentResourceKey || "",
-          title: current.currentTitle || "批量补拍",
-          message:
-            "补拍标签页被导航到其他网页，任务已暂停，避免覆盖错误封面。"
-        }
-      ].slice(-20);
-      await invalidateSnapshotBackfillCapture(current);
-    });
+    );
+    void driveSnapshotBackfill();
   })().catch(() => undefined);
 });
 
@@ -6732,8 +7005,12 @@ chrome.webNavigation.onCompleted.addListener((details) => {
   if (details.frameId !== 0) return;
   void chrome.tabs
     .get(details.tabId)
-    .then((tab) => {
-      if (!tab.active) return;
+    .then(async (tab) => {
+      const backfillTab =
+        typeof tab.id === "number"
+          ? await isBatchBackfillTab(tab.id)
+          : false;
+      if (!tab.active && !backfillTab) return;
       void coordinateActiveBookmarkedPage(
         tab,
         details.documentId,
@@ -6804,13 +7081,10 @@ chrome.tabs.onActivated.addListener(({ tabId }) => {
       if (
         ["running", "waiting_focus"].includes(job.state) &&
         typeof job.windowId === "number" &&
-        tab.windowId === job.windowId
+        tab.windowId === job.windowId &&
+        job.tabId === tabId
       ) {
-        if (job.tabId === tabId) {
-          void driveSnapshotBackfill();
-        } else {
-          await setSnapshotBackfillWaitingFocus();
-        }
+        void driveSnapshotBackfill();
       }
     })
     .catch(() => undefined);
@@ -6840,15 +7114,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 });
 
 chrome.windows.onFocusChanged.addListener((windowId) => {
-  if (windowId === chrome.windows.WINDOW_ID_NONE) {
-    void (async () => {
-      const job = await getStoredSnapshotBackfill();
-      if (["running", "waiting_focus"].includes(job.state)) {
-        await setSnapshotBackfillWaitingFocus();
-      }
-    })().catch(() => undefined);
-    return;
-  }
+  if (windowId === chrome.windows.WINDOW_ID_NONE) return;
   void chrome.tabs
     .query({ active: true, windowId })
     .then(async ([tab]) => {
@@ -6858,12 +7124,12 @@ chrome.windows.onFocusChanged.addListener((windowId) => {
         void coordinateActiveBookmarkedPage(tab);
       }
       const job = await getStoredSnapshotBackfill();
-      if (["running", "waiting_focus"].includes(job.state)) {
-        if (job.windowId === windowId && job.tabId === tab?.id) {
-          void driveSnapshotBackfill();
-        } else {
-          await setSnapshotBackfillWaitingFocus();
-        }
+      if (
+        ["running", "waiting_focus"].includes(job.state) &&
+        job.windowId === windowId &&
+        job.tabId === tab?.id
+      ) {
+        void driveSnapshotBackfill();
       }
     })
     .catch(() => undefined);
@@ -7072,7 +7338,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   } else {
     const timeout = snapshotBackfillTimeoutIdentity(alarm.name);
     if (timeout) {
-      void retryOrFailSnapshotBackfillCurrent(
+      void timeoutOrFailSnapshotBackfillCurrent(
         "网页在限定时间内没有完成稳定加载。",
         timeout
       );

@@ -93,7 +93,7 @@ export function emptySnapshotBackfillStatus(): SnapshotBackfillStatus {
     currentTitle: "",
     errors: [],
     concurrency: 1,
-    requiresForeground: true
+    requiresForeground: false
   };
 }
 

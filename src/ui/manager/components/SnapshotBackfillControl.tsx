@@ -64,7 +64,7 @@ function statusTimestamp(status: SnapshotBackfillStatus): number {
 function stateLabel(state: SnapshotBackfillState): string {
   switch (state) {
     case "running":
-      return "正在补拍";
+      return "正在后台补拍";
     case "waiting_focus":
       return "等待前台";
     case "paused":
@@ -84,7 +84,7 @@ function statusMessage(status: SnapshotBackfillStatus): string {
   switch (status.state) {
     case "running":
       return status.currentTitle
-        ? `正在等待“${status.currentTitle}”加载稳定`
+        ? `正在后台补拍“${status.currentTitle}”`
         : "正在准备下一项";
     case "waiting_focus":
       return status.currentTitle
@@ -381,12 +381,12 @@ export function SnapshotBackfillControl({
 
               <div className="snapshot-backfill-dialog-body">
                 <p id="snapshot-backfill-description">
-                  Aarre 将新建并激活一个专用标签页，依次打开约 {effectiveMissingCount} 项缺少封面的网页。每一页都会在加载完成并稳定后才截图，不会在刚打开时立即截取。
+                  Aarre 将新建一个后台专用标签页，依次打开约 {effectiveMissingCount} 项缺少封面的网页。每一页都会在加载完成并稳定后才截图，不会在刚打开时立即截取。
                 </p>
                 <div className="snapshot-backfill-foreground-note">
-                  <strong>开始后请保持补拍标签页和 Chrome 窗口在前台</strong>
+                  <strong>任务在后台运行，不占用当前页面</strong>
                   <span>
-                    切换标签页或窗口后任务会等待，不会抢回焦点。你可以随时暂停或取消，已经完成的截图会保留。
+                    开始后你可以正常使用 Chrome。浏览器可能短暂显示“扩展正在调试此浏览器”提示，这是后台截图所需权限的正常现象。你可以随时暂停或取消，已经完成的截图会保留。
                   </span>
                 </div>
                 <p className="snapshot-backfill-privacy">

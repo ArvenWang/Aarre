@@ -78,7 +78,7 @@ describe("snapshot backfill planning", () => {
     ]);
     expect(emptySnapshotBackfillStatus()).toMatchObject({
       concurrency: 1,
-      requiresForeground: true
+      requiresForeground: false
     });
   });
 

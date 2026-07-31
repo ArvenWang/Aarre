@@ -132,10 +132,11 @@ export function isLoadedSnapshotTab(
     chrome.tabs.Tab,
     "active" | "incognito" | "status" | "url"
   >,
-  expectedUrl = ""
+  expectedUrl = "",
+  requireActive = true
 ): boolean {
   return Boolean(
-    tab.active &&
+    (!requireActive || tab.active) &&
       !tab.incognito &&
       tab.status === "complete" &&
       tab.url &&
@@ -150,7 +151,12 @@ export function isLoadedSnapshotTab(
  */
 export async function waitForStablePageInDocument(
   quietWindowMs = 900,
-  maxQuietWaitMs = 4_000
+  maxQuietWaitMs = 4_000,
+  options: {
+    fontTimeoutMs?: number;
+    imageTimeoutMs?: number;
+    rAFTimeoutMs?: number;
+  } = {}
 ): Promise<boolean> {
   if (
     document.readyState !== "complete" ||
@@ -165,7 +171,10 @@ export async function waitForStablePageInDocument(
     });
 
   if ("fonts" in document) {
-    await Promise.race([document.fonts.ready.then(() => undefined), wait(3_000)]);
+    await Promise.race([
+      document.fonts.ready.then(() => undefined),
+      wait(options.fontTimeoutMs ?? 3_000)
+    ]);
   }
 
   const visibleImages = Array.from(document.images)
@@ -191,7 +200,10 @@ export async function waitForStablePageInDocument(
           };
           image.addEventListener("load", finish, { once: true });
           image.addEventListener("error", finish, { once: true });
-          globalThis.setTimeout(finish, 3_000);
+          globalThis.setTimeout(
+            finish,
+            options.imageTimeoutMs ?? 3_000
+          );
         })
     )
   );
@@ -225,12 +237,47 @@ export async function waitForStablePageInDocument(
     maximumTimer = globalThis.setTimeout(finish, maxQuietWaitMs);
   });
 
-  await new Promise<void>((resolve) => {
-    globalThis.requestAnimationFrame(() =>
-      globalThis.requestAnimationFrame(() => resolve())
-    );
-  });
+  // 后台标签页不会触发 requestAnimationFrame（渲染被节流/暂停），
+  // 必须用超时兜底，否则批量后台补拍会永远卡在等待两帧这里。
+  await Promise.race([
+    new Promise<void>((resolve) => {
+      globalThis.requestAnimationFrame(() =>
+        globalThis.requestAnimationFrame(() => resolve())
+      );
+    }),
+    wait(options.rAFTimeoutMs ?? 1_000)
+  ]);
   return document.readyState === "complete";
+}
+
+/**
+ * 检测 Cloudflare/Turnstile 等“安全验证”挑战页。此类页面截图没有收藏价值，
+ * 而且往往自己跳转或保持轮询，会拖住批量补拍。函数会被序列化到网页上下文
+ * 执行，因此必须保持自包含，不能引用模块外变量。
+ */
+export function detectBotChallengeInDocument(): boolean {
+  const title = document.title || "";
+  const url = globalThis.location?.href || "";
+  const body = document.body;
+  const text = (body?.innerText || body?.textContent || "")
+    .slice(0, 3_000);
+  const challengeText = /请稍候|正在进行安全验证|verify(?:ing)? you are human|checking your browser|cf-challenge|turnstile/i.test(
+    `${title} ${text}`
+  );
+  const hasChallengeDom =
+    document.querySelector(
+      '[id*="challenge"], [class*="challenge"], [id*="turnstile"], [class*="turnstile"]'
+    ) !== null;
+  if (
+    url.includes("/cdn-cgi/challenge") ||
+    url.includes("__cf_chl") ||
+    (challengeText && /ray[- ]id|cf-ray/i.test(text)) ||
+    (challengeText && /cloudflare|turnstile/i.test(text)) ||
+    (challengeText && hasChallengeDom)
+  ) {
+    return true;
+  }
+  return false;
 }
 
 /**

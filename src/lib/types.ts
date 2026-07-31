@@ -545,9 +545,8 @@ export interface SnapshotBackfillError {
 }
 
 /**
- * 页面截图只能通过 captureVisibleTab 获取当前可见标签页，因此批量补拍
- * 永远是用户主动启动的单并发前台任务。waiting_focus 表示任务仍可继续，
- * 但 Aarre 不会擅自把标签页或窗口抢回前台。
+ * 批量补拍通过 chrome.debugger 对后台专用标签页截图，不再要求前台窗口，
+ * 用户可以在任务运行时正常使用 Chrome。waiting_focus 仅用于兼容旧任务。
  */
 export interface SnapshotBackfillStatus {
   id: string;
@@ -568,7 +567,7 @@ export interface SnapshotBackfillStatus {
   completedAt?: string;
   errors: SnapshotBackfillError[];
   concurrency: 1;
-  requiresForeground: true;
+  requiresForeground: boolean;
   tabId?: number;
 }
 
