@@ -14,6 +14,7 @@
   --active: color-mix(in srgb, var(--ink) 10%, transparent);
   --focus-ring: var(--accent);
   --destructive: var(--negative);
+  --radius-pill: 999px;
 }
 
 @theme inline {
