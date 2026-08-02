@@ -47,6 +47,7 @@
   --radius-inset-module: var(--radius-nested-md);
   --radius-compact: var(--radius-xs);
   --radius-chip: var(--radius-md);
+  --radius-pill: 999px;
 
   /* Scrims and shadows mix from a fixed dark ink rather than from --ink, which
      inverts for the dark theme: mixing from --ink there turned every overlay

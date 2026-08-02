@@ -1,5 +1,6 @@
 import { cloudRequest } from "./auth";
 import { getCloudSyncSettings } from "./cloud-settings";
+import { updateCloudSyncProgress } from "./cloud-progress";
 import { pinnedBrandAssetNeedsRefresh } from "./cover-rules";
 import {
   buildProtectionPolicy,
@@ -261,11 +262,19 @@ export async function syncCloudAssets(maxUploads = 12): Promise<{ uploaded: numb
     }));
   }
 
+  await updateCloudSyncProgress({
+    assetTotal: jobs.length,
+    statusText: "正在上传图片与快照…"
+  });
+
   let uploaded = 0;
   let inspected = 0;
   for (const job of jobs) {
     if (uploaded >= maxUploads) break;
-    if (await job()) uploaded += 1;
+    if (await job()) {
+      uploaded += 1;
+      await updateCloudSyncProgress({ assetProcessedDelta: 1 });
+    }
     inspected += 1;
   }
   if (uploaded) await writeState(state);

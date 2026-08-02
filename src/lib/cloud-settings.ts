@@ -18,6 +18,16 @@ export interface CloudStorageUsage {
   usageRatio: number;
 }
 
+export interface CloudSyncEstimate {
+  scope: CloudSyncScope;
+  localTotalBytes: number;
+  localMetadataBytes: number;
+  localAssetBytes: number;
+  resourceCount: number;
+  assetCount: number;
+  calculatedAt: string;
+}
+
 const DEFAULT_SETTINGS: CloudSyncSettings = {
   enabled: false,
   scope: "text",

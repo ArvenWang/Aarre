@@ -272,6 +272,76 @@ function database(): Promise<IDBPDatabase<BookmarkLayerDatabase>> {
   return databasePromise;
 }
 
+export interface LocalIndexedDbSize {
+  totalBytes: number;
+  resourcesBytes: number;
+  outboxBytes: number;
+  undoSnapshotsBytes: number;
+  siteBrandsBytes: number;
+  pageSnapshotsBytes: number;
+  resourceCount: number;
+  outboxCount: number;
+  undoSnapshotCount: number;
+  siteBrandCount: number;
+  pageSnapshotCount: number;
+}
+
+function jsonByteLength(value: unknown): number {
+  const serialized = JSON.stringify(value);
+  return serialized ? new TextEncoder().encode(serialized).byteLength : 0;
+}
+
+function collectionByteLength(values: unknown[]): number {
+  return values.reduce<number>(
+    (total, value) => total + jsonByteLength(value),
+    0
+  );
+}
+
+/**
+ * Return the logical payload size of every Aarre IndexedDB record.
+ *
+ * This is intentionally a read-only logical size, not the filesystem's
+ * LevelDB/IndexedDB overhead. The latter is implementation-specific and can
+ * change after browser compaction; this number is the useful product metric
+ * for explaining what the user's local data contains.
+ */
+export async function getLocalIndexedDbSize(): Promise<LocalIndexedDbSize> {
+  const db = await database();
+  const [resources, outbox, undoSnapshots, siteBrands, pageSnapshots] =
+    await Promise.all([
+      db.getAll("resources"),
+      db.getAll("outbox"),
+      db.getAll("undoSnapshots"),
+      db.getAll("siteBrands"),
+      db.getAll("pageSnapshots")
+    ]);
+  const resourcesBytes = collectionByteLength(resources);
+  const outboxBytes = collectionByteLength(outbox);
+  const undoSnapshotsBytes = collectionByteLength(undoSnapshots);
+  const siteBrandsBytes = collectionByteLength(siteBrands);
+  const pageSnapshotsBytes = collectionByteLength(pageSnapshots);
+
+  return {
+    totalBytes:
+      resourcesBytes +
+      outboxBytes +
+      undoSnapshotsBytes +
+      siteBrandsBytes +
+      pageSnapshotsBytes,
+    resourcesBytes,
+    outboxBytes,
+    undoSnapshotsBytes,
+    siteBrandsBytes,
+    pageSnapshotsBytes,
+    resourceCount: resources.length,
+    outboxCount: outbox.length,
+    undoSnapshotCount: undoSnapshots.length,
+    siteBrandCount: siteBrands.length,
+    pageSnapshotCount: pageSnapshots.length
+  };
+}
+
 function normalizeSiteBrand(value: SiteBrandRecord): SiteBrandRecord {
   const pageImageSamples =
     value.pageImageSamples &&

@@ -117,6 +117,18 @@ describe("cloud settings stay local-first", () => {
       handler.indexOf("saveCloudSyncSettings(request.payload)")
     );
   });
+
+  it("returns from sign-in before starting the potentially large restore", async () => {
+    const source = await readFile(backgroundUrl, "utf8");
+    const handler = source.slice(
+      source.indexOf('case "SIGN_IN_CLOUD"'),
+      source.indexOf('case "SIGN_OUT_CLOUD"')
+    );
+
+    expect(handler).toContain("void syncAfterExplicitCloudSettings(cloudSettings)");
+    expect(handler).not.toContain("await syncAfterExplicitCloudSettings(cloudSettings)");
+    expect(handler).toContain("return getAppState();");
+  });
 });
 
 describe("only one system paints a given control", () => {

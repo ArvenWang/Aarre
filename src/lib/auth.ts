@@ -26,7 +26,10 @@ interface CloudSession {
   };
 }
 
-let refreshPromise: Promise<CloudSession> | null = null;
+let refreshPromise: {
+  refreshToken: string;
+  promise: Promise<CloudSession>;
+} | null = null;
 
 async function getChromeProfileEmail(): Promise<string | undefined> {
   try {
@@ -93,7 +96,11 @@ async function challengeForVerifier(verifier: string): Promise<string> {
 async function responseError(response: Response): Promise<string> {
   try {
     const body = (await response.json()) as { message?: string; error?: string };
-    return body.message || body.error || `云端服务返回 ${response.status}`;
+    const message = body.message || body.error || "";
+    if (/refresh token replay/i.test(message)) {
+      return "云端登录会话已失效，请重新登录后继续同步。";
+    }
+    return message || `云端服务返回 ${response.status}`;
   } catch {
     return `云端服务返回 ${response.status}`;
   }
@@ -116,6 +123,26 @@ function wait(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
+function withTimeout<T>(
+  operation: Promise<T>,
+  milliseconds: number,
+  message: string
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), milliseconds);
+    operation.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+}
+
 async function fetchJson<T>(path: string, init: RequestInit): Promise<T> {
   requireCloudConfiguration();
   const response = await fetch(`${CLOUD_API_BASE_URL}${path}`, {
@@ -131,17 +158,26 @@ async function fetchJson<T>(path: string, init: RequestInit): Promise<T> {
 }
 
 async function refreshSession(session: CloudSession): Promise<CloudSession> {
+  // A request can receive a late 401 after another request has already
+  // rotated the token. Re-read storage before spending the one-time refresh
+  // token; otherwise the late request would look like a replay to the server.
+  const latest = await readSession();
+  if (!latest) throw new Error("请重新登录 Aarre 云端。");
+  if (latest.refreshToken !== session.refreshToken) return latest;
+  if (Date.parse(latest.accessExpiresAt) > Date.now() + 30_000) return latest;
+
   if (!refreshPromise) {
-    refreshPromise = fetchJson<Omit<CloudSession, "profile" | "userId">>(
+    const refreshToken = latest.refreshToken;
+    const promise = fetchJson<Omit<CloudSession, "profile" | "userId">>(
       "/v1/auth/refresh",
       {
         method: "POST",
-        body: JSON.stringify({ refreshToken: session.refreshToken })
+        body: JSON.stringify({ refreshToken })
       }
     )
       .then((tokens) =>
         saveSession({
-          ...session,
+          ...latest,
           ...tokens
         })
       )
@@ -150,10 +186,18 @@ async function refreshSession(session: CloudSession): Promise<CloudSession> {
         throw error;
       })
       .finally(() => {
-        refreshPromise = null;
+        if (refreshPromise?.promise === promise) refreshPromise = null;
       });
+    refreshPromise = { refreshToken, promise };
   }
-  return refreshPromise;
+  return refreshPromise.promise;
+}
+
+async function readRotatedSession(
+  session: CloudSession
+): Promise<CloudSession | null> {
+  const latest = await readSession();
+  return latest && latest.accessToken !== session.accessToken ? latest : null;
 }
 
 export async function cloudRequest<T>(
@@ -181,7 +225,7 @@ export async function cloudRequest<T>(
   while (true) {
     const response = await send(session);
     if (response.status === 401 && !refreshed) {
-      session = await refreshSession(session);
+      session = (await readRotatedSession(session)) || await refreshSession(session);
       refreshed = true;
       continue;
     }
@@ -236,10 +280,14 @@ export async function signInWithGoogle(): Promise<AuthState> {
   start.searchParams.set("codeChallenge", codeChallenge);
   start.searchParams.set("deviceId", currentDeviceId);
   start.searchParams.set("redirectUri", redirectUri);
-  const callbackUrl = await chrome.identity.launchWebAuthFlow({
-    url: start.toString(),
-    interactive: true
-  });
+  const callbackUrl = await withTimeout(
+    chrome.identity.launchWebAuthFlow({
+      url: start.toString(),
+      interactive: true
+    }),
+    90_000,
+    "登录窗口在 90 秒内没有返回，请重试。"
+  );
   if (!callbackUrl) throw new Error("登录已取消。");
   const callback = new URL(callbackUrl);
   const ticket = callback.searchParams.get("ticket") ||

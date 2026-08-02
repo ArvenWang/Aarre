@@ -40,9 +40,12 @@ import type {
 import type { ItemProtectionState } from "./protection";
 import type {
   CloudStorageUsage,
+  CloudSyncEstimate,
   CloudSyncSettings
 } from "./cloud-settings";
+import type { CloudSyncProgress } from "./cloud-progress";
 import type { CloudConflict } from "./cloud";
+import type { LocalDataSize } from "./local-size";
 
 export type ProtectionTarget =
   | { kind: "bookmark"; id: string }
@@ -152,6 +155,9 @@ export type ExtensionRequest =
       payload: Pick<CloudSyncSettings, "enabled" | "scope">;
     }
   | { type: "GET_CLOUD_USAGE" }
+  | { type: "GET_CLOUD_SYNC_ESTIMATE" }
+  | { type: "GET_LOCAL_DATA_SIZE" }
+  | { type: "GET_CLOUD_SYNC_PROGRESS" }
   | { type: "GET_CLOUD_CONFLICTS" }
   | {
       type: "RESOLVE_CLOUD_CONFLICT";
@@ -229,6 +235,9 @@ export type ResponseDataByRequest = {
   GET_CLOUD_SETTINGS: CloudSyncSettings;
   SAVE_CLOUD_SETTINGS: CloudSyncSettings;
   GET_CLOUD_USAGE: CloudStorageUsage;
+  GET_CLOUD_SYNC_ESTIMATE: CloudSyncEstimate;
+  GET_LOCAL_DATA_SIZE: LocalDataSize;
+  GET_CLOUD_SYNC_PROGRESS: CloudSyncProgress;
   GET_CLOUD_CONFLICTS: CloudConflict[];
   RESOLVE_CLOUD_CONFLICT: { resolved: true };
   AUTH_CHANGED: AppState;

@@ -21,6 +21,15 @@ import {
   type CloudStorageUsage
 } from "../lib/cloud-settings";
 import {
+  beginCloudSyncProgress,
+  completeCloudSyncProgress,
+  failCloudSyncProgress,
+  getCloudSyncProgress,
+  updateCloudSyncProgress
+} from "../lib/cloud-progress";
+import { getCloudSyncEstimate } from "../lib/cloud-estimate";
+import { getLocalDataSize } from "../lib/local-size";
+import {
   clearDurableCloudStateTracking,
   restoreDurableCloudState,
   syncCloudScopeSetting,
@@ -5089,7 +5098,26 @@ async function tryImmediateSync(
   }
 }
 
-async function syncPendingIfReady(): Promise<void> {
+async function countPendingCloudResources(): Promise<number> {
+  const [local, trackedResourceKeys, protectionSettings, bookmarkTree] =
+    await Promise.all([
+      getLocalResources(),
+      getTrackedCloudResourceKeys(),
+      getProtectionSettings(),
+      chrome.bookmarks.getTree()
+    ]);
+  const protectionPolicy = buildProtectionPolicy(
+    bookmarkTree,
+    protectionSettings
+  );
+  return local.filter(
+    (resource) =>
+      !isResourceUserProtected(resource, protectionPolicy) &&
+      shouldQueueResourceForCloud(resource, trackedResourceKeys)
+  ).length;
+}
+
+async function syncPendingIfReady(): Promise<{ synced: number; failed: number }> {
   const [auth, cloudSettings] = await Promise.all([
     getAuthState(),
     getCloudSyncSettings()
@@ -5131,8 +5159,9 @@ async function syncPendingIfReady(): Promise<void> {
       if (pending !== resource) await upsertLocalResource(pending);
       await enqueueOutbox(pending, "");
     }
-    await drainOutbox();
+    return drainOutbox();
   }
+  return { synced: 0, failed: 0 };
 }
 
 async function saveBookmark(
@@ -7113,14 +7142,28 @@ async function syncNow() {
   if (!cloudSettings.enabled) {
     return { synced: 0, failed: 0, resources: await getLocalResources() };
   }
-  const result = await drainOutbox();
-  const resources = await pullCloudResources();
-  await syncDurableCloudState();
-  if (cloudSettings.scope === "complete") {
-    await restoreCloudAssets();
-    await syncCloudAssets();
+  await beginCloudSyncProgress({
+    scope: cloudSettings.scope,
+    resourceTotal: await countPendingCloudResources()
+  });
+  try {
+    const result = await drainOutbox();
+    const resources = await pullCloudResources();
+    await updateCloudSyncProgress({
+      statusText: "正在同步设置、会话和报告…"
+    });
+    await syncDurableCloudState();
+    if (cloudSettings.scope === "complete") {
+      await restoreCloudAssets();
+      let assets = await syncCloudAssets();
+      while (assets.remaining) assets = await syncCloudAssets();
+    }
+    await completeCloudSyncProgress({ resourceFailed: result.failed });
+    return { ...result, resources };
+  } catch (error) {
+    await failCloudSyncProgress(error);
+    throw error;
   }
-  return { ...result, resources };
 }
 
 async function drainOutbox(maxBatches = 50): Promise<{
@@ -7136,6 +7179,11 @@ async function drainOutbox(maxBatches = 50): Promise<{
     const result = await processOutbox();
     synced += result.synced;
     failed += result.failed;
+    await updateCloudSyncProgress({
+      resourceProcessedDelta: result.synced,
+      resourceFailedDelta: result.failed,
+      statusText: "正在同步收藏…"
+    });
     if (result.attempted === 0) break;
   }
 
@@ -7145,16 +7193,35 @@ async function drainOutbox(maxBatches = 50): Promise<{
 async function syncAfterExplicitCloudSettings(
   settings: Awaited<ReturnType<typeof getCloudSyncSettings>>
 ): Promise<void> {
-  // The scope the user just selected is authoritative. Push that small entity
-  // before restoring other cloud state so an older device cannot switch a
-  // freshly chosen complete backup back to text-only during the same action.
-  await syncCloudScopeSetting(settings);
-  await pullCloudResources();
-  await restoreDurableCloudState({ skipCloudScope: true });
-  if (settings.scope === "complete") await restoreCloudAssets();
-  await syncPendingIfReady();
-  await syncDurableCloudState();
-  if (settings.scope === "complete") await syncCloudAssets();
+  await beginCloudSyncProgress({
+    scope: settings.scope,
+    resourceTotal: await countPendingCloudResources()
+  });
+  try {
+    // The scope the user just selected is authoritative. Push that small entity
+    // before restoring other cloud state so an older device cannot switch a
+    // freshly chosen complete backup back to text-only during the same action.
+    await syncCloudScopeSetting(settings);
+    await pullCloudResources();
+    await updateCloudSyncProgress({
+      statusText: "正在恢复云端设置与会话…"
+    });
+    await restoreDurableCloudState({ skipCloudScope: true });
+    if (settings.scope === "complete") await restoreCloudAssets();
+    const result = await syncPendingIfReady();
+    await updateCloudSyncProgress({
+      statusText: "正在同步设置、会话和报告…"
+    });
+    await syncDurableCloudState();
+    if (settings.scope === "complete") {
+      let assets = await syncCloudAssets();
+      while (assets.remaining) assets = await syncCloudAssets();
+    }
+    await completeCloudSyncProgress({ resourceFailed: result.failed });
+  } catch (error) {
+    await failCloudSyncProgress(error);
+    throw error;
+  }
 }
 
 async function getResources(query = "") {
@@ -7753,13 +7820,12 @@ async function handleRequest(
       ]);
       {
         const cloudSettings = await getCloudSyncSettings();
-        if (!cloudSettings.enabled) return getAppState();
-        await pullCloudResources();
-        await restoreDurableCloudState();
-        if (cloudSettings.scope === "complete") await restoreCloudAssets();
-        await syncPendingIfReady();
-        await syncDurableCloudState();
-        if (cloudSettings.scope === "complete") await syncCloudAssets();
+        // Authentication should complete as soon as the account session is
+        // established. Restoring a large library is deliberately a separate
+        // background job so the login button cannot appear stuck for minutes.
+        if (cloudSettings.enabled) {
+          void syncAfterExplicitCloudSettings(cloudSettings).catch(() => undefined);
+        }
       }
       return getAppState();
     case "SIGN_OUT_CLOUD":
@@ -7796,6 +7862,12 @@ async function handleRequest(
     }
     case "GET_CLOUD_USAGE":
       return cloudRequest<CloudStorageUsage>("/v1/account/usage");
+    case "GET_CLOUD_SYNC_ESTIMATE":
+      return getCloudSyncEstimate((await getCloudSyncSettings()).scope);
+    case "GET_LOCAL_DATA_SIZE":
+      return getLocalDataSize();
+    case "GET_CLOUD_SYNC_PROGRESS":
+      return getCloudSyncProgress();
     case "GET_CLOUD_CONFLICTS":
       return listCloudConflicts();
     case "RESOLVE_CLOUD_CONFLICT":
