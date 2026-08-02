@@ -45,11 +45,12 @@ const badgeVariants = cva(
       variant: "solid",
       size: "md",
     },
-  }
+  },
 );
 
 interface BadgeProps
-  extends Omit<HTMLAttributes<HTMLSpanElement>, "color">,
+  extends
+    Omit<HTMLAttributes<HTMLSpanElement>, "color">,
     VariantProps<typeof badgeVariants> {
   color?: BadgeColor;
 }
@@ -65,7 +66,7 @@ const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
       style,
       ...props
     },
-    ref
+    ref,
   ) => {
     const shape = useShape();
     const colorValue = badgeColors[color];
@@ -106,7 +107,7 @@ const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
         <span className="[text-box:trim-both_cap_alphabetic]">{children}</span>
       </span>
     );
-  }
+  },
 );
 
 Badge.displayName = "Badge";

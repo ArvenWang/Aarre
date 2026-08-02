@@ -1,0 +1,10 @@
+[Unit]
+Description=Aarre monthly PostgreSQL backup to Tencent COS
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/aarre/current/infra/production
+ExecStart=/usr/bin/docker compose --profile maintenance run --rm -e AARRE_BACKUP_CLASS=monthly aarre-backup
+TimeoutStartSec=1800

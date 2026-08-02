@@ -42,7 +42,13 @@ const Elevated = forwardRef<HTMLDivElement, ElevatedProps>(
       <SurfaceProvider value={level}>
         <div
           ref={ref}
-          className={cn(surfaceClasses(level, shadowLevel ?? level), className)}
+          className={cn(
+            // Hairline matches Card's floating tiles — shadow alone washes out
+            // against a white page, so elevated shells keep a faint edge.
+            surfaceClasses(level, shadowLevel ?? level),
+            "border border-border/60",
+            className
+          )}
           {...props}
         >
           {children}

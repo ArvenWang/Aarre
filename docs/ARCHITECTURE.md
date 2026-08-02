@@ -1,149 +1,130 @@
 # Aarre 架构
 
-## 1. 身份
+最后更新：2026-08-03
+实现版本：0.5.33
 
-Google 登录只用于可选的 Aarre 云端同步。未登录或未配置 Supabase 时，Chrome 原生书签、本地智能信息和 BYOK AI 处理仍然可用。登录通过 Supabase Auth 的 Google Provider 和 OAuth PKCE 完成。
+> 自建云端已部署到与 NexVoice 共用的腾讯云香港服务器：独立 API、数据库/用户、两只私有 COS、两套最小权限 CAM、Google Web OAuth client、每日/月度备份、两分钟健康巡检、Aarre 独立 GlitchTip project 和加密恢复材料均已建立，真实 COS 复制/全版本删除、PostgreSQL 隔离恢复及脱敏错误上报演练通过。当前生产发布指向 `/opt/aarre/releases/20260803-sync-rate-v27`，服务端版本 0.1.9；`sync.nexvoice.cc` 的 DNS、公开 TLS、隐私/条款页面、真实 OAuth 登录/登出和 262 条资源 metadata 首次同步均已通过。0.5.33 将显式范围选择改为本地立即保存、云端后台续传，并修复价格版本字段契约与 429 `Retry-After`。Google 品牌、完整图片备份、卸载重装恢复和正式 Web Store ID 仍是发布门。旧 Supabase / Edge Function / pgvector 路径已删除，不属于现状。
 
-扩展会读取当前 Chrome 配置文件的主账号邮箱，并要求它与产品 Google 账号一致：
+## 1. 不可动摇的边界
 
-- Chrome 未登录：不允许连接产品云端。
-- 两个邮箱不一致：立即退出产品会话并暂停同步。
-- 两个邮箱一致：允许拉取和推送当前用户的智能收藏数据。
+1. Chrome 原生书签是标题、URL、文件夹和顺序的唯一事实来源。
+2. 未登录、断网或云端故障时，本地收藏、检索、AI 和截图仍可使用。
+3. 网页正文、Cookie、完整浏览历史、BYOK API Key、Chrome 原生 ID 和运行时任务不进入 Aarre 云端。
+4. 云端默认关闭。用户连接账号后仍需明确选择“仅文字与设置”或“完整云端备份”。
+5. 页面快照只在“完整云端备份”下加密上传；受保护网页和文件夹在任何模式下都不上传。
+6. 云端加密是服务端信封加密，不宣传成端到端加密。
 
-真正的云端权限边界是 Supabase `auth.users.id`。邮箱只用于确认用户没有误选其他 Google 账号。
+## 2. 三层数据模型
 
-## 2. 双层数据模型
+### 2.1 Chrome 原生层
 
-### Chrome 原生层
+保存标题、URL、文件夹、顺序和创建时间。Aarre 通过 `chrome.bookmarks` 直接读取和修改，并监听创建、改名、移动、排序和删除事件。Chrome Sync 是否开启仍由用户在 Chrome 中控制。
 
-保存：
+### 2.2 Aarre 本地智能层
 
-- 标题
-- URL
-- 文件夹和书签栏位置
+IndexedDB 与 `chrome.storage.local` 保存：
 
-作用：
+- URL 级摘要、标签、主题、别名、内容类型、链接健康和用户备注；
+- 收藏位置绑定、页面快照、站点标识和封面；
+- AI 用量、会话、报告、保护规则、操作历史和持久任务；
+- 用户的 AI Key 与云端 Token。
 
-- 是标题、URL、顺序和文件夹结构的唯一事实来源。
-- 侧边栏每次直接读取当前配置文件的 `chrome.bookmarks` 书签树，不读取产品数据库副本。
-- 继续使用 Chrome 原生书签栏。
-- 使用 Chrome Sync 在同一 Chrome 账号的设备之间同步。
-- 即使扩展暂时不可用，链接仍然可访问。
+本地层始终优先写入。Service Worker 被暂停、网络失败或云端未配置时，持久 Outbox 继续保留待同步变更。
 
-### Aarre 本地智能层
+### 2.3 可选云端层
 
-保存：
+云端只保存恢复后仍有用户价值的白名单数据：
 
-- 规范化 URL 和资源键
-- 用户收藏原因
-- 页面摘要、标签和主题
-- 页面截图时间与持久增强任务状态（截图二进制单独存入 `pageSnapshots`）
-- 作者、站点、图片、选中文字
-- 内容哈希和 AI 状态
+- PostgreSQL：加密后的资源、收藏位置、设置、保护规则、会话、报告、用量、操作历史、冲突版本和墓碑；
+- 腾讯云 COS：页面快照、页面封面、站点标识和用户封面；
+- 不保存本地全文检索向量，语义检索继续在设备端完成；
+- 不运行 AI 富化，Gemini / OpenAI / DeepSeek 请求继续由扩展使用用户自己的 Key 直连。
 
-作用：
+## 3. 稳定身份与重装恢复
 
-- 在当前 Chrome 配置中保存摘要、标签、备注等智能信息。
-- 使用标题、摘要、标签、备注和正文摘录进行本地检索。
-- 后续实现当前任务上下文推荐。
-- 本地 Agent 历史会话；最多保留最近 50 个会话，每个会话最多 60 条消息。
+- URL 级资源键：规范化 URL 的 SHA-256。
+- 收藏位置：Aarre 生成跨设备稳定的 `bookmarkItemId`；Chrome bookmark ID 只保存在当前设备。
+- 文件夹保护：云端保存 `protectedFolderRuleId` 与路径提示，本机保存它和 Chrome folder ID 的绑定。
+- 新设备先由 Chrome Sync 恢复书签树，再用 URL、标题和文件夹路径重绑定智能层。唯一匹配自动绑定；歧义项保持待确认，不静默绑定到错误书签。
 
-可选云端层会把这些信息同步到 Supabase，并增加 pgvector 语义向量。智能层通过规范化 URL 与 Chrome 书签关联，但不能覆盖原生层的标题、URL、顺序或文件夹。搜索结果展示时，基础字段始终以当前 Chrome 数据为准。
+恢复顺序是“原生书签首屏 → 文字元数据 → 当前可见图片懒下载”。已有完整 AI 信息的条目不重新消耗用户的 AI 额度；API Key 必须在新设备重新配置。
 
-### 绑定方式
+## 4. 认证与 Token
 
-不依赖可能因设备不同而变化的 Chrome bookmark ID 作为云端主键。云端主键由：
+Google 登录使用服务端 Web OAuth broker 与扩展一次性 PKCE ticket：
 
-```text
-SHA-256(canonical URL)
-```
+1. 扩展生成 verifier/challenge 和 `deviceId`，通过 `chrome.identity.launchWebAuthFlow` 打开 Aarre API。
+2. 服务端只接受正式 Extension ID 对应的精确 `chromiumapp.org/auth` 回跳。
+3. Google 只回调 `https://sync.nexvoice.cc/v1/auth/google/callback`；服务端验证 state、nonce、签名、issuer、audience、有效期和 `email_verified`。
+4. Google access token 立即丢弃，不保存 refresh token。
+5. 服务端通过 URL fragment 交付 60 秒单次 ticket；扩展用 verifier 换取 Aarre 自己的随机不透明 Token。
+6. access token 10 分钟、refresh token 30 天并每次轮换；旧 refresh 重放会吊销整个 family。
 
-生成，并与 Supabase 用户 ID 组成复合主键。Chrome bookmark ID 只保存在当前设备的本地绑定中。
+Token 仅由 Service Worker 读取，`chrome.storage.local` access level 固定为 `TRUSTED_CONTEXTS`。侧边栏、网页端和 content script 只能发送类型化消息，拿不到 Token 或 COS 短签名 URL。
 
-## 3. 侧边栏与统一输入框
+## 5. 同步协议与冲突
 
-- 数据层读取 Chrome 的全部原生书签根目录，包括账号、本机、其他和移动设备书签；展示层统一隐藏这些系统根目录，只从其下的真实书签和用户自建文件夹开始展示，因此不会因保存位置不同而遗漏内容。
-- 新建和右键快捷收藏默认写入 `syncing = true` 的账号书签栏；没有账号书签栏时回退到 Chrome 当前可写书签栏。
-- 通过 Chrome 书签事件实时响应创建、改名、移动、删除和重新排序。
-- 文件夹和书签操作直接调用 Chrome Bookmarks API。
-- 当前页面右键项随活动 tab、URL 与书签事件持续同步：未命中显示“添加到收藏…”，命中显示“管理此收藏…”。Chrome Context Menus API 只公开点击事件，不公开菜单显示前的链接目标事件，所以链接项固定为“添加或管理此链接…”，点击后在侧边栏校验。无法确认页面状态时禁用入口，绝不在未知状态下静默新建。
-- 右键草稿进入侧边栏后再次校验状态。完全相同的单条记录直接更新；canonical-only 命中要求确认复用或另存；多条命中必须选择目标；受管理记录只写 Aarre 元数据。Aarre 不记录也不依赖“由 Aarre 还是 Chrome 创建”的来源标记。
-- 输入联想同时查询 Chrome 书签、浏览历史和已打开标签页。
-- 网址直接在当前或新标签页打开；普通文本交给 Chrome 当前默认搜索引擎。
-- 扩展无法接管 Chrome 地址栏的私有内部逻辑，因此不承诺复制计算器、单位换算、站点搜索快捷词等未公开能力。
-- 底部 Agent 提交后进入独立会话页；回答使用整个书签目录的紧凑元数据索引，并携带最近 10 轮上下文。
-- 列表右上角的历史入口读取当前 Chrome 配置文件中的真实会话记录。
-- 网页端收藏库从当前 Chrome 书签树构建文件夹分面，隐藏系统根目录但保留根目录、嵌套目录和同一资源的多个真实位置；支持“全部/已理解/待处理”状态、文件夹子树筛选，以及 Chrome 顺序、收藏时间、最近使用、更新时间和标题排序。存在搜索词且使用默认排序时保留搜索相关度；控制状态写入 URL，刷新后可恢复。
-- 管理页把 Aarre 标识与六个功能 Tab 合并在同一条头部，仅保留一条整体分隔线；收藏搜索位于收藏库自身工具栏，不承担全局网页搜索。输入草稿与已提交查询分离，只有提交后才改变列表、高亮、相关度排序和 URL。
-- 每张瀑布流卡片的编辑器通过 `bookmarkId` 精确作用于一个 Chrome 位置。名称、完整 URL 与文件夹写回 Chrome；标签和备注写入 Aarre。跨站改 URL 时只迁移所选绑定并清空旧站 AI/截图字段，同资源的 canonical/redirect/追踪参数变化保留其他位置与增强信息；事务失败同时恢复 Chrome 与本地状态，不能确认完整恢复时明确要求用户检查。
-- 收藏库大封面只有两级：本机 `pageSnapshots` 的真实网页截图，以及 40 张随扩展打包的 Aarre 兜底图。可靠语义分类优先选择对应兜底图，否则按 canonical URL 稳定哈希分散到完整资产池；普通 `og:image`、网络代表图、侧边栏分类图和低清 favicon 均不进入大封面。
+- 第一次登录按 200 条分页 bootstrap；现有本地资源按“当前账号是否真的返回过云端 revision”补种 Outbox，避免旧版本的 `synced` 标记让换账号或升级后的记录被漏传；以后使用单调递增的 `sync_changes.sequence` 拉增量。
+- 每个写入携带 UUID `operationId`，重试返回第一次结果，避免重复写入和重复计量。
+- URL 级 AI 字段使用字段时钟合并，改一个字段不会覆盖整条资源。
+- 备注和用户标签携带 `baseRevision`。旧 revision 的不同内容不会静默覆盖：服务端把两份内容写入加密的 `conflict_versions`，备注保留当前权威值、标签先取并集；侧边栏和网页端编辑器可选择云端版、离线版或用当前编辑内容合并。
+- 删除写墓碑；游标落后于 180 天变更保留窗口时，服务端要求 full resync。
+- 保护规则优先于普通同步。文件夹规则同时写入该文件夹当前覆盖的资源身份映射；服务端会拒绝旧设备对这些资源的资源 JSON、收藏位置和图片写入，并清理既有元数据与 COS 全版本。
 
-## 4. 保存流程
+## 6. 图片资产协议
 
-```text
-用户添加或管理收藏
-  → activeTab 临时授权
-  → Readability 提取正文
-  → 用户确认名称、备注和文件夹
-  → 全局查重后创建或更新真实 Chrome 书签
-  → 写入本地资源
-  → 持久化“AI 摘要 + 标签 + 页面截图”增强任务
-  → 扩展直接调用用户选择的 Gemini / OpenAI / DeepSeek
-  → 页面 complete 后等待字体、首屏图片和 DOM 稳定，再截当前可见标签页
-  → 摘要、标签与截图分别完成并写回本地 IndexedDB
-  → 如果已配置云端，再加入同步队列并写入 Supabase
-  → 云端可选生成 768 维检索向量并写入 pgvector
-```
+图片二进制不经过 Fastify JSON body：
 
-如果 AI Key、网页权限、前台页面或网络暂不可用，Chrome 书签和本地记录仍然成功；AI 与截图增强任务保存在 `chrome.storage.local`，通过 Alarm、配置恢复以及收藏下次以任意正常方式打开继续，按指数退避避免死循环。Chrome 原生星标触发 `bookmarks.onCreated` 后走同一增强队列，不弹第二个收藏表单，也不创建第二条书签。
+1. Service Worker 计算 WebP bytes、SHA-256、尺寸与绑定信息。
+2. API 校验账号、范围、保护规则和配额，分配 `users/<userId>/<assetId>/<sha256>.webp`。
+3. API 签发 5 分钟单对象 PUT URL；浏览器直接上传到香港私有 COS。
+4. `complete` 后服务端 HEAD 校验大小、hash metadata、MIME 和 SSE-COS AES-256，再把对象标记为可见。
+5. 新设备只拉 manifest，当前可见资产按需用短时 GET URL 下载，并在客户端再次校验 SHA-256。
 
-截图协调器不依赖打开入口：Chrome 星标或 Aarre 新收藏先登记静默首拍；Aarre、地址栏、Chrome 书签栏、历史记录或普通链接打开已收藏且缺图页面时，在页面稳定后自动补拍。从 Aarre 打开或正常浏览补齐旧图成功后，在网页底部显示“封面截图已更新”；新收藏首拍静默。已有截图以 7 天为新鲜度窗口，只有正常浏览命中已过期截图时才静默刷新，不会每次打开都覆盖。临时目标同时写入 `chrome.storage.session`，持久任务写入 `chrome.storage.local`，MV3 Service Worker 暂停后仍能恢复；截图前后都重新确认活动标签、聚焦窗口、最终 URL、页面文档和收藏绑定。
+普通替换和误删通过 COS 版本控制保留 30 天。开启保护或删除账号时，独立 deletion worker 枚举并删除香港主桶与新加坡灾备桶的全部对象版本，不能只写 delete marker。
 
-连续打开多个网页时，退到后台的标签页不会在后台直接截图，因为普通路径的 `captureVisibleTab()` 只能捕获指定窗口的当前活动页；任务会保留，用户之后切回该页并等待稳定后自动补拍。对于存量缺图收藏，管理页提供用户显式启动的后台补拍队列：复用一个不抢焦点的后台专用标签页，通过 `chrome.debugger` 的 `Page.captureScreenshot` 截图，截图并发固定为 1，支持暂停、继续、取消、超时和失败隔离。批量补拍只写本机页面快照，不触发 AI 富化、不上传图片；安全验证页会快速识别跳过，页面被导航到其他网页时自动跳过而不是暂停等待。
+## 7. 加密与授权
 
-本地资源和队列使用 IndexedDB，避免书签数量增大后反复序列化整份数据。
+- 每个用户有独立 32-byte DEK，内容使用 AES-256-GCM。
+- Alpha 的应用 KEK 使用最多 8 个版本的 keyring，保存在服务器 `/etc/aarre/aarre.env`（root-only、mode 600）；`user_keys` 只存 wrapped DEK 和 KEK version，轮换期间旧版本继续可读。
+- COS 使用腾讯云默认 SSE-COS AES-256。KMS/SSM wrapper 接口仍保留给未来高合规阶段，但当前没有购买高固定成本 KMS/SSM，也不会把缺服务降级成数据库明文。
+- `/etc/aarre` secrets 已导出为 AES-256/PBKDF2 加密恢复包；恢复口令同时保存在当前 Mac Keychain 和独立 mode 600 恢复文件。获得服务器 root 与 KEK 的受控后端仍能解密，因此不宣传为端到端加密。
+- 所有查询从认证结果取得 `userId`，并在 SQL 中显式限定；跨用户资源与不存在统一返回 404。
+- payload 使用 zod 严格白名单，正文、base64 图片、API Key、Token 与原生 ID 会被拒绝。
 
-### 全目录扫描
+## 8. 腾讯云部署
+
+Alpha 与 NexVoice 共用腾讯云香港轻量应用服务器，但只共用机器、Caddy 和 PostgreSQL 实例：
 
 ```text
-用户在设置页点击“扫描全部书签”
-  → 使用安装时已说明并授予的 http/https 网页读取权限
-  → 后台持久化扫描队列与进度
-  → 不携带 Cookie 抓取每个可访问网页（最多读取 600KB）
-  → 提取描述、站点、H1/H2、首段、关键词和 URL 路径词
-  → 所选 AI 生成简介、标签和主题
-  → 每条完成后立即写回 IndexedDB，并可选同步云端
+Caddy :443
+  └─ sync.nexvoice.cc → 127.0.0.1:8788
+       └─ aarre-api（独立容器，320 MiB / 0.75 CPU）
+            ├─ control-db:5432 / aarre_sync（独立 database + role）
+            ├─ 香港私有 COS 主桶（SSE-COS AES-256）
+            └─ root-only 版本化 KEK keyring
+
+短命 backup/deletion worker（独立高权限 CAM）
+  └─ 新加坡私有 COS 灾备桶
 ```
 
-任务支持暂停、恢复和取消；Chrome 终止 MV3 Service Worker 后，任务会由持久状态和 Alarm 恢复。内部、局域网、带凭据和常见企业域名会被跳过。网页抓取失败时，AI 只基于名称、URL 和文件夹生成保守信息。
+Compose project 固定为 `aarre-production`，仅以 external network 方式加入已存在的 `production_default`。Aarre 不读取 NexVoice ASR 密钥、业务 database 或对象路径，API 容器也不加载 backup/deletion 凭据。
 
-## 5. 安全边界
+生产机每两分钟只检查 `127.0.0.1:8788/ready`；失败时只重启 `aarre-api`，绝不重启 NexVoice 容器。错误上报复用现有 GlitchTip 实例，但使用独立 `aarre` team、`Aarre Sync API` project 和“5 分钟内首次错误”邮件告警。SDK 禁止默认 PII、trace、breadcrumb 和 HTTP/Fastify request integration；Fastify 日志删除 query 与 Authorization，GlitchTip 事件再删除 request、user、extra、contexts 和 URL/API Key 样式文本。受控生产事件已真实入库并标记为已解决。
 
-- `<all_urls>` 是完整增强层的必需 `host_permissions`。原因是 Chrome 自带星标只触发 `bookmarks.onCreated`，不会授予 `activeTab`，而 `captureVisibleTab()` 对持久权限要求真正的 `<all_urls>`。安装/升级时由 Chrome 明示这项权限；业务逻辑仍只处理 HTTP(S) 收藏，并只在新收藏、已收藏页面的补缺/7 天静默刷新或用户主动启动扫描时使用。
-- `unlimitedStorage` 只用于大量书签元数据和离线补同步队列，不授予网站访问能力。
-- 快照仅截非无痕、已收藏且加载稳定的页面；普通浏览路径只截当前前台活动页并只补缺图或静默刷新已满 7 天的截图。显式批量补拍通过 `chrome.debugger` 在后台专用标签页单并发执行，不占用前台，开始后用户可正常使用 Chrome。无痕、内网、银行、支付、医疗和用户排除页面同时禁止正文读取、AI 调用和截图。
-- `history` 和 `tabs` 权限只用于用户正在输入时生成本机联想，不把完整浏览历史同步到产品云端。
-- 表单、输入框、选择器和按钮在正文提取前移除。
-- 网页正文被视为不可信数据；AI 提示明确禁止执行网页中的指令。
-- 所有 Edge Function 都要求有效的 Supabase 用户 JWT。
-- Postgres 开启 RLS，所有查询都限制为 `auth.uid() = user_id`。
-- 云端向量搜索使用的 Gemini Embedding 密钥只存在于服务端 Secret；它不会作为侧栏 AI 生成服务提供给用户。
-- 用户 BYOK 只保存在当前 Chrome 配置，并由扩展直接发送给所选 AI 服务商；网页正文不会经过 Aarre 云端。
-- 扩展构建只申请实际 Supabase 项目域名。
+## 9. 备份、容量与扩容
 
-## 6. 同步模型
+- 每日 `pg_dump -Fc` 上传新加坡 COS，日备保留 35 天、月备保留 12 个月；容器强制使用与服务端一致的 PostgreSQL 16 client，备份对象记录 source/client major 与 SHA-256。
+- 香港主资产桶启用版本控制并跨地域复制到新加坡。
+- restore 默认只允许隔离数据库，先核 SHA-256 和 dump/source/restore/target major；覆盖生产需要额外精确确认。2026-08-02 首次正式演练恢复了 6 个 migration、25 张表并删除演练库。
+- 每季度联合恢复数据库与资产 manifest，验证数量、sequence、对象 version/bytes/hash 和图片解码。
+- 当前账号实测有效云端投影 5.17 MiB；加数据库/加密开销后主数据 7–9 MiB，含主桶、异地副本、历史版本和数据库备份约 15–25 MiB。
+- 完整腾讯云价格、1/1,000/10,000 用户模型、购买清单和 50/70/85 扩容阈值见 [CLOUD_CAPACITY_PLAN.md](CLOUD_CAPACITY_PLAN.md)。
 
-- 原生书签由 Chrome Sync 同步；扩展不能开启或替代 Chrome Sync。
-- 扩展安装、启动和原生书签事件都会自动对齐智能索引，不提供“导入 Chrome 书签”步骤。
-- Google 账号登录成功后，本地资源会进入智能元数据队列并自动同步，由后台周期任务继续补同步。
-- 新设备上先由 Chrome Sync 拉回原生书签，再按规范化 URL 合并云端智能信息。
-- 原生书签删除：当前版本只移除设备绑定，不立即删除云端记录，避免同步延迟或误操作造成永久数据丢失。
+## 10. 构建与上线门
 
-## 7. 下一阶段
-
-1. 云端回收站、删除传播和冲突解决。
-2. 为全目录扫描增加按域名限速、失败重试策略和费用预估。
-3. 当前项目上下文与收藏库的 AI 重排推荐。
-4. Web/PWA 管理端，覆盖 Chrome 移动端。
-5. 端到端加密字段和企业数据驻留选项。
-6. Chrome Web Store 权限披露、隐私政策和正式发布流程。
+- 普通 `npm run build` 不配置云端 URL，账号入口保持不可连接状态。
+- 生产云端构建必须显式设置 `AARRE_CLOUD_RELEASE=1` 和根 HTTPS `VITE_AARRE_API_BASE_URL`；脚本拒绝 localhost、URL path、query 和 fragment。
+- COS/CAM、版本/生命周期、SSE-COS、跨地域复制、真实 PUT/HEAD/GET/全版本删除、数据库灾备演练、DNS/TLS 和公开 OAuth 技术链路已完成。完整发布验收前仍必须完成 Google 品牌审核、正式 Web Store Extension ID、真实扩展首次同步、卸载重装恢复和 50 账号并发压测。
+- 生产健康巡检、错误状态映射、OAuth query 日志脱敏和独立 GlitchTip 事件链已经验收；它们不能替代真实扩展首次同步与卸载重装恢复门。
+- 当前自动化通过不等于上述外部资源已上线；最终状态以 `AGENT_PROGRESS.md` 的生产门记录为准。

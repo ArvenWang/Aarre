@@ -3,6 +3,7 @@ export interface CoverRule {
   hosts: string[];
   hostSuffixes?: string[];
   brandAsset?: string | ((url: URL) => string);
+  pinBrandAsset?: boolean;
   pageImage?: (url: URL) => string;
   skipPageImage?: boolean;
   listUsesPageImage?: boolean;
@@ -665,7 +666,8 @@ export const COVER_RULES: CoverRule[] = [
   {
     id: "github",
     hosts: ["github.com", "www.github.com", "gist.github.com"],
-    brandAsset: "https://github.com/apple-touch-icon.png",
+    brandAsset: "https://github.githubassets.com/favicons/favicon.svg",
+    pinBrandAsset: true,
     pageImage: (url) => {
       const [owner, repository] = url.pathname.split("/").filter(Boolean);
       return owner && repository
@@ -995,4 +997,18 @@ export function resolveRuleAsset(
   } catch {
     return "";
   }
+}
+
+export function pinnedBrandAssetUrl(input: string): string {
+  return matchCoverRule(input)?.pinBrandAsset
+    ? resolveRuleAsset(input, "brandAsset")
+    : "";
+}
+
+export function pinnedBrandAssetNeedsRefresh(
+  input: string,
+  iconAssetUrl: string | undefined
+): boolean {
+  const expectedUrl = pinnedBrandAssetUrl(input);
+  return Boolean(expectedUrl && iconAssetUrl !== expectedUrl);
 }

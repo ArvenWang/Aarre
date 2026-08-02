@@ -13,13 +13,16 @@ import {
   type HTMLAttributes,
 } from "react";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
-import { motion, AnimatePresence } from "framer-motion";
 import type { IconComponent } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
-import { spring } from "@/lib/springs";
 import { fontWeights } from "@/lib/font-weight";
-import { useShape } from "@/lib/shape-context";
 import { useProximityHover } from "@/ui/hooks/use-proximity-hover";
+
+// The moving pill and the tab it sits under must share one radius, and that
+// radius must be the concentric inset of the strip's own radius — otherwise the
+// pill reads as a capsule floating inside a rounded-rectangle shell. Call sites
+// override it by setting --tabs-pill-radius on the strip.
+const TAB_PILL_RADIUS = "rounded-[var(--tabs-pill-radius,var(--radius-nested-md))]";
 
 interface TabsSubtleContextValue {
   registerTab: (index: number, element: HTMLElement | null) => void;
@@ -65,7 +68,6 @@ const TabsSubtle = forwardRef<HTMLDivElement, TabsSubtleProps>(
   ) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const isMouseInside = useRef(false);
-    const shape = useShape();
 
     const {
       activeIndex: hoveredIndex,
@@ -125,6 +127,9 @@ const TabsSubtle = forwardRef<HTMLDivElement, TabsSubtleProps>(
     const focusRect = focusedIndex !== null ? tabRects[focusedIndex] : null;
     const isHoveringSelected = hoveredIndex === selectedIndex;
     const isHovering = hoveredIndex !== null && !isHoveringSelected;
+    const showHoverPill = Boolean(
+      hoverRect && !isHoveringSelected && selectedRect
+    );
 
     return (
       <TabsSubtleContext.Provider
@@ -193,84 +198,58 @@ const TabsSubtle = forwardRef<HTMLDivElement, TabsSubtleProps>(
             }}
             {...props}
           >
-            {/* Selected pill */}
-            {selectedRect && (
-              <motion.div
-                className={cn("absolute bg-active pointer-events-none", shape.bg)}
-                initial={false}
-                animate={{
-                  left: selectedRect.left,
-                  width: selectedRect.width,
-                  top: selectedRect.top,
-                  height: selectedRect.height,
-                  opacity: isHovering ? 0.8 : 1,
-                }}
-                transition={{
-                  ...spring.moderate,
-                  opacity: { duration: 0.08 },
-                }}
-              />
-            )}
-
-            {/* Hover pill */}
-            <AnimatePresence>
-              {hoverRect && !isHoveringSelected && selectedRect && (
-                <motion.div
-                  className={cn("absolute bg-active pointer-events-none", shape.bg)}
-                  initial={{
-                    left: selectedRect.left,
-                    width: selectedRect.width,
-                    top: selectedRect.top,
-                    height: selectedRect.height,
-                    opacity: 0,
-                  }}
-                  animate={{
-                    left: hoverRect.left,
-                    width: hoverRect.width,
-                    top: hoverRect.top,
-                    height: hoverRect.height,
-                    opacity: 0.4,
-                  }}
-                  exit={
-                    !isMouseInside.current && selectedRect
-                      ? {
-                          left: selectedRect.left,
-                          width: selectedRect.width,
-                          top: selectedRect.top,
-                          height: selectedRect.height,
-                          opacity: 0,
-                          transition: { ...spring.moderate, opacity: { duration: 0.06 } },
-                        }
-                      : { opacity: 0, transition: spring.fast.exit }
-                  }
-                  transition={{
-                    ...spring.fast,
-                    opacity: { duration: 0.08 },
-                  }}
-                />
+            {/* Selected pill. Kept mounted so switching tabs slides the same
+                element rather than cross-fading two of them. */}
+            <div
+              aria-hidden
+              className={cn(
+                "absolute bg-[var(--tabs-pill-bg,var(--color-active))] pointer-events-none",
+                "transition-[top,left,width,height,opacity] duration-240 ease-out",
+                TAB_PILL_RADIUS
               )}
-            </AnimatePresence>
+              style={{
+                left: selectedRect?.left ?? 0,
+                width: selectedRect?.width ?? 0,
+                top: selectedRect?.top ?? 0,
+                height: selectedRect?.height ?? 0,
+                opacity: !selectedRect ? 0 : isHovering ? 0.8 : 1,
+              }}
+            />
 
-            {/* Focus ring */}
-            <AnimatePresence>
-              {focusRect && (
-                <motion.div
-                  className={cn("absolute pointer-events-none z-20 border border-[color:var(--focus-ring,#6B97FF)]", shape.focusRing)}
-                  initial={false}
-                  animate={{
-                    left: focusRect.left - 2,
-                    top: focusRect.top - 2,
-                    width: focusRect.width + 4,
-                    height: focusRect.height + 4,
-                  }}
-                  exit={{ opacity: 0, transition: spring.fast.exit }}
-                  transition={{
-                    ...spring.fast,
-                    opacity: { duration: 0.08 },
-                  }}
-                />
+            {/* Hover pill. Parks on the selected rect when idle so it grows out
+                of the current selection instead of appearing from nowhere. */}
+            <div
+              aria-hidden
+              className={cn(
+                "absolute bg-[var(--tabs-pill-bg,var(--color-active))] pointer-events-none",
+                "transition-[top,left,width,height,opacity] duration-160 ease-out",
+                TAB_PILL_RADIUS
               )}
-            </AnimatePresence>
+              style={{
+                left: (showHoverPill ? hoverRect : selectedRect)?.left ?? 0,
+                width: (showHoverPill ? hoverRect : selectedRect)?.width ?? 0,
+                top: (showHoverPill ? hoverRect : selectedRect)?.top ?? 0,
+                height: (showHoverPill ? hoverRect : selectedRect)?.height ?? 0,
+                opacity: showHoverPill ? 0.4 : 0,
+              }}
+            />
+
+            {/* Focus ring sits on the tab box (not inflated outside it). */}
+            <div
+              aria-hidden
+              className={cn(
+                "absolute pointer-events-none z-20 border border-[color:var(--focus-ring)]",
+                "transition-[top,left,width,height,opacity] duration-160 ease-out",
+                TAB_PILL_RADIUS
+              )}
+              style={{
+                left: focusRect?.left ?? 0,
+                top: focusRect?.top ?? 0,
+                width: focusRect?.width ?? 0,
+                height: focusRect?.height ?? 0,
+                opacity: focusRect ? 1 : 0,
+              }}
+            />
 
             {children}
           </TabsPrimitive.List>
@@ -291,7 +270,6 @@ interface TabsSubtleItemProps extends HTMLAttributes<HTMLButtonElement> {
 const TabsSubtleItem = forwardRef<HTMLButtonElement, TabsSubtleItemProps>(
   ({ icon: Icon, label, index, className, ...props }, ref) => {
     const internalRef = useRef<HTMLButtonElement | null>(null);
-    const shape = useShape();
     const { registerTab, hoveredIndex, selectedIndex, idPrefix, activeLabel } =
       useTabsSubtle();
 
@@ -352,8 +330,10 @@ const TabsSubtleItem = forwardRef<HTMLButtonElement, TabsSubtleItemProps>(
           // Fixed heights (was py-2 around a 19.5px line box ≈ 35.5px) so the
           // text-box trim on the label doesn't shrink the tab.
           "relative z-10 flex items-center justify-center px-3 cursor-pointer bg-transparent border-none outline-none",
-          collapseLabel ? "h-8" : "h-9 gap-2",
-          shape.bg,
+          collapseLabel
+            ? "h-[var(--control-h-sm)]"
+            : "h-[var(--control-h-md)] gap-2",
+          TAB_PILL_RADIUS,
           className
         )}
         {...props}
@@ -369,23 +349,19 @@ const TabsSubtleItem = forwardRef<HTMLButtonElement, TabsSubtleItemProps>(
           />
         )}
         {collapseLabel ? (
-          <AnimatePresence initial={false}>
-            {showLabel && (
-              <motion.span
-                key="label"
-                className="overflow-hidden"
-                initial={{ width: 0, opacity: 0, marginLeft: 0 }}
-                animate={{ width: "auto", opacity: 1, marginLeft: 8 }}
-                exit={{ width: 0, opacity: 0, marginLeft: 0 }}
-                transition={{
-                  ...spring.fast,
-                  opacity: { duration: 0.06 },
-                }}
-              >
-                {labelContent}
-              </motion.span>
+          // grid-template-columns animates between 0fr and 1fr, which is the
+          // CSS way to transition to an intrinsic width.
+          <span
+            className={cn(
+              "grid overflow-hidden",
+              "transition-[grid-template-columns,opacity,margin-left] duration-160 ease-out",
+              showLabel
+                ? "grid-cols-[1fr] opacity-100 ml-2"
+                : "grid-cols-[0fr] opacity-0 ml-0"
             )}
-          </AnimatePresence>
+          >
+            <span className="min-w-0 overflow-hidden">{labelContent}</span>
+          </span>
         ) : (
           labelContent
         )}

@@ -12,12 +12,12 @@ import {
   type ReactNode,
   type HTMLAttributes,
 } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { cva, type VariantProps } from "class-variance-authority";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import type { IconComponent } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
-import { spring, exitFallbackMs } from "@/lib/springs";
+// Must stay in sync with the popup's CSS exit transition below.
+const EXIT_MS = 160;
 import { useProximityHover } from "@/ui/hooks/use-proximity-hover";
 import { useShape } from "@/lib/shape-context";
 import { Elevated } from "@/lib/elevated";
@@ -202,15 +202,16 @@ const triggerVariants = cva(
   [
     "group inline-flex items-center justify-between gap-2 outline-none cursor-pointer",
     "text-[13px] h-9 px-3 min-w-[160px]",
-    "transition-all duration-80",
+    "transition-[background-color,border-color,color] duration-80",
     "disabled:opacity-50 disabled:pointer-events-none",
-    "focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring,#6B97FF)]",
   ],
   {
     variants: {
       variant: {
+        // Same rule as FluidControls: deepen the border, never paint an
+        // accent ring around the trigger.
         bordered:
-          "border border-border bg-transparent text-foreground hover:bg-hover",
+          "border border-border bg-transparent text-foreground hover:bg-hover focus-visible:border-[color:var(--line-strong)]",
         borderless:
           "border border-transparent bg-transparent text-foreground hover:bg-hover",
       },
@@ -319,19 +320,16 @@ const SelectContent = forwardRef<HTMLDivElement, SelectContentProps>(
       remeasure,
     } = useProximityHover(containerRef);
 
-    const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
     const [checkedIndex, setCheckedIndex] = useState<number | undefined>(
       undefined
     );
 
-    // Release Radix's open state once the exit tween has played.
-    // onAnimationComplete on the motion.div is the primary signal; this
-    // timeout is a fallback for throttled/background tabs where rAF-driven
-    // animation callbacks can stall. The popup exits with spring.fast, so the
-    // fallback tracks that tier's exit duration plus a safety buffer.
+    // Radix would unmount the popup the moment its open state flips, so that
+    // flip is held back (radixOpen in the root) until the CSS exit transition
+    // has played.
     useEffect(() => {
       if (open) return;
-      const id = setTimeout(() => unmount(), exitFallbackMs(spring.fast));
+      const id = setTimeout(() => unmount(), EXIT_MS);
       return () => clearTimeout(id);
     }, [open, unmount]);
 
@@ -389,7 +387,6 @@ const SelectContent = forwardRef<HTMLDivElement, SelectContentProps>(
       if (open) return;
       setCheckedIndex(undefined);
       setActiveIndex(null);
-      setFocusedIndex(null);
     }, [open, setActiveIndex]);
 
     // Overlays read rects only once the hook reports the item set fully
@@ -399,8 +396,6 @@ const SelectContent = forwardRef<HTMLDivElement, SelectContentProps>(
       isMeasured && activeIndex !== null ? itemRects[activeIndex] : null;
     const checkedRect =
       isMeasured && checkedIndex != null ? itemRects[checkedIndex] : null;
-    const focusRect =
-      isMeasured && focusedIndex !== null ? itemRects[focusedIndex] : null;
 
     const contentCtx = useMemo(
       () => ({ registerItem, activeIndex, checkedIndex }),
@@ -420,20 +415,14 @@ const SelectContent = forwardRef<HTMLDivElement, SelectContentProps>(
           sideOffset={6}
           className="z-50"
         >
-          <motion.div
-            initial={{ opacity: 0, y: -4, scaleY: 0.96 }}
-            animate={
-              open
-                ? { opacity: 1, y: 0, scaleY: 1 }
-                : { opacity: 0, y: -4, scaleY: 0.96 }
-            }
-            transition={open ? spring.fast : spring.fast.exit}
-            style={{ transformOrigin: "top center" }}
-            // Radix unmounts the popup the moment its open state flips, so
-            // that flip is held back (radixOpen in the root) until the exit
-            // spring has finished.
-            onAnimationComplete={() => {
-              if (!open) unmount();
+          <div
+            className="transition-[opacity,transform] duration-140 ease-out"
+            style={{
+              transformOrigin: "top center",
+              opacity: open ? 1 : 0,
+              transform: open
+                ? "translateY(0) scaleY(1)"
+                : "translateY(-4px) scaleY(0.96)",
             }}
           >
             <SelectContentContext.Provider value={contentCtx}>
@@ -454,30 +443,22 @@ const SelectContent = forwardRef<HTMLDivElement, SelectContentProps>(
                         ref as React.MutableRefObject<HTMLDivElement | null>
                       ).current = node;
                   }}
-                  onMouseEnter={() => {
-                    handlers.onMouseEnter();
-                    setFocusedIndex(null);
-                  }}
+                  onMouseEnter={handlers.onMouseEnter}
                   onMouseMove={handlers.onMouseMove}
                   onMouseLeave={handlers.onMouseLeave}
                   onFocus={(e) => {
+                    // Keyboard focus shares the hover fill — no separate
+                    // focus-ring stroke (that read as a black outline on hover).
                     const indexAttr = (e.target as HTMLElement)
                       .closest("[data-proximity-index]")
                       ?.getAttribute("data-proximity-index");
                     if (indexAttr != null) {
-                      const idx = Number(indexAttr);
-                      setActiveIndex(idx);
-                      setFocusedIndex(
-                        (e.target as HTMLElement).matches(":focus-visible")
-                          ? idx
-                          : null
-                      );
+                      setActiveIndex(Number(indexAttr));
                     }
                   }}
                   onBlur={(e) => {
                     if (containerRef.current?.contains(e.relatedTarget as Node))
                       return;
-                    setFocusedIndex(null);
                     setActiveIndex(null);
                   }}
                   className={cn(
@@ -487,101 +468,47 @@ const SelectContent = forwardRef<HTMLDivElement, SelectContentProps>(
                     className
                   )}
                 >
-                  {/* The three overlays are torn down as the close begins rather
-                      than exit-animated, because an overlay still mounted when the
-                      popup reopens is one AnimatePresence re-adopts under its old
-                      key: `initial` never runs again, so it keeps the position of the
-                      row it had before and animates from there to the new one. The
-                      popup's own fade covers their disappearance. */}
-                  {/* Selected background */}
-                  {open && (
-                    <AnimatePresence>
-                      {checkedRect && (
-                        <motion.div
-                          className={`absolute ${shape.bg} bg-active pointer-events-none`}
-                          // Position lives in `animate` so an in-session value
-                          // change springs the marker to the picked row (the
-                          // selection acknowledgment). Safe against the reopen
-                          // slide: the `open &&` teardown means no marker
-                          // survives a close, and a fresh mount with
-                          // initial={false} renders snapped at these values.
-                          initial={false}
-                          animate={{
-                            top: checkedRect.top,
-                            left: checkedRect.left,
-                            width: checkedRect.width,
-                            height: checkedRect.height,
-                            opacity: 1,
-                          }}
-                          exit={{ opacity: 0, transition: spring.moderate.exit }}
-                          transition={{
-                            ...spring.moderate,
-                            opacity: { duration: 0.08 },
-                          }}
-                        />
+                  {/* Overlays mount only once their row rect is known. Starting
+                      at 0×0 with opacity 0 and then transitioning into place
+                      reads as the highlight flying in from the top-left. */}
+                  {open && checkedRect ? (
+                    <div
+                      aria-hidden
+                      className={cn(
+                        `absolute ${shape.bg} bg-active pointer-events-none`,
+                        "transition-[top,left,width,height] duration-240 ease-out"
                       )}
-                    </AnimatePresence>
-                  )}
+                      style={{
+                        top: checkedRect.top,
+                        left: checkedRect.left,
+                        width: checkedRect.width,
+                        height: checkedRect.height,
+                      }}
+                    />
+                  ) : null}
 
-                  {/* Hover background */}
-                  {open && (
-                    <AnimatePresence>
-                      {activeRect && (
-                        <motion.div
-                          key={sessionRef.current}
-                          className={`absolute ${shape.bg} bg-hover pointer-events-none`}
-                          initial={{
-                            opacity: 0,
-                            top: activeRect.top,
-                            left: activeRect.left,
-                            width: activeRect.width,
-                            height: activeRect.height,
-                          }}
-                          animate={{
-                            opacity: 1,
-                            top: activeRect.top,
-                            left: activeRect.left,
-                            width: activeRect.width,
-                            height: activeRect.height,
-                          }}
-                          exit={{ opacity: 0, transition: spring.fast.exit }}
-                          transition={{
-                            ...spring.fast,
-                            opacity: { duration: 0.08 },
-                          }}
-                        />
+                  {open && activeRect ? (
+                    <div
+                      key={sessionRef.current}
+                      aria-hidden
+                      className={cn(
+                        `absolute ${shape.bg} bg-hover pointer-events-none`,
+                        "transition-[top,left,width,height] duration-160 ease-out"
                       )}
-                    </AnimatePresence>
-                  )}
-
-                  {/* Focus ring */}
-                  {open && (
-                    <AnimatePresence>
-                      {focusRect && (
-                        <motion.div
-                          className={`absolute ${shape.focusRing} pointer-events-none z-20 border border-[color:var(--focus-ring,#6B97FF)]`}
-                          initial={false}
-                          animate={{
-                            left: focusRect.left - 2,
-                            top: focusRect.top - 2,
-                            width: focusRect.width + 4,
-                            height: focusRect.height + 4,
-                          }}
-                          exit={{ opacity: 0, transition: spring.fast.exit }}
-                          transition={{
-                            ...spring.fast,
-                            opacity: { duration: 0.08 },
-                          }}
-                        />
-                      )}
-                    </AnimatePresence>
-                  )}
+                      style={{
+                        top: activeRect.top,
+                        left: activeRect.left,
+                        width: activeRect.width,
+                        height: activeRect.height,
+                      }}
+                    />
+                  ) : null}
 
                   {children}
                 </Elevated>
               </SelectPrimitive.Viewport>
             </SelectContentContext.Provider>
-          </motion.div>
+          </div>
         </SelectPrimitive.Content>
       </SelectPrimitive.Portal>
     );
@@ -693,38 +620,32 @@ const SelectItem = forwardRef<HTMLDivElement, SelectItemProps>(
             never changes the row's intrinsic width — without it the whole
             popup resizes when a selection lands. */}
         <span aria-hidden className="shrink-0 w-4 h-4">
-          <AnimatePresence>
-            {isChecked && (
-              <motion.svg
-                key="check"
-                width={16}
-                height={16}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="text-foreground"
-                initial={{ opacity: 1 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 1 }}
-              >
-                <motion.path
-                  d="M4 12L9 17L20 6"
-                  initial={{ pathLength: skipAnimation ? 1 : 0 }}
-                  animate={{
-                    pathLength: 1,
-                    transition: { duration: 0.08, ease: "easeOut" },
-                  }}
-                  exit={{
-                    pathLength: 0,
-                    transition: { duration: 0.04, ease: "easeIn" },
-                  }}
-                />
-              </motion.svg>
-            )}
-          </AnimatePresence>
+          {isChecked && (
+            <svg
+              width={16}
+              height={16}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-foreground"
+            >
+              {/* The stroke draws itself in via dashoffset. When the popup
+                  opens on an already-selected row there is nothing to
+                  acknowledge, so it renders complete. */}
+              <path
+                d="M4 12L9 17L20 6"
+                pathLength={1}
+                strokeDasharray={1}
+                strokeDashoffset={0}
+                className={
+                  skipAnimation ? undefined : "select-check-draw"
+                }
+              />
+            </svg>
+          )}
         </span>
       </SelectPrimitive.Item>
     );

@@ -109,14 +109,22 @@ export async function saveDisplaySettings(
  */
 export async function requestPageSnapshotPermission(): Promise<boolean> {
   if (!chrome.permissions) return true;
-  if (
-    await chrome.permissions
-      .contains({ origins: [...PAGE_SNAPSHOT_ORIGINS] })
-      .catch(() => false)
-  ) {
-    return true;
+  // Design preview and some hosts only stub request(); calling a missing
+  // contains() throws before any Promise.catch can run.
+  if (typeof chrome.permissions.contains === "function") {
+    try {
+      if (
+        await chrome.permissions.contains({
+          origins: [...PAGE_SNAPSHOT_ORIGINS]
+        })
+      ) {
+        return true;
+      }
+    } catch {
+      // Fall through to request when the check itself is unavailable.
+    }
   }
-  if (!chrome.permissions.request) return false;
+  if (typeof chrome.permissions.request !== "function") return true;
   return chrome.permissions.request({
     origins: [...PAGE_SNAPSHOT_ORIGINS]
   });

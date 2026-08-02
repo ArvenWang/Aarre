@@ -203,6 +203,15 @@ describe("page snapshot privacy", () => {
     ).not.toBeNull();
   });
 
+  it("keeps injected stability functions self-contained", () => {
+    expect(waitForStablePageInDocument.toString()).not.toContain(
+      "imageIsReadyForCapture"
+    );
+    expect(
+      prepareBackgroundPageForCaptureInDocument.toString()
+    ).not.toContain("imageIsReadyForCapture");
+  });
+
   it("resolves the batch stability wait when no content is pending", async () => {
     vi.useFakeTimers();
     Object.defineProperty(document, "readyState", {

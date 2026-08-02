@@ -1,9 +1,10 @@
 import { Button } from "../../../components/ui/button";
-import { FluidInput, FluidTextarea, FluidSelect } from "../../components/FluidControls";
-import type {
-  KnowledgeDashboard,
-  LibraryReport
-} from "../../../lib/types";
+import {
+  FluidInput,
+  FluidTextarea,
+  FluidSelect,
+} from "../../components/FluidControls";
+import type { KnowledgeDashboard, LibraryReport } from "../../../lib/types";
 import { ResourceLink } from "../components/ResourceLink";
 
 interface ReportViewProps {
@@ -20,13 +21,13 @@ function reportMetrics(report: LibraryReport) {
       label: "本期新增",
       value: report.createdCount,
       detail: report.period === "week" ? "最近 7 天" : "最近 30 天",
-      tone: "neutral"
+      tone: "neutral",
     },
     {
       label: "很少打开",
       value: report.rarelyOpenedOver90Days,
       detail: "超过 90 天",
-      tone: "neutral"
+      tone: "neutral",
     },
     {
       label: "失效链接",
@@ -34,14 +35,14 @@ function reportMetrics(report: LibraryReport) {
       detail: report.health.newlyDetectedDeadLinks
         ? `其中 ${report.health.newlyDetectedDeadLinks} 条本期发现`
         : "本期无新增",
-      tone: report.health.newlyDetectedDeadLinks ? "negative" : "positive"
+      tone: report.health.newlyDetectedDeadLinks ? "negative" : "positive",
     },
     {
       label: "过大文件夹",
       value: report.health.largeFolders,
       detail: report.health.largeFolders ? "建议整理" : "结构健康",
-      tone: report.health.largeFolders ? "negative" : "positive"
-    }
+      tone: report.health.largeFolders ? "negative" : "positive",
+    },
   ] as const;
 }
 
@@ -50,7 +51,7 @@ export function ReportView({
   period,
   onPeriodChange,
   onOpenOrganize,
-  onOpenResource
+  onOpenResource,
 }: ReportViewProps) {
   if (!dashboard) {
     return (
@@ -64,10 +65,7 @@ export function ReportView({
   const report = period === "week" ? dashboard.weekly : dashboard.monthly;
   const maxTrend = Math.max(
     1,
-    ...report.topicTrends.flatMap((trend) => [
-      trend.current,
-      trend.previous
-    ])
+    ...report.topicTrends.flatMap((trend) => [trend.current, trend.previous]),
   );
 
   return (
@@ -97,9 +95,8 @@ export function ReportView({
         <span>本周结论</span>
         <h2>{report.attentionShift}</h2>
         <p>
-          本期新增 {report.createdCount} 条；有{" "}
-          {report.rarelyOpenedOver90Days} 条收藏超过 90
-          天很少通过书签打开。
+          本期新增 {report.createdCount} 条；有 {report.rarelyOpenedOver90Days}{" "}
+          条收藏超过 90 天很少通过书签打开。
         </p>
       </header>
 
@@ -134,13 +131,13 @@ export function ReportView({
                     <i
                       data-series="previous"
                       style={{
-                        width: `${(trend.previous / maxTrend) * 100}%`
+                        width: `${(trend.previous / maxTrend) * 100}%`,
                       }}
                     />
                     <i
                       data-series="current"
                       style={{
-                        width: `${(trend.current / maxTrend) * 100}%`
+                        width: `${(trend.current / maxTrend) * 100}%`,
                       }}
                     />
                   </div>
@@ -148,7 +145,9 @@ export function ReportView({
                 </div>
               ))
             ) : (
-              <p className="report-empty-copy">本期还没有形成明显的主题变化。</p>
+              <p className="report-empty-copy">
+                本期还没有形成明显的主题变化。
+              </p>
             )}
           </div>
         </section>
@@ -168,7 +167,7 @@ export function ReportView({
                   <i>
                     <span
                       style={{
-                        width: `${Math.min(4, gap.angleCount) * 25}%`
+                        width: `${Math.min(4, gap.angleCount) * 25}%`,
                       }}
                     />
                   </i>
@@ -190,8 +189,8 @@ export function ReportView({
             <h3>值得再看一次</h3>
           </div>
           <Button
+            variant="unstyled"
             type="button"
-            variant="tertiary"
             className="button button-quiet"
             onClick={onOpenOrganize}
           >

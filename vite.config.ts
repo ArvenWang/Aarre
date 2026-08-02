@@ -18,6 +18,7 @@ export default defineConfig({
         sidepanel: resolve(__dirname, "sidepanel.html"),
         manager: resolve(__dirname, "manager.html"),
         privacy: resolve(__dirname, "privacy.html"),
+        iconProcessor: resolve(__dirname, "icon-processor.html"),
         background: resolve(__dirname, "src/extension/background.ts")
       },
       output: {

@@ -1,0 +1,10 @@
+[Unit]
+Description=Aarre local health check and isolated API recovery
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/aarre/current/infra/production
+ExecStart=/opt/aarre/current/infra/production/health-check.sh
+TimeoutStartSec=90

@@ -67,6 +67,7 @@ describe("manager masonry cover policy", () => {
     expect(markup).toContain('data-cover-kind="aarre-fallback"');
     expect(markup).toContain('data-fallback-cover-id="ai-automation"');
     expect(markup).toContain("ai-automation-v1.webp");
+    expect(markup).toContain('style="background-color:#CBCADB"');
     expect(markup).not.toContain("data-cover-kind=\"category\"");
   });
 
@@ -141,12 +142,14 @@ describe("manager masonry cover policy", () => {
       })
     );
     const largeCover = markup.match(
-      /<a class="library-card-cover"[\s\S]*?<\/a>/
+      /<div class="library-card-cover-frame"[\s\S]*?<\/div>\s*<div class="library-card-copy"/
     )?.[0];
 
+    expect(largeCover).toBeTruthy();
     expect(largeCover).toContain('data-cover-kind="aarre-fallback"');
     expect(largeCover).not.toContain("OG_IMAGE_SHOULD_NOT_RENDER");
     expect(largeCover).toContain("video-v2");
+    expect(largeCover).toContain('style="background-color:#C46686"');
   });
 
   it("renders native folder filtering, sorting and the card location", () => {

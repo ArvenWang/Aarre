@@ -1,13 +1,7 @@
 import type { ReactNode } from "react";
-import {
-  SiteThumbnail,
-  type SiteThumbnailProps
-} from "./SiteThumbnail";
+import { SiteThumbnail, type SiteThumbnailProps } from "./SiteThumbnail";
 
-interface ResourceIdentityProps extends Omit<
-  SiteThumbnailProps,
-  "className"
-> {
+interface ResourceIdentityProps extends Omit<SiteThumbnailProps, "className"> {
   title: ReactNode;
   meta?: ReactNode;
   className?: string;
@@ -27,10 +21,7 @@ export function ResourceIdentity({
 }: ResourceIdentityProps) {
   return (
     <span className={`resource-identity ${className}`.trim()}>
-      <SiteThumbnail
-        {...thumbnail}
-        className={thumbnailClassName}
-      />
+      <SiteThumbnail {...thumbnail} className={thumbnailClassName} />
       <span className="resource-identity-copy">
         <strong>{title}</strong>
         {meta ? <small>{meta}</small> : null}

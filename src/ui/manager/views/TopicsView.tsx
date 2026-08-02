@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   KnowledgeDashboard,
   TopicGraph,
-  TopicGraphNode
+  TopicGraphNode,
 } from "../../../lib/types";
 
 const CLOUD_RADIUS = 205;
@@ -48,14 +48,13 @@ interface GraphReadout {
 function seeded(seed: number) {
   let state = seed >>> 0;
   return () =>
-    ((state = (state * 1_664_525 + 1_013_904_223) >>> 0) /
-      4_294_967_296);
+    (state = (state * 1_664_525 + 1_013_904_223) >>> 0) / 4_294_967_296;
 }
 
 export function screenRadius(count: number, scale: number): number {
   return Math.max(
     2,
-    RADIUS_UNIT * Math.sqrt(count) * Math.pow(scale, 0.45) * 1.3
+    RADIUS_UNIT * Math.sqrt(count) * Math.pow(scale, 0.45) * 1.3,
   );
 }
 
@@ -64,8 +63,8 @@ export function analyzeTopicGraph(graph: TopicGraph): GraphAnalysis {
   const adjacency = new Map(
     graph.nodes.map((node) => [
       node.id,
-      [] as Array<{ id: string; weight: number }>
-    ])
+      [] as Array<{ id: string; weight: number }>,
+    ]),
   );
   for (const edge of graph.edges) {
     if (!adjacency.has(edge.source) || !adjacency.has(edge.target)) continue;
@@ -73,17 +72,15 @@ export function analyzeTopicGraph(graph: TopicGraph): GraphAnalysis {
     degree.set(edge.target, (degree.get(edge.target) || 0) + 1);
     adjacency.get(edge.source)!.push({
       id: edge.target,
-      weight: edge.weight
+      weight: edge.weight,
     });
     adjacency.get(edge.target)!.push({
       id: edge.source,
-      weight: edge.weight
+      weight: edge.weight,
     });
   }
 
-  const labels = new Map(
-    graph.nodes.map((node, index) => [node.id, index])
-  );
+  const labels = new Map(graph.nodes.map((node, index) => [node.id, index]));
   const order = graph.nodes.map((node) => node.id).sort();
   for (let pass = 0; pass < 30; pass += 1) {
     let changed = false;
@@ -98,7 +95,7 @@ export function analyzeTopicGraph(graph: TopicGraph): GraphAnalysis {
       let best = labels.get(id)!;
       let bestWeight = -1;
       for (const [label, weight] of [...tally].sort(
-        (left, right) => left[0] - right[0]
+        (left, right) => left[0] - right[0],
       )) {
         if (weight > bestWeight) {
           best = label;
@@ -117,19 +114,17 @@ export function analyzeTopicGraph(graph: TopicGraph): GraphAnalysis {
     ...new Set(
       graph.nodes
         .filter((node) => (degree.get(node.id) || 0) > 0)
-        .map((node) => labels.get(node.id)!)
-    )
+        .map((node) => labels.get(node.id)!),
+    ),
   ].sort((left, right) => left - right);
-  const remap = new Map(
-    connectedLabels.map((label, index) => [label, index])
-  );
+  const remap = new Map(connectedLabels.map((label, index) => [label, index]));
   const clusters = new Map<string, number>();
   for (const [index, node] of graph.nodes.entries()) {
     clusters.set(
       node.id,
       (degree.get(node.id) || 0) > 0
         ? remap.get(labels.get(node.id)!) || 0
-        : connectedLabels.length + index
+        : connectedLabels.length + index,
     );
   }
 
@@ -144,13 +139,13 @@ export function analyzeTopicGraph(graph: TopicGraph): GraphAnalysis {
   const communities = [...groups.entries()]
     .map(([id, members]) => {
       const sorted = [...members].sort(
-        (left, right) => right.count - left.count
+        (left, right) => right.count - left.count,
       );
       return {
         id,
         name: sorted[0]?.label || "未命名主题",
         total: members.reduce((sum, node) => sum + node.count, 0),
-        members: sorted
+        members: sorted,
       };
     })
     .sort((left, right) => right.total - left.total);
@@ -162,12 +157,11 @@ export function analyzeTopicGraph(graph: TopicGraph): GraphAnalysis {
     .filter((node) => (degree.get(node.id) || 0) > 0)
     .map((node) => ({
       node,
-      degree: degree.get(node.id) || 0
+      degree: degree.get(node.id) || 0,
     }))
     .sort(
       (left, right) =>
-        right.node.count / right.degree -
-        left.node.count / left.degree
+        right.node.count / right.degree - left.node.count / left.degree,
     )
     .slice(0, 3);
 
@@ -176,18 +170,18 @@ export function analyzeTopicGraph(graph: TopicGraph): GraphAnalysis {
     clusters,
     communities,
     isolated,
-    underconnected
+    underconnected,
   };
 }
 
 export function layoutGraph(
   graph: TopicGraph,
-  degree: Map<string, number>
+  degree: Map<string, number>,
 ): Point3D[] {
   const count = graph.nodes.length;
   if (!count) return [];
   const index = new Map(
-    graph.nodes.map((node, nodeIndex) => [node.id, nodeIndex])
+    graph.nodes.map((node, nodeIndex) => [node.id, nodeIndex]),
   );
   const radius = 190;
   const idealDistance =
@@ -197,7 +191,7 @@ export function layoutGraph(
   const positions = graph.nodes.map(() => ({
     x: (random() - 0.5) * radius,
     y: (random() - 0.5) * radius,
-    z: (random() - 0.5) * radius
+    z: (random() - 0.5) * radius,
   }));
   const displacement = graph.nodes.map(() => ({ x: 0, y: 0, z: 0 }));
   const iterations = 620;
@@ -255,7 +249,7 @@ export function layoutGraph(
         Math.hypot(
           displacement[nodeIndex].x,
           displacement[nodeIndex].y,
-          displacement[nodeIndex].z
+          displacement[nodeIndex].z,
         ) || 0.01;
       const limited = Math.min(magnitude, temperature);
       positions[nodeIndex].x +=
@@ -272,21 +266,18 @@ export function layoutGraph(
     (result, point) => ({
       x: result.x + point.x / count,
       y: result.y + point.y / count,
-      z: result.z + point.z / count
+      z: result.z + point.z / count,
     }),
-    { x: 0, y: 0, z: 0 }
+    { x: 0, y: 0, z: 0 },
   );
   const centred = positions.map((point) => ({
     x: point.x - centre.x,
     y: point.y - centre.y,
-    z: point.z - centre.z
+    z: point.z - centre.z,
   }));
   // 只用连通节点定标；孤岛主题应该留在外围，不能把主体压成一团。
   const connectedSpread = centred
-    .filter(
-      (_, nodeIndex) =>
-        (degree.get(graph.nodes[nodeIndex].id) || 0) > 0
-    )
+    .filter((_, nodeIndex) => (degree.get(graph.nodes[nodeIndex].id) || 0) > 0)
     .map((point) => Math.hypot(point.x, point.y, point.z));
   const extent = Math.max(1, ...connectedSpread);
   const factor = CLOUD_RADIUS / extent;
@@ -294,7 +285,7 @@ export function layoutGraph(
     const scaled = {
       x: point.x * factor,
       y: point.y * factor,
-      z: point.z * factor
+      z: point.z * factor,
     };
     const distance = Math.hypot(scaled.x, scaled.y, scaled.z);
     const outerLimit = CLOUD_RADIUS * 1.45;
@@ -303,7 +294,7 @@ export function layoutGraph(
     return {
       x: scaled.x * clamp,
       y: scaled.y * clamp,
-      z: scaled.z * clamp
+      z: scaled.z * clamp,
     };
   });
 }
@@ -321,7 +312,7 @@ function withAlpha(color: string, alpha: number): string {
 
 function TopicGraphCanvas({
   graph,
-  analysis
+  analysis,
 }: {
   graph: TopicGraph;
   analysis: GraphAnalysis;
@@ -330,7 +321,7 @@ function TopicGraphCanvas({
   const [readout, setReadout] = useState<GraphReadout | null>(null);
   const positions = useMemo(
     () => layoutGraph(graph, analysis.degree),
-    [analysis.degree, graph]
+    [analysis.degree, graph],
   );
 
   useEffect(() => {
@@ -342,11 +333,9 @@ function TopicGraphCanvas({
     const canvas: HTMLCanvasElement = mountedCanvas;
     const context: CanvasRenderingContext2D = mountedContext;
     const index = new Map(
-      graph.nodes.map((node, nodeIndex) => [node.id, nodeIndex])
+      graph.nodes.map((node, nodeIndex) => [node.id, nodeIndex]),
     );
-    const reducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    );
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const darkMode = window.matchMedia("(prefers-color-scheme: dark)");
     let yaw = 0.6;
     let pitch = -0.26;
@@ -366,9 +355,9 @@ function TopicGraphCanvas({
         inkMuted: style.getPropertyValue("--ink-muted").trim(),
         inkFaint: style.getPropertyValue("--ink-faint").trim(),
         palette: [1, 2, 3, 4, 5].map((position) =>
-          style.getPropertyValue(`--chart-${position}`).trim()
+          style.getPropertyValue(`--chart-${position}`).trim(),
         ),
-        font: style.getPropertyValue("--font-ui").trim()
+        font: style.getPropertyValue("--font-ui").trim(),
       };
     }
 
@@ -395,17 +384,14 @@ function TopicGraphCanvas({
         const y1 = point.y * cosinePitch - z1 * sinePitch;
         const z2 = point.y * sinePitch + z1 * cosinePitch;
         // 未归一化时分母可能转负；下界可保证 arc 永远收到正半径。
-        const denominator = Math.max(
-          1,
-          FOCAL_LENGTH + z2 + DEPTH_OFFSET
-        );
+        const denominator = Math.max(1, FOCAL_LENGTH + z2 + DEPTH_OFFSET);
         const scale = (FOCAL_LENGTH / denominator) * zoom;
         return {
           index: nodeIndex,
           x: centreX + x1 * scale,
           y: centreY + y1 * scale,
           z: z2,
-          scale
+          scale,
         };
       });
     }
@@ -444,7 +430,7 @@ function TopicGraphCanvas({
                 edge,
                 source,
                 target,
-                depth: (source.z + target.z) / 2
+                depth: (source.z + target.z) / 2,
               }
             : null;
         })
@@ -458,21 +444,15 @@ function TopicGraphCanvas({
         const depthWeight = nearness(depth);
         const dimmed =
           hoverIndex >= 0 &&
-          !(
-            neighbours.has(edge.source) &&
-            neighbours.has(edge.target)
-          );
+          !(neighbours.has(edge.source) && neighbours.has(edge.target));
         const base = sameCommunity
-          ? palette[
-              analysis.clusters.get(edge.source)! % palette.length
-            ]
+          ? palette[analysis.clusters.get(edge.source)! % palette.length]
           : tokens.inkFaint;
         context.strokeStyle = withAlpha(
           base,
           dimmed
             ? 0.05
-            : (0.13 + depthWeight * 0.37) *
-                (sameCommunity ? 1 : 0.6)
+            : (0.13 + depthWeight * 0.37) * (sameCommunity ? 1 : 0.6),
         );
         context.lineWidth =
           (0.5 + edge.weight * 0.16) * (0.55 + depthWeight * 0.7);
@@ -484,10 +464,10 @@ function TopicGraphCanvas({
       }
 
       const drawableNodes = [...projected].sort(
-        (left, right) => right.z - left.z
+        (left, right) => right.z - left.z,
       );
       const labelled = new Set(
-        drawableNodes.slice(-11).map((point) => point.index)
+        drawableNodes.slice(-11).map((point) => point.index),
       );
       for (const point of drawableNodes) {
         const node = graph.nodes[point.index];
@@ -500,7 +480,7 @@ function TopicGraphCanvas({
         if (!dimmed && depthWeight > 0.45 && !isolated) {
           context.fillStyle = withAlpha(
             colour,
-            0.09 * (depthWeight - 0.45) * 2
+            0.09 * (depthWeight - 0.45) * 2,
           );
           context.beginPath();
           context.arc(
@@ -508,25 +488,19 @@ function TopicGraphCanvas({
             point.y,
             Math.max(1, radius * 1.9),
             0,
-            Math.PI * 2
+            Math.PI * 2,
           );
           context.fill();
         }
 
         context.beginPath();
-        context.arc(
-          point.x,
-          point.y,
-          Math.max(1, radius),
-          0,
-          Math.PI * 2
-        );
+        context.arc(point.x, point.y, Math.max(1, radius), 0, Math.PI * 2);
         if (isolated) {
           context.fillStyle = withAlpha(tokens.surface, 1);
           context.fill();
           context.strokeStyle = withAlpha(
             tokens.inkFaint,
-            dimmed ? 0.12 : 0.35 + depthWeight * 0.3
+            dimmed ? 0.12 : 0.35 + depthWeight * 0.3,
           );
           context.lineWidth = 1.2;
           context.setLineDash([3, 2.5]);
@@ -535,13 +509,10 @@ function TopicGraphCanvas({
         } else {
           context.fillStyle = withAlpha(
             colour,
-            dimmed ? 0.1 : 0.42 + depthWeight * 0.58
+            dimmed ? 0.1 : 0.42 + depthWeight * 0.58,
           );
           context.fill();
-          context.strokeStyle = withAlpha(
-            tokens.surface,
-            dimmed ? 0.2 : 0.9
-          );
+          context.strokeStyle = withAlpha(tokens.surface, dimmed ? 0.2 : 0.9);
           context.lineWidth = Math.max(1, 1.4 * point.scale);
           context.stroke();
         }
@@ -565,7 +536,7 @@ function TopicGraphCanvas({
         ).toFixed(1)}px ${tokens.font}`;
         context.fillStyle = withAlpha(
           emphasized ? tokens.ink : tokens.inkMuted,
-          dimmed ? 0.12 : 0.24 + depthWeight * 0.76
+          dimmed ? 0.12 : 0.24 + depthWeight * 0.76,
         );
         context.fillText(node.label, point.x, point.y + radius + 5);
       }
@@ -586,10 +557,7 @@ function TopicGraphCanvas({
         yaw -= (event.clientX - lastPointer.x) * 0.006;
         pitch = Math.max(
           -1.2,
-          Math.min(
-            1.2,
-            pitch + (event.clientY - lastPointer.y) * 0.005
-          )
+          Math.min(1.2, pitch + (event.clientY - lastPointer.y) * 0.005),
         );
         lastPointer = { x: event.clientX, y: event.clientY };
         return;
@@ -619,7 +587,7 @@ function TopicGraphCanvas({
       }
       const node = graph.nodes[found];
       const community = analysis.communities.find(
-        (group) => group.id === analysis.clusters.get(node.id)
+        (group) => group.id === analysis.clusters.get(node.id),
       );
       setReadout({
         topic: node.label,
@@ -628,7 +596,7 @@ function TopicGraphCanvas({
         community:
           (analysis.degree.get(node.id) || 0) === 0
             ? "孤岛主题"
-            : `「${community?.name || node.label}」群`
+            : `「${community?.name || node.label}」群`,
       });
     }
 
@@ -659,10 +627,7 @@ function TopicGraphCanvas({
 
     function wheel(event: WheelEvent) {
       event.preventDefault();
-      zoom = Math.max(
-        0.55,
-        Math.min(2.4, zoom - event.deltaY * 0.0012)
-      );
+      zoom = Math.max(0.55, Math.min(2.4, zoom - event.deltaY * 0.0012));
     }
 
     const resizeObserver = new ResizeObserver(resize);
@@ -670,7 +635,7 @@ function TopicGraphCanvas({
     const themeObserver = new MutationObserver(() => draw());
     themeObserver.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ["data-theme"]
+      attributeFilter: ["data-theme"],
     });
     darkMode.addEventListener("change", draw);
     canvas.addEventListener("pointerdown", pointerDown);
@@ -703,9 +668,7 @@ function TopicGraphCanvas({
         role="img"
         aria-label="可拖动旋转、滚轮缩放的三维收藏主题关系图"
       />
-      <div className="topic-graph-hint">
-        拖动旋转 · 滚轮缩放 · 悬停查看关系
-      </div>
+      <div className="topic-graph-hint">拖动旋转 · 滚轮缩放 · 悬停查看关系</div>
       <aside
         className="topic-graph-readout"
         data-visible={Boolean(readout)}
@@ -738,7 +701,7 @@ function TopicGraphCanvas({
 function InsightRows({
   children,
   rest,
-  unit
+  unit,
 }: {
   children: React.ReactNode[];
   rest: number;
@@ -757,7 +720,7 @@ function InsightRows({
 }
 
 export function TopicsView({
-  dashboard
+  dashboard,
 }: {
   dashboard: KnowledgeDashboard | null;
 }) {
@@ -767,10 +730,10 @@ export function TopicsView({
       analyzeTopicGraph(
         graph || {
           nodes: [],
-          edges: []
-        }
+          edges: [],
+        },
       ),
-    [graph]
+    [graph],
   );
 
   if (!graph?.nodes.length) {
@@ -800,9 +763,7 @@ export function TopicsView({
               <div className="topic-insight-row" key={community.id}>
                 <i
                   style={{
-                    background: `var(--chart-${
-                      (community.id % 5) + 1
-                    })`
+                    background: `var(--chart-${(community.id % 5) + 1})`,
                   }}
                 />
                 <span>以「{community.name}」为核心</span>
@@ -832,7 +793,9 @@ export function TopicsView({
               ))}
             </InsightRows>
           ) : (
-            <p className="topic-insight-empty">当前主题都已形成至少一条联系。</p>
+            <p className="topic-insight-empty">
+              当前主题都已形成至少一条联系。
+            </p>
           )}
         </section>
 
@@ -848,7 +811,7 @@ export function TopicsView({
                 style={{
                   background: `var(--chart-${
                     (analysis.clusters.get(node.id)! % 5) + 1
-                  })`
+                  })`,
                 }}
               />
               <span>{node.label}</span>

@@ -70,3 +70,35 @@ export async function addScanAiUsage(
   return next;
 }
 
+export async function mergeAiUsageStats(
+  incoming: Partial<AiUsageStats>
+): Promise<AiUsageStats> {
+  const current = await getAiUsageStats();
+  const next: AiUsageStats = {
+    inputTokens: Math.max(current.inputTokens, nonNegativeNumber(incoming.inputTokens)),
+    outputTokens: Math.max(current.outputTokens, nonNegativeNumber(incoming.outputTokens)),
+    cachedInputTokens: Math.max(
+      current.cachedInputTokens,
+      nonNegativeNumber(incoming.cachedInputTokens)
+    ),
+    estimatedTokens: Math.max(
+      current.estimatedTokens,
+      nonNegativeNumber(incoming.estimatedTokens)
+    ),
+    estimatedCostCny: Math.max(
+      current.estimatedCostCny,
+      nonNegativeNumber(incoming.estimatedCostCny)
+    ),
+    scanCount: Math.max(current.scanCount, Math.floor(nonNegativeNumber(incoming.scanCount))),
+    priceUpdatedAt:
+      typeof incoming.priceUpdatedAt === "string"
+        ? incoming.priceUpdatedAt
+        : current.priceUpdatedAt,
+    updatedAt:
+      typeof incoming.updatedAt === "string" && incoming.updatedAt > current.updatedAt
+        ? incoming.updatedAt
+        : current.updatedAt
+  };
+  await chrome.storage.local.set({ [AI_USAGE_KEY]: next });
+  return next;
+}

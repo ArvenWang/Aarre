@@ -1,0 +1,10 @@
+[Unit]
+Description=Aarre privileged COS all-version deletion worker
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/aarre/current/infra/production
+ExecStart=/usr/bin/docker compose --profile maintenance run --rm aarre-deletion-worker
+TimeoutStartSec=900

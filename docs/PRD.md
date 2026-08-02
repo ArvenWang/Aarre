@@ -1,6 +1,6 @@
 # Aarre 产品需求文档
 
-版本：v1.2 · 制定日期：2026-07-29 · 最后修订：2026-07-30 · 基线代码版本：0.2.3
+版本：v1.3 · 制定日期：2026-07-29 · 最后修订：2026-08-03 · 基线代码版本：0.5.33
 
 本文档面向两类读者：产品负责人用它做优先级判断和验收；开发 Agent 用它作为实现依据。每个需求都包含「要解决什么问题 / 怎么做 / 验收标准 / 技术备注」四段，可以独立领取执行。
 
@@ -16,7 +16,7 @@
 
 `src/extension/background.ts` 和 `src/ui/sidepanel/SidePanelApp.tsx` 是两个高冲突文件（分别 2,227 行和 2,815 行）。同一时间只允许一个 Agent 修改其中任意一个，且必须在进展文档登记。
 
-云端相关文件（`src/lib/auth.ts`、`src/lib/cloud.ts`、`src/lib/supabase.ts`、`supabase/`）由 F14 独占改造，M1 / M2 的其他需求不要触碰。
+云端相关文件（`src/lib/auth.ts`、`cloud.ts`、`cloud-assets.ts`、`storage.ts`、`types.ts`、`protection.ts`、`display-settings.ts`、`settings.ts`、`theme.ts`、`usage-stats.ts`、`conversations.ts`、`bookmark-undo.ts`、`data-export.ts`、`scripts/build.mjs`、新建的 `server/` 与云端数据迁移文件）由 F14 独占改造，M1 / M2 的其他需求不要触碰。旧 `src/lib/supabase.ts` 与 `supabase/` 已退出当前架构，不得重新引入。
 
 ### 0.2 每个需求的完成定义
 
@@ -36,7 +36,8 @@
 | 术语 | 含义 |
 | --- | --- |
 | 原生层 | `chrome.bookmarks` 中的标题、URL、文件夹结构。唯一事实来源。 |
-| 智能层 | Aarre 存在本地 IndexedDB 的摘要、标签、主题、封面等元数据。 |
+| 智能层 | Aarre 在本地 IndexedDB 保存，并在用户明确开启云端后同步的摘要、标签、主题、备注、封面与其他增强信息。 |
+| 云端资产 | 用户开启完整云端备份后，保存在私有对象存储中的页面快照、用户封面、页面代表图与站点标识二进制；数据库只保存资产元数据和绑定。 |
 | 资源键 | `SHA-256(规范化 URL)`，智能层的主键，跨设备稳定。 |
 | BYOK | 用户自带 AI API Key，请求由扩展直接发往服务商。 |
 
@@ -52,6 +53,7 @@ Aarre 是 Chrome 原生书签的增强层，不是又一个书签服务。
 2. **资源键用规范化 URL 的哈希，不用 Chrome bookmark ID。** bookmark ID 跨设备不稳定，这是多设备合并唯一可靠的锚点。
 3. **网页正文不经过 Aarre 自己的服务器。** BYOK 请求由扩展直连服务商。这是隐私叙事的根基，也是成本结构能成立的原因。
 4. **完整增强能力必须具备稳定权限。** `<all_urls>` 作为必需 `host_permissions`，在安装/升级时由 Chrome 明示。原因是 Chrome 自带星标不会授予 `activeTab`，且 `captureVisibleTab()` 对持久权限要求真正的 `<all_urls>`；业务逻辑仍只处理 HTTP(S) 收藏。运行时只在新收藏、已收藏页面补缺/7 天静默刷新或用户主动扫描时使用，不把持续权限解释成持续监控。
+5. **云端保存所有有用户价值的持久数据，但不上传网页正文、API Key 或运行时垃圾。** 摘要、用户备注、自定义标签、设置、会话、封面与页面快照可以在用户明确开启相应云端范围后同步；原始正文、Cookie、完整浏览历史、浏览器原生 bookmark ID、Service Worker 临时状态、队列锁和 API Key 不进入常规云端同步。受保护网页与文件夹始终排除在正文读取、AI、截图和云端资产上传之外。
 
 ---
 
@@ -329,14 +331,14 @@ IndexedDB 需要从 v1 升到 v2，新增 `undoSnapshots` store（keyPath: `batc
 
 普通浏览只做当前 URL 的本地收藏命中，不扫描全库。命中缺图收藏时自动补拍；已有图按 7 天新鲜度静默刷新，因此不会因每次访问反复截图。
 
-**采集属于完整增强层的必选步骤。** 不再保留隐藏或容易误触的全局关闭值；否则 Chrome 原生收藏会出现“收藏成功但增强层永久不完整”的不可解释状态。隐私保护通过无痕拒绝、敏感/内网页面同时拒绝 AI 与截图、只处理已收藏页面和快照永不上云实现。
+**本机采集属于完整增强层的必选步骤。** 不再保留隐藏或容易误触的本机全局关闭值；否则 Chrome 原生收藏会出现“收藏成功但增强层永久不完整”的不可解释状态。隐私保护通过无痕拒绝、敏感/内网/受保护页面同时拒绝 AI 与截图、只处理已收藏页面实现。是否把本机快照加入完整云端备份，是连接云端时单独明确选择的范围，不能与本机采集开关混为一谈。
 
 隐私边界必须同时到位，否则「默认开启」站不住：
 
 - 仅 `http/https`，Chrome 内部页和本地文件跳过。
 - 无痕窗口完全不采集。
 - 内置一份不采集的域名清单（银行、支付、医疗、内网地址）。
-- **快照永不上传云端**，只存在本机（见 F14）。
+- **默认本机保存；只有用户明确选择 F14 的“完整云端备份”后才加密上传。** 仅文字与设置模式不上传任何快照；受保护资源无论哪种模式都不上传。
 - 首次引导和隐私政策里明确说明这个行为，不能让用户事后才发现。
 
 首次引导的措辞建议是「打开已收藏网页时，Aarre 会在页面稳定后自动补齐预览截图，越用越完整」。
@@ -561,11 +563,13 @@ Apple 的规范明确写了：如果页面没有声明 `<link rel="apple-touch-i
 
 在 `OffscreenCanvas` 里渲染，注意两点：只接受不含外部引用和脚本的静态 SVG；渲染有超时上限，防止恶意 SVG 拖住流程。
 
-**关于透明背景：允许，但合成到卡片自身的表面色**
+Manifest V3 Service Worker 的 `createImageBitmap()` 若无法解码一个已经下载并通过大小/类型检查的 SVG 或传统 ICO，必须统一降级到扩展自带的 Offscreen Document，用浏览器 DOM 图像解码器处理；处理结果仍执行完全相同的 128px、方形比例、墨迹覆盖、透明通道和 192px WebP 闸门。隐藏处理页不打开窗口或标签、不读取网页 DOM、不新增网络来源，也不能成为绕过质量门槛的通道。
+
+**关于透明背景：缓存保留透明通道，显示时固定使用纯白承载层**
 
 前一版规定「背景必须不透明满版」，这会挡掉大量 SVG 和 `rel=icon` 资产，和压低兜底率的目标直接冲突。调整为：
 
-允许透明背景，渲染时合成到**卡片自身的表面色**（浅色模式纯白、深色模式对应的表面色）。这和 5.3 否掉的做法有本质区别——**不发明任何新颜色，也不为图标额外造一个色块**，只是把图标放在它本来所在的卡片底色上，视觉效果等同于一个白底图标。
+允许透明背景，缓存生成时必须保留原图 Alpha，不能把浅色或深色主题表面烘焙进 WebP。若来源资产本身带有覆盖整个方形画布的中性深色展示底，只移除外围托底并保留内部 Logo，不得因此重排、拒绝或改选候选；也不得把图标内部的白色负空间逐像素改黑。只有整张可见图形几乎都是浅色单色时，才可以在保留 Alpha 的前提下整体转为中性深色。显示层为站点标识提供独立且固定的 **`#FFFFFF` 白色承载层**，并通过 `color-scheme: only light` 与 Aarre 的日夜主题隔离；夜间模式也不生成或切换深色底。这里不提取主色，也不为不同网站发明色块。
 
 同时加一道墨迹闸门，防止出现「一个几乎空白的方格」：图标本体的不透明像素占画布面积低于 15%，或与表面色的对比度不足时，判定为过于单薄，走分类封面。
 
@@ -638,8 +642,8 @@ Apple 的规范明确写了：如果页面没有声明 `<link rel="apple-touch-i
 | --- | --- | --- | --- |
 | 站点标识（管线 A） | 192×192 | WebP q0.85 | 新建 `siteBrands` store，按域名共享 |
 | 分类封面 | 384×384 | WebP q0.85 | 随扩展打包，`src/assets/covers/` |
-| 页面封面（管线 B） | 长边 512，保留原始宽高比 | WebP q0.80 | `resources` store，随记录 |
-| 页面快照（F22） | 长边 960，16:10 | WebP q0.75 | 新建 `pageSnapshots` store，按 canonicalUrl；满足 240–300px 瀑布流卡片的 Retina 显示 |
+| 页面封面（管线 B） | 长边 512，保留原始宽高比 | WebP q0.80 | 本机 `resources` store；开启完整云端备份后以二进制对象同步 |
+| 页面快照（F22） | 长边 960，16:10 | WebP q0.75 | 本机 `pageSnapshots` store，按 canonicalUrl；开启云端图片备份后同步当前有效版本，满足 240–300px 瀑布流卡片的 Retina 显示 |
 
 站点标识从 128 提到 192，是为了和分类封面的清晰度对齐——列表用 48px、卡片视图和整理提案里最大用到 96px，192 都有余量。（悬浮预览不再显示站点标识，见 F22 的 2026-07-30 修订。）
 
@@ -647,9 +651,9 @@ Apple 的规范明确写了：如果页面没有声明 `<link rel="apple-touch-i
 
 页面封面不裁方图。卡片视图和周报是横向布局，保留原始比例信息量更大；需要方图时在显示层裁。
 
-页面快照单独建 store，不放在 `resources` 里。两个原因：它按 `canonicalUrl` 而不是书签 ID 索引（同一 URL 被收藏两次共享一张快照）；它是唯一**不参与云端同步**的资产（见 F14），单独存放能让同步逻辑天然不碰它。
+页面快照单独建 store，不放在 `resources` 里。它按 `canonicalUrl` 而不是书签 ID 索引（同一 URL 被收藏两次共享一张快照），并且二进制生命周期、容量、加密和懒下载策略与文字元数据不同。云端同步只能通过 F14 的资产协议读取该 store，禁止把 `imageDataUrl` 混入资源 JSON。
 
-按 1,000 条书签估算：60% 有页面封面约 21MB，200 个域名的站点标识约 2MB，快照按活跃使用后 40% 覆盖、每张约 45KB 计约 18MB。合计 40MB 出头，`unlimitedStorage` 完全承受得住。
+按 1,000 条书签估算：60% 有页面封面约 21MB，200 个域名的站点标识约 2MB，快照按活跃使用后 40% 覆盖、每张约 45KB 计约 18MB。典型用户约 40MB；当前本机最多 2,000 张快照，极端用户仅快照就可能接近 90MB。`unlimitedStorage` 能承受本机缓存，但云端容量模型必须按每位重度用户约 50–150MB 设计，不能继续沿用“每千条 1.5MB”的纯元数据估算。
 
 **显示层：**
 
@@ -681,6 +685,7 @@ snapshotAt?: string         // 页面快照采集时间，仅用于容量清理�
 ```
 host: string                // 主键
 iconDataUrl?: string        // 192×192 WebP，仅在通过准入闸门时存在
+iconRenderVersion?: number  // 透明缓存与固定白色承载规则版本，用于淘汰旧的预合成深色缓存
 iconSource?: string         // "apple-touch-icon" / "manifest" / "icon"
 iconRejectReason?: string   // 未通过闸门的原因，诊断用，如 "below-128px" / "transparent-bg"
 skipPageImage?: boolean     // 运行时由横幅检测写入
@@ -711,7 +716,7 @@ IndexedDB 从 v2 升到 v3（v2 由 F2 的 `undoSnapshots` 占用），新增 `s
 - 覆盖率 100%，不出现灰色地球、破图占位或空白方块。
 - 来自 `apple-touch-icon`（含约定路径探测）或 manifest 的不低于 65%。
 - 来自 SVG 栅格化的不低于 8%（检验这条新增来源真的接上了）。
-- 透明背景资产合成到表面色后，不出现墨迹稀薄的空白方格（墨迹闸门生效）。
+- 透明背景资产的缓存保留 Alpha，无论 Aarre 日夜主题都显示在固定纯白承载层上，且不出现墨迹稀薄的空白方格（墨迹闸门生效）。
 - 混排视觉检查：真实品牌图标和分类封面交替出现时，圆角、留白、尺寸完全一致，不出现某几行明显「脏」的情况。
 - 连续 5 条以上同分类兜底书签时，底色不连成一片（检验明度偏移生效）。
 - 抽查 `iconRejectReason` 分布，确认拒绝原因集中在「确实无可用资产」而不是闸门过严。
@@ -938,29 +943,66 @@ IndexedDB 从 v2 升到 v3（v2 由 F2 的 `undoSnapshots` 占用），新增 `s
 
 ### F14 · 云端链路跑通
 
-**当前状态是最危险的中间态。** Supabase 表结构、RLS、复合主键、离线 Outbox、指数退避、revision 并发校验代码全部写完了，OAuth 的 PKCE 流程和账号一致性校验也在，但**从来没有真实跑通过一次**。而 README 和界面已经在向用户承诺跨设备同步。
+**当前状态（2026-08-03）：生产公网、真实 OAuth 与 metadata 首次同步已完成，图片和重装恢复仍待验收。** 旧 Supabase 路径保持删除；扩展已接入自建 REST，腾讯云香港服务器运行独立 Fastify API、PostgreSQL database/role 和 8 组 migration，当前不可变发布为 `/opt/aarre/releases/20260803-sync-rate-v27`（服务端 0.1.9）。香港主 COS、新加坡灾备 COS、SSE-COS AES-256、版本控制、生命周期、跨地域复制、API/backup 两套最小权限 CAM、Google Web OAuth client、每日/月度备份、两分钟健康巡检、Aarre 独立 GlitchTip project 与包含 SSH 的加密恢复包均已配置。`sync.nexvoice.cc` A 记录、Let's Encrypt TLS、公开主页/隐私/条款、真实 Google OAuth 登录、ticket exchange、bootstrap、登出和吊销后 401 均已通过；真实账号已写入 262 条资源、235 个收藏位置、4 组设置和 1 个月度用量。0.5.33 / 0.1.9 修复了 `priceUpdatedAt` strict schema 不一致、首次同步限流续传和旧云端 scope 覆盖用户显式选择；文件夹保护继续由服务端资源映射阻止旧设备复传。正式 Web Store Extension ID、完整图片备份、卸载重装恢复和 50 账号压测仍待验收，Google 品牌当前处于审核中。
 
-**方向已定：云端保留，职责收窄，并且从 Supabase 迁到自建服务器。**
+**方向已定：云端保留并升级为完整的持久数据备份与跨设备同步，服务端部署在腾讯云轻量应用服务器，与 NexVoice 共用同一台机器。** 元数据进入独立 PostgreSQL database，图片二进制进入腾讯云 COS 私有桶；Aarre 使用独立 API 容器、独立数据库用户、独立 COS CAM 身份和独立故障边界，不复用 NexVoice 的业务数据库、ASR 密钥或对象路径。
 
 保留的理由是硬的。Chrome Sync 只同步书签树本身——标题、URL、文件夹结构。Aarre 的整个增强层（标签、摘要、主题、别名、封面来源、笔记）都在本地 IndexedDB，**Chrome Sync 一个字节都不会带走**。用户换台电脑，书签在，AI 分析的成果全丢。这是产品承诺「增强层」时必须自己解决的问题，没有别的办法。
 
-同时 F8 把语义检索完全本地化了，这不是削弱云端的理由，而是**让云端的职责变得干净**：
+F8 的语义检索继续本地化，AI 富化继续 BYOK 直连。云端的职责是“可恢复、可同步、可删除”，不是替代本机检索或把所有运行时缓存搬上去：
 
 | 云端做什么 | 云端不做什么 |
 | --- | --- |
-| 增强层元数据的同步与备份 | 语义检索（已完全本地化，向量不上云） |
-| 跨设备一致性与冲突解决 | AI 富化（BYOK 直连，不经过服务端） |
-| 账号与数据隔离 | 存储任何二进制图像资产（见下） |
+| 全部用户可感知的持久增强信息：摘要、AI 字段、用户备注、自定义标签、链接状态、设置、保护规则、会话与报告 | 语义检索（已完全本地化，向量不上云） |
+| 用户封面、真实页面快照、页面代表图和站点标识的加密对象存储与恢复 | AI 富化（BYOK 直连，不经过服务端） |
+| 跨设备一致性、冲突解决、回收站、卸载重装后的恢复 | 网页正文、Cookie、完整浏览历史与 API Key 的常规云端存储 |
+| 账号、设备、配额、导出、删除与审计 | Chrome 原生书签树的替代副本；标题、URL、文件夹与顺序仍由 Chrome 负责 |
 
-#### 关键优化：只同步派生指令，不同步派生产物
+#### 同步边界：同步持久用户资产，不同步运行时垃圾
 
-这一条决定了云端方案的成本量级，在自建服务器上比在 Supabase 上更重要——磁盘和带宽都是自己掏钱且固定容量。
+“所有相关信息”指所有会影响用户恢复后体验的持久数据，不等于把整个 IndexedDB、`chrome.storage.local` 或内存状态原样镜像。每个字段和 store 必须进入一份版本化的同步清单，未分类的数据默认不得上传。
 
-**封面不需要同步。** 它是从公开 URL 派生出来的，同步 `coverSource`、原始图片地址、`categoryCoverId` 这些字符串（合计几百字节），另一台设备拿到后本地重新抓取即可，结果完全一致。
+| 数据类别 | 云端策略 |
+| --- | --- |
+| URL 级智能信息 | 同步 `summary`、AI/用户标签、`topics`、`aliases`、`useCases`、`contentType`、`questions`、`entities`、作者/站点/语言、用户主动保存的 `selectedText`、AI schema、链接健康状态、内容哈希和封面选择；不上传自动提取的 `contentExcerpt` 原文 |
+| 收藏位置级信息 | 新增稳定的 `bookmarkItemId`，同步该位置的用户备注、自定义标签、绑定提示和时间；Chrome bookmark ID 只留本机 |
+| 用户设置 | 同步主题、显示偏好、扫描成本上限、AI 服务商/模型名称、保护规则、排除域名和云端图片范围；API Key 不同步 |
+| Agent、报告与用量 | 同步用户选择保留的会话、报告、不可便宜重建的洞察，以及按周期聚合的 AI token / 估算费用 / 扫描次数；保留当前 50 会话/每会话 60 条上限，不同步正在运行的 progress |
+| 图片资产 | 用户上传封面、页面快照、页面代表图和站点标识存 COS；40 张内置兜底图只同步 `categoryCoverId` |
+| 恢复信息 | 同步墓碑、冲突版本、云端回收站、用户可见的操作历史和设备游标；本机原生书签 undo snapshot、队列、lease、alarm、临时 tab 与锁不同步 |
+| 严格排除 | 网页正文、Cookie、完整浏览历史、API Key、Token 明文、原生 bookmark ID、受保护资源内容和任何未列入白名单的字段 |
 
-**页面快照不但不该同步，而且不应该同步。** 快照是设备本地的浏览痕迹，上传它等于把用户的浏览行为搬到服务端，和产品的隐私定位直接冲突。这也是 5.7 把快照单独建 store 的原因——同步逻辑遍历 `resources` 时天然碰不到它。
+对照当前代码的持久存储，F14 必须维护下面这份“真实 store → 云端策略”清单；以后新增 store 或 `chrome.storage` key 时同步更新，不能靠开发者记忆：
 
-结果：每条书签的同步载荷约 1–2KB（摘要、标签、主题、别名、元数据），1,000 条约 1.5MB。一台轻量应用服务器的磁盘可以支撑数千用户。
+| 当前本地数据 | F14 云端处理 |
+| --- | --- |
+| IndexedDB `resources` | 只上传白名单持久字段；`contentExcerpt`、同步状态、阻塞提示、本机 native ID 与正文 outbox 留本机 |
+| `siteBrands` / `pageSnapshots` | 最终可显示图片转 WebP bytes 存 `assets` + COS；抓取候选、拒绝原因和页面采样属于诊断缓存，不同步 |
+| `aarre:agent-conversations` | 按用户云端范围同步已完成/失败/取消的稳定消息、来源和动作结果；运行中 progress 不同步。动作只保留 `resourceKey`、类型、用户可见描述和结果，剥离 `targetId` / `parentId` / `destinationId` / `createdNodeId` 等本机 Chrome ID |
+| 主题、display settings、AI provider/model | 写入按 key revision 的 `user_settings`；API Key、临时验证状态不上传。URL/文件夹保护使用独立 `protection_rules`，不和普通设置做整包覆盖 |
+| `aarre:ai-usage:v1` | 转为按月份/provider/model 聚合的 `usage_periods`；这是用户可见历史，不作为服务端计费真相 |
+| `undoSnapshots` | 原生 Chrome 树快照和本机 ID 不上传；云端另存稳定实体级 `operation_history`、墓碑和版本，提供跨设备最近操作与可恢复信息 |
+| Outbox、全库扫描/补拍任务、onboarding、sidepanel 状态 | 设备级或运行时数据，卸载后可安全重建，不同步 |
+| AI Key、Aarre Token、预签名 URL | 严格不进入普通同步、导出、报告或日志 |
+
+文件夹保护需要单独迁移，不能把当前 `ProtectionSettings.folderIds` 上传：Chrome folder ID 跨设备不稳定。云端使用 Aarre 生成的 `protectedFolderRuleId`，保存路径段、父级路径、标题和创建时间等**重绑定提示**，每台设备只在本地保存 `protectedFolderRuleId ↔ nativeFolderId` 映射。唯一匹配时自动绑定；重复路径或结构歧义时先把所有候选视为受保护并提示用户确认，绝不能在未确认时扫描其中任意候选。URL 级 `resourceKey` 保护继续跨设备直接生效。
+
+页面快照可能包含登录后的界面和个人信息，因此不能借“开启账号同步”顺便静默上传。云端设置必须同时提供两个清楚的范围：
+
+1. **仅同步文字与设置**：不上传任何图片二进制。
+2. **完整云端备份**：明确告知会加密上传页面快照和封面，由用户主动选择；这是产品推荐模式，但不得用隐藏勾选或首次启动自动开启。
+
+用户随后把网页或文件夹设为“受保护”时，客户端必须停止新上传，服务端必须删除已上传资产的全部对象版本及对应敏感元数据，只保留阻止旧设备复传所需的最小墓碑。关闭保护不会自动重新抓取或上传，仍按用户之后的正常访问和增强流程恢复。
+
+#### 容量模型
+
+2026-08-02 已对当前 Chrome 账号做最新有效记录的物理审计：262 条原生网页书签对应 261 条 Aarre 资源，当前可进入云端的数据为 5,422,378 B（约 5.17 MiB）；补齐当前缺失站点 icon 并加入 PostgreSQL/加密开销后，主数据预计 7–9 MiB，主桶、异地副本、历史版本与数据库备份合计预计 15–25 MiB。完整测量、腾讯云价格、1,000/10,000 账号模型和扩容触发器见 `docs/CLOUD_CAPACITY_PLAN.md`。
+
+- 1,000 条典型重度书签的文字元数据约 1.5–3MB。
+- 页面封面、站点标识与约 40% 快照覆盖合计约 40MB。
+- 当前本机最多 2,000 张快照，极端用户仅快照可能接近 90MB；加上封面和历史版本，设计预算按每位重度用户 50–150MB。
+- Alpha 阶段每用户预留 250MB 可配置软配额；正式免费/付费额度由 F16 决定，代码不得写死产品套餐。
+- 图片不得使用 base64 JSON 传输。扩展先把 Data URL 解码为 WebP 二进制，再通过短时单对象上传凭据直传 COS，避免 33% 左右的 base64 膨胀和 API 内存尖峰。
 
 #### 技术栈：与 NexVoice ControlPlane 同栈
 
@@ -976,9 +1018,14 @@ IndexedDB 从 v2 升到 v3（v2 由 F2 的 `undoSnapshots` 占用），新增 `s
 | 限流 | `@fastify/rate-limit` | 已在用 |
 | 迁移 | 自研 SQL 迁移器 | 直接复用 `src/migrations.ts` 的 `applyMigrations` |
 | 构建 / 测试 | `tsc` 构建、`tsx` 开发、`node --test` | 与 ControlPlane 脚本一致 |
-| 容器 | 多阶段 Dockerfile（`node:22-bookworm-slim`） | 照搬 ControlPlane 的 Dockerfile |
+| 容器 | 多阶段 Dockerfile（Node 22 trixie slim；运行层含兼容 PostgreSQL 16 的新版本 client） | `server/Dockerfile` |
 | 反向代理 | 系统级 Caddy | 新增一个 site block |
 | 错误上报 | GlitchTip（`crash.nexvoice.cc`） | 复用现有实例，新建一个 project |
+| 图片对象 | 腾讯云 COS 私有桶 + SSE-COS AES-256 | Aarre 独立 bucket、独立 CAM 最小权限身份；不占轻量服务器系统盘 |
+
+**2026-08-02 生产服务器只读实测基线：** 腾讯云 `ap-hongkong-2`，Ubuntu 24.04，2 vCPU、3.66GiB 内存，复核时可用约 2.4GiB；系统盘 59GB、可用 44GB。`production-control-api-1` 实际约 92MiB / 限额 384MiB，`production-control-db-1` 约 112MiB / 限额 640MiB，Docker 网络为 `production_default`。这组数据支持新增独立 320MiB 的 `aarre-api`，但它是开工时点的容量证据，不是永久承诺；每次生产部署前仍要重新检查 `free -h`、`docker stats`、磁盘和 load average，并按 `docs/CLOUD_CAPACITY_PLAN.md` 的 50/70/85 与计算资源触发器扩容。
+
+**2026-08-02 监控验收：** GlitchTip 已创建独立 `aarre` team 和 `Aarre Sync API` project，生产 DSN 只存于 `/etc/aarre/aarre.env` 与加密恢复包；规则为 5 分钟内出现 1 个事件即通知项目团队。受控事件真实进入 project 后已标记 Resolved。SDK 不发送默认 PII、trace、breadcrumb 或 HTTP request context；API 请求日志只保留无 query 的路由路径。systemd 每两分钟检查一次 Aarre readiness，失败时只重启 Aarre 容器。
 
 **可以直接照搬的代码**（不要重新发明）：
 
@@ -989,11 +1036,21 @@ IndexedDB 从 v2 升到 v3（v2 由 F2 的 `undoSnapshots` 占用），新增 `s
 - `app.ts` 里 `requireInstallation` / `findInstallationIDByAccessToken` 的鉴权中间件形态，以及 `issueTokens` 的双 Token 签发模式。
 - `authenticatedRateLimitKey` 的「有 Token 按 Token 限流、无 Token 按 IP 限流」写法。
 
+可以复用的是实现模式，不是密钥和权限。Aarre 必须使用独立的 `TOKEN_PEPPER`、Google OAuth 凭据、数据库密码、API CAM 与 backup/deletion-worker CAM；NexVoice 的 ASR Secret 或管理员身份不得被 Aarre 读取。
+
+**PostgreSQL 里的内容字段也必须加密，不只给 COS 图片加密。** `canonicalUrl`、摘要/标签、用户备注、`selectedText`、会话正文、报告正文和重绑定提示在服务端完成 schema 校验后，使用每用户独立 data-encryption key（DEK）做 AES-256-GCM 信封加密。2026-08-02 成本和可用性实测确认腾讯云 KMS 基础/标准版已停止新购、专业版固定成本不适合 Alpha，当前账号的 SSM 也需额外购买。因此受控 Alpha 使用 `/etc/aarre/aarre.env` 中最多 8 个版本的 root-only 32-byte KEK keyring；`user_keys` 保存带 KEK version 的 wrapped DEK，轮换时保留仍被引用的旧版本。COS 对象使用默认 SSE-COS AES-256。未来高合规阶段可启用现有 SSM/KMS wrapper 并逐用户 rewrap，payload 不需要重写。数据库明文列只保留授权/同步所需的 `user_id`、`resource_key` hash、entity ID、revision、sequence、时间、状态和配额；任何 KEK provider 不可用时拒绝内容读写，绝不退化成明文。
+
+这仍然**不是端到端加密**：获得 Aarre 服务 root 身份和 KEK 的受控后端可以解密。它解决的是数据库文件、磁盘快照和普通 dump 泄露时的明文暴露，不替代最小权限、审计和未来零知识设计。服务器 `/etc/aarre` secrets 已进入本机 AES-256/PBKDF2 加密恢复包，口令同时保存在当前 Mac Keychain 和独立 mode 600 恢复文件；KEK 轮换完成所有用户 DEK rewrap 和恢复演练后，才能删除旧 version。账户删除先删在线密文与 wrapped DEK，备份中的旧版本按公开保留期到期。
+
 **Token 模型完全沿用 NexVoice 的做法**，不要改成自签 JWT：随机不透明 Token，数据库只存 HMAC-SHA256 摘要（带 pepper），access 有效期 10 分钟、refresh 30 天。这套模式的好处是可即时吊销，而自签 JWT 做不到，且 NexVoice 已经验证过。
+
+补充设备与 Token family：每次安装生成 `deviceId`，refresh Token 轮换后旧 Token 立即失效；检测到旧 refresh 重放时，吊销同一 family 并要求该设备重新登录。设置页允许查看并撤销其他设备，服务端不得用邮箱作为授权主键。
+
+Token 只由扩展 Service Worker 的认证模块读写。Worker 启动时把 `chrome.storage.local` access level 设为 `TRUSTED_CONTEXTS`；侧边栏、网页端和 content script 通过类型化消息请求同步动作，不接收 access/refresh Token，也不把 Token 放进 URL。上传/下载签名 URL 只在单次后台任务内存中短暂存在，任务结束或 Service Worker 休眠前不另行持久化。
 
 #### 部署形态：独立服务，共用 Postgres 实例
 
-**结论：新增一个独立的 `aarre-api` 容器，监听 `127.0.0.1:8788`，但复用 `control-db` 这个 Postgres 实例里的一个独立 database。**
+**结论：新增一个独立的 `aarre-api` 容器，监听 `127.0.0.1:8788`，但复用 `control-db` 这个 Postgres 实例里的一个独立 database；图片进入 COS，不写服务器持久卷。**
 
 为什么不直接在 `control-api` 里加一段路由前缀：NexVoice 的 `control-api` 承载设备激活和 AI Gateway，内存限额只有 384M。Aarre 的同步流量一旦造成内存尖峰或崩溃重启，NexVoice 用户会连激活都做不了。爆炸半径不能这样耦合。
 
@@ -1004,232 +1061,270 @@ IndexedDB 从 v2 升到 v3（v2 由 F2 的 `undoSnapshots` 占用），新增 `s
 ```
 数据库    在 control-db 内 CREATE DATABASE aarre_sync
 用户      CREATE USER aarre WITH PASSWORD ...  仅授予 aarre_sync 的权限
-容器      aarre-api，limits.memory 256M，端口 127.0.0.1:8788:8788
-网络      加入 control-db 所在的 compose 网络（external），以 control-db:5432 连接
-Caddy     新增 site block 反代到 127.0.0.1:8788
+容器      aarre-api，mem_limit 320M / cpus 0.75，端口 127.0.0.1:8788:8788
+网络      以 external 方式加入已实测存在的 production_default，以 control-db:5432 连接
+Caddy     新增 sync.nexvoice.cc site block，反代到 127.0.0.1:8788；取得 Aarre 独立域名后按双域名迁移
+对象存储  Aarre 独立的 ap-hongkong 私有 COS bucket；服务端只签发短时、精确对象键的上传/下载权限
 ```
 
-**代码归属：服务端代码放在 Aarre 仓库的 `server/` 目录**，自带 Dockerfile 和 `server/infra/compose.yml`。该 compose 把 NexVoice 的网络声明为 `external: true` 并接入，这样两个产品各自独立发布，互不牵连，但共享机器和 Postgres 实例。
+**代码归属：服务端代码放在 Aarre 仓库的 `server/` 目录**，自带 Dockerfile 和 `server/infra/production/compose.yml`。Compose project 固定为 `aarre-production`，避免与 NexVoice 的 `production` project 相撞；网络仅以 `external: true` 接入已存在的 `production_default`。
 
-实施前需要用 `docker network ls` 确认 NexVoice compose 的实际网络名（项目目录是 `infra/production`，默认网络名大概是 `production_default`，但要实测确认，不要猜）。
+Docker 网络名已在 2026-08-02 实测为 `production_default`。部署脚本仍需在运行前验证该网络存在，缺失就拒绝部署，不得自行创建一个同名空网络后继续。
 
-**内存预算必须先核对。** 现有占用：`control-db` 640M + `control-api` 384M + GlitchTip 整套（Django 加自己的 Postgres 和 Redis，通常 1.5GB 以上）。再加 256M 之前，先在机器上跑一次 `free -h` 和 `docker stats` 确认余量。**如果余量不足，退化方案是在 `control-api` 里加 `/aarre/v1/*` 路由前缀**，接受爆炸半径耦合，并把 `control-api` 的内存限额提到 512M。这个退化决定必须先报给产品负责人，不要自行选择。
+**内存预算必须在每次部署前复核。** 当前余量允许 320MiB 独立容器，因此不再保留“把 Aarre 路由塞进 `control-api`”作为静默退化方案。未来余量不足时，按 `docs/CLOUD_CAPACITY_PLAN.md` 购买腾讯云实例或迁移 Aarre 服务，不能为了省一个容器把两个产品的故障域重新耦合。
+
+**共机是 Alpha / 早期 Beta 的成本选择，不是永久绑定。** 满足任一条件就进入拆机评审：可用内存连续 15 分钟低于 1GiB、`aarre-api` 连续 15 分钟超过内存限额 80% 或发生 OOM/异常重启、Aarre 流量使 NexVoice P95 延迟上升超过 10% 或错误率增加超过 0.5 个百分点、联合恢复无法达到当前 RTO，或合规/区域要求发生变化。服务端所有连接地址必须来自环境变量，迁移 API 容器或 database/COS endpoint 时不改变扩展的数据模型和用户身份。
 
 #### 认证流程
 
-Supabase 的 OAuth 流程不能直接搬。采用**授权码 + PKCE，在服务端交换**，`client_secret` 永不进入扩展：
+Supabase 的 OAuth 流程不能直接搬。Chrome 官方把 `chrome.identity.getAuthToken` 定位为扩展直接获取 Google API access token，把 `launchWebAuthFlow` 定位为通用网页认证流。Aarre 不需要调用 Google API，也不应把 Google access/refresh token 长期交给扩展，因此采用**服务端 Web OAuth broker + 扩展侧一次性 PKCE 票据**：`client_secret` 和 Google token 永不进入扩展。
 
-1. 扩展生成 `code_verifier` 和 `code_challenge`（S256），调用 `chrome.identity.launchWebAuthFlow`，指向 Google 的授权端点，`response_type=code`，`redirect_uri` 为 `chrome.identity.getRedirectURL("auth")`（形如 `https://<extension-id>.chromiumapp.org/auth`），`scope=openid email profile`，`prompt=select_account`。
-2. 拿到回调里的 `code`，POST `{ code, codeVerifier }` 到 `/v1/auth/google`。
-3. 服务端用 `client_id` + `client_secret` + `code_verifier` + 同一个 `redirect_uri` 向 Google 的 token 端点交换，拿到 `id_token`。
-4. **服务端用 `jose` 的 `createRemoteJWKSet` 从 Google 的 JWKS 验签**，并校验 `iss`、`aud`（必须等于自己的 `client_id`）、`exp`。
-5. 从 `id_token` 取 `sub` 和 `email`，upsert 到 `users` 表（`google_sub` 唯一），按 NexVoice 的 `issueTokens` 模式签发自己的 access / refresh Token。
-6. 扩展把两个 Token 存 `chrome.storage.local`，401 时用 refresh 续期。
+1. 扩展生成 `code_verifier` / `code_challenge`（S256）、`deviceId`，取得 `chrome.identity.getRedirectURL("auth")`（形如 `https://<extension-id>.chromiumapp.org/auth`）。
+2. 扩展调用 `chrome.identity.launchWebAuthFlow` 打开 Aarre 自己的 `/v1/auth/google/start`，传入 `codeChallenge`、`deviceId` 和最终扩展回跳地址。服务端只接受发布配置中的精确 Extension ID / redirect allowlist，拒绝任意 URL，避免 open redirect。
+3. Aarre 服务端生成高熵 `state` 与 OIDC `nonce`，只保存摘要、code challenge、device 和 5 分钟过期时间，然后 302 到 Google。Google Cloud 的 Web application callback 固定为 `https://sync.nexvoice.cc/v1/auth/google/callback`，`scope=openid email profile`、`response_type=code`、`prompt=select_account`；只做登录，不请求 Google API 离线权限。
+4. Google 回调 Aarre API。服务端先逐字节核对并消费 `state`，再用只存在服务器的 `client_id` / `client_secret` 交换 code；用 `jose` 和 Google JWKS 验证 `id_token` 签名，并校验 `iss`、`aud`、`exp`、`nonce` 与 `email_verified`。
+5. 服务端从 `id_token` 取稳定 `sub` 和展示邮箱，upsert `auth_identities` / `users`；Google access token 随即丢弃，不保存 Google refresh token。服务端生成 60 秒有效、单次使用且绑定原 auth transaction / device / code challenge 的随机 login ticket，只在回跳 URL fragment `#ticket=...` 中交给扩展，不放 Aarre Token、Google Token 或用户信息。
+6. `launchWebAuthFlow` 返回最终 URL。扩展核对 origin/path 后，POST `{ ticket, codeVerifier, deviceId }` 到 `/v1/auth/exchange`。服务端验证 ticket 摘要、一次性状态、过期时间与 S256 challenge，随后按 NexVoice 的 `issueTokens` 模式签发 Aarre 自己的 access / refresh Token。
+7. 扩展把 Aarre Token 存 `chrome.storage.local`，401 时用 refresh 轮换；服务端创建或更新 `devices` 与 Token family。登录取消、回调超时、ticket 重放和 PKCE 不匹配都必须可恢复且不给出账号是否存在的信息。
 
-**`redirect_uri` 需要在 Google Cloud Console 里注册为 Web 应用的重定向 URI，而这依赖正式的 Extension ID**——所以这一步和 F16 的「申请正式 Extension ID」是有依赖关系的，要排在它之后。
+这里有两个不同的回调，不能混写：**Google Cloud Console 只注册 Aarre 自有 HTTPS 回调** `https://sync.nexvoice.cc/v1/auth/google/callback`；`https://<extension-id>.chromiumapp.org/auth` 是 Aarre 服务端完成登录后回跳扩展的地址，由 `launchWebAuthFlow` 截获。正式 Extension ID 仍依赖 F17，因为服务端 redirect allowlist、扩展构建、COS CORS 和商店包必须使用同一个 ID；但不要把 `chromiumapp.org` 地址登记成 Google Web client callback。
 
-**`id_token` 必须在服务端验签，不能只解码不验证。** 这是这类实现最常见的严重漏洞：只 base64 解码就信任内容，等于任何人构造一个 JSON 就能冒充任意用户。
+**`state`、`nonce`、PKCE 和 `id_token` 验签缺一不可。** `id_token` 不能只 base64 解码；login ticket 不能裸奔或重复使用；Caddy、GlitchTip 和 API 日志都必须删除 Google code、ticket 和 OAuth query。否则任意一个环节都可能变成账号冒用或凭据泄漏入口。
 
 现有 `src/lib/auth.ts` 里「产品账号必须等于当前 Chrome profile 账号」的校验要保留，它是个好设计，能防止用户在共用电脑上误登他人账号。
 
+Google 是 v1 的首个登录方式，但数据库身份不能硬编码成只有 `google_sub`。使用独立 `auth_identities(provider, subject, user_id)` 表，为未来增加邮箱链接或其他身份方式留出位置；授权主键始终是内部 `users.id`，邮箱只用于展示和账号误选提示。
+
 #### 数据库 schema
 
-两张表就够。迁移文件命名沿用 ControlPlane 风格（`001_initial.sql` 递增）。
+完整云端不能继续塞进一张 `resources.payload`。迁移文件命名沿用 ControlPlane 风格（`001_initial.sql` 递增），最小正式模型如下：
 
-```sql
-CREATE TABLE users (
-  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  google_sub    text NOT NULL UNIQUE,
-  email         text NOT NULL,
-  created_at    timestamptz NOT NULL DEFAULT now(),
-  last_seen_at  timestamptz NOT NULL DEFAULT now()
-);
+| 表 | 关键主键与职责 |
+| --- | --- |
+| `users` | 内部 `user_id`、展示邮箱、状态、配额与创建时间；不把邮箱当授权边界 |
+| `auth_identities` | `(provider, subject)` 唯一，绑定内部用户；Google `sub` 存这里 |
+| `auth_transactions` | Google `state` / OIDC nonce / PKCE challenge / device / 允许的扩展回跳摘要、过期和消费状态；保存摘要或加密值，不存 login ticket 明文 |
+| `devices` | `device_id`、名称、最后活跃时间、撤销时间和最后同步游标 |
+| `auth_tokens` | Token HMAC 摘要、类型、device、family、过期/消费/撤销时间；不存明文 |
+| `user_keys` | 每用户 DEK 经 Aarre 版本化应用 KEK（当前为 root-file keyring，企业阶段可切 SSM/KMS）包装后的密文、provider、key version、创建/轮换时间；不存明文 DEK |
+| `resources` | `(user_id, resource_key)`，保存 URL 级智能信息、revision、字段时间戳和墓碑 |
+| `bookmark_items` | `(user_id, bookmark_item_id)`，保存一个真实收藏位置的备注、用户标签和本机重绑定提示；不使用 Chrome bookmark ID 做云端主键 |
+| `protection_rules` | `(user_id, protection_rule_id)`，逐条保存 resource 或 folder 保护；resource 用稳定 `resource_key`，folder 用路径/结构重绑定提示；native folder ID 永远只在设备本机 |
+| `user_settings` | `(user_id, setting_key)`，按键独立 revision，避免一台设备的旧整包设置覆盖另一台设备的新值 |
+| `conversations` | `(user_id, conversation_id)`，保存用户允许同步的会话与消息上限；删除使用墓碑 |
+| `reports` | `(user_id, report_id)`，保存周/月报和不可便宜重建洞察的版本、范围、生成时间与墓碑 |
+| `usage_periods` | `(user_id, period, provider, model)`，保存 BYOK token/估算费用/扫描次数聚合；与服务端存储配额账本分离 |
+| `operation_history` | `(user_id, operation_id)`，保存稳定实体级的用户可见操作摘要、结果与恢复状态；不存原生书签树快照 |
+| `assets` | `(user_id, asset_id)`，保存 `resource_key`、类型、COS object key/version、SHA-256、字节数、尺寸、MIME、采集时间、revision 与删除状态；不存图片正文 |
+| `conflict_versions` | 保存笔记、用户标签等不能安全自动合并字段的两份版本、来源 device/revision 与解决状态 |
+| `sync_operations` | `(user_id, operation_id)` 幂等结果、请求摘要、状态与过期时间；保证 mutation 重试不重复执行或计费 |
+| `sync_changes` | 单调递增 `sequence`、entity type/id、revision 和墓碑；为所有实体提供统一增量游标 |
 
-CREATE TABLE auth_tokens (
-  id          bigserial PRIMARY KEY,
-  user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  token_type  text NOT NULL CHECK (token_type IN ('access', 'refresh')),
-  token_hash  text NOT NULL UNIQUE,
-  expires_at  timestamptz NOT NULL,
-  consumed_at timestamptz,
-  created_at  timestamptz NOT NULL DEFAULT now()
-);
-CREATE INDEX auth_tokens_user_idx ON auth_tokens (user_id) WHERE consumed_at IS NULL;
+每次资源、收藏位置、保护规则、设置、会话、报告、用量、操作历史或资产提交必须与对应 `sync_changes` 和 `sync_operations` 幂等结果处于同一个数据库事务。初次同步分页读取实体快照；之后只按服务端生成的 `sequence` 拉变更，不再依赖客户端时间，也不存在“同一毫秒 500 条”造成漏项的问题。变更日志保留 180 天，离线超过保留期的设备收到 `full_resync_required` 并重新 bootstrap。
 
-CREATE TABLE resources (
-  user_id       uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  resource_key  text NOT NULL,              -- canonical URL 的 SHA-256
-  revision      bigint NOT NULL DEFAULT 1,
-  payload       jsonb NOT NULL,             -- 见下方载荷白名单
-  note_versions jsonb,                      -- 冲突时保留的多份笔记
-  deleted_at    timestamptz,                -- 墓碑，不做物理删除
-  updated_at    timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (user_id, resource_key)
-);
-CREATE INDEX resources_cursor_idx ON resources (user_id, updated_at, resource_key);
-```
+**`resources` 和其他 JSON payload 必须使用白名单，不得把当前 TypeScript 对象原样上传。** URL 级允许字段包括：`canonicalUrl`、`summary`、AI/用户标签及来源、`topics`、`aliases`、`useCases`、`contentType`、`questions`、`entities`、`aiSchemaVersion`、`selectedText`、`author`、`siteName`、`language`、`contentHash`、`linkHealth`、`coverSource`、`coverUpdatedAt`、`categoryCoverId`、`createdAt`、`updatedAt`。`selectedText` 是用户明确保存的内容，单条最多 8KB，并在云端范围说明中单列；自动提取的 `contentExcerpt` 仍不上传。当前本地 `imageUrl` 不能直接进入白名单：只有通过 HTTPS、无用户名密码、去掉 query/fragment 且不命中敏感/受保护规则的公开来源才可规范化为 `publicImageUrl`，完整备份优先恢复已保存 asset bytes。
 
-索引带上 `resource_key` 是为了让下面的复合游标能走索引，不是可选的。
-
-**`payload` 必须是白名单字段，不是整条 `ResourceRecord` 原样上传。** 允许的字段只有：`title`、`url`、`canonicalUrl`、`folderPath`、`summary`、`tags`、`topics`、`aliases`、`note`、`coverSource`、`imageUrl`、`categoryCoverId`、`savedAt`、`updatedAt`。
-
-**明确禁止出现在 `payload` 里的字段**（服务端要主动剥离并在收到时记一条警告，不能只靠客户端自律）：`thumbnailDataUrl`、`snapshotDataUrl`、任何 base64 图像、任何向量、任何页面正文。这是「只同步派生指令，不同步派生产物」这条原则在服务端的强制点——**光靠客户端不发是不够的，因为一次客户端 bug 就会把几十 MB 的位图写进库**。
-
-写一个服务端测试：构造一个带 `thumbnailDataUrl` 的请求，断言入库后的 `payload` 里没有这个键，且单条 `payload` 大小上限（建议 32KB）被强制。
+服务端必须主动拒绝或剥离：`thumbnailDataUrl`、`imageDataUrl`、任何 base64、网页正文、`contentExcerpt`、API Key、Token、`nativeBookmarkIds`、对话/动作里的 `targetId` / `parentId` / `destinationId` / `createdNodeId` 等本机 Chrome ID、本机队列和 lease。图片只能先上传 COS，再让 `assets` 记录引用；元数据单条上限 64KB，普通资源超过 32KB要记结构化警告并调查，不能靠扩大 JSON 上限掩盖字段失控。
 
 **墓碑保留期 180 天**，之后由定时任务物理清理。不能立刻物理删除，否则离线设备重新上线时会把已删除的书签又同步回来。
 
 #### API 契约
 
-统一前缀 `/v1`。除 `/health` 和 `/ready` 外全部要求 `Authorization: Bearer <accessToken>`。
+统一前缀 `/v1`。除健康检查、Google OAuth start/callback、一次性 ticket exchange 和 refresh 外，其余端点都要求 `Authorization: Bearer <accessToken>`；豁免鉴权不等于豁免限流、state、PKCE 或输入校验。
 
 | 端点 | 说明 | 限流 |
 | --- | --- | --- |
 | `GET /health` | 存活探针 | 无 |
-| `GET /ready` | 就绪探针，含一次数据库 ping | 无 |
-| `POST /v1/auth/google` | `{ code, codeVerifier }` → Token 对 + 用户信息 | 10 次 / 分钟 / IP |
-| `POST /v1/auth/refresh` | `{ refreshToken }` → 新 Token 对，旧 refresh 立即 `consumed_at` | 20 次 / 分钟 / IP |
-| `POST /v1/auth/logout` | 吊销当前用户全部未消费 Token | 20 次 / 分钟 |
-| `GET /v1/resources?since=&limit=` | 增量拉取，按 `updated_at` 升序，含墓碑 | 60 次 / 分钟 / Token |
-| `POST /v1/resources` | 批量上推，单次最多 200 条 | 60 次 / 分钟 / Token |
+| `GET /ready` | 就绪探针，含数据库 ping；COS 故障以 `degraded` 明示，不把已有本地功能一起判死 | 无 |
+| `GET /v1/auth/google/start` | 校验精确 extension redirect / device / PKCE challenge，创建 5 分钟 auth transaction 并跳转 Google | 10 次 / 分钟 / IP |
+| `GET /v1/auth/google/callback` | 校验/消费 state，服务端换票并验 ID Token，生成 60 秒一次性 login ticket，再回跳扩展 fragment | 20 次 / 分钟 / IP |
+| `POST /v1/auth/exchange` | `{ ticket, codeVerifier, deviceId }` → Aarre Token 对 + 用户信息；ticket 立即消费 | 10 次 / 分钟 / IP + device |
+| `POST /v1/auth/refresh` | `{ refreshToken }` → 新 Token 对，旧 refresh 立即 `consumed_at` | 20 次 / 分钟 / IP + token family |
+| `POST /v1/auth/logout` | 吊销当前 Token family 或用户全部设备 | 20 次 / 分钟 |
+| `GET /v1/devices` / `DELETE /v1/devices/:id` | 查看和撤销设备 | 30 次 / 分钟 / Token |
+| `GET /v1/sync/bootstrap?cursor=&limit=` | 分页获取当前用户全部实体快照及当前 change sequence | 30 次 / 分钟 / Token |
+| `GET /v1/sync/changes?after=&limit=` | 按单调 `sequence` 拉增量与墓碑 | 120 次 / 分钟 / Token |
+| `POST /v1/sync/mutations` | 批量提交资源、位置、设置、会话、回收站与资产绑定，单次最多 200 条 | 60 次 / 分钟 / Token |
+| `POST /v1/assets/uploads` | 校验配额、类型、尺寸与保护状态，创建 asset 并签发精确 object key 的短时上传 URL | 30 次 / 分钟 / Token |
+| `POST /v1/assets/:id/complete` | 服务端 HEAD 校验字节数、MIME、hash/SSE-COS 后提交资产 | 60 次 / 分钟 / Token |
+| `GET /v1/assets/:id/download` | 返回短时下载 URL；每次重新鉴权，不返回永久公开地址 | 120 次 / 分钟 / Token |
+| `DELETE /v1/assets/:id` | 写墓碑并异步清除 COS 全部对象版本 | 30 次 / 分钟 / Token |
+| `GET /v1/account/usage` | 返回元数据、对象字节数、数量、配额和待清理空间 | 30 次 / 分钟 / Token |
+| `POST /v1/account/export` | 创建包含元数据与资产清单的可恢复导出任务 | 3 次 / 小时 / Token |
+| `DELETE /v1/account` | 二次确认后吊销 Token，安排数据库和对象全版本删除 | 3 次 / 小时 / Token |
 
-`GET /v1/resources` 返回：
+`bootstrap` 返回服务端一致性快照分页。最后一页给出 `changeCursor`；客户端必须先提交整个 bootstrap，再从该游标拉 changes，不能边分页边把本地状态标成“已恢复”。`changes` 游标只由服务端生成，客户端原样保存和回传。
 
-```
-{ "items": [ { "resourceKey", "revision", "payload", "noteVersions", "deletedAt", "updatedAt" } ],
-  "nextCursor": "2026-07-30T01:23:45.678Z|a3f2c1..." | null }
-```
-
-`since` 省略时为全量首次同步。`limit` 默认 200、上限 500。
-
-**游标必须是 `(updated_at, resource_key)` 复合值，不能只用时间戳，也不能用页码。**
-
-- 用页码：翻页期间有数据变动就会漏条。
-- 只用时间戳：一次批量同步会让几百条记录的 `updated_at` 落在同一毫秒。此时 `WHERE updated_at > cursor` 会跳过同毫秒的剩余记录（**静默丢数据**），改成 `>=` 又会无限返回同一页（**死循环**）。
-
-正确的查询条件是字典序比较：
-
-```sql
-WHERE user_id = $1
-  AND (updated_at, resource_key) > ($2, $3)
-ORDER BY updated_at, resource_key
-LIMIT $4
-```
-
-`since` 为空时省略 `AND` 那一行。`nextCursor` 取本页最后一条的 `updated_at` 和 `resource_key` 拼接，客户端原样回传，不要自己解析或重新构造。
-
-`POST /v1/resources` 请求体：
-
-```
-{ "items": [ { "resourceKey", "baseRevision", "payload", "deletedAt" } ] }
-```
-
-响应逐条给出结果：
-
-```
-{ "results": [ { "resourceKey", "status": "applied" | "merged", "revision", "payload", "noteVersions" } ] }
-```
+`mutations` 的每一项必须包含：`operationId`（客户端 UUID，幂等键）、`entityType`、`entityId`、`baseRevision`、白名单 `payload` 和可选 `deletedAt`。同一个 `operationId` 重试必须返回首次结果，不得创建重复记录或重复计费。响应逐项给出 `applied / merged / conflict / rejected`、新 revision 和服务端最终实体。
 
 #### 同步协议与冲突解决
 
-客户端记录自己上次拉取到的 `revision` 作为 `baseRevision` 上推。服务端逐条处理：
+客户端记录每个实体上次拉取到的 `revision` 作为 `baseRevision` 上推。服务端逐条处理：
 
 - **`baseRevision` 等于库内 `revision`** → 干净写入，`revision + 1`，返回 `applied`。
 - **`baseRevision` 小于库内 `revision`** → 发生并发修改，服务端做合并，`revision + 1`，返回 `merged` 和合并后的完整载荷，客户端用返回值覆盖本地。
 
-合并规则按字段分三类：
+不能只使用整条 `payload.updatedAt` 判输赢，否则一台设备改标题诊断字段可能覆盖另一台刚写的标签。资源中的可独立编辑字段保存字段级更新时间；合并规则如下：
 
 | 字段 | 规则 | 理由 |
 | --- | --- | --- |
-| AI 生成字段（`summary`、`tags`、`topics`、`aliases`） | 取 `payload.updatedAt` 较新的一方 | 可重新生成，冲突代价低 |
-| `note`（用户手写） | **两份都保留，写入 `note_versions` 数组，不覆盖** | 用户自己写的内容丢一个字都不可接受 |
-| 封面来源（`coverSource`、`imageUrl`、`categoryCoverId`） | 较新的一方 | 代价为零，本地可重建 |
+| AI 生成字段（`summary`、AI tags、`topics`、`aliases`、`useCases`、`questions`、`entities`） | 每个字段取字段时间较新的一方 | 可重新生成，冲突代价较低，但不能因改了一个字段覆盖整组 |
+| `userNote`、用户自定义标签 | **两份都保留为 conflict versions，不覆盖**；标签以集合合并并保留删除操作 | 用户自己写的内容丢一个字都不可接受 |
+| 设置 | 按 `setting_key` 独立 revision；保护规则冲突时更严格的一方优先，防止旧设备重新上传受保护内容 | 整包 LWW 会把隐私设置回滚 |
+| 自动封面与快照 | 同类型取采集时间较新的有效资产；用户手动选择或上传的封面优先级永远高于自动快照和页面代表图 | 人工意图不能被后台刷新覆盖 |
+| 收藏位置绑定 | 云端 `bookmarkItemId` 不变；本机仅更新 Chrome binding hint。匹配不唯一时进入待确认状态，不静默并错位置 | Chrome bookmark ID 跨设备不稳定 |
 | `deletedAt` | 删除优先。任一方标记删除即为删除 | 删除是用户明确意图，不该被另一台设备的旧数据复活 |
 
-`note_versions` 非空时，侧边栏的编辑器要显示「这条笔记有 2 个版本」并让用户选择保留哪个或合并，选定后清空 `note_versions`。**不要静默展示其中一个版本**，那等于把冲突处理成了丢数据。
+笔记或用户标签存在冲突版本时，侧边栏和网页端编辑器都要显示冲突数量，让用户选择、合并或全部保留；处理完成后写一个新的权威 revision。**不要静默展示其中一个版本**，那等于把冲突处理成了丢数据。
 
 标题、URL、文件夹结构**永远以 `chrome.bookmarks` 为准，云端副本不允许覆盖本地**。这条纪律现有代码已经在执行（`mergeLocalResources` 里 pending 本地态优先），迁移后必须保留。
+
+#### 图片资产协议
+
+COS bucket 必须是私有读写、禁止匿名 ACL 和公共 CDN。扩展永远拿不到 SecretId/SecretKey，只能通过 Aarre API 获得 5 分钟以内、绑定单个 `assetId`、object key、Content-Type 和加密请求头的预签名 URL。
+
+1. 客户端将本机 Data URL 解码为 WebP bytes，校验魔数、尺寸和上限，计算 SHA-256。
+2. `POST /v1/assets/uploads` 发送资源、资产类型、hash、字节数、尺寸与 MIME；服务端检查用户、配额、保护规则和是否已有同 hash 资产。
+3. 服务端生成不可由用户指定前缀的 object key：`users/<userId>/<assetId>/<sha256>.webp`，签发短时 PUT URL并要求 SSE-COS AES-256。
+4. 客户端直传必须由扩展 Service Worker 用精确 COS `host_permissions` 执行，不能从 content script、页面正文或任意网页 origin 上传。传完调用 `complete`；服务端 HEAD 校验对象存在、字节数、Content-Type、加密状态和 hash 元数据，随后才把资产标记为可见并写 `sync_changes`。
+5. 下载每次由 API 重新鉴权并签发短时 GET URL。新设备只先拉资产清单，当前可见卡片和用户打开的详情再懒下载，不能登录后一次性下载全部图片。
+6. 未完成上传 24 小时清理；没有数据库引用的 orphan object 每日巡检；替换和普通删除保留 30 天对象版本用于误删恢复，受保护资源清除与账户删除必须显式删除全部版本，不能只写 delete marker。
+
+支持的资产类型固定为：`page_snapshot`、`page_cover`、`site_brand`、`user_cover`。每个 WebP 默认上限 2MB、长边上限 2048；用户原图若未来开放，必须在客户端先规范化为安全 WebP，不允许任意 SVG、HTML 或原始文件直接进入可展示对象。
+
+v1 使用 COS 私有访问和 SSE-COS AES-256，**不宣称端到端加密**。服务端正常业务不下载图片正文，运维权限最小化并审计 COS 操作；如果以后要做零知识图片备份，必须另立密钥恢复 PRD，不能在没有恢复密钥设计时只加一层 AES 就冒充 E2EE。
+
+#### 卸载重装与新设备恢复
+
+1. 用户重新安装后先由 Chrome Sync 恢复原生书签；Aarre 未登录时仍立即展示原生列表。
+2. 用户登录后执行 cloud bootstrap，把 URL 级资源与本地 canonical URL 关联，再按 `bookmarkItemId` 的 URL、文件夹路径、标题和日期提示重绑定收藏位置。
+3. 唯一匹配自动绑定；同一 URL 多位置或路径已改名时保留为“待确认”，不能把一条备注静默绑到错误书签。
+4. 元数据先恢复，封面与快照按视口懒下载并写回本地缓存。已有完整 AI schema 和有效云端资产的记录不进入全目录重扫；只为云端缺失、过期或用户明确要求刷新的字段排队。
+5. 恢复完成必须显示核对结果：Chrome 书签数、已关联智能记录、待确认位置、已恢复图片、仍缺失项目和是否需要重新配置本机 API Key。
+6. 云端不可用、登录失败或 COS 降级都不能阻止 Chrome 书签使用；本地写入继续进入持久 Outbox，恢复网络后幂等补同步。
+
+#### 备份、灾难恢复与删除
+
+NexVoice 当前 `/opt/nexvoice/ops/backup.sh` 只把数据库 dump 和 GlitchTip uploads 保存在同一台服务器的 `/var/backups/nexvoice`，并在 7 天后删除。它适合部署前短期回滚，**不满足 Aarre 用户资产灾备**：系统盘、数据库和本机备份可能在同一次机器故障中一起丢失。
+
+- `server/src/cli/backup.ts` 对 `aarre_sync` 做一致性 `pg_dump -Fc`，计算 SHA-256，以 backup Worker 独立 CAM 上传到新加坡私有 COS并强制 SSE-COS AES-256；临时 dump 只在 `mkdtemp` 中存在，成功/失败路径都精确清理。镜像固定 PostgreSQL 16 client；备份写入 source/client major metadata，`restore.ts` 同时校验 dump/source/restore/target major 和摘要，默认禁止覆盖生产库。2026-08-02 日备已恢复到隔离库并核对 6 个 migration / 25 张表；不兼容的旧备份已从 COS 全版本删除并标记失败。
+- 主资产桶和备份桶使用不同 CAM。长期运行的 API 容器不加载 `/etc/aarre/backup.env`，不能删除灾备桶；受保护/删号的全版本任务由每 5 分钟启动的短命 `aarre-deletion-worker` 同时清主桶与灾备桶。数据库 daily 备份保留 35 天、monthly 保留 12 个月。
+- **资产备份必须覆盖全部已提交对象，不是“关键对象抽样”。** 每次备份以数据库 manifest 为准，把所有 committed asset 的 object key、version、hash 和字节数写入清单，并通过增量复制保证备份桶存在对应字节；只有内置 40 张随扩展发布的兜底图可以只记录版本 ID。
+- Alpha：每日全量 database dump 保留 35 日、每月 dump 保留 12 月；COS 香港主桶启用版本控制并跨地域复制到新加坡灾备桶。正式付费前补 WAL 归档或等价持续备份，并评估独立腾讯云子账号/主账号副本，避免香港区域或主账号故障成为共同失效点。
+- 每季度在隔离 database 和临时 bucket 做一次联合恢复演练，核对用户数、实体数、最高 sequence、asset hash、受保护清除状态和抽样图片可解码；只看“备份命令退出 0”不算通过。
+- 普通同步墓碑保留 180 天；用户误删资产版本保留 30 天；账户删除和受保护 purge 不走普通保留期，必须枚举并删除所有 COS versions。安全备份中的账户数据按公开保留周期到期，不能恢复回生产。
+- 目标：Alpha RPO ≤ 24 小时、RTO ≤ 8 小时；正式付费前 RPO ≤ 1 小时、RTO ≤ 4 小时。
 
 #### 授权强制：这是最容易出事的地方
 
 失去 Supabase 的 RLS 之后，数据库层不再兜底，漏一个 `user_id` 条件就是全库泄露。要求：
 
-**所有对 `resources` 表的访问必须走唯一的 repository 模块**，该模块的每个导出方法第一个参数都是已验证的 `userId`，且不导出任何不带 `userId` 的查询：
+**所有用户数据表必须走 repository 层**，每个导出方法第一个参数都是已验证的 `userId`，且不导出任何不带 `userId` 的查询。资产 repository 还必须同时校验 `asset.user_id` 与 object key 前缀，不能因为拿到一个合法 asset ID 就跨用户签下载地址：
 
 ```ts
-// server/src/resource-repository.ts —— 唯一允许出现 resources 表 SQL 的文件
+// server/src/repositories/resource-repository.ts
 export function createResourceRepository(db: Database) {
   return {
-    listSince(userId: string, since: Date | null, limit: number): Promise<ResourceRow[]>,
+    bootstrap(userId: string, cursor: string | null, limit: number): Promise<ResourcePage>,
     upsertMany(userId: string, items: ResourceInput[]): Promise<UpsertResult[]>,
     purgeExpiredTombstones(olderThan: Date): Promise<number>
   };
 }
 ```
 
-**写一个会真正失败的结构测试**，而不是靠代码审查：扫描 `server/src/` 下除 `resource-repository.ts` 以外的所有文件，断言不出现 `FROM resources`、`INTO resources`、`UPDATE resources` 这些字符串。这条测试能挡住未来任何一次「顺手在别处写个查询」。
+**写一个会真正失败的结构测试**，而不是靠代码审查：扫描 `server/src/` 下除 `repositories/` 以外的所有文件，断言不出现对用户数据表的裸 SQL。每个 repository 的集成测试必须用两个用户交叉覆盖 list/get/update/delete/sign-download，确保所有路径都带上 `user_id`。
 
-再加一条越权集成测试：建两个用户，用 A 的 access token 请求 `GET /v1/resources`，断言返回结果里不含任何 B 的 `resource_key`。
+再加资产越权测试：A 用户不能用 B 的 `assetId` 获取下载 URL、提交上传、删除对象或借报错信息判断对象是否存在；未授权与不存在统一返回 404，避免资源枚举。
 
 #### 客户端改造清单
 
 | 文件 | 动作 |
 | --- | --- |
-| `src/lib/supabase.ts` | 删除 |
-| `src/lib/cloud.ts` | 重写为 REST 客户端。**Outbox、指数退避、`revision` 并发校验的逻辑保留**，它们与后端选型无关 |
-| `src/lib/auth.ts` | 重写为上面的 PKCE 流程。保留「产品账号必须等于 Chrome profile 账号」的校验 |
-| `scripts/build.mjs` | `VITE_SUPABASE_URL` 换成 `VITE_AARRE_API_URL`，仍然写死具体域名进 `host_permissions`，不用通配符 |
+| `src/lib/supabase.ts` / `supabase/` | 保持删除状态，增加构建反向检查，禁止旧 SDK、Edge Function 和云端 AI 路径回流 |
+| `src/lib/cloud.ts` | 重写为 REST 同步客户端。保留本地优先、Outbox 和指数退避；增加幂等 operation、bootstrap、change cursor、full-resync 与按实体 revision |
+| `src/lib/auth.ts` | 重写为上面的服务端 OAuth broker + 一次性 PKCE ticket 流程。保留「产品账号必须等于 Chrome profile 账号」的校验 |
+| 新建 `src/lib/cloud-assets.ts` | WebP bytes/hash、上传创建/完成、懒下载、COS 降级、本机缓存回填、orphan 重试和受保护资产清除 |
+| `src/lib/storage.ts` / `types.ts` | 增加 `bookmarkItemId`、字段级 revision、云端 asset manifest 和 sync cursor；IndexedDB 只增量升级，不删库重建 |
+| `src/lib/protection.ts` | URL 规则直接同步；folder ID 转稳定 `protectedFolderRuleId` + 本机绑定。开启保护时生成高优先级 purge mutation 并取消旧上传 |
+| `src/lib/display-settings.ts` / `settings.ts` / `theme.ts` | 把显示、成本上限、provider/model 与主题拆成按 key revision 的安全设置；API Key 留本机 |
+| `src/lib/usage-stats.ts` | 把本机累计值迁移为按周期/provider/model 聚合，并与服务端存储配额账本严格分开 |
+| `src/lib/conversations.ts` | 按用户云端范围同步；本机仍保留现有容量上限和离线可用性 |
+| `src/lib/bookmark-undo.ts` / 新建 operation history 模块 | 本机 raw undo snapshot 不上云；把稳定实体级操作摘要、墓碑和恢复结果写入云端操作历史 |
+| `src/lib/data-export.ts` | 从“只能导出”升级为版本化导出 + 导入恢复；云端导出包含资产清单和受控下载包，不含 API Key/Token |
+| `scripts/build.mjs` | 使用 `VITE_AARRE_API_BASE_URL`；云端发行必须同时设置 `AARRE_CLOUD_RELEASE=1`，并拒绝 localhost、非 HTTPS、path/query/fragment。由于本机扫描和截图本来就需要 `<all_urls>`，Manifest 无法再靠 host permission 单独收窄云端；云端客户端必须只调用该编译期常量和服务端签发的短时单对象 COS URL，构建不得回退 localhost/Supabase |
 | `.env.example` | 同步改键名 |
 | `package.json` | 移除 `@supabase/supabase-js` 依赖 |
-| `supabase/` 整个目录 | 删除（两个 Edge Function 和两个迁移文件）。语义检索已本地化，富化是 BYOK 直连，都不再需要 |
-| `src/lib/types.ts` | `AuthState` 去掉 Supabase 特有字段 |
+| `src/ui/privacy/main.tsx` / `README.md` / 商店披露 | 代码真实支持图片云备份后再更新承诺；实现前继续如实写“当前不上传”，不得提前宣传 |
+| 新建 `server/` | Fastify API、Postgres migrations、repositories、COS adapter、Dockerfile、独立 compose、测试与部署/恢复脚本 |
 
-`dist/` 里的 `host_permissions` 从 Supabase 域名换成自建 API 域名，Chrome Web Store 的权限披露文案要跟着改。
+扩展网络代码只允许固定 Aarre API 与服务端签发的短时 COS URL；现有 `<all_urls>` host permission 是本机页面增强/截图需要，不能被解释成允许任意云端目标。Chrome Web Store 的权限披露和隐私问卷同步更新。正式 bucket 名、CAM Secret 与 KEK keyring 只存在服务端 root-only 环境文件；扩展包不得包含。
 
-#### 开工前必须先确认的四件事
+#### 开工前事实核对与剩余外部资产
 
-这四件都可能推翻实施方案，要在写代码前查清，不要边做边发现：
+2026-08-02 已完成生产部署复核：机器位于腾讯云香港 `ap-hongkong-2`，`aarre-api` 独立容器健康运行并加入 `production_default`；Aarre 使用 PostgreSQL 16 中独立的 `aarre_sync` database/role。两只 COS、两套 CAM、Google Web OAuth、备份、两分钟健康巡检、独立 GlitchTip project 与加密恢复材料已建立。`sync.nexvoice.cc` A 记录、公开 TLS、主页/隐私/条款和 OAuth 技术链路已经通过；当前真正未完成的是 Google 品牌审核、正式 Web Store Extension ID 和真实安装扩展的同步/重装恢复验收。
 
-1. **域名与备案。** 腾讯云国内节点对外提供 HTTP 服务需要 ICP 备案。`nexvoice.cc` 已经在 Caddy 上正常服务，确认能否直接用它的子域名（如 `sync.nexvoice.cc`）；如果要用独立的 Aarre 域名，备案周期要提前算进排期。
-2. **内存余量。** 在机器上跑 `free -h` 和 `docker stats`，确认加一个 256M 容器还有余量。不足则走上面的退化方案，并先报给产品负责人。
-3. **Compose 网络名。** `docker network ls` 查 NexVoice compose 的实际网络名，Aarre 的 compose 要以 `external` 方式接入它。
-4. **Google Cloud 项目与重定向 URI。** 需要正式 Extension ID 才能注册 `chromiumapp.org` 重定向 URI，确认 F16 的 Extension ID 申请进度。
+当前外部收口清单：
+
+1. **正式 Extension ID 与 Google OAuth。** Google Cloud Web application client 已创建，只注册精确 `https://sync.nexvoice.cc/v1/auth/google/callback`；OAuth app 已从 Testing 切到 In production，当前品牌处于 Google 审核中。Aarre API allowlist/COS CORS 暂使用当前固定 unpacked ID；F17 获得 Web Store 正式 ID 后必须同步替换并重做公开 OAuth 验收，开发 ID 不得作为最终发布身份。
+2. **API 域名。** `sync.nexvoice.cc` 已由 DNSPod 指向当前服务器，Caddy 已签发并自动续期公开证书；若随后获得 Aarre 独立域名，必须先双域名兼容一个客户端版本再迁移，避免老扩展断连。
+3. **COS / CAM。** 香港主桶、新加坡灾备桶、SSE-COS AES-256、版本控制、生命周期、跨地域复制和两套 CAM 已完成；真实 PUT/HEAD/复制/历史版本列举/永久删除及 API CAM 无管理权探针通过。桶级历史版本权限使用专用桶 `/*` 资源与 `cos:prefix` 条件，不能再退回对象路径上的无效授权；CORS 只允许一个扩展 origin，不得改成 `*`。
+4. **生产 secrets 与恢复材料。** Aarre 已使用 root-only `/etc/aarre/aarre.env` 与单独 `/etc/aarre/backup.env`；长期 API 不加载后者。服务器 secrets 已导出为本机 AES-256/PBKDF2 加密包并做解密目录验证，口令在 Keychain 与独立 mode 600 文件中。仍需在隔离环境执行一次从该包恢复 OAuth、数据库/COS 身份和 KEK keyring 的完整冷恢复演练。
+5. **容量复核。** 每次部署前重新记录内存、磁盘、容器重启次数和数据库连接余量；低于 1GiB available memory 或系统盘低于 20% 可用时拒绝部署并先扩容。
 
 #### 验收标准
 
 **功能**
 
-- 两台设备登录同一账号，A 设备的 AI 摘要和标签在 B 设备出现。
-- B 设备本地无封面缓存时，能仅凭同步来的来源信息重建出与 A 设备一致的封面。
-- **B 设备不出现任何来自 A 设备的页面快照**（验证快照不上传）。
-- 两台设备同时编辑同一条笔记时，`note_versions` 保留两份，界面提示用户选择。
+- 两台设备登录同一账号，A 设备的摘要、全部 AI schema 字段、自定义标签、备注、设置和允许同步的会话在 B 设备出现。
+- 用户选择“完整云端备份”后，A 设备的用户封面、页面快照、页面代表图和站点标识能在 B 设备按需恢复；只同步文字模式下 B 设备不下载任何图片二进制。
+- 卸载扩展并重新安装：Chrome 书签出现后登录 Aarre，已有完整智能字段不重新调用 AI，当前可见封面恢复，结果页明确列出已关联、待确认和缺失项目。
+- 同一个 Canonical URL 收藏在两个文件夹并写不同备注，重装后仍保持两个 `bookmarkItemId`，不会合并成一条或把备注绑错位置。
+- 两台设备同时编辑同一条笔记或用户标签时，conflict versions 保留两份，侧边栏和网页端都提示用户选择或合并。
 - 一台设备删除的书签，在另一台设备上也消失（墓碑生效）；离线设备重新上线后不会把它同步回来。
 - 断网期间的保存全部进 Outbox，恢复网络后自动补同步，不丢条不重复。
-- **翻页游标的同毫秒测试**：构造 500 条 `updated_at` 完全相同的记录，用 `limit=100` 翻完全部页，断言恰好拿到 500 条、无重复、无遗漏、不死循环。这是复合游标唯一有意义的验证方式。
+- 构造 500 条同一事务写入的多实体变更，用 `limit=100` 从 `sync_changes.sequence` 翻完，断言恰好 500 条、无重复、无遗漏；重复提交同一 `operationId` 不产生第二次写入。
+- 把网页或文件夹改为受保护后，其他离线设备旧队列重新上线也不能恢复已清除的图片或触发重传；关闭保护不自动扫描。
+- Aarre API 或 COS 故障时，Chrome 原生收藏与本机增强继续可用；恢复后自动补同步。
 
 **安全**（每一条都要有对应的自动化测试）
 
 - **伪造的 `id_token` 被拒绝**：构造一个签名无效的 token，断言 401。
 - **过期的 `id_token` 被拒绝**。
 - **`aud` 不匹配的 `id_token` 被拒绝**（防止用别的应用的 token 登录）。
-- 用 A 用户的 access token 请求，返回结果不含任何 B 用户的数据。
-- 结构测试通过：`server/src/` 下除 repository 外不存在 `resources` 表的裸 SQL。
-- 载荷白名单生效：带 `thumbnailDataUrl` 的请求入库后该键不存在；超过 32KB 的单条 `payload` 被拒绝。
-- refresh Token 使用一次后立即失效，重放返回 401。
+- OAuth `state` 或 OIDC `nonce` 不匹配、过期、重复消费都被拒绝；任意非 allowlist 的 extension redirect 被拒绝，不能利用 start/callback 做 open redirect。
+- login ticket 超过 60 秒、重复使用、换 device 或 PKCE verifier 不匹配均被拒绝；最终回跳只含 fragment ticket，不含 Google code、Google Token、Aarre Token 或用户信息。
+- 登录完成后数据库、扩展存储和日志中都不存在 Google access/refresh token；服务端只保存 Aarre 自己的 Token 摘要和 Google `sub` 身份绑定。
+- content script 无法读取 Aarre access/refresh Token；侧边栏、网页端、runtime message 和错误上报载荷也不含 Token。资产 PUT/GET 只能从扩展 Service Worker 发起，任意 content script 请求上传能力会被后台消息 schema 拒绝。
+- 直接查询 PostgreSQL 或打开备份 dump，不能看到 URL、摘要、标签、备注、选中文字、会话、报告或重绑定提示明文；篡改 AES-GCM ciphertext/tag 会被拒绝，root-file/SSM/KMS 任一 provider 的 key version 轮换和逐用户 rewrap 后旧数据仍可读且新写入使用新版本。
+- 用 A 用户的 access token 请求，任何资源、设置、会话、设备、asset ID 或下载 URL 都不含 B 用户的数据；不存在与越权统一返回 404。
+- SQL 结构审计与双用户集成测试通过：所有用户实体 get/list/update/delete/sign-download 都从已认证 account 取得 `userId`，查询参数化并显式带 `user_id`；不存在无账号参数的用户数据查询入口。
+- 载荷白名单生效：带 `thumbnailDataUrl`、`imageDataUrl`、base64、正文、API Key 或 `nativeBookmarkIds` 的 mutation 被拒绝或剥离并告警；超过上限的 metadata 被拒绝。
+- 上传 URL 只能写入服务端分配的单一 object key，5 分钟内过期；替换 user ID、asset ID、Content-Type、SSE-COS header 或字节数均失败。
+- `complete` 对不存在、超尺寸、hash/字节数/MIME/SSE-COS 不匹配的对象拒绝提交；未完成对象和 orphan object 会清理。
+- refresh Token 使用一次后立即失效；重放返回 401 并吊销同一 token family。
+- 受保护资源不会获得上传 URL；保护开启后的 purge 会删除 COS 全部历史版本，而不是只创建 delete marker。
+- GlitchTip、Caddy、API 与 COS 访问日志不含 Token、签名 URL query、书签标题、URL、备注、对话正文或图片内容。
 
 **运维**
 
-- 单用户 1,000 条书签的云端存储占用不超过 3MB。
-- 逻辑备份**实际恢复过一次**，恢复后数据与备份时一致。备份产物落在对象存储，不只在本机。
-- 同步压测（模拟 50 用户各 1,000 条全量同步）期间，`console.nexvoice.cc` 的响应时间不出现可观测劣化。
+- 1,000 条典型书签的 metadata 不超过 5MB；完整图片资产基线记录实际 P50/P95 和总量，目标落在 50–150MB/重度用户预算内，超出必须解释来源而不是提高配额掩盖。
+- PostgreSQL 逻辑备份与 COS 资产备份**实际联合恢复过一次**：完整 manifest 中每个 committed asset 都能在恢复桶找到匹配 object/version/bytes/hash，资源绑定与总数完全一致；再对分层随机样本逐字节校验并解码图片。备份离开本机系统盘，不能只放 `/var/backups/nexvoice`。
+- Alpha 阶段至少每日数据库备份到独立 COS backup bucket，保留 30 个日备份、12 个周备份、12 个按月备份；正式付费前增加 WAL 归档或等价能力，使 RPO ≤ 1 小时、RTO ≤ 4 小时。
+- COS 主桶启用版本控制；历史版本生命周期、数据库墓碑和账户删除保留期有统一表，不产生无限账单。每日执行 DB 引用 ↔ COS object inventory 双向一致性巡检。
+- 同步压测（模拟 50 用户各 1,000 条 metadata，并按真实图片尺寸混入上传/懒下载）期间，`console.nexvoice.cc` 的 P95 与错误率不出现可观测劣化。
 - `aarre-api` 容器 OOM 或崩溃时，NexVoice 的 `control-api` 不受影响。
-- 错误上报能在 GlitchTip 里看到，且上报内容不含 Token、书签标题、URL 或笔记正文。
+- 错误上报能在独立 GlitchTip project 里看到；同步队列年龄、mutation 失败率、资产完成率、orphan 数、配额拒绝、恢复耗时和 COS/DB degraded 状态可观测。
+- 生产发布有独立回滚目录、数据库迁移回退说明和“旧客户端仍可同步”的兼容窗口；服务端不得要求所有用户同日更新扩展。
 
 ### F15 · 隐私与合规
 
-- 隐私政策页面，明确说明：正文发往哪里、什么数据留在本地、什么数据上云、封面图片请求会访问哪些第三方域名。
+- 隐私政策页面，明确说明：正文发往哪里、自动提取正文不进 Aarre 云端但用户主动保存的选中文字/备注会随文字数据同步、什么数据留在本地、云端图片是否包含页面截图、服务端加密但并非端到端加密、封面请求会访问哪些域名，以及用户如何关闭图片同步并删除既有资产。
+- “仅同步文字与设置”和“完整云端备份”必须在连接云端时分开展示；页面截图上传需要用户明确选择，不能把同意藏在总条款、默认静默开启或升级迁移里。
+- 受保护资源不进入云端正文/图片范围；用户开启保护、退出账号、清除此设备、删除云端账户是四种不同动作，数据后果必须分别说明。
 - Chrome Web Store 的权限披露文案，逐条解释为什么需要 `history`、`tabs`、`bookmarks`、`unlimitedStorage`。
-- 数据导出功能。用户能一键导出全部智能层数据为 JSON。这既是合规要求，也是「我们不锁定你」的最好证明。
+- 数据导出必须同时具备导入恢复。用户能导出版本化 archive：metadata JSON + 资产 manifest + 可选图片文件；导入前校验 schema、hash、数量和空间，支持 dry run、合并与冲突报告。现有“只下载 JSON、没有 importer”的状态不算备份闭环。
+- 云端账户删除先吊销全部 Token，在线数据与 COS 全版本在 7 天内完成物理删除；安全备份按公开保留周期自然过期，不允许恢复到生产。完成后提供不含私人内容的删除回执。
+- 导出与导入覆盖矩阵至少包含：资源白名单字段、收藏位置备注/标签、稳定文件夹保护规则、显示/AI 非密钥设置、AI 用量聚合、会话、报告、操作历史、冲突版本、资产 manifest 与用户选择的图片字节；明确排除 API Key、Token、正文、Outbox、原生 ID 和运行中任务。导出测试必须把这份矩阵逐项断言，不能只比较总条数。
 
 ### F16 · 计费与配额接口
 
@@ -1237,8 +1332,10 @@ export function createResourceRepository(db: Database) {
 
 - AI 调用统一走一层网关函数，具备用量计数和配额检查的挂载点。
 - 用户等级字段预留，即使当前所有人都是 BYOK 层。
+- 云端同步增加独立的 metadata bytes、asset bytes、asset count、月上传/下载流量和导出次数配额；AI 配额与存储配额不能混成一个数字。
+- `GET /v1/account/usage` 返回当前用量、软/硬上限、待清理对象和下一次可重试时间；超额时只阻止新云端资产，不阻止本机收藏、查看和导出。
 
-不要现在就实现计费，只留接口。
+不要现在就实现收费扣款，但必须把配额判定、用量账本和套餐配置做成服务端接口，避免未来靠客户端自报。
 
 ### F17 · 商店素材
 
@@ -1274,7 +1371,7 @@ export function createResourceRepository(db: Database) {
 
 ### F21 · Web / PWA 端
 
-Chrome 移动端跑不了扩展，但原生书签会通过 Chrome Sync 同步到手机。一个只读的 Web 端就能补上移动端缺口。依赖 F14 选择路线一。
+Chrome 移动端跑不了扩展，但原生书签会通过 Chrome Sync 同步到手机。一个只读的 Web 端就能补上移动端缺口。依赖 F14 完成账号、metadata 与私有资产访问；Web 端不得绕过相同的保护规则、短时资产 URL 和用户数据删除边界。
 
 ---
 
@@ -1285,16 +1382,18 @@ Chrome 移动端跑不了扩展，但原生书签会通过 Chrome Sync 同步到
 | 编号 | 决策 | 影响 | 建议 |
 | --- | --- | --- | --- |
 | D1 | 商业模式：纯 BYOK / 混合三层 / 纯订阅 | 影响 F4 引导设计、F16 配额接口、整体获客能力 | 混合三层。纯 BYOK 要求用户先注册 AI 账号充值才能体验核心价值，这个漏斗会杀掉绝大多数普通用户 |
-| D2 | 云端保留还是砍掉 | 影响 F14 工作量、运维成本、F21 是否可行 | **已定：保留，职责收窄，并从 Supabase 迁到自建服务器（腾讯云轻量应用服务器，与 NexVoice 共用）。** Chrome Sync 只同步书签树，Aarre 的增强层一个字节都不带走，这个缺口必须自己补。同时下线向量检索和云端 AI 富化，服务端收窄到认证三个端点加同步两个端点。见 F14 |
+| D2 | 云端保留还是砍掉 | 影响 F14 工作量、运维成本、F21 是否可行 | **已定：保留并做完整持久数据备份与同步。** 服务端使用腾讯云轻量应用服务器，与 NexVoice 共用机器但独立容器/database/user；图片进入 Aarre 私有 COS。语义检索仍本地，AI 富化仍 BYOK 直连。见 F14 |
 | D3 | 双 UI 保留还是合并 | 影响 F5、F7 的呈现载体 | 保留全页并明确分工。整理提案和周报需要更大画布 |
 | D4 | 列表封面默认用页面封面还是站点标识 | 影响第一印象 | **已定：默认站点标识。** 48px 下页面封面基本不可读，站点标识是唯一能让用户真正感知内容的选项。仍提供切换给偏好丰富视觉的用户 |
 | D5 | 是否接管新标签页 | 曝光量与侵入感的权衡 | 做成默认关闭的可选项。书签产品最大的问题是用户想不起来打开，但强制接管会招致反感 |
 | D6 | 本地语言包（F8 第二层）托管在哪 | 影响国内用户能否用上，以及是否产生带宽成本 | 需要先验证 HuggingFace CDN 在国内的实际可用性。不可用时在自托管和国内镜像之间选，自托管有带宽成本但可控 |
 | D7 | F8 第二层是否值得做 | 影响 M2 工作量约 1–2 周 | 先只做第一层并实测召回质量。别名方案的效果如果达到日常够用，第二层可以无限期推迟 |
 | D8 | 分类封面要不要做变体扩充 | 影响插画维护成本与视觉重复度 | **已定：不扩充，总量约 40 张、一个分类一张。** 视觉重复靠把兜底率压到 12% 以下解决，不靠加图。工程重心放在 5.5 的来源丰富度上 |
-| D9 | 页面快照采集的状态 | 影响快照覆盖率与隐私观感的平衡 | **已定：完整增强层必选，不保留隐藏全局关闭值。** 新收藏静默首拍；所有正常打开方式命中缺图收藏时稳定补拍并显示 toast；已有图按 7 天新鲜度静默刷新。无痕、敏感和内网页面禁 AI/截图，快照永不上云，并在引导和隐私政策里明示 |
+| D9 | 页面快照采集与云端范围 | 影响快照覆盖率、恢复能力与隐私观感 | **已定：本机采集继续属于完整增强层；云端图片备份必须在连接云端时明确选择。** 提供“仅文字与设置 / 完整云端备份”两个清楚范围。无痕、敏感、内网和受保护资源禁 AI/截图/上传；完整模式使用私有 COS + SSE-COS AES-256，不宣称 E2EE |
 | D10 | 服务端技术栈与 NexVoice 的复用程度 | 影响开发速度和运维复杂度 | **已定：同栈。** NexVoice ControlPlane 是 Fastify 5 + Postgres 16 + `pg` + zod 4 + `jose` + `@fastify/rate-limit`，Node 22 ESM，自研 SQL 迁移器，Docker 多阶段构建 + 系统级 Caddy + GlitchTip。迁移器、连接池、配置校验、Token 摘要、鉴权中间件都可直接照搬。见 F14 |
-| D11 | 内存不足时是否接受与 NexVoice 同进程 | 影响爆炸半径 | 默认独立 `aarre-api` 容器（256M）。若机器余量不足，退化为在 `control-api` 里加 `/aarre/v1/*` 路由前缀并把限额提到 512M——**这个退化必须先报产品负责人，开发不要自行选择**。见 F14 |
+| D11 | 内存不足时是否接受与 NexVoice 同进程 | 影响爆炸半径 | **已定：不接受同进程。** 2026-08-02 实测余量支持独立 320MiB `aarre-api`；未来不足时按容量计划购买腾讯云资源并迁移 Aarre，不把同步流量塞进 `control-api` |
+| D12 | 云端是否保存封面和页面快照 | 影响恢复完整度、存储成本和隐私政策 | **已定：保存。** 用户选择完整云端备份后，用户封面、页面快照、页面代表图和站点标识以 WebP 二进制存 Aarre 私有 COS；40 张内置兜底图只同步 ID。图片不进 PostgreSQL JSON，不占轻量服务器磁盘 |
+| D13 | 是否把 BYOK API Key 放入普通云同步 | 影响卸载恢复便利性与凭据风险 | **已定：F14 不同步 API Key。** 重新安装后需重新配置；未来若需要只能另做带恢复密钥的端到端加密 vault，不能把 Key 明文或仅靠服务端/COS 静态加密上传 |
 
 ---
 
@@ -1307,12 +1406,13 @@ Chrome 移动端跑不了扩展，但原生书签会通过 Chrome Sync 同步到
 | 扫描把用户的 AI 额度烧光 | 用户愤怒卸载 | F11 成本预估与实时统计。设置页提供单次扫描的花费上限 |
 | 封面抓取被站点判定为爬虫 | IP 被封，功能失效 | F11 的域名限速同样适用于封面抓取；不携带 Cookie；遵守 `robots.txt` 的抓取频率约定。管线 A 按域名只抓一次，天然把请求量降到五分之一 |
 | 本地语言包在国内下载不了 | F8 第二层对中国用户不可用 | 第一层必须独立达到「日常够用」，第二层永远是可选增强。见 D6、D7 |
-| 云端存储与带宽超出单机容量 | 服务不可用或被迫紧急扩容 | 只同步派生指令不同步派生产物：封面靠来源信息本地重建，快照完全不上传。单用户载荷从 21MB 降到 1.5MB。见 F14 |
-| 页面快照被视为隐私侵犯 | 商店评论和舆情风险 | 只处理新收藏或当前正常打开的已收藏页面；已有图最多每 7 天静默刷新一次。无痕、敏感和内网页面禁 AI/截图，快照永不上传，并在安装权限、引导和隐私政策中明示。见 D9 |
+| 云端图片存储与下行带宽失控 | COS 费用增长、恢复变慢 | 图片进 COS 不进系统盘/Postgres；按 hash 去重、只上传变化、视口懒下载、资产配额、历史版本生命周期和用量看板。按每位重度用户 50–150MB 建模，不再假装只有 1.5MB。见 F14 |
+| 页面快照被视为隐私侵犯 | 商店评论、合规和信任风险 | 云端连接时单独选择图片范围；私有 COS + SSE-COS AES-256；无痕、敏感、内网和受保护资源禁 AI/截图/上传；开启保护会清除云端全版本。隐私政策明确“不属于 E2EE”。见 D9、D12 |
 | **自建服务器授权漏洞导致跨用户数据泄露** | 不可挽回的信任事故 | 失去了 Supabase 的 RLS 兜底，授权必须在应用层强制：统一 repository 层，每个方法签名强制传入已验证的 `userId`，不提供无 `userId` 的查询入口。验收里有专门的越权测试。见 F14 |
-| 与 NexVoice 共用服务器互相影响 | 一个项目的故障拖垮另一个 | 数据库必须独立（独立 database、独立用户），实例可共用；按用户和 IP 双维度限流；批量上推设条数上限；同步压测时观测 NexVoice 的响应时间 |
-| 增强层数据丢失且无法恢复 | 用户最在意的资产没了 | 增强层是用户唯一无法自行恢复的数据（书签有 Chrome Sync，封面可重抓）。机器快照粒度太粗，必须有定时逻辑备份到对象存储，并**实际验证过一次恢复** |
-| 域名未备案导致上不了线 | 开发完成但无法交付 | 腾讯云国内节点对外提供 HTTP 服务需要 ICP 备案。动手前先确认能否用 NexVoice 已备案域名的子域名 |
+| 与 NexVoice 共用服务器互相影响 | 一个项目的故障拖垮另一个 | 独立 `aarre-api` 容器、database、数据库用户、secrets、CAM 与 GlitchTip project；API 限流和批量上限；图片直传 COS；压测同时观测 NexVoice P95/错误率。禁止同进程退化 |
+| PostgreSQL 记录与 COS 对象不一致 | 封面丢失、孤儿对象持续计费 | 上传 create/complete 两阶段提交、hash/HEAD 校验、每日双向 inventory、24 小时未完成清理、删除全版本任务与可重试状态机 |
+| 增强层数据丢失且无法恢复 | 用户最在意的资产没了 | 数据库与 COS 联合备份、对象版本控制、离机 backup bucket、明确 RPO/RTO，并实际完成重装恢复和灾备恢复两种演练；机器本地 7 天 dump 不算完成 |
+| API 域名或 OAuth 外部资产未就绪 | 开发完成但无法登录/同步 | DNS/TLS、Google redirect 和真实 OAuth 技术链路已完成；现阶段外部门是 Google 品牌审核、正式 Extension ID，以及新 ID 下的安装态 OAuth/同步复验 |
 | Chrome 扩展 API 变更 | 功能失效 | `minimum_chrome_version` 已锁 134。关注 MV3 后续变更，特别是 Service Worker 生命周期 |
 | 单人维护的持续性 | 用户对长期可用性存疑 | 数据导出（F15）和「不建平行库」本身就是最好的答案：即使产品停止维护，用户的书签一条都不会丢 |
 
@@ -1328,8 +1428,8 @@ Chrome 移动端跑不了扩展，但原生书签会通过 Chrome Sync 同步到
 - **后台批量开标签页截图已通过 `chrome.debugger` 落地（0.4.5 决策）。** `captureVisibleTab` 只能截可见标签页；`debugger` 权限用于用户显式启动的批量补拍，只附加 Aarre 自己创建的后台专用标签页，不附加用户浏览中的其他页面，商店披露与隐私文案同步说明。
 - **不用 AI 生成「看起来像网页」的预览图。** 那是凭空编造，用户会误以为是真实页面。预览窗的可信度不能掺假。
 - **不做封面色底合成、不做生成式字标。** 低分辨率图标叠色底不会变精致，只会增加视觉噪音。分类封面已经覆盖这个需求。
-- **不上传页面快照到云端。** 快照是设备本地的浏览痕迹，同步它就是把浏览行为搬到服务端。
-- **不把任何二进制图像资产上云。** 封面靠来源信息本地重建，服务端有白名单强制剥离。
+- **不把页面快照或封面放进公开桶、永久 URL、PostgreSQL JSON 或日志。** 用户选择完整云端备份后，图片只能进入 Aarre 私有 COS，经短时签名访问并使用 SSE-COS AES-256；受保护资源始终排除。
+- **不把“服务端加密”宣传成“端到端加密”。** v1 的服务端在授权运维条件下具备解密能力；未来零知识方案必须另做密钥恢复设计和独立验收。
 - **不在服务端做 AI 富化，不在服务端存 API Key。** BYOK 直连是产品的隐私基石，也是成本结构的基石。
 - **不复制 Chrome 地址栏的私有能力。** 计算器、单位换算、站点搜索快捷词是未公开实现，承诺了做不到。
 - **不做社交与协作。** 共享收藏夹、团队空间是另一个产品，会稀释「个人知识管理」的定位。
@@ -1351,7 +1451,7 @@ Chrome 移动端跑不了扩展，但原生书签会通过 Chrome Sync 同步到
 | **第 2 批** | F22 悬浮预览 | 功能上不依赖 F3，但要占用 IndexedDB v4，所以必须等 F3 的 v3 落地 |
 | **第 3 批**（可两路并行） | F4 首次引导 · F5 / F6 其余 M1 项 | |
 | **第 4 批** | F8 检索改造（只做第一层） | 别名字段要同时改 enrichment prompt，与 F3 的扫描流程有交集，不要和 F3 并行 |
-| **第 5 批** | F14 云端迁移 | 依赖 F16 的正式 Extension ID（Google 重定向 URI 需要它）。**开工前先完成 F14 的「四件事确认」** |
+| **第 5 批** | F14 完整云端 | 生产 API、数据库、COS/CAM、DNS/TLS、Google OAuth 技术链路、secrets 和数据库灾备已完成；下一步按“Google 品牌审核/正式 ID → 真实 metadata/资产同步 → 卸载重装/冷恢复 → 50 用户压测”四个门串行收口，不能先宣传后补恢复 |
 | 其余 | 按第 3 章里程碑表 | |
 
 **IndexedDB 版本号是共享资源，必须串行分配**，两个 Agent 同时把版本号改成 v2 会导致其中一方的 store 永远建不出来：
@@ -1375,7 +1475,7 @@ Chrome 移动端跑不了扩展，但原生书签会通过 Chrome Sync 同步到
 | F3 封面 | 新建 `src/lib/cover-registry.ts`、改 `src/lib/thumbnail.ts` / `page-essence.ts` / `favicon.ts`、`src/ui/components/SiteThumbnail.tsx` |
 | F8 检索 | `src/lib/search.ts`、`src/lib/local-ai.ts`（enrichment prompt 加 `aliases`） |
 | F22 悬浮预览 | 新建 `src/ui/components/BookmarkPreview.tsx`、`src/lib/snapshot.ts`；改 `SidePanelApp.tsx`（需登记） |
-| F14 云端 | `src/lib/auth.ts` / `cloud.ts` / `supabase.ts`、`scripts/build.mjs`、新建 `server/` |
+| F14 云端 | `src/lib/auth.ts` / `cloud.ts` / `cloud-assets.ts` / `storage.ts` / `types.ts` / `protection.ts` / `display-settings.ts` / `settings.ts` / `theme.ts` / `usage-stats.ts` / `conversations.ts` / `bookmark-undo.ts` / `data-export.ts`、`scripts/build.mjs`、新建 `server/`；涉及 `background.ts` / `SidePanelApp.tsx` 时仍需单独登记高冲突文件 |
 
 `src/lib/storage.ts` 的 `normalizeResourceRecord` 会被多个需求同时想改（都要加新字段）。**加字段时只做追加，不要重排、不要改已有字段的默认值**，这样多个 Agent 的改动可以自然合并。
 
@@ -1389,14 +1489,18 @@ Chrome 移动端跑不了扩展，但原生书签会通过 Chrome Sync 同步到
 4. **AI 写操作前必须有快照。** 快照写入失败就拒绝执行操作，不允许「先做了再说」。
 5. **通配网页权限只服务完整增强层。** `<all_urls>` 是原生星标自动增强与 `captureVisibleTab()` 所必需的 `host_permissions`；业务逻辑只处理 HTTP(S) 收藏，不得用它读取无痕/敏感/内网页面、调用 AI 或上传快照。普通浏览只做本地 URL 命中检查，未收藏网页不读取正文；命中已收藏页面才补缺图或按 7 天新鲜度静默刷新。新增其他权限仍须单独说明理由。
 6. **不引入需要额外权限的能力**而不在 PRD 里说明。新增任何 manifest 权限都要在进展文档里写明理由，因为它会影响商店审核。
+7. **云端默认拒绝未分类字段。** 新增本地持久字段时必须同时决定：是否同步、属于哪个实体、冲突规则、导出/删除行为、是否含敏感内容；没有答案就保持本地且记待决策。
+8. **保护规则优先于同步。** 任何上传、重试、恢复、旧设备回放和资产下载在执行前都重新检查保护状态；不能只在任务入队时检查一次。
 
 ### 12.4 不要做的事
 
 - **不要为了让测试通过而放宽验收标准。** 第 5 章的「零上采样」和「兜底率 ≤ 12%」是互相拉扯的硬指标，达不到就报出来，不要单独满足一个。
 - **不要用模拟数据代替真实验证。** 完成定义里的「在真实 Chrome 中加载 `dist/`」不能用 `?preview=1` 替代。
 - **不要顺手重构不属于本需求的代码。** 两个高冲突文件尤其如此。
-- **不要自行决定 D 系列的待决策项。** 第 9 章里还没标「已定」的（D1、D3、D5、D6、D7、D11）需要产品负责人拍板，遇到就停下来问。
+- **不要自行决定 D 系列的待决策项。** 第 9 章里还没标「已定」的（当前为 D1、D3、D5、D6、D7）需要产品负责人拍板，遇到就停下来问。
 - **不要在服务端记录任何书签内容。** 日志里不能出现标题、URL、笔记、Token、API Key。
+- **不要把 COS Secret、KEK/SSM/KMS key material 或预签名 URL 写进扩展、日志、错误上报和进展文档。** 扩展只能得到短时单对象能力。
+- **不要用“来源 URL 可重抓”替代用户资产恢复。** 云端存在有效 `assetId` 时优先恢复已保存字节；只有用户未开启图片云备份或资产确实缺失时才重抓。
 
 ### 12.5 每完成一个需求要做的事
 

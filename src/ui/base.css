@@ -74,10 +74,97 @@ mark {
   background: color-mix(in srgb, var(--ink) 15%, transparent);
 }
 
+.protection-control {
+  min-width: 0;
+  margin-top: var(--sp-5);
+  padding: var(--sp-3) var(--sp-4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-module);
+  background: var(--surface-sunken);
+}
+
+.protection-control-copy {
+  min-width: 0;
+  display: grid;
+  gap: var(--sp-1);
+}
+
+.protection-control-copy strong {
+  font-size: var(--fs-small);
+  font-weight: var(--fw-strong);
+}
+
+.protection-control-copy small {
+  color: var(--ink-muted);
+  font-size: var(--fs-caption);
+  line-height: 1.5;
+}
+
+.protection-control-copy .protection-control-error {
+  color: var(--negative);
+}
+
+.protection-switch {
+  position: relative;
+  width: var(--toggle-track-w);
+  height: var(--toggle-track-h);
+  min-width: var(--toggle-track-w);
+  min-height: var(--toggle-track-h);
+  padding: 0;
+  flex: 0 0 var(--toggle-track-w);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-chip);
+  background: var(--surface);
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease);
+}
+
+.protection-switch > span {
+  position: absolute;
+  top: var(--toggle-inset);
+  left: var(--toggle-inset);
+  width: var(--toggle-thumb);
+  height: var(--toggle-thumb);
+  border-radius: 50%;
+  background: var(--ink-muted);
+  transition:
+    translate var(--dur-base) var(--ease),
+    background-color var(--dur-fast) var(--ease);
+}
+
+.protection-switch[data-state="checked"] {
+  border-color: var(--ink);
+  background: var(--ink);
+}
+
+.protection-switch[data-state="checked"] > span {
+  translate: calc(
+    var(--toggle-track-w) - var(--toggle-thumb) - var(--toggle-inset) -
+      var(--toggle-inset)
+  );
+  background: var(--surface);
+}
+
+.protection-switch:disabled {
+  opacity: 0.55;
+}
+
+/* One focus indicator across both control systems: the shared Button draws its
+   own ring in --focus-ring, so a second outline in a different colour and width
+   here would double up on every button that uses it. */
 button:focus-visible,
 a:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--ink) 42%, transparent);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
+}
+
+button[data-slot="button"]:focus-visible {
+  outline: 0;
 }
 
 input:focus-visible,
@@ -100,22 +187,16 @@ textarea:focus-visible {
 }
 
 .button {
-  min-height: 40px;
+  min-height: var(--control-h-lg);
   padding: 0 var(--sp-4);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--sp-2);
   border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-control);
   font-size: var(--fs-small);
   white-space: nowrap;
-}
-
-.button-small {
-  min-height: 34px;
-  padding-inline: var(--sp-3);
-  font-size: var(--fs-caption);
 }
 
 .button svg {
@@ -123,19 +204,18 @@ textarea:focus-visible {
   height: 1.1em;
 }
 
-.button-dark,
-.button-danger {
+.button-dark {
   color: var(--bg);
   background: var(--ink);
 }
 
-.button-dark:not(:disabled):hover,
-.button-danger:not(:disabled):hover {
+.button-dark:not(:disabled):hover {
   background: color-mix(in srgb, var(--ink) 88%, var(--bg));
   transform: translateY(-1px);
 }
 
 .button-quiet {
+  min-height: var(--control-h-lg);
   border-color: var(--line);
   color: var(--ink);
   background: var(--surface);
@@ -146,9 +226,40 @@ textarea:focus-visible {
   background: var(--surface-sunken);
 }
 
+/* Destructive confirmation is the one place the product spends a colour. It
+   has to read as "this removes something" before the label is read. */
 .button-danger {
+  min-height: var(--control-h-lg);
   color: var(--bg);
-  background: var(--ink);
+  background: var(--negative);
+}
+
+.button-danger:not(:disabled):hover {
+  background: color-mix(in srgb, var(--negative) 88%, var(--ink));
+  transform: translateY(-1px);
+}
+
+/* Quiet destructive entry point: reads as dangerous without competing with the
+   confirm button that follows it. */
+.button-danger-quiet {
+  min-height: var(--control-h-lg);
+  border-color: color-mix(in srgb, var(--negative) 35%, transparent);
+  color: var(--negative);
+  background: transparent;
+}
+
+.button-danger-quiet:not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--negative) 55%, transparent);
+  background: color-mix(in srgb, var(--negative) 10%, transparent);
+}
+
+/* Keep the compact action height after semantic button variants have declared
+   their default 40px minimum. */
+.button-small {
+  height: var(--control-h-button);
+  min-height: var(--control-h-button);
+  padding-inline: var(--sp-3);
+  font-size: var(--fs-caption);
 }
 
 .button:disabled,
@@ -157,7 +268,10 @@ textarea:focus-visible {
 }
 
 .text-button {
+  min-height: var(--control-h-sm);
   padding: var(--sp-1) 0;
+  display: inline-flex;
+  align-items: center;
   color: var(--ink-muted);
   background: transparent;
   font-size: var(--fs-caption);
@@ -167,7 +281,17 @@ textarea:focus-visible {
   color: var(--ink);
 }
 
+.text-button-danger {
+  color: var(--negative);
+}
+
+.text-button-danger:hover {
+  color: color-mix(in srgb, var(--negative) 82%, var(--ink));
+}
+
 .icon-button {
+  min-width: var(--control-h-sm);
+  min-height: var(--control-h-sm);
   display: grid;
   place-items: center;
   padding: 0;
@@ -178,6 +302,44 @@ textarea:focus-visible {
 .icon-button:hover {
   color: var(--ink);
   background: var(--surface-sunken);
+}
+
+/* A removable tag reads the same in the side panel and in the library editor,
+   so it is defined once here instead of drifting into two sizes, two corner
+   radii and two icon sizes in the two page stylesheets. */
+.tag-chip {
+  min-height: var(--control-h-xs);
+  padding: 0 var(--sp-1) 0 var(--sp-3);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  border-radius: var(--radius-chip);
+  color: var(--ink-muted);
+  background: var(--surface-sunken);
+  font-size: var(--fs-caption);
+}
+
+.tag-chip-remove {
+  width: var(--control-h-2xs);
+  height: var(--control-h-2xs);
+  padding: 0;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--ink-faint);
+  background: transparent;
+}
+
+.tag-chip-remove:hover {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+}
+
+.tag-chip-remove svg {
+  width: 12px;
+  height: 12px;
 }
 
 .eyebrow,
@@ -192,7 +354,7 @@ textarea:focus-visible {
 .notice {
   padding: var(--sp-3) var(--sp-4);
   border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-module);
   color: var(--ink-muted);
   background: var(--surface);
   font-size: var(--fs-small);
@@ -252,7 +414,7 @@ textarea:focus-visible {
 
 .loading-indicator {
   width: 28px;
-  height: 28px;
+  height: var(--control-h-xs);
   margin-bottom: var(--sp-2);
   border: 2px solid var(--line-strong);
   border-top-color: var(--ink);
@@ -270,13 +432,24 @@ textarea:focus-visible {
 
 .site-thumbnail {
   position: relative;
+  isolation: isolate;
   overflow: hidden;
   border-radius: var(--radius-sm);
-  background: var(--surface-sunken);
+  /* Restores the pre-theme invariant: icon transparency always reveals white. */
+  color-scheme: only light;
+  background: var(--site-icon-canvas);
+}
+
+.site-thumbnail > picture {
+  background: inherit;
 }
 
 .site-thumbnail-image {
   object-fit: cover;
+}
+
+.site-thumbnail-image[data-cover-kind="site"] {
+  background: inherit;
 }
 
 @keyframes loading-spin {

@@ -3,6 +3,8 @@ import { canonicalizeUrl } from "./url";
 import {
   COVER_RULES,
   matchCoverRule,
+  pinnedBrandAssetNeedsRefresh,
+  pinnedBrandAssetUrl,
   resolveRuleAsset,
   type CoverRule
 } from "./cover-rules";
@@ -12,6 +14,8 @@ export type CoverPipeline = "site-brand" | "page-image" | "category";
 export {
   COVER_RULES,
   matchCoverRule,
+  pinnedBrandAssetNeedsRefresh,
+  pinnedBrandAssetUrl,
   resolveRuleAsset,
   type CoverRule
 } from "./cover-rules";
@@ -69,6 +73,56 @@ export const CATEGORY_COVER_FILES = {
 } as const;
 
 export type CategoryCoverId = keyof typeof CATEGORY_COVER_FILES;
+
+/**
+ * 每张本地兜底封面的不透明底色。
+ *
+ * 这些颜色与封面资产中的整块强调色保持一致。网页端大卡片使用
+ * `object-fit: contain` 时，封面左右会留下可见的横向空白；空白必须
+ * 由当前封面自己的底色承接，而不是露出管理页的中性色。
+ */
+export const CATEGORY_COVER_BACKGROUNDS: Record<CategoryCoverId, string> = {
+  "web-tool": "#BCD1CA",
+  "work-dashboard": "#E3DACC",
+  "code-repository": "#BCD1CA",
+  "documentation-api": "#E3DACC",
+  "tutorial-course": "#6A9BCC",
+  "paper-research": "#CBCADB",
+  "pdf-report": "#D97757",
+  "data-chart": "#788C5D",
+  video: "#C46686",
+  "audio-podcast": "#C46686",
+  "newsletter-rss": "#EBCECE",
+  "shopping-products": "#D97757",
+  "place-map": "#6A9BCC",
+  "event-ticket": "#D97757",
+  "job-career": "#BCD1CA",
+  "portfolio-gallery": "#C46686",
+  "ai-automation": "#CBCADB",
+  "development-software": "#BCD1CA",
+  "data-cloud": "#6A9BCC",
+  "security-privacy": "#CBCADB",
+  "hardware-devices": "#E3DACC",
+  "design-creation": "#C46686",
+  "art-creation": "#C46686",
+  "business-startup": "#D97757",
+  "work-productivity": "#BCD1CA",
+  "education-science": "#CBCADB",
+  "finance-investing": "#788C5D",
+  "news-society": "#6A9BCC",
+  "health-medical": "#EBCECE",
+  "sports-fitness": "#788C5D",
+  "food-cooking": "#D97757",
+  "travel-places": "#6A9BCC",
+  "home-family": "#EBCECE",
+  "consumer-fashion": "#C46686",
+  "automotive-mobility": "#D97757",
+  "real-estate-housing": "#E3DACC",
+  "entertainment-culture": "#C46686",
+  "games-hobbies": "#788C5D",
+  "nature-pets": "#788C5D",
+  "generic-webpage": "#CBCADB"
+};
 
 /**
  * Aarre 随扩展一同打包的完整兜底封面池。
@@ -250,6 +304,14 @@ export function categoryCoverUrl(id: string | undefined): string {
     ] ||
     ""
   );
+}
+
+export function categoryCoverBackground(id: string | undefined): string {
+  const safeId =
+    id && id in CATEGORY_COVER_FILES
+      ? (id as CategoryCoverId)
+      : "generic-webpage";
+  return CATEGORY_COVER_BACKGROUNDS[safeId];
 }
 
 export function coverBrightnessForHost(input: string): number {

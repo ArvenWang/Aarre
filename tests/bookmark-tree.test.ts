@@ -1,112 +1,47 @@
 import { describe, expect, it } from "vitest";
-import {
-  findBookmarkByUrl,
-  visibleBookmarkRootChildren
-} from "../src/lib/bookmark-tree";
-import type {
-  BookmarkBarSnapshot,
-  NativeBookmarkNode
-} from "../src/lib/types";
+import { buildBookmarkBarSnapshot } from "../src/lib/bookmark-tree";
 
-const tree: NativeBookmarkNode[] = [
-  {
-    id: "root",
-    title: "书签栏",
-    children: [
+describe("native bookmark snapshot", () => {
+  it("preserves Chrome root ordering while counting all visible folders and bookmarks", () => {
+    const snapshot = buildBookmarkBarSnapshot([
       {
-        id: "folder",
-        parentId: "root",
-        title: "资料",
+        id: "0",
+        title: "根",
         children: [
           {
-            id: "bookmark",
-            parentId: "folder",
-            title: "Example",
-            url: "https://example.com/article"
-          }
-        ]
-      }
-    ]
-  }
-];
-
-describe("findBookmarkByUrl", () => {
-  it("finds an existing bookmark in nested folders", () => {
-    expect(
-      findBookmarkByUrl(tree, "https://example.com/article")
-    ).toMatchObject({
-      id: "bookmark",
-      parentId: "folder"
-    });
-  });
-
-  it("can ignore managed bookmarks when an editable target is required", () => {
-    const managed: NativeBookmarkNode[] = [
-      {
-        ...tree[0],
-        children: [
-          {
-            ...tree[0].children![0],
+            id: "other",
+            title: "其他书签",
+            index: 2,
             children: [
+              { id: "other-bookmark", parentId: "other", title: "其他", url: "https://other.example" },
+            ],
+          },
+          {
+            id: "bar",
+            title: "书签栏",
+            folderType: "bookmarks-bar",
+            syncing: true,
+            index: 1,
+            children: [
+              { id: "bar-bookmark", parentId: "bar", title: "栏内", url: "https://bar.example" },
               {
-                ...tree[0].children![0].children![0],
-                unmodifiable: true
-              }
-            ]
-          }
-        ]
-      }
-    ];
-
-    expect(
-      findBookmarkByUrl(
-        managed,
-        "https://example.com/article",
-        true
-      )
-    ).toBeNull();
-  });
-});
-
-describe("visibleBookmarkRootChildren", () => {
-  it("hides every Chrome system root while preserving their contents", () => {
-    const snapshot: BookmarkBarSnapshot = {
-      root: {
-        id: "bar",
-        title: "书签栏",
-        folderType: "bookmarks-bar",
-        children: [{ id: "bar-folder", title: "设计" }]
+                id: "nested",
+                parentId: "bar",
+                title: "文件夹",
+                children: [
+                  { id: "nested-bookmark", parentId: "nested", title: "嵌套", url: "https://nested.example" },
+                ],
+              },
+            ],
+          },
+        ],
       },
-      roots: [
-        {
-          id: "bar",
-          title: "书签栏",
-          folderType: "bookmarks-bar",
-          children: [{ id: "bar-folder", title: "设计" }]
-        },
-        {
-          id: "other",
-          title: "其他书签",
-          folderType: "other",
-          children: [{ id: "other-folder", title: "待复查" }]
-        },
-        {
-          id: "local-bar",
-          title: "书签栏",
-          folderType: "bookmarks-bar",
-          children: [{ id: "local-folder", title: "本机资料" }]
-        }
-      ],
-      primaryRootId: "bar",
-      bookmarkCount: 0,
-      folderCount: 3,
-      syncing: true
-    };
+    ] as chrome.bookmarks.BookmarkTreeNode[]);
 
-    expect(visibleBookmarkRootChildren(snapshot)).toEqual([
-      expect.objectContaining({ id: "bar-folder" }),
-      expect.objectContaining({ id: "other-folder" }),
-      expect.objectContaining({ id: "local-folder" })
-    ]);
+    expect(snapshot.primaryRootId).toBe("bar");
+    expect(snapshot.roots.map((root) => root.id)).toEqual(["bar", "other"]);
+    expect(snapshot.bookmarkCount).toBe(3);
+    expect(snapshot.folderCount).toBe(1);
+    expect(snapshot.root.children?.[1]?.unmodifiable).toBe(false);
   });
 });

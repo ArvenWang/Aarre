@@ -37,6 +37,16 @@ import type {
   UndoBatchResult,
   UndoSnapshotBatch
 } from "./types";
+import type { ItemProtectionState } from "./protection";
+import type {
+  CloudStorageUsage,
+  CloudSyncSettings
+} from "./cloud-settings";
+import type { CloudConflict } from "./cloud";
+
+export type ProtectionTarget =
+  | { kind: "bookmark"; id: string }
+  | { kind: "folder"; id: string };
 
 export type ExtensionRequest =
   | { type: "GET_APP_STATE" }
@@ -54,8 +64,10 @@ export type ExtensionRequest =
   | {
       type: "ASK_BOOKMARK_AGENT";
       query: string;
+      requestId: string;
       history?: BookmarkAgentTurn[];
     }
+  | { type: "CANCEL_BOOKMARK_AGENT"; requestId: string }
   | {
       type: "EXECUTE_BOOKMARK_AGENT_ACTIONS";
       actions: BookmarkAgentActionProposal[];
@@ -72,6 +84,12 @@ export type ExtensionRequest =
   | { type: "GET_UNDO_SNAPSHOTS" }
   | { type: "UNDO_BOOKMARK_BATCH"; batchId: string }
   | { type: "GET_LOCAL_RESOURCES" }
+  | { type: "GET_ITEM_PROTECTION"; target: ProtectionTarget }
+  | {
+      type: "SET_ITEM_PROTECTION";
+      target: ProtectionTarget;
+      protected: boolean;
+    }
   | { type: "GET_SITE_BRANDS" }
   | { type: "GET_PAGE_SNAPSHOT"; canonicalUrl: string }
   | { type: "GET_AGENT_CONVERSATIONS" }
@@ -126,6 +144,22 @@ export type ExtensionRequest =
       view?: "organize" | "report" | "topics" | "resurface" | "reading";
     }
   | { type: "OPEN_SIDE_PANEL" }
+  | { type: "SIGN_IN_CLOUD" }
+  | { type: "SIGN_OUT_CLOUD" }
+  | { type: "GET_CLOUD_SETTINGS" }
+  | {
+      type: "SAVE_CLOUD_SETTINGS";
+      payload: Pick<CloudSyncSettings, "enabled" | "scope">;
+    }
+  | { type: "GET_CLOUD_USAGE" }
+  | { type: "GET_CLOUD_CONFLICTS" }
+  | {
+      type: "RESOLVE_CLOUD_CONFLICT";
+      conflictId: string;
+      resolution: "current" | "incoming" | "merged";
+      mergedUserNote?: string;
+      mergedTags?: string[];
+    }
   | { type: "AUTH_CHANGED" };
 
 export type ResponseDataByRequest = {
@@ -142,6 +176,7 @@ export type ResponseDataByRequest = {
   GET_FOLDER_SUGGESTIONS: FolderSuggestion[];
   SAVE_BOOKMARK: SaveBookmarkResult;
   ASK_BOOKMARK_AGENT: BookmarkAgentResponse;
+  CANCEL_BOOKMARK_AGENT: { cancelled: true };
   EXECUTE_BOOKMARK_AGENT_ACTIONS: {
     results: BookmarkAgentActionExecutionResult[];
     batchId?: string;
@@ -158,6 +193,8 @@ export type ResponseDataByRequest = {
   GET_UNDO_SNAPSHOTS: UndoSnapshotBatch[];
   UNDO_BOOKMARK_BATCH: UndoBatchResult;
   GET_LOCAL_RESOURCES: ResourceRecord[];
+  GET_ITEM_PROTECTION: ItemProtectionState;
+  SET_ITEM_PROTECTION: ItemProtectionState;
   GET_SITE_BRANDS: SiteBrandRecord[];
   GET_PAGE_SNAPSHOT: PageSnapshot | null;
   GET_AGENT_CONVERSATIONS: AgentConversation[];
@@ -185,8 +222,15 @@ export type ResponseDataByRequest = {
   CREATE_NATIVE_FOLDER: NativeBookmarkNode;
   MOVE_NATIVE_BOOKMARK: NativeBookmarkNode;
   DELETE_NATIVE_BOOKMARK: { deleted: true };
-  OPEN_MANAGER: { opened: true };
-  OPEN_SIDE_PANEL: { opened: true };
+  OPEN_MANAGER: { opened: true; reused: boolean };
+  OPEN_SIDE_PANEL: { opened: boolean };
+  SIGN_IN_CLOUD: AppState;
+  SIGN_OUT_CLOUD: AppState;
+  GET_CLOUD_SETTINGS: CloudSyncSettings;
+  SAVE_CLOUD_SETTINGS: CloudSyncSettings;
+  GET_CLOUD_USAGE: CloudStorageUsage;
+  GET_CLOUD_CONFLICTS: CloudConflict[];
+  RESOLVE_CLOUD_CONFLICT: { resolved: true };
   AUTH_CHANGED: AppState;
 };
 

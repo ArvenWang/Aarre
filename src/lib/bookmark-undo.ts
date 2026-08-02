@@ -1,5 +1,6 @@
 import type {
   NativeBookmarkNode,
+  ResourceMetadataPatch,
   UndoBatchResult,
   UndoMutation,
   UndoSnapshotBatch
@@ -96,6 +97,24 @@ export async function snapshotCreatedMutation(input: {
     beforeChildIds: children.map((child) => child.id),
     expectedTitle: input.title,
     expectedUrl: input.url
+  };
+}
+
+export function snapshotMetadataMutation(input: {
+  resourceKey: string;
+  label: string;
+  actionId?: string;
+  before: ResourceMetadataPatch;
+}): UndoMutation {
+  return {
+    id: crypto.randomUUID(),
+    actionId: input.actionId,
+    kind: "restore_metadata",
+    label: input.label,
+    destructive: false,
+    applied: false,
+    resourceKey: input.resourceKey,
+    beforeMetadata: input.before
   };
 }
 
@@ -211,7 +230,8 @@ async function restoreMutation(
   mutation: UndoMutation,
   fallbackParentId: () => Promise<string>,
   onBeforeRemove?: (nodeId: string) => void,
-  onAfterRemove?: (nodeId: string) => void
+  onAfterRemove?: (nodeId: string) => void,
+  restoreMetadata?: (mutation: UndoMutation) => Promise<string>
 ): Promise<string> {
   if (!mutation.applied) return "";
   if (mutation.kind === "remove_created") {
@@ -220,6 +240,14 @@ async function restoreMutation(
       onBeforeRemove,
       onAfterRemove
     );
+  }
+  if (mutation.kind === "restore_metadata") {
+    // Metadata lives in Aarre's own storage, which this module deliberately
+    // does not import — the caller supplies the writer.
+    if (!restoreMetadata) {
+      throw new Error(`“${mutation.label}”缺少本地信息的恢复方式。`);
+    }
+    return restoreMetadata(mutation);
   }
   if (!mutation.node) {
     throw new Error(`“${mutation.label}”缺少恢复数据。`);
@@ -272,6 +300,7 @@ export async function undoBookmarkBatch(
   options: {
     onBeforeRemove?: (nodeId: string) => void;
     onAfterRemove?: (nodeId: string) => void;
+    restoreMetadata?: (mutation: UndoMutation) => Promise<string>;
   } = {}
 ): Promise<UndoBatchResult> {
   if (batch.status === "undone") {
@@ -291,7 +320,8 @@ export async function undoBookmarkBatch(
         mutation,
         fallbackParentId,
         options.onBeforeRemove,
-        options.onAfterRemove
+        options.onAfterRemove,
+        options.restoreMetadata
       );
       if (message) messages.push(message);
       restored += 1;

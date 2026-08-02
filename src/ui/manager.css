@@ -1,3 +1,66 @@
+.manager-page,
+body.manager-page {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.manager-page::-webkit-scrollbar,
+body.manager-page::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+html.manager-page[data-theme="light"],
+html.manager-page[data-theme="light"] body,
+html.manager-page[data-theme="light"] #root,
+html.manager-page[data-theme="light"] .manager-shell {
+  background: var(--page-bg-light);
+}
+
+.manager-floating-scrollbar {
+  position: fixed;
+  inset-block: var(--scrollbar-inset);
+  right: var(--scrollbar-inset);
+  z-index: 20;
+  width: var(--scrollbar-thumb-size);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur-base) var(--ease);
+}
+
+.manager-floating-scrollbar[data-overflow="true"][data-visible="true"],
+.manager-floating-scrollbar[data-dragging="true"] {
+  opacity: 1;
+}
+
+.manager-floating-scrollbar-thumb {
+  position: absolute;
+  inset: 0 0 auto;
+  height: var(--manager-scrollbar-thumb-height, var(--scrollbar-thumb-min));
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--scrollbar-thumb-color);
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  transform: translate3d(0, var(--manager-scrollbar-thumb-offset, 0px), 0);
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.manager-floating-scrollbar-thumb:hover,
+.manager-floating-scrollbar-thumb:focus-visible {
+  background: var(--scrollbar-thumb-color-hover);
+}
+
+.manager-floating-scrollbar-thumb:active,
+.manager-floating-scrollbar[data-dragging="true"]
+  .manager-floating-scrollbar-thumb {
+  cursor: grabbing;
+  background: var(--scrollbar-thumb-color-hover);
+}
+
 .manager-shell {
   min-height: 100vh;
   padding-bottom: var(--sp-8);
@@ -29,7 +92,6 @@
   display: flex;
   align-items: stretch;
   gap: var(--sp-7);
-  border-bottom: 1px solid var(--line);
 }
 
 .manager-topbar {
@@ -70,7 +132,7 @@
 
 .library-search {
   width: min(560px, 66vw);
-  min-height: 44px;
+  min-height: var(--control-h-touch);
   padding: var(--sp-1);
   padding-left: var(--sp-3);
   /* The submit is 4px shorter than the input row, so its visual top/bottom
@@ -127,13 +189,13 @@
 }
 
 .library-search .button {
-  min-height: 32px;
-  height: 32px;
+  min-height: var(--control-h-sm);
+  height: var(--control-h-sm);
 }
 
 .library-search-submit {
-  min-height: 34px;
-  height: 34px;
+  min-height: var(--control-h-sm);
+  height: var(--control-h-sm);
   min-width: 64px;
   margin: 0;
   padding-block: 0;
@@ -144,7 +206,7 @@
 
 .library-search-clear {
   width: 36px;
-  height: 36px;
+  height: var(--control-h-md);
   padding: 0;
   display: grid;
   place-items: center;
@@ -188,8 +250,8 @@
 
 .manager-view-tabs button {
   position: relative;
-  height: 36px;
-  min-height: 36px;
+  height: var(--control-h-md);
+  min-height: var(--control-h-md);
   padding: 0 var(--sp-3);
   display: inline-flex;
   align-items: center;
@@ -208,8 +270,8 @@
 
 .manager-theme-button {
   width: 34px;
-  height: 34px;
-  min-height: 34px;
+  height: var(--control-h-sm);
+  min-height: var(--control-h-sm);
   padding: 0;
   flex: 0 0 auto;
   align-self: center;
@@ -247,13 +309,18 @@
   left: 50%;
   z-index: 15;
   max-width: min(520px, calc(100% - 32px));
+  min-height: var(--control-h-touch);
   padding: var(--sp-3) var(--sp-4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid color-mix(in srgb, var(--surface) 18%, transparent);
   border-radius: var(--radius-md);
   color: var(--bg);
   background: var(--ink);
   box-shadow: var(--shadow-float);
   font-size: var(--fs-small);
+  line-height: 1.45;
   text-align: center;
   transform: translateX(-50%);
 }
@@ -298,13 +365,13 @@
 
 .library-tabs button,
 .report-period-tabs button {
-  min-height: 34px;
+  min-height: var(--control-h-md);
   padding-inline: var(--sp-3);
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-nested-md);
   color: var(--ink-muted);
   background: transparent;
   font-size: var(--fs-small);
@@ -313,6 +380,12 @@
 
 .library-tabs button {
   border-radius: var(--radius-pill);
+}
+
+.library-tabs button:hover:not([data-active="true"]),
+.report-period-tabs button:hover:not([data-active="true"]) {
+  color: var(--ink);
+  background: var(--hover);
 }
 
 .library-tabs button[data-active="true"],
@@ -429,7 +502,7 @@
 
 .library-select-control .library-select-trigger {
   width: 100%;
-  min-height: 40px;
+  min-height: var(--control-h-lg);
   padding-left: var(--sp-5);
   font-size: var(--fs-small);
 }
@@ -447,8 +520,8 @@
 }
 
 .snapshot-backfill-trigger {
-  min-height: 40px;
-  height: 40px;
+  min-height: var(--control-h-lg);
+  height: var(--control-h-lg);
   margin-left: auto;
   padding-inline: var(--sp-3);
   flex: 0 0 auto;
@@ -464,11 +537,6 @@
   color: var(--ink);
   background: var(--surface-sunken);
   border-color: var(--line-strong);
-}
-
-.library-toolbar .button > [data-slot="button-background"],
-.snapshot-backfill-trigger > [data-slot="button-background"] {
-  background: transparent;
 }
 
 .snapshot-backfill-status {
@@ -511,7 +579,7 @@
 }
 
 .snapshot-backfill-status-heading span {
-  padding: 3px var(--sp-2);
+  padding: 3px var(--sp-3);
   border-radius: var(--radius-sm);
   color: var(--ink-muted);
   background: var(--surface-sunken);
@@ -582,7 +650,7 @@
 }
 
 .snapshot-backfill-cancel {
-  min-height: 34px;
+  min-height: var(--control-h-sm);
   padding-inline: var(--sp-2);
   color: var(--negative);
 }
@@ -594,7 +662,7 @@
   padding: var(--sp-5);
   display: grid;
   place-items: center;
-  background: color-mix(in srgb, var(--ink) 40%, transparent);
+  background: var(--scrim-modal);
 }
 
 .snapshot-backfill-dialog {
@@ -602,7 +670,7 @@
   max-height: calc(100dvh - 40px);
   overflow: auto;
   border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-shell);
   color: var(--ink);
   background: var(--surface);
   box-shadow: var(--shadow-float);
@@ -642,7 +710,7 @@
 
 .snapshot-backfill-dialog-close {
   width: 34px;
-  height: 34px;
+  height: var(--control-h-sm);
   display: grid;
   place-items: center;
   flex: 0 0 auto;
@@ -650,6 +718,11 @@
   border-radius: var(--radius-md);
   color: var(--ink-muted);
   background: var(--surface);
+}
+
+.snapshot-backfill-dialog-close:hover {
+  color: var(--ink);
+  background: var(--surface-sunken);
 }
 
 .snapshot-backfill-dialog-body {
@@ -668,7 +741,7 @@
   padding: var(--sp-4);
   display: grid;
   gap: var(--sp-1);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-module);
   background: var(--surface-sunken);
 }
 
@@ -712,25 +785,44 @@
   margin: 0;
   display: block;
   align-self: start;
+  overflow: visible;
+  border: 0;
+  box-shadow: none;
+}
+
+/* The inner cover is the only clipping layer, so artwork and hover content
+   respect the rounded mask while the frame keeps a quiet hairline edge. */
+.library-card-cover-frame {
+  position: relative;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  display: block;
+  overflow: visible;
+  border: 1px solid var(--card-outline);
+  border-radius: var(--radius-shell);
+  background: var(--surface-sunken);
+  box-shadow: none;
 }
 
 .library-card-cover {
   position: relative;
   width: 100%;
-  height: auto;
-  aspect-ratio: 16 / 9;
+  height: 100%;
   display: block;
   overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--surface-sunken);
-  transition:
-    border-color var(--dur-base) var(--ease);
+  border-radius: inherit;
 }
 
-.library-card:hover .library-card-cover,
-.library-card:focus-within .library-card-cover {
-  border-color: var(--line-strong);
+.library-card-link {
+  position: static;
+}
+
+.library-card-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
 }
 
 .library-card-cover > .library-card-cover-loader {
@@ -748,12 +840,31 @@
 
 .library-card-cover .site-thumbnail-image {
   object-position: center;
+  transform: scale(1.05);
+  transform-origin: center;
   transition: transform 340ms var(--ease);
+}
+
+/* The bundled fallback illustrations are square. Keep their complete height
+   visible in the 4:3 cover and let the selected illustration's own accent
+   field fill the intentional horizontal letterbox. */
+.library-card-cover .site-thumbnail-image[data-cover-kind="aarre-fallback"] {
+  object-fit: contain;
+  transform: none;
 }
 
 .library-card:hover .library-card-cover .site-thumbnail-image,
 .library-card:focus-within .library-card-cover .site-thumbnail-image {
-  transform: scale(1.018);
+  transform: scale(1.09);
+}
+
+.library-card:hover
+  .library-card-cover
+  .site-thumbnail-image[data-cover-kind="aarre-fallback"],
+.library-card:focus-within
+  .library-card-cover
+  .site-thumbnail-image[data-cover-kind="aarre-fallback"] {
+  transform: none;
 }
 
 .library-card-copy {
@@ -764,18 +875,26 @@
   margin: 0;
   display: -webkit-box;
   overflow: hidden;
+  color: var(--ink-muted);
   font-size: var(--fs-body);
   font-weight: var(--fw-strong);
   letter-spacing: -0.012em;
   line-height: 1.35;
+  transition: color var(--dur-fast) var(--ease);
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
-.library-card h3 a:hover {
-  text-decoration: underline;
-  text-decoration-color: var(--line-strong);
-  text-underline-offset: 0.2em;
+/* Hover feedback is a weight of ink, not a drawn frame. */
+.library-card:hover h3,
+.library-card:focus-within h3 {
+  color: var(--ink);
+}
+
+.library-card-link:focus-visible::after {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+  border-radius: var(--radius-lg);
 }
 
 .library-card-site {
@@ -823,70 +942,48 @@
   font-size: var(--fs-caption);
 }
 
-/* Cards are top-aligned grid items, so revealing one card's details cannot
-   stretch its siblings in the same row. */
+/* Full-bleed cool-dark tint. Copy can grow past the cover; overflow scrolls
+   inside the mask with no visible scrollbar, so masonry height stays fixed. */
 .library-card-extra {
-  position: static;
-  height: auto;
-  max-height: 0;
-  margin-top: 0;
-  padding: 0;
-  display: grid;
-  gap: var(--sp-1);
-  overflow: hidden;
-  visibility: hidden;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  padding: var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   pointer-events: none;
   opacity: 0;
-  background: transparent;
-  transition:
-    max-height var(--dur-base) var(--ease),
-    margin-top var(--dur-base) var(--ease),
-    opacity var(--dur-base) var(--ease),
-    visibility 0s linear var(--dur-base);
+  color: var(--scrim-ink);
+  background: var(--scrim-cover);
+  cursor: pointer;
+  transition: opacity var(--dur-base) var(--ease);
+}
+
+.library-card-extra::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .library-card:hover .library-card-extra,
 .library-card:focus-within .library-card-extra {
-  max-height: 160px;
-  margin-top: var(--sp-3);
-  visibility: visible;
   opacity: 1;
-  transition:
-    max-height var(--dur-base) var(--ease),
-    margin-top var(--dur-base) var(--ease),
-    opacity var(--dur-base) var(--ease);
+  pointer-events: auto;
 }
 
 .library-card-extra p {
   margin: 0;
-  display: -webkit-box;
-  overflow: hidden;
-  color: var(--ink-muted);
-  font-size: var(--fs-small);
-  line-height: 1.5;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.library-card-extra > div {
-  margin-top: var(--sp-1);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-2);
-  color: var(--ink-faint);
+  color: var(--scrim-ink);
   font-size: var(--fs-caption);
-}
-
-.library-card-extra > div > span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.library-card-extra time {
-  flex: 0 0 auto;
+  line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .organization-shell,
@@ -993,6 +1090,7 @@
 .proposal-info-mark {
   width: 18px;
   height: 18px;
+  margin-top: var(--sp-1);
   display: grid;
   place-items: center;
   border: 1px solid var(--line-strong);
@@ -1007,7 +1105,7 @@
   padding: var(--sp-3) var(--sp-4);
   display: grid;
   gap: var(--sp-2);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-module);
   background: var(--surface-sunken);
 }
 
@@ -1033,7 +1131,12 @@
   gap: var(--sp-2);
 }
 
+/* These sit on their own row as actions, not inside running text, so they get
+   a control-sized hit area instead of a bare line box. */
 .proposal-recovery-links a {
+  min-height: var(--control-h-xs);
+  display: inline-flex;
+  align-items: center;
   color: var(--ink-muted);
   font-size: var(--fs-caption);
   text-decoration: underline;
@@ -1056,7 +1159,7 @@
 
 .reading-index {
   width: 34px;
-  height: 34px;
+  height: var(--control-h-sm);
   display: grid;
   place-items: center;
   border-radius: 50%;
@@ -1468,7 +1571,7 @@
 }
 
 .topic-insight-row {
-  min-height: 38px;
+  min-height: var(--control-h-md);
   display: grid;
   grid-template-columns: 10px minmax(0, 1fr) auto;
   align-items: center;
@@ -1553,24 +1656,26 @@
   font-size: var(--fs-small);
 }
 
+/* Above the stretched card link, otherwise the link swallows the click. */
 .library-card-editor-trigger {
   position: absolute;
   top: var(--sp-3);
   right: var(--sp-3);
-  z-index: 1;
+  z-index: 2;
   width: 32px;
-  height: 32px;
+  height: var(--control-h-sm);
   min-width: 32px;
-  min-height: 32px;
+  min-height: var(--control-h-sm);
   padding: 0;
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
-  border: 1px solid color-mix(in srgb, var(--surface) 62%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cover-action-bg) 62%, transparent);
   border-radius: 50%;
-  opacity: 0.84;
-  color: var(--ink);
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  color: var(--cover-action-ink);
+  background: color-mix(in srgb, var(--cover-action-bg) 92%, transparent);
   box-shadow: var(--shadow-soft);
   font-size: var(--fs-caption);
   font-weight: var(--fw-medium);
@@ -1597,9 +1702,11 @@
 
 .library-card:hover .library-card-editor-trigger,
 .library-card:focus-within .library-card-editor-trigger,
-.library-card-editor-trigger:hover {
+.library-card-editor-trigger:hover,
+.library-card-editor-trigger:focus-visible {
   opacity: 1;
-  background: var(--surface);
+  pointer-events: auto;
+  background: var(--cover-action-bg);
 }
 
 .library-card-editor-trigger:active {
@@ -1613,7 +1720,7 @@
   padding: var(--sp-5);
   display: grid;
   place-items: center;
-  background: color-mix(in srgb, var(--ink) 40%, transparent);
+  background: var(--scrim-modal);
 }
 
 .library-card-editor-dialog {
@@ -1621,7 +1728,7 @@
   max-height: calc(100dvh - 40px);
   overflow: auto;
   border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-shell);
   color: var(--ink);
   background: var(--surface);
   box-shadow: var(--shadow-float);
@@ -1637,7 +1744,6 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--sp-4);
-  border-bottom: 1px solid var(--line);
   background: color-mix(in srgb, var(--surface) 96%, transparent);
 }
 
@@ -1659,31 +1765,40 @@
 }
 
 .library-card-editor-close {
-  width: 34px;
-  height: 34px;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
+  min-height: var(--control-h-sm);
+  padding: 0;
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border: 0;
+  border-radius: var(--radius-control);
   color: var(--ink-muted);
-  background: var(--surface);
+  background: transparent;
+}
+
+.library-card-editor-close:hover {
+  color: var(--ink);
+  background: transparent;
+}
+
+.library-card-editor-close svg {
+  width: 18px;
+  height: 18px;
 }
 
 .library-card-editor-dialog form {
   padding: var(--sp-5) var(--sp-6) var(--sp-6);
 }
 
-.library-card-editor-field,
-.library-card-editor-location {
+.library-card-editor-field {
   min-width: 0;
   display: grid;
   gap: var(--sp-2);
 }
 
-.library-card-editor-field > span,
-.library-card-editor-location > span,
-.library-card-editor-tags > span {
+.library-card-editor-field > span {
   color: var(--ink-muted);
   font-size: var(--fs-caption);
   font-weight: var(--fw-medium);
@@ -1692,9 +1807,9 @@
 .library-card-editor-field input,
 .library-card-editor-field select,
 .library-card-editor-field textarea,
-.library-card-editor-tags > div:last-child input {
+.library-card-editor-tag-entry input {
   width: 100%;
-  min-height: 42px;
+  min-height: var(--control-h-lg);
   padding: var(--sp-2) var(--sp-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
@@ -1714,10 +1829,42 @@
   line-height: 1.5;
 }
 
+/* The folder and location pickers use the same popup as the library toolbar
+   filters; only the trigger is restyled to sit in a form field's place. */
+.library-card-editor-field .editor-select-trigger {
+  width: 100%;
+  min-height: var(--control-h-lg);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  background: var(--surface);
+  font-size: var(--fs-small);
+}
+
+.library-card-editor-field .editor-select-trigger:hover,
+.library-card-editor-field .editor-select-trigger:focus-visible {
+  border-color: var(--line-strong);
+  background: var(--surface);
+}
+
+.library-card-editor-field .editor-select-trigger[data-state="open"] {
+  border-color: var(--line-strong);
+  background: var(--surface-sunken);
+}
+
+.editor-select-content .bg-active {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.editor-select-content .bg-hover {
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
+}
+
 .library-card-editor-field input:focus,
 .library-card-editor-field select:focus,
 .library-card-editor-field textarea:focus,
-.library-card-editor-tags > div:last-child input:focus {
+.library-card-editor-tag-entry input:focus {
   border-color: var(--line-strong);
   background: var(--surface-sunken);
 }
@@ -1730,16 +1877,10 @@
 }
 
 .library-card-editor-field small,
-.library-card-editor-location strong,
 .library-card-editor-ai small {
   color: var(--ink-faint);
   font-size: var(--fs-caption);
   font-weight: var(--fw-regular);
-}
-
-.library-card-editor-location {
-  padding-bottom: var(--sp-4);
-  border-bottom: 1px solid var(--line);
 }
 
 .library-card-editor-readonly,
@@ -1768,12 +1909,28 @@
   padding-top: var(--sp-5);
   display: grid;
   gap: var(--sp-5);
-  border-top: 1px solid var(--line);
+}
+
+.library-card-editor-ai-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
 }
 
 .library-card-editor-ai strong {
   font-size: var(--fs-small);
   font-weight: var(--fw-strong);
+}
+
+.library-card-editor-status {
+  flex: 0 0 auto;
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--radius-md);
+  color: var(--ink-muted);
+  background: var(--surface-sunken);
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-medium);
 }
 
 .library-card-editor-ai p {
@@ -1783,52 +1940,29 @@
   line-height: 1.55;
 }
 
-.library-card-editor-tags {
-  display: grid;
-  gap: var(--sp-2);
-}
-
-.library-card-editor-tags > div:nth-child(2) {
+.library-card-editor-tag-list {
   display: flex;
   flex-wrap: wrap;
   gap: var(--sp-2);
 }
 
-.library-card-editor-tags > div:nth-child(2) > span {
-  min-height: 30px;
-  padding: 0 var(--sp-1) 0 var(--sp-3);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  border-radius: var(--radius-md);
-  color: var(--ink-muted);
-  background: var(--surface-sunken);
+.library-card-editor-tag-list > small {
+  color: var(--ink-faint);
   font-size: var(--fs-caption);
 }
 
-.library-card-editor-tags > div:nth-child(2) > span button {
-  width: 26px;
-  height: 26px;
+.library-card-editor-tags {
   display: grid;
-  place-items: center;
-  border: 0;
-  border-radius: var(--radius-sm);
-  color: var(--ink-faint);
-  background: transparent;
+  gap: var(--sp-2);
 }
 
-.library-card-editor-tags > div:nth-child(2) > span button svg {
-  width: 13px;
-  height: 13px;
-}
-
-.library-card-editor-tags > div:last-child {
+.library-card-editor-tag-entry {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--sp-2);
 }
 
-.library-card-editor-tags > div:last-child button {
+.library-card-editor-tag-submit {
   min-width: 64px;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
@@ -1837,14 +1971,22 @@
   font-size: var(--fs-caption);
 }
 
+.library-card-editor-tag-submit:not(:disabled):hover {
+  border-color: var(--line-strong);
+  background: var(--surface);
+}
+
+/* Both states occupy the same single control row, so entering the delete
+   confirmation cannot resize the dialog. */
 .library-card-editor-actions,
 .library-card-editor-confirm {
+  min-height: var(--control-h-lg);
   margin-top: var(--sp-6);
   padding-top: var(--sp-4);
-  border-top: 1px solid var(--line);
 }
 
 .library-card-editor-actions,
+.library-card-editor-confirm,
 .library-card-editor-actions > div,
 .library-card-editor-confirm > div {
   display: flex;
@@ -1855,37 +1997,44 @@
 
 .library-card-editor-actions > div,
 .library-card-editor-confirm > div {
+  flex: 0 0 auto;
   justify-content: flex-end;
 }
 
-.library-card-editor-actions .button-danger {
+.library-card-editor-actions .button-danger-quiet {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
 }
 
-.library-card-editor-actions .button-danger svg {
+.library-card-editor-actions .button-danger-quiet svg {
   width: 15px;
   height: 15px;
 }
 
-.library-card-editor-confirm {
-  padding: var(--sp-4);
-  border: 1px solid
-    color-mix(in srgb, var(--negative) 24%, var(--line));
-  border-radius: var(--radius-md);
-  background: color-mix(
-    in srgb,
-    var(--negative) 5%,
-    var(--surface)
-  );
+.library-card-editor-confirm p {
+  min-width: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--negative);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-medium);
+  line-height: 1.3;
 }
 
-.library-card-editor-confirm p {
-  margin: 0 0 var(--sp-3);
+.library-card-editor-confirm p svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.library-card-editor-confirm p small {
+  display: block;
   color: var(--ink-muted);
-  font-size: var(--fs-small);
-  line-height: 1.5;
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-regular);
 }
 
 @media (max-width: 900px) {
@@ -1972,18 +2121,19 @@
 
   .library-search .button,
   .library-search-clear {
-    min-height: 44px;
+    min-height: var(--control-h-touch);
   }
 
   .library-search-clear {
     width: 44px;
-    height: 44px;
+    height: var(--control-h-touch);
   }
 
   .library-card-editor-trigger {
-    min-height: 44px;
+    min-height: var(--control-h-touch);
     padding-inline: var(--sp-3);
     opacity: 1;
+    pointer-events: auto;
   }
 
   .library-toolbar-actions {
@@ -1992,7 +2142,7 @@
   }
 
   .library-tabs button {
-    min-height: 44px;
+    min-height: var(--control-h-touch);
   }
 
   .library-controls {
@@ -2013,7 +2163,7 @@
 
   .snapshot-backfill-trigger {
     align-self: flex-start;
-    min-height: 44px;
+    min-height: var(--control-h-touch);
     margin: 0;
     padding: 0;
   }
@@ -2037,7 +2187,7 @@
   }
 
   .snapshot-backfill-actions .button {
-    min-height: 44px;
+    min-height: var(--control-h-touch);
   }
 
   .snapshot-backfill-backdrop {
@@ -2062,7 +2212,7 @@
 
   .snapshot-backfill-dialog > footer .button {
     width: 100%;
-    min-height: 44px;
+    min-height: var(--control-h-touch);
   }
 
   .organization-toolbar > div:last-child {
@@ -2139,11 +2289,12 @@
   .library-card-editor-trigger {
     width: 44px;
     min-width: 44px;
-    height: 44px;
-    min-height: 44px;
+    height: var(--control-h-touch);
+    min-height: var(--control-h-touch);
     padding-inline: 0;
     border-radius: 50%;
     opacity: 1;
+    pointer-events: auto;
   }
 
   .library-card-extra {

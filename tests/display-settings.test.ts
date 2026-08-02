@@ -89,6 +89,28 @@ describe("display settings", () => {
     });
   });
 
+  it("在设计预览缺少 contains 时不把 TypeError 抛给界面", async () => {
+    const request = vi.fn(async () => true);
+    vi.stubGlobal("chrome", {
+      storage: {
+        local: {
+          get: async (key: string) => ({ [key]: values[key] }),
+          set: async (next: Record<string, unknown>) => {
+            Object.assign(values, next);
+          }
+        }
+      },
+      permissions: {
+        request
+      }
+    });
+
+    await expect(requestPageSnapshotPermission()).resolves.toBe(true);
+    expect(request).toHaveBeenCalledWith({
+      origins: ["<all_urls>"]
+    });
+  });
+
   it("为单次扫描提供真实可持久化的费用上限", async () => {
     expect((await getDisplaySettings()).scanCostLimitCny).toBe(10);
     expect(

@@ -92,3 +92,16 @@ export function bookmarkPageMenuPresentation(
     enabled: true
   };
 }
+
+export function bookmarkSnapshotMenuPresentation(
+  state: BookmarkSaveState | null,
+  available = true
+): { title: string; enabled: boolean; visible: boolean } {
+  const canRefresh =
+    available && Boolean(state && state.status !== "none");
+  return {
+    title: "更新封面",
+    enabled: canRefresh,
+    visible: canRefresh
+  };
+}

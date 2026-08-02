@@ -19,6 +19,9 @@ describe("bookmark enhancement jobs", () => {
     expect(enhancementTriggerAllowsRenderedAi("normal_browse")).toBe(
       true
     );
+    expect(enhancementTriggerAllowsRenderedAi("manual_refresh")).toBe(
+      false
+    );
     expect(enhancementTriggerAllowsRenderedAi("aarre_save")).toBe(true);
   });
 
@@ -88,6 +91,28 @@ describe("bookmark enhancement jobs", () => {
       capture: true,
       refreshExisting: true,
       showToast: false
+    });
+    expect(
+      snapshotCapturePolicy({
+        hasSnapshot: false,
+        snapshotIsStale: true,
+        trigger: "manual_refresh"
+      })
+    ).toEqual({
+      capture: true,
+      refreshExisting: false,
+      showToast: true
+    });
+    expect(
+      snapshotCapturePolicy({
+        hasSnapshot: true,
+        snapshotIsStale: false,
+        trigger: "manual_refresh"
+      })
+    ).toEqual({
+      capture: true,
+      refreshExisting: true,
+      showToast: true
     });
   });
 

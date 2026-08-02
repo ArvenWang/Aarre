@@ -3,6 +3,7 @@ import {
   AI_PRICE_UPDATED_AT,
   costCnyForUsage,
   estimateScanCost,
+  estimateScanTokens,
   tokenPriceForModel
 } from "../src/lib/ai-cost";
 
@@ -32,6 +33,25 @@ describe("AI scan costs", () => {
     expect(
       estimateScanCost(300, "openai", "custom-model").estimatedCostCny
     ).toBeNull();
+  });
+
+  it("estimates token volume for a scan regardless of pricing", () => {
+    expect(estimateScanTokens(206)).toEqual({
+      estimatedInputTokens: 185_400,
+      estimatedOutputTokens: 37_080
+    });
+    expect(estimateScanCost(206, "deepseek", "deepseek-v4-flash")).toMatchObject(
+      {
+        estimatedInputTokens: 185_400,
+        estimatedOutputTokens: 37_080
+      }
+    );
+    expect(
+      estimateScanCost(10, "openai", "custom-model")
+    ).toMatchObject({
+      estimatedInputTokens: 9_000,
+      estimatedOutputTokens: 1_800
+    });
   });
 
   it("accounts for cheaper cached input when calculating actual use", () => {

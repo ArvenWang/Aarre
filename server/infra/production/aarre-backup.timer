@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Aarre database backup every day
+
+[Timer]
+OnCalendar=*-*-* 03:35:00 Asia/Shanghai
+Persistent=true
+RandomizedDelaySec=900
+
+[Install]
+WantedBy=timers.target

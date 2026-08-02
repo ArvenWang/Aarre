@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import genericFallbackCoverUrl from "../../../assets/covers/generic-webpage-v1.webp?url";
 import {
   aarreFallbackCoverId,
-  categoryCoverUrl
+  categoryCoverBackground,
+  categoryCoverUrl,
 } from "../../../lib/cover-registry";
 import { sendExtensionRequest } from "../../../lib/messages";
 import type { ResourceRecord } from "../../../lib/types";
@@ -18,7 +19,7 @@ export function LibraryCardCoverImage({
   snapshotImageUrl = "",
   fallbackImageUrl = genericFallbackCoverUrl,
   fallbackCoverId = "generic-webpage",
-  label
+  label,
 }: LibraryCardCoverImageProps) {
   const [snapshotFailed, setSnapshotFailed] = useState(false);
   const [fallbackFailed, setFallbackFailed] = useState(false);
@@ -44,15 +45,20 @@ export function LibraryCardCoverImage({
       className="site-thumbnail manager-site-thumbnail"
       aria-hidden="true"
       title={label || undefined}
+      style={
+        useSnapshot
+          ? undefined
+          : {
+              backgroundColor: categoryCoverBackground(
+                resolvedFallbackCoverId,
+              ),
+            }
+      }
     >
       <picture>
         <img
           className="site-thumbnail-image"
-          src={
-            useSnapshot
-              ? snapshotImageUrl
-              : resolvedFallbackImageUrl
-          }
+          src={useSnapshot ? snapshotImageUrl : resolvedFallbackImageUrl}
           alt=""
           loading="lazy"
           data-cover-kind={useSnapshot ? "page-snapshot" : "aarre-fallback"}
@@ -62,9 +68,7 @@ export function LibraryCardCoverImage({
           onError={() => {
             if (useSnapshot) {
               setSnapshotFailed(true);
-            } else if (
-              resolvedFallbackImageUrl !== genericFallbackCoverUrl
-            ) {
+            } else if (resolvedFallbackImageUrl !== genericFallbackCoverUrl) {
               setFallbackFailed(true);
             }
           }}
@@ -94,7 +98,7 @@ export function LibraryCardCover({
   canonicalUrl,
   label,
   snapshotRevision = "",
-  fallbackResource
+  fallbackResource,
 }: LibraryCardCoverProps) {
   const containerRef = useRef<HTMLSpanElement>(null);
   const [nearViewport, setNearViewport] = useState(false);
@@ -106,8 +110,8 @@ export function LibraryCardCover({
       title: label,
       topics: [],
       tags: [],
-      summary: ""
-    }
+      summary: "",
+    },
   );
   const fallbackImageUrl = categoryCoverUrl(fallbackCoverId);
 
@@ -119,7 +123,7 @@ export function LibraryCardCover({
     }
     const observer = new IntersectionObserver(
       ([entry]) => setNearViewport(Boolean(entry?.isIntersecting)),
-      { rootMargin: "600px 0px" }
+      { rootMargin: "600px 0px" },
     );
     observer.observe(node);
     return () => observer.disconnect();
@@ -135,7 +139,7 @@ export function LibraryCardCover({
     let cancelled = false;
     void sendExtensionRequest({
       type: "GET_PAGE_SNAPSHOT",
-      canonicalUrl
+      canonicalUrl,
     })
       .then((snapshot) => {
         if (!cancelled) {

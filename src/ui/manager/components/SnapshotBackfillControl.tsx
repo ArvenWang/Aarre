@@ -1,16 +1,20 @@
 import { Button } from "../../../components/ui/button";
-import { FluidInput, FluidTextarea, FluidSelect } from "../../components/FluidControls";
+import {
+  FluidInput,
+  FluidTextarea,
+  FluidSelect,
+} from "../../components/FluidControls";
 import {
   useCallback,
   useEffect,
   useRef,
   useState,
-  type KeyboardEvent
+  type KeyboardEvent,
 } from "react";
 import { sendExtensionRequest } from "../../../lib/messages";
 import type {
   SnapshotBackfillState,
-  SnapshotBackfillStatus
+  SnapshotBackfillStatus,
 } from "../../../lib/types";
 import { CloseIcon } from "../../components/Icons";
 
@@ -19,30 +23,25 @@ interface SnapshotBackfillControlProps {
   onCollectionChanged?: () => void;
 }
 
-type SnapshotBackfillAction =
-  | "start"
-  | "pause"
-  | "resume"
-  | "cancel"
-  | "";
+type SnapshotBackfillAction = "start" | "pause" | "resume" | "cancel" | "";
 
 const DISMISSED_JOB_KEY = "aarre:snapshot-backfill-dismissed-job";
 const ACTIVE_STATES: SnapshotBackfillState[] = [
   "running",
   "waiting_focus",
-  "paused"
+  "paused",
 ];
 const TERMINAL_STATES: SnapshotBackfillState[] = [
   "completed",
   "cancelled",
-  "failed"
+  "failed",
 ];
 
 function focusableElements(container: HTMLElement): HTMLElement[] {
   return Array.from(
     container.querySelectorAll<HTMLElement>(
-      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-    )
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ),
   ).filter((element) => !element.hasAttribute("hidden"));
 }
 
@@ -56,7 +55,7 @@ function isTerminalState(state: SnapshotBackfillState): boolean {
 
 function statusTimestamp(status: SnapshotBackfillStatus): number {
   const value = Date.parse(
-    status.updatedAt || status.completedAt || status.startedAt || ""
+    status.updatedAt || status.completedAt || status.startedAt || "",
   );
   return Number.isFinite(value) ? value : 0;
 }
@@ -83,6 +82,9 @@ function stateLabel(state: SnapshotBackfillState): string {
 function statusMessage(status: SnapshotBackfillStatus): string {
   switch (status.state) {
     case "running":
+      if ((status.activeCount || 0) > 1) {
+        return `正在后台并发补拍 ${status.activeCount} 个网页`;
+      }
       return status.currentTitle
         ? `正在后台补拍“${status.currentTitle}”`
         : "正在准备下一项";
@@ -107,14 +109,10 @@ function statusMessage(status: SnapshotBackfillStatus): string {
 
 export function SnapshotBackfillControl({
   missingCount,
-  onCollectionChanged
+  onCollectionChanged,
 }: SnapshotBackfillControlProps) {
-  const [status, setStatus] = useState<SnapshotBackfillStatus | null>(
-    null
-  );
-  const [candidateCount, setCandidateCount] = useState<number | null>(
-    null
-  );
+  const [status, setStatus] = useState<SnapshotBackfillStatus | null>(null);
+  const [candidateCount, setCandidateCount] = useState<number | null>(null);
   const [initialized, setInitialized] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [action, setAction] = useState<SnapshotBackfillAction>("");
@@ -131,31 +129,27 @@ export function SnapshotBackfillControl({
       setCandidateCount(next.candidateCount);
     }
     setStatus((current) => {
-      if (
-        current &&
-        statusTimestamp(next) < statusTimestamp(current)
-      ) {
+      if (current && statusTimestamp(next) < statusTimestamp(current)) {
         return current;
       }
       return next;
     });
   }, []);
 
-  const readStatus = useCallback(async (
-    includeCandidateCount = false
-  ) => {
-    try {
-      const next = await sendExtensionRequest({
-        type: "GET_SNAPSHOT_BACKFILL",
-        ...(includeCandidateCount
-          ? { includeCandidateCount: true }
-          : {})
-      });
-      if (mountedRef.current) acceptStatus(next);
-    } finally {
-      if (mountedRef.current) setInitialized(true);
-    }
-  }, [acceptStatus]);
+  const readStatus = useCallback(
+    async (includeCandidateCount = false) => {
+      try {
+        const next = await sendExtensionRequest({
+          type: "GET_SNAPSHOT_BACKFILL",
+          ...(includeCandidateCount ? { includeCandidateCount: true } : {}),
+        });
+        if (mountedRef.current) acceptStatus(next);
+      } finally {
+        if (mountedRef.current) setInitialized(true);
+      }
+    },
+    [acceptStatus],
+  );
 
   useEffect(() => {
     mountedRef.current = true;
@@ -170,8 +164,7 @@ export function SnapshotBackfillControl({
       if (
         !message ||
         typeof message !== "object" ||
-        (message as { type?: unknown }).type !==
-          "SNAPSHOT_BACKFILL_UPDATED"
+        (message as { type?: unknown }).type !== "SNAPSHOT_BACKFILL_UPDATED"
       ) {
         return;
       }
@@ -206,18 +199,15 @@ export function SnapshotBackfillControl({
     };
     document.addEventListener(
       "visibilitychange",
-      refreshCandidatesAfterReturning
+      refreshCandidatesAfterReturning,
     );
     window.addEventListener("focus", refreshCandidatesAfterReturning);
     return () => {
       document.removeEventListener(
         "visibilitychange",
-        refreshCandidatesAfterReturning
+        refreshCandidatesAfterReturning,
       );
-      window.removeEventListener(
-        "focus",
-        refreshCandidatesAfterReturning
-      );
+      window.removeEventListener("focus", refreshCandidatesAfterReturning);
     };
   }, [readStatus, status]);
 
@@ -250,9 +240,7 @@ export function SnapshotBackfillControl({
     window.requestAnimationFrame(() => triggerRef.current?.focus());
   }
 
-  function handleConfirmationKeyDown(
-    event: KeyboardEvent<HTMLDivElement>
-  ) {
+  function handleConfirmationKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (action) return;
     if (event.key === "Escape") {
       event.preventDefault();
@@ -277,9 +265,7 @@ export function SnapshotBackfillControl({
     }
   }
 
-  async function runAction(
-    nextAction: Exclude<SnapshotBackfillAction, "">
-  ) {
+  async function runAction(nextAction: Exclude<SnapshotBackfillAction, "">) {
     if (action) return;
     setAction(nextAction);
     setError("");
@@ -292,7 +278,7 @@ export function SnapshotBackfillControl({
               ? "PAUSE_SNAPSHOT_BACKFILL"
               : nextAction === "resume"
                 ? "RESUME_SNAPSHOT_BACKFILL"
-                : "CANCEL_SNAPSHOT_BACKFILL"
+                : "CANCEL_SNAPSHOT_BACKFILL",
       });
       acceptStatus(next);
       if (nextAction === "start") setConfirmOpen(false);
@@ -300,7 +286,7 @@ export function SnapshotBackfillControl({
       setError(
         caught instanceof Error
           ? caught.message
-          : "封面补拍操作失败，请稍后重试。"
+          : "封面补拍操作失败，请稍后重试。",
       );
     } finally {
       if (mountedRef.current) setAction("");
@@ -331,6 +317,7 @@ export function SnapshotBackfillControl({
     return (
       <>
         <Button
+          variant="unstyled"
           ref={triggerRef}
           type="button"
           className="text-button snapshot-backfill-trigger"
@@ -361,14 +348,12 @@ export function SnapshotBackfillControl({
             >
               <header>
                 <div>
-                  <h2 id="snapshot-backfill-title">
-                    批量补齐缺失封面
-                  </h2>
+                  <h2 id="snapshot-backfill-title">批量补齐缺失封面</h2>
                   <p>仅处理尚无真实网页截图的收藏。</p>
                 </div>
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="unstyled"
                   size="icon-sm"
                   className="snapshot-backfill-dialog-close"
                   aria-label="关闭批量补拍确认"
@@ -381,12 +366,15 @@ export function SnapshotBackfillControl({
 
               <div className="snapshot-backfill-dialog-body">
                 <p id="snapshot-backfill-description">
-                  Aarre 将新建一个后台专用标签页，依次打开约 {effectiveMissingCount} 项缺少封面的网页。每一页都会在加载完成并稳定后才截图，不会在刚打开时立即截取。
+                  Aarre 将新建一个后台专用标签页，依次打开约{" "}
+                  {effectiveMissingCount}{" "}
+                  项缺少封面的网页。每一页都会在加载完成并稳定后才截图，不会在刚打开时立即截取。
                 </p>
                 <div className="snapshot-backfill-foreground-note">
                   <strong>任务在后台运行，不占用当前页面</strong>
                   <span>
-                    开始后你可以正常使用 Chrome。浏览器可能短暂显示“扩展正在调试此浏览器”提示，这是后台截图所需权限的正常现象。你可以随时暂停或取消，已经完成的截图会保留。
+                    开始后你可以正常使用
+                    Chrome。浏览器可能短暂显示“扩展正在调试此浏览器”提示，这是后台截图所需权限的正常现象。你可以随时暂停或取消，已经完成的截图会保留。
                   </span>
                 </div>
                 <p className="snapshot-backfill-privacy">
@@ -401,6 +389,7 @@ export function SnapshotBackfillControl({
 
               <footer>
                 <Button
+                  variant="unstyled"
                   type="button"
                   className="button button-quiet"
                   disabled={Boolean(action)}
@@ -409,6 +398,7 @@ export function SnapshotBackfillControl({
                   暂不补拍
                 </Button>
                 <Button
+                  variant="unstyled"
                   ref={confirmButtonRef}
                   type="button"
                   className="button button-dark"
@@ -429,10 +419,10 @@ export function SnapshotBackfillControl({
   const latestError = currentStatus.errors.at(-1);
   const canPause = currentStatus.state === "running";
   const canResume = ["waiting_focus", "paused", "failed"].includes(
-    currentStatus.state
+    currentStatus.state,
   );
   const canCancel = ["running", "waiting_focus", "paused"].includes(
-    currentStatus.state
+    currentStatus.state,
   );
   const canDismiss = isTerminalState(currentStatus.state);
 
@@ -482,6 +472,7 @@ export function SnapshotBackfillControl({
       <div className="snapshot-backfill-actions">
         {canPause ? (
           <Button
+            variant="unstyled"
             type="button"
             className="button button-quiet button-small"
             disabled={Boolean(action)}
@@ -492,6 +483,7 @@ export function SnapshotBackfillControl({
         ) : null}
         {canResume ? (
           <Button
+            variant="unstyled"
             type="button"
             className="button button-dark button-small"
             disabled={Boolean(action)}
@@ -508,6 +500,7 @@ export function SnapshotBackfillControl({
         ) : null}
         {canCancel ? (
           <Button
+            variant="unstyled"
             type="button"
             className="text-button snapshot-backfill-cancel"
             disabled={Boolean(action)}
@@ -518,6 +511,7 @@ export function SnapshotBackfillControl({
         ) : null}
         {canDismiss ? (
           <Button
+            variant="unstyled"
             type="button"
             className="button button-quiet button-small"
             onClick={dismissStatus}

@@ -22,6 +22,11 @@ function resource(
     tagsSource: "user",
     topics: ["old topic"],
     aliases: ["https://example.com/alias"],
+    useCases: ["旧使用场景"],
+    contentType: "文章",
+    questions: ["旧问题"],
+    entities: ["Old Product"],
+    aiSchemaVersion: 2,
     contentExcerpt: "old content",
     contentHash: "old hash",
     selectedText: "old selection",
@@ -170,6 +175,11 @@ describe("bookmark edit resource migration", () => {
     expect(nextResource.tags).toEqual(["new tag"]);
     expect(nextResource.summary).toBe("");
     expect(nextResource.topics).toEqual([]);
+    expect(nextResource.useCases).toBeUndefined();
+    expect(nextResource.contentType).toBeUndefined();
+    expect(nextResource.questions).toBeUndefined();
+    expect(nextResource.entities).toBeUndefined();
+    expect(nextResource.aiSchemaVersion).toBeUndefined();
     expect(nextResource.snapshotAt).toBeUndefined();
     expect(nextResource.thumbnailDataUrl).toBeUndefined();
     expect(nextResource.coverSource).toBeUndefined();

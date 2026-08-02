@@ -1,13 +1,21 @@
-import { describe, expect, it } from "vitest";
+import { readFile } from "node:fs/promises";
+import { describe, expect, it, vi } from "vitest";
 import {
-  composeSiteIconPixels,
+  cacheSiteBrandIcon,
+  currentSiteBrandImageUrl,
   extractLargestPngFromIco,
   normalizeSvgViewport,
+  normalizeSiteIconPixels,
   sanitizeStaticSvg,
-  SITE_ICON_SURFACES
+  SITE_ICON_SURFACE,
+  siteBrandIconCacheIsFresh,
+  type SiteIconDecodeFallbackInput
 } from "../src/lib/thumbnail";
 
 const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47] as const;
+const baseCssUrl = new URL("../src/ui/base.css", import.meta.url);
+const tokensCssUrl = new URL("../src/ui/tokens.css", import.meta.url);
+const thumbnailSourceUrl = new URL("../src/lib/thumbnail.ts", import.meta.url);
 
 function createIco(
   frames: Array<{
@@ -41,12 +49,157 @@ function createIco(
 }
 
 describe("thumbnail safety", () => {
+  it("gives transparent artwork a theme-independent canvas", async () => {
+    const [css, tokens] = await Promise.all([
+      readFile(baseCssUrl, "utf8"),
+      readFile(tokensCssUrl, "utf8"),
+    ]);
+    const start = css.indexOf(".site-thumbnail {");
+    const bodyStart = css.indexOf("{", start) + 1;
+    const rule = css.slice(bodyStart, css.indexOf("}", bodyStart));
+
+    expect(rule).toContain("background: var(--site-icon-canvas)");
+    expect(rule).toContain("color-scheme: only light");
+    expect(tokens.match(/--site-icon-canvas:/g)).toHaveLength(1);
+    expect(tokens).toContain("--site-icon-canvas: #ffffff");
+    expect(css).toContain(".site-thumbnail > picture {");
+    expect(css).toContain("background: inherit");
+  });
+
+  it("makes the cached page-cover canvas opaque before encoding", async () => {
+    const source = await readFile(thumbnailSourceUrl, "utf8");
+
+    expect(source).toContain(
+      'context.globalCompositeOperation = "destination-over"',
+    );
+    expect(source).toContain("context.fillRect(0, 0, width, height)");
+  });
+
+  it("never exposes a legacy site-brand cache to the UI", () => {
+    expect(
+      currentSiteBrandImageUrl({
+        iconDataUrl: "data:image/webp;base64,DARK_LEGACY",
+        iconDataUrlLight: "data:image/webp;base64,DARK_LEGACY",
+        iconRenderVersion: 1,
+      }),
+    ).toBe("");
+    expect(
+      currentSiteBrandImageUrl({
+        iconDataUrl: "data:image/webp;base64,UNKNOWN_LEGACY",
+      }),
+    ).toBe("");
+    expect(
+      currentSiteBrandImageUrl({
+        iconDataUrl: "data:image/webp;base64,TRANSPARENT_CURRENT",
+        iconDataUrlLight: "data:image/webp;base64,TRANSPARENT_CURRENT",
+        iconRenderVersion: 6,
+      }),
+    ).toBe("data:image/webp;base64,TRANSPARENT_CURRENT");
+    expect(
+      currentSiteBrandImageUrl({
+        host: "github.com",
+        iconDataUrl: "data:image/webp;base64,OLD_GITHUB",
+        iconDataUrlLight: "data:image/webp;base64,OLD_GITHUB",
+        iconRenderVersion: 6,
+        iconAssetUrl: "https://github.com/apple-touch-icon-180x180.png",
+      }),
+    ).toBe("");
+    expect(
+      currentSiteBrandImageUrl({
+        host: "github.com",
+        iconDataUrl: "data:image/webp;base64,CURRENT_GITHUB",
+        iconDataUrlLight: "data:image/webp;base64,CURRENT_GITHUB",
+        iconRenderVersion: 6,
+        iconAssetUrl:
+          "https://github.githubassets.com/favicons/favicon.svg",
+      }),
+    ).toBe("data:image/webp;base64,CURRENT_GITHUB");
+  });
+
+  it("marks missing or legacy site-brand icons for regeneration", () => {
+    const now = Date.parse("2026-08-02T00:00:00.000Z");
+
+    expect(siteBrandIconCacheIsFresh(undefined, now)).toBe(false);
+    expect(
+      siteBrandIconCacheIsFresh(
+        {
+          iconDataUrlLight: "data:image/webp;base64,LEGACY",
+          iconRenderVersion: 2,
+          updatedAt: "2026-08-01T00:00:00.000Z"
+        },
+        now
+      )
+    ).toBe(false);
+    expect(
+      siteBrandIconCacheIsFresh(
+        {
+          iconDataUrlLight: "data:image/webp;base64,CURRENT",
+          iconRenderVersion: 6,
+          updatedAt: "2026-08-01T00:00:00.000Z"
+        },
+        now
+      )
+    ).toBe(true);
+  });
+
   it("allows a self-contained static SVG", () => {
     expect(
       sanitizeStaticSvg(
         '<svg viewBox="0 0 192 192"><path fill="#111" d="M0 0h192v192H0z"/></svg>'
       )
     ).toContain("<path");
+  });
+
+  it("uses the generic DOM decoder when the service worker cannot decode a safe SVG", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          '<svg width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15"/></svg>',
+          { status: 200, headers: { "content-type": "image/svg+xml" } }
+        )
+      )
+    );
+    vi.stubGlobal(
+      "createImageBitmap",
+      vi.fn(async () => {
+        throw new Error("The source image could not be decoded.");
+      })
+    );
+    const decodeFallback = vi.fn(async (_input: SiteIconDecodeFallbackInput) => ({
+      iconDataUrl: "data:image/webp;base64,DOM_DECODED",
+      iconDataUrlLight: "data:image/webp;base64,DOM_DECODED",
+      iconRenderVersion: 6,
+      nativeWidth: 32,
+      nativeHeight: 32
+    }));
+
+    try {
+      const result = await cacheSiteBrandIcon(
+        [
+          {
+            url: "https://icons.example/favicon.svg",
+            source: "svg-icon",
+            vector: true
+          }
+        ],
+        decodeFallback
+      );
+
+      expect(decodeFallback).toHaveBeenCalledTimes(1);
+      expect(decodeFallback.mock.calls[0]?.[0]).toMatchObject({
+        vector: true,
+        nativeWidth: 32,
+        nativeHeight: 32
+      });
+      expect(result).toMatchObject({
+        iconDataUrlLight: "data:image/webp;base64,DOM_DECODED",
+        iconSource: "svg-icon",
+        iconAssetUrl: "https://icons.example/favicon.svg"
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("rejects scripts, event handlers and external references", () => {
@@ -63,7 +216,7 @@ describe("thumbnail safety", () => {
     ).toThrow("unsafe-svg");
   });
 
-  it("keeps the same transparent dark graphic visible on both surfaces", () => {
+  it("keeps a dark site graphic transparent for the white CSS carrier", () => {
     const size = 192;
     const pixels = new Uint8ClampedArray(size * size * 4);
     for (let y = 40; y < 152; y += 1) {
@@ -77,22 +230,91 @@ describe("thumbnail safety", () => {
       }
     }
 
-    const light = composeSiteIconPixels(
+    const normalized = normalizeSiteIconPixels(
       pixels,
-      SITE_ICON_SURFACES.light,
-      { x: 0, y: 0, width: size, height: size, canvasWidth: size }
-    );
-    const dark = composeSiteIconPixels(
-      pixels,
-      SITE_ICON_SURFACES.dark,
+      SITE_ICON_SURFACE,
       { x: 0, y: 0, width: size, height: size, canvasWidth: size }
     );
 
-    expect(light.inkCoverage).toBeGreaterThan(0.15);
-    expect(dark.inkCoverage).toBeGreaterThan(0.15);
+    expect(normalized.inkCoverage).toBeGreaterThan(0.15);
+    expect([...normalized.pixels.slice(0, 4)]).toEqual([0, 0, 0, 0]);
     const center = (96 * size + 96) * 4;
-    expect(light.pixels[center]).toBeLessThan(64);
-    expect(dark.pixels[center]).toBeGreaterThan(224);
+    expect(normalized.pixels[center]).toBeLessThan(64);
+    expect(normalized.pixels[center + 3]).toBe(255);
+  });
+
+  it("removes an opaque dark outer matte without darkening the enclosed white artwork", () => {
+    const size = 64;
+    const pixels = new Uint8ClampedArray(size * size * 4);
+    for (let y = 0; y < size; y += 1) {
+      for (let x = 0; x < size; x += 1) {
+        const index = (y * size + x) * 4;
+        pixels[index] = 18;
+        pixels[index + 1] = 20;
+        pixels[index + 2] = 24;
+        pixels[index + 3] = 255;
+        const distance = Math.hypot(x - 31.5, y - 31.5);
+        if (distance <= 25) {
+          pixels[index] = 255;
+          pixels[index + 1] = 255;
+          pixels[index + 2] = 255;
+        }
+        if (x >= 22 && x <= 42 && y >= 20 && y <= 47) {
+          pixels[index] = 18;
+          pixels[index + 1] = 20;
+          pixels[index + 2] = 24;
+        }
+      }
+    }
+
+    const normalized = normalizeSiteIconPixels(
+      pixels,
+      SITE_ICON_SURFACE,
+      { x: 0, y: 0, width: size, height: size, canvasWidth: size },
+    );
+    const whiteCircle = (32 * size + 12) * 4;
+    const darkLogo = (32 * size + 32) * 4;
+
+    expect([...normalized.pixels.slice(0, 4)]).toEqual([0, 0, 0, 0]);
+    expect([...normalized.pixels.slice(whiteCircle, whiteCircle + 4)]).toEqual([
+      255,
+      255,
+      255,
+      255,
+    ]);
+    expect([...normalized.pixels.slice(darkLogo, darkLogo + 4)]).toEqual([
+      18,
+      20,
+      24,
+      255,
+    ]);
+    expect(normalized.inkCoverage).toBeGreaterThan(0.15);
+  });
+
+  it("darkens a genuinely light-only transparent glyph as one unit", () => {
+    const size = 64;
+    const pixels = new Uint8ClampedArray(size * size * 4);
+    for (let y = 12; y < 52; y += 1) {
+      for (let x = 24; x < 40; x += 1) {
+        const index = (y * size + x) * 4;
+        pixels[index] = 255;
+        pixels[index + 1] = 255;
+        pixels[index + 2] = 255;
+        pixels[index + 3] = 255;
+      }
+    }
+
+    const normalized = normalizeSiteIconPixels(
+      pixels,
+      SITE_ICON_SURFACE,
+      { x: 0, y: 0, width: size, height: size, canvasWidth: size },
+    );
+    const glyph = (32 * size + 32) * 4;
+
+    expect([...normalized.pixels.slice(0, 4)]).toEqual([0, 0, 0, 0]);
+    expect(normalized.pixels[glyph]).toBe(24);
+    expect(normalized.pixels[glyph + 3]).toBe(255);
+    expect(normalized.inkCoverage).toBeGreaterThan(0.15);
   });
 
   it("measures ink inside the drawn asset region instead of the whole canvas", () => {
@@ -108,9 +330,9 @@ describe("thumbnail safety", () => {
       }
     }
 
-    const result = composeSiteIconPixels(
+    const result = normalizeSiteIconPixels(
       pixels,
-      SITE_ICON_SURFACES.light,
+      SITE_ICON_SURFACE,
       { x: 48, y: 48, width: 96, height: 96, canvasWidth: size }
     );
 
@@ -131,9 +353,9 @@ describe("thumbnail safety", () => {
       }
     }
 
-    const result = composeSiteIconPixels(
+    const result = normalizeSiteIconPixels(
       pixels,
-      SITE_ICON_SURFACES.light,
+      SITE_ICON_SURFACE,
       { x: 0, y: 0, width: size, height: size, canvasWidth: size }
     );
 

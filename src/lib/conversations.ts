@@ -1,8 +1,28 @@
-import type { AgentConversation } from "./types";
+import type { AgentChatMessage, AgentConversation } from "./types";
 
 const CONVERSATIONS_KEY = "aarre:agent-conversations";
 const MAX_CONVERSATIONS = 50;
 const MAX_MESSAGES_PER_CONVERSATION = 60;
+
+const VALID_MESSAGE_STATUSES = new Set([
+  "sending",
+  "complete",
+  "failed",
+  "cancelled"
+]);
+
+function isMessage(value: unknown): value is AgentChatMessage {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<AgentChatMessage>;
+  return (
+    typeof candidate.id === "string" &&
+    (candidate.role === "user" || candidate.role === "assistant") &&
+    typeof candidate.content === "string" &&
+    typeof candidate.createdAt === "string" &&
+    (candidate.status === undefined ||
+      VALID_MESSAGE_STATUSES.has(candidate.status))
+  );
+}
 
 function isConversation(value: unknown): value is AgentConversation {
   if (!value || typeof value !== "object") return false;
@@ -12,7 +32,8 @@ function isConversation(value: unknown): value is AgentConversation {
     typeof candidate.title === "string" &&
     typeof candidate.createdAt === "string" &&
     typeof candidate.updatedAt === "string" &&
-    Array.isArray(candidate.messages)
+    Array.isArray(candidate.messages) &&
+    candidate.messages.every(isMessage)
   );
 }
 
@@ -34,8 +55,19 @@ export async function saveAgentConversation(
 ): Promise<AgentConversation> {
   const normalized: AgentConversation = {
     ...conversation,
+    id: conversation.id.slice(0, 160),
     title: conversation.title.trim().slice(0, 80) || "新会话",
-    messages: conversation.messages.slice(-MAX_MESSAGES_PER_CONVERSATION)
+    messages: conversation.messages
+      .filter(isMessage)
+      .slice(-MAX_MESSAGES_PER_CONVERSATION)
+      .map((message) => ({
+        ...message,
+        id: message.id.slice(0, 160),
+        content: message.content.slice(0, 12_000),
+        providerName: message.providerName?.slice(0, 240),
+        sources: message.sources?.slice(0, 20),
+        actions: message.actions?.slice(0, 40)
+      }))
   };
   const current = await getAgentConversations();
   await chrome.storage.local.set({

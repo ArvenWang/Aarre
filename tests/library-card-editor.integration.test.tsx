@@ -305,7 +305,10 @@ describe("LibraryCardEditor", () => {
       buttonWithText(document.body, "删除")?.click();
     });
     expect(document.body.textContent).toContain(
-      "只会删除当前选中的 Chrome 收藏位置"
+      "只删除当前选中的收藏位置？"
+    );
+    expect(document.body.textContent).toContain(
+      "其他位置与 Aarre 智能信息保留"
     );
 
     await act(async () => {

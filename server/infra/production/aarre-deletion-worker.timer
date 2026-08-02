@@ -1,0 +1,11 @@
+[Unit]
+Description=Process Aarre protected-resource and account deletion jobs
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+Persistent=true
+RandomizedDelaySec=30
+
+[Install]
+WantedBy=timers.target

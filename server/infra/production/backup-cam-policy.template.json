@@ -1,0 +1,54 @@
+{
+  "version": "2.0",
+  "statement": [
+    {
+      "effect": "allow",
+      "action": [
+        "name/cos:GetObject",
+        "name/cos:PutObject",
+        "name/cos:InitiateMultipartUpload",
+        "name/cos:UploadPart",
+        "name/cos:ListParts",
+        "name/cos:CompleteMultipartUpload",
+        "name/cos:AbortMultipartUpload",
+        "name/cos:HeadObject",
+        "name/cos:DeleteObject",
+        "name/cos:DeleteMultipleObjects"
+      ],
+      "resource": [
+        "qcs::cos:ap-singapore:uid/<APPID>:<BACKUP_BUCKET>/users/*",
+        "qcs::cos:ap-singapore:uid/<APPID>:<BACKUP_BUCKET>/backups/database/*"
+      ]
+    },
+    {
+      "effect": "allow",
+      "action": [
+        "name/cos:ListMultipartUploads",
+        "name/cos:GetBucketObjectVersions"
+      ],
+      "resource": [
+        "qcs::cos:ap-singapore:uid/<APPID>:<BACKUP_BUCKET>/*"
+      ],
+      "condition": {
+        "string_like": {
+          "cos:prefix": "users%2F*"
+        }
+      }
+    },
+    {
+      "effect": "allow",
+      "action": [
+        "name/cos:ListMultipartUploads",
+        "name/cos:GetBucketObjectVersions"
+      ],
+      "resource": [
+        "qcs::cos:ap-singapore:uid/<APPID>:<BACKUP_BUCKET>/*"
+      ],
+      "condition": {
+        "string_like": {
+          "cos:prefix": "backups%2Fdatabase%2F*"
+        }
+      }
+    }
+  ]
+}

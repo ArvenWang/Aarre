@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import {
   categoryCoverUrl,
   coverBrightnessForHost,
-  listCoverPipeline
+  listCoverPipeline,
 } from "../../lib/cover-registry";
 import type { ListCoverStyle } from "../../lib/display-settings";
 
@@ -10,7 +10,6 @@ export interface SiteThumbnailProps {
   url: string;
   imageUrl?: string;
   brandImageUrl?: string;
-  brandImageUrlDark?: string;
   categoryCoverId?: string;
   coverStyle?: ListCoverStyle;
   forceSiteBrand?: boolean;
@@ -22,12 +21,11 @@ export function SiteThumbnail({
   url,
   imageUrl = "",
   brandImageUrl = "",
-  brandImageUrlDark = "",
   categoryCoverId = "",
   coverStyle = "site",
   forceSiteBrand = false,
   label = "",
-  className = ""
+  className = "",
 }: SiteThumbnailProps) {
   const categoryImageUrl = categoryCoverUrl(categoryCoverId);
   const preferredImageUrl =
@@ -36,15 +34,11 @@ export function SiteThumbnail({
     imageUrl
       ? imageUrl
       : brandImageUrl || categoryImageUrl;
-  const preferredDarkImageUrl =
-    preferredImageUrl === brandImageUrl && brandImageUrlDark
-      ? brandImageUrlDark
-      : preferredImageUrl;
   const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
     setImageFailed(false);
-  }, [preferredDarkImageUrl, preferredImageUrl]);
+  }, [categoryImageUrl, preferredImageUrl]);
 
   const displayImageUrl =
     imageFailed && preferredImageUrl !== categoryImageUrl
@@ -59,13 +53,6 @@ export function SiteThumbnail({
       title={label || undefined}
     >
       <picture>
-        {!usingCategory &&
-        preferredDarkImageUrl !== displayImageUrl ? (
-          <source
-            media="(prefers-color-scheme: dark)"
-            srcSet={preferredDarkImageUrl}
-          />
-        ) : null}
         <img
           className="site-thumbnail-image"
           src={displayImageUrl}
@@ -75,7 +62,7 @@ export function SiteThumbnail({
           style={
             usingCategory
               ? {
-                  filter: `brightness(${coverBrightnessForHost(url)})`
+                  filter: `brightness(${coverBrightnessForHost(url)})`,
                 }
               : undefined
           }

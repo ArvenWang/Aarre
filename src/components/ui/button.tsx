@@ -14,28 +14,53 @@ import type { IconComponent } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 import { useShape } from "@/lib/shape-context";
 
+// The variant background lives on the button element itself, not on an inner
+// absolutely-positioned layer. An inner layer paints over any background set by
+// a plain CSS class on the same element, which is how a "quiet" button ends up
+// rendering as an opaque dark rectangle with invisible dark text.
 const buttonVariants = cva(
   [
     "group relative isolate inline-flex items-center justify-center outline-none cursor-pointer",
-    "transition-colors duration-80",
+    "transition-[background-color,color,border-color] duration-80",
     "disabled:opacity-50 disabled:pointer-events-none",
-    "focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring,#6B97FF)]",
+    "focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring)]",
   ],
   {
     variants: {
       variant: {
-        primary: "text-background",
-        secondary: "text-foreground",
-        tertiary: "text-foreground",
-        ghost: "text-muted-foreground hover:text-foreground",
+        // No active:scale on any variant. A 2% press-scale on a wide row
+        // reads as sideways collapse, and the same displacement shows up on
+        // every other control that inherited it. Click feedback is colour
+        // change only.
+        primary:
+          "text-background bg-foreground hover:bg-foreground/90 active:bg-foreground/80",
+        secondary:
+          "text-foreground bg-accent hover:bg-accent/80 active:bg-accent",
+        tertiary:
+          "text-foreground border border-border bg-transparent hover:bg-hover active:bg-active",
+        ghost:
+          "text-muted-foreground hover:text-foreground bg-transparent hover:bg-hover active:bg-active",
+        danger:
+          "text-danger-foreground bg-danger hover:bg-danger-hover active:bg-danger-hover",
+        "danger-quiet":
+          "text-danger border border-danger/35 bg-transparent hover:bg-danger-soft active:bg-danger-soft",
+        // For buttons whose appearance is owned by the project's own CSS. The
+        // painted variants use hover:/active: utilities, and a pseudo-class
+        // selector outranks a plain class no matter the source order — so a
+        // painted variant would silently win over the CSS rule on the same
+        // element the moment the pointer enters it.
+        unstyled: "",
       },
       size: {
-        sm: "h-7 px-3 text-[12px] gap-1",
-        md: "h-8 px-4 text-[13px] gap-1.5",
-        lg: "h-9 px-5 text-[14px] gap-1.5",
-        "icon-sm": "h-8 w-8 p-0 [&_svg]:h-3.5 [&_svg]:w-3.5",
-        icon: "h-9 w-9 p-0 [&_svg]:h-4 [&_svg]:w-4",
-        "icon-lg": "h-10 w-10 p-0 [&_svg]:h-5 [&_svg]:w-5",
+        sm: "h-[var(--control-h-sm)] px-3 text-[length:var(--fs-caption)] gap-1",
+        md: "h-[var(--control-h-md)] px-4 text-[length:var(--fs-small)] gap-1.5",
+        lg: "h-[var(--control-h-lg)] px-5 text-[length:var(--fs-body)] gap-1.5",
+        "icon-sm":
+          "h-[var(--control-h-sm)] w-[var(--control-h-sm)] p-0 [&_svg]:h-3.5 [&_svg]:w-3.5",
+        icon: "h-[var(--control-h-md)] w-[var(--control-h-md)] p-0 [&_svg]:h-4 [&_svg]:w-4",
+        "icon-lg":
+          "h-[var(--control-h-lg)] w-[var(--control-h-lg)] p-0 [&_svg]:h-5 [&_svg]:w-5",
+        unstyled: "",
       },
       iconLeft: { true: "" },
       iconRight: { true: "" },
@@ -68,18 +93,16 @@ interface ButtonProps
   active?: boolean;
 }
 
-const bgVariants: Record<string, string> = {
-  primary: "bg-foreground group-hover:bg-foreground/90 group-active:bg-foreground/80",
-  secondary: "bg-accent group-hover:bg-accent/80 group-active:bg-accent",
-  tertiary: "border border-border bg-transparent group-hover:bg-hover group-active:bg-active",
-  ghost: "bg-transparent group-hover:bg-hover group-active:bg-active",
-};
-
-const activeBgVariants: Record<string, string> = {
+// Held-open state (the button drives a visible popover/menu), rendered as the
+// variant's active colour so the trigger reads as engaged.
+const heldVariants: Record<string, string> = {
   primary: "bg-foreground/80",
   secondary: "bg-accent",
-  tertiary: "border border-border bg-active",
-  ghost: "bg-active",
+  tertiary: "bg-active",
+  ghost: "bg-active text-foreground",
+  danger: "bg-danger-hover",
+  "danger-quiet": "bg-danger-soft",
+  unstyled: "",
 };
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -117,27 +140,14 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     // the loading glyph stays proportionate across sizes.
     const spinnerSizeClass =
       size === "sm"
-        ? "h-7 w-7"
-        : size === "lg" || size === "icon"
-          ? "h-9 w-9"
-          : size === "icon-lg"
-            ? "h-10 w-10"
-            : "h-8 w-8";
+        ? "h-[var(--control-h-sm)] w-[var(--control-h-sm)]"
+        : size === "lg" || size === "icon" || size === "icon-lg"
+          ? "h-[var(--control-h-lg)] w-[var(--control-h-lg)]"
+          : "h-[var(--control-h-md)] w-[var(--control-h-md)]";
     const shape = useShape();
-    const bgClass = active
-      ? activeBgVariants[variant ?? "primary"]
-      : bgVariants[variant ?? "primary"];
 
     const internals = (
       <>
-        <span
-          data-slot="button-background"
-          aria-hidden
-          className={cn(
-            "absolute inset-0 rounded-[inherit] transition-[background-color,transform] duration-80 group-active:scale-[0.98]",
-            bgClass
-          )}
-        />
         <span
           data-slot="button-content"
           className="relative inline-flex items-center justify-center gap-[inherit]"
@@ -192,13 +202,19 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
               {/* text-box only applies to block containers, so the trim lives
                   on the label span (a blockified flex item), not the flex root.
                   The button's height is fixed (h-*), so this doesn't change
-                  layout — it just centers the cap-to-baseline box optically. */}
-              <span
-                data-slot="button-label"
-                className="[text-box:trim-both_cap_alphabetic]"
-              >
-                {label}
-              </span>
+                  layout — it just centers the cap-to-baseline box optically.
+                  Only text needs trimming, and wrapping composed children would
+                  collapse a caller's intended row into a stack. */}
+              {typeof label === "string" || typeof label === "number" ? (
+                <span
+                  data-slot="button-label"
+                  className="[text-box:trim-both_cap_alphabetic]"
+                >
+                  {label}
+                </span>
+              ) : (
+                label
+              )}
               {TrailingIcon && (
                 <TrailingIcon
                   size={iconSize}
@@ -224,6 +240,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             iconRight: !isIconOnly && !!TrailingIcon,
           }),
           shape.button,
+          active && heldVariants[variant ?? "primary"],
           className
         )}
         // asChild roots (e.g. an anchor) don't take the disabled attribute —

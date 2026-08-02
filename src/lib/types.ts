@@ -21,6 +21,9 @@ export interface PageCapture {
   language: string;
   imageUrl: string;
   faviconUrl: string;
+  /** H1 followed by the first few H2s. Optional so existing empty captures
+   *  and stored drafts stay valid. */
+  headings?: string[];
 }
 
 export interface PendingSaveDraft {
@@ -112,6 +115,19 @@ export interface ResourceRecord {
   tagsSource?: "ai" | "user";
   topics: string[];
   aliases?: string[];
+  /** Situations in which this page is worth reopening. This is how people
+   *  actually recall a bookmark, so it carries real retrieval weight. */
+  useCases?: string[];
+  /** One of AI_CONTENT_TYPES. */
+  contentType?: string;
+  /** Verbatim questions the user might type to find this page again. Highest
+   *  weight in the search index. */
+  questions?: string[];
+  /** Product, company and technology names mentioned on the page. */
+  entities?: string[];
+  /** Metadata contract version successfully produced by AI. This prevents an
+   *  optional empty field from making the same bookmark billable forever. */
+  aiSchemaVersion?: number;
   contentExcerpt: string;
   contentHash: string;
   selectedText: string;
@@ -157,11 +173,14 @@ export interface SiteIconCandidate {
 
 export interface SiteBrandRecord {
   host: string;
-  /** 兼容 0.3.4 及更早版本；新记录与浅色主题值相同。 */
+  /** 兼容 0.3.4 及更早版本；新记录与当前透明缓存相同。 */
   iconDataUrl?: string;
   iconDataUrlLight?: string;
+  /** 仅为读取旧缓存保留；显示层和新生成流程均不再使用。 */
   iconDataUrlDark?: string;
+  iconRenderVersion?: number;
   iconSource?: SiteIconSource;
+  iconAssetUrl?: string;
   iconRejectReason?: string;
   nativeWidth?: number;
   nativeHeight?: number;
@@ -257,6 +276,8 @@ export interface AppState {
   activeTab: ActiveTabSummary | null;
   localResourceCount: number;
   aiReadyResourceCount: number;
+  aiEligibleResourceCount: number;
+  aiPrivacyProtectedCount: number;
   pendingSyncCount: number;
   libraryScan: LibraryScanStatus;
 }
@@ -342,7 +363,9 @@ export type BookmarkAgentActionType =
   | "update_bookmark"
   | "rename_folder"
   | "move_bookmark"
-  | "move_folder";
+  | "move_folder"
+  /** Aarre-only: tags, note and summary. Never touches Chrome. */
+  | "update_metadata";
 
 export type BookmarkAgentActionStatus =
   | "pending"
@@ -390,7 +413,22 @@ export interface BookmarkAgentActionProposal {
   expectedParentId?: string;
   title?: string;
   url?: string;
+  /** Set when several proposals answer one semantic instruction, e.g.
+   *  「把所有设计类收藏移到设计文件夹」. The UI folds them into a single
+   *  confirm card showing the hit list. */
+  groupLabel?: string;
+  resourceKey?: string;
+  tags?: string[];
+  userNote?: string;
+  summary?: string;
   resultMessage?: string;
+}
+
+export interface ResourceMetadataPatch {
+  tags?: string[];
+  tagsSource?: "ai" | "user";
+  userNote?: string;
+  summary?: string;
 }
 
 export interface BookmarkAgentActionExecutionResult {
@@ -404,7 +442,8 @@ export type UndoMutationKind =
   | "remove_created"
   | "restore_subtree"
   | "restore_update"
-  | "restore_move";
+  | "restore_move"
+  | "restore_metadata";
 
 export interface UndoMutation {
   id: string;
@@ -419,6 +458,8 @@ export interface UndoMutation {
   expectedTitle?: string;
   expectedUrl?: string;
   createdNodeId?: string;
+  resourceKey?: string;
+  beforeMetadata?: ResourceMetadataPatch;
 }
 
 export type UndoSnapshotStatus = "pending" | "ready" | "undone" | "partial";
@@ -451,11 +492,32 @@ export interface BookmarkAgentResponse {
   actions: BookmarkAgentActionProposal[];
   catalogSize: number;
   examinedCount: number;
+  /** Bookmarks intentionally kept out of provider prompts by privacy rules. */
+  excludedCount: number;
+  /** Whether the response was produced only after checking the full catalog. */
+  catalogScanComplete: boolean;
 }
 
 export interface BookmarkAgentTurn {
   role: "user" | "assistant";
   content: string;
+}
+
+export type BookmarkAgentProgressStage =
+  | "preparing"
+  | "scanning"
+  | "selecting"
+  | "synthesizing";
+
+export interface BookmarkAgentProgress {
+  requestId: string;
+  stage: BookmarkAgentProgressStage;
+  /** Only stages that this request will actually execute. */
+  stages: BookmarkAgentProgressStage[];
+  completedStages: BookmarkAgentProgressStage[];
+  completed: number;
+  total: number;
+  label: string;
 }
 
 export interface AgentChatMessage {
@@ -467,7 +529,8 @@ export interface AgentChatMessage {
   sources?: BookmarkAgentSource[];
   actions?: BookmarkAgentActionProposal[];
   undoBatchId?: string;
-  status?: "sending" | "complete" | "failed";
+  status?: "sending" | "complete" | "failed" | "cancelled";
+  progress?: BookmarkAgentProgress;
 }
 
 export interface AgentConversation {
@@ -522,6 +585,8 @@ export interface LibraryScanEstimate {
   aiResourceCount: number;
   concurrency: number;
   estimatedMinutes: number;
+  estimatedInputTokens: number;
+  estimatedOutputTokens: number;
   estimatedCostCny?: number;
   pricingUpdatedAt: string;
   providerName?: string;
@@ -566,7 +631,10 @@ export interface SnapshotBackfillStatus {
   updatedAt?: string;
   completedAt?: string;
   errors: SnapshotBackfillError[];
-  concurrency: 1;
+  /** 固定的后台补拍 worker 数，避免把机器资源无限并行化。 */
+  concurrency: 3;
+  /** 当前正在加载或等待截图的 worker 数。 */
+  activeCount?: number;
   requiresForeground: boolean;
   tabId?: number;
 }

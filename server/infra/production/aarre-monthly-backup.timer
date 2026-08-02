@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Aarre retained monthly database backup
+
+[Timer]
+OnCalendar=*-*-01 04:20:00 Asia/Shanghai
+Persistent=true
+RandomizedDelaySec=1200
+
+[Install]
+WantedBy=timers.target

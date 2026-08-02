@@ -1,12 +1,15 @@
 import type {
+  SiteBrandRecord,
   SiteIconCandidate,
   SiteIconSource
 } from "./types";
+import { pinnedBrandAssetNeedsRefresh } from "./cover-rules";
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const MAX_SVG_BYTES = 256 * 1024;
 const SITE_ICON_SIZE = 192;
 const PAGE_COVER_LONG_EDGE = 512;
+const SITE_ICON_CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1_000;
 
 export interface SiteIconSurface {
   red: number;
@@ -14,21 +17,85 @@ export interface SiteIconSurface {
   blue: number;
 }
 
-export const SITE_ICON_SURFACES = {
-  light: { red: 246, green: 247, blue: 250 },
-  dark: { red: 36, green: 36, blue: 38 }
-} as const satisfies Record<"light" | "dark", SiteIconSurface>;
+export const SITE_ICON_SURFACE = {
+  red: 255,
+  green: 255,
+  blue: 255
+} as const satisfies SiteIconSurface;
+export const SITE_ICON_RENDER_VERSION = 6;
+
+export function siteBrandIconCacheIsFresh(
+  brand:
+    | Pick<
+        SiteBrandRecord,
+        "iconDataUrlLight" | "iconRenderVersion" | "updatedAt"
+      >
+    | undefined,
+  referenceTime = Date.now()
+): boolean {
+  if (
+    !brand?.iconDataUrlLight ||
+    brand.iconRenderVersion !== SITE_ICON_RENDER_VERSION
+  ) {
+    return false;
+  }
+  const updatedAt = Date.parse(brand.updatedAt);
+  return (
+    Number.isFinite(updatedAt) &&
+    referenceTime - updatedAt < SITE_ICON_CACHE_MAX_AGE_MS
+  );
+}
+
+/**
+ * Only the current alpha-preserving render is safe to show. Older records may
+ * contain a dark pre-composited WebP in either compatibility field; keeping
+ * those records readable is useful for migration, but they must never reach
+ * an image element again.
+ */
+export function currentSiteBrandImageUrl(
+  brand:
+    | (Pick<
+        SiteBrandRecord,
+        "iconDataUrl" | "iconDataUrlLight" | "iconRenderVersion"
+      > &
+        Partial<Pick<SiteBrandRecord, "host" | "iconAssetUrl">>)
+    | undefined
+): string {
+  if (brand?.iconRenderVersion !== SITE_ICON_RENDER_VERSION) return "";
+  if (
+    brand.host &&
+    pinnedBrandAssetNeedsRefresh(
+      `https://${brand.host}/`,
+      brand.iconAssetUrl
+    )
+  ) {
+    return "";
+  }
+  return brand.iconDataUrlLight || "";
+}
 
 export interface CachedSiteIcon {
-  /** 浅色版本的兼容别名，供旧数据与旧调用方平滑迁移。 */
+  /** 当前透明缓存的兼容别名，供旧数据与旧调用方平滑迁移。 */
   iconDataUrl?: string;
   iconDataUrlLight?: string;
-  iconDataUrlDark?: string;
+  iconRenderVersion?: number;
   iconSource?: SiteIconSource;
+  iconAssetUrl?: string;
   iconRejectReason?: string;
   nativeWidth?: number;
   nativeHeight?: number;
 }
+
+export interface SiteIconDecodeFallbackInput {
+  source: Blob;
+  vector: boolean;
+  nativeWidth?: number;
+  nativeHeight?: number;
+}
+
+export type SiteIconDecodeFallback = (
+  input: SiteIconDecodeFallbackInput
+) => Promise<CachedSiteIcon>;
 
 async function readLimitedBlob(
   response: Response,
@@ -349,7 +416,211 @@ function contrastRatio(
   );
 }
 
-export interface CompositedSiteIcon {
+interface PixelPoint {
+  x: number;
+  y: number;
+}
+
+function isOpaqueDarkNeutralPixel(
+  pixels: Uint8ClampedArray,
+  index: number
+): boolean {
+  const alpha = pixels[index + 3] || 0;
+  if (alpha < 224) return false;
+  const red = pixels[index] || 0;
+  const green = pixels[index + 1] || 0;
+  const blue = pixels[index + 2] || 0;
+  const maximum = Math.max(red, green, blue);
+  const minimum = Math.min(red, green, blue);
+  return maximum <= 80 && maximum - minimum <= 32;
+}
+
+function convexHull(points: PixelPoint[]): PixelPoint[] {
+  const sorted = points
+    .sort((left, right) => left.x - right.x || left.y - right.y)
+    .filter(
+      (point, index, all) =>
+        index === 0 ||
+        point.x !== all[index - 1]!.x ||
+        point.y !== all[index - 1]!.y
+    );
+  if (sorted.length <= 2) return sorted;
+  const cross = (origin: PixelPoint, a: PixelPoint, b: PixelPoint) =>
+    (a.x - origin.x) * (b.y - origin.y) -
+    (a.y - origin.y) * (b.x - origin.x);
+  const lower: PixelPoint[] = [];
+  for (const point of sorted) {
+    while (
+      lower.length >= 2 &&
+      cross(lower[lower.length - 2]!, lower[lower.length - 1]!, point) <= 0
+    ) {
+      lower.pop();
+    }
+    lower.push(point);
+  }
+  const upper: PixelPoint[] = [];
+  for (let index = sorted.length - 1; index >= 0; index -= 1) {
+    const point = sorted[index]!;
+    while (
+      upper.length >= 2 &&
+      cross(upper[upper.length - 2]!, upper[upper.length - 1]!, point) <= 0
+    ) {
+      upper.pop();
+    }
+    upper.push(point);
+  }
+  lower.pop();
+  upper.pop();
+  return [...lower, ...upper];
+}
+
+function polygonArea(points: PixelPoint[]): number {
+  let twiceArea = 0;
+  for (let index = 0; index < points.length; index += 1) {
+    const current = points[index]!;
+    const next = points[(index + 1) % points.length]!;
+    twiceArea += current.x * next.y - next.x * current.y;
+  }
+  return Math.abs(twiceArea) / 2;
+}
+
+/**
+ * Some app-icon assets contain a neutral dark presentation matte even though
+ * the useful logo is centred inside it. Remove only the outer matte while
+ * retaining dark logo pixels enclosed by the coloured/light artwork. This is
+ * a generic pixel transform and does not alter candidate selection.
+ */
+function removeOpaqueDarkOuterMatte(
+  sourcePixels: Uint8ClampedArray,
+  canvasWidth: number,
+  canvasHeight: number,
+  left: number,
+  top: number,
+  right: number,
+  bottom: number
+): Uint8ClampedArray {
+  const output = new Uint8ClampedArray(sourcePixels);
+  if (right - left < 8 || bottom - top < 8) return output;
+  const indexAt = (x: number, y: number) => (y * canvasWidth + x) * 4;
+  const cornerCoordinates = [
+    [left, top],
+    [right - 1, top],
+    [left, bottom - 1],
+    [right - 1, bottom - 1]
+  ] as const;
+  const darkCorners = cornerCoordinates.filter(([x, y]) =>
+    isOpaqueDarkNeutralPixel(sourcePixels, indexAt(x, y))
+  ).length;
+  if (darkCorners < 3) return output;
+
+  let darkBorderPixels = 0;
+  let borderPixels = 0;
+  const inspectBorderPixel = (x: number, y: number) => {
+    borderPixels += 1;
+    if (isOpaqueDarkNeutralPixel(sourcePixels, indexAt(x, y))) {
+      darkBorderPixels += 1;
+    }
+  };
+  for (let x = left; x < right; x += 1) {
+    inspectBorderPixel(x, top);
+    inspectBorderPixel(x, bottom - 1);
+  }
+  for (let y = top + 1; y < bottom - 1; y += 1) {
+    inspectBorderPixel(left, y);
+    inspectBorderPixel(right - 1, y);
+  }
+  if (!borderPixels || darkBorderPixels / borderPixels < 0.78) return output;
+
+  const rowMinimum = new Int32Array(canvasHeight);
+  const rowMaximum = new Int32Array(canvasHeight);
+  const columnMinimum = new Int32Array(canvasWidth);
+  const columnMaximum = new Int32Array(canvasWidth);
+  rowMinimum.fill(canvasWidth);
+  rowMaximum.fill(-1);
+  columnMinimum.fill(canvasHeight);
+  columnMaximum.fill(-1);
+  let foregroundPixels = 0;
+  for (let y = top; y < bottom; y += 1) {
+    for (let x = left; x < right; x += 1) {
+      const index = indexAt(x, y);
+      if (
+        (sourcePixels[index + 3] || 0) < 24 ||
+        isOpaqueDarkNeutralPixel(sourcePixels, index)
+      ) {
+        continue;
+      }
+      foregroundPixels += 1;
+      rowMinimum[y] = Math.min(rowMinimum[y]!, x);
+      rowMaximum[y] = Math.max(rowMaximum[y]!, x);
+      columnMinimum[x] = Math.min(columnMinimum[x]!, y);
+      columnMaximum[x] = Math.max(columnMaximum[x]!, y);
+    }
+  }
+  const contentArea = (right - left) * (bottom - top);
+  if (foregroundPixels / contentArea < 0.02) return output;
+
+  const boundaryPoints: PixelPoint[] = [];
+  for (let y = top; y < bottom; y += 1) {
+    if (rowMaximum[y]! < 0) continue;
+    boundaryPoints.push({ x: rowMinimum[y]!, y });
+    boundaryPoints.push({ x: rowMaximum[y]!, y });
+  }
+  for (let x = left; x < right; x += 1) {
+    if (columnMaximum[x]! < 0) continue;
+    boundaryPoints.push({ x, y: columnMinimum[x]! });
+    boundaryPoints.push({ x, y: columnMaximum[x]! });
+  }
+  const hull = convexHull(boundaryPoints);
+  if (hull.length < 3 || polygonArea(hull) / contentArea < 0.04) return output;
+
+  const spanMinimum = new Int32Array(canvasHeight);
+  const spanMaximum = new Int32Array(canvasHeight);
+  spanMinimum.fill(canvasWidth);
+  spanMaximum.fill(-1);
+  for (let y = top; y < bottom; y += 1) {
+    let minimum = Number.POSITIVE_INFINITY;
+    let maximum = Number.NEGATIVE_INFINITY;
+    for (let index = 0; index < hull.length; index += 1) {
+      const start = hull[index]!;
+      const end = hull[(index + 1) % hull.length]!;
+      const low = Math.min(start.y, end.y);
+      const high = Math.max(start.y, end.y);
+      if (y < low || y > high) continue;
+      if (start.y === end.y) {
+        minimum = Math.min(minimum, start.x, end.x);
+        maximum = Math.max(maximum, start.x, end.x);
+        continue;
+      }
+      const ratio = (y - start.y) / (end.y - start.y);
+      const x = start.x + (end.x - start.x) * ratio;
+      minimum = Math.min(minimum, x);
+      maximum = Math.max(maximum, x);
+    }
+    if (Number.isFinite(minimum) && Number.isFinite(maximum)) {
+      spanMinimum[y] = Math.floor(minimum);
+      spanMaximum[y] = Math.ceil(maximum);
+    }
+  }
+
+  for (let y = top; y < bottom; y += 1) {
+    for (let x = left; x < right; x += 1) {
+      const index = indexAt(x, y);
+      if (
+        !isOpaqueDarkNeutralPixel(sourcePixels, index) ||
+        (x >= spanMinimum[y]! && x <= spanMaximum[y]!)
+      ) {
+        continue;
+      }
+      output[index] = 0;
+      output[index + 1] = 0;
+      output[index + 2] = 0;
+      output[index + 3] = 0;
+    }
+  }
+  return output;
+}
+
+export interface NormalizedSiteIcon {
   pixels: Uint8ClampedArray;
   inkCoverage: number;
 }
@@ -363,15 +634,16 @@ export interface SiteIconContentRect {
 }
 
 /**
- * 把透明站点图标合成到真实承载色上。只对接近承载色、会消失的像素
- * 做中性前景色补偿；本来已有足够对比度的品牌色保持不变。
+ * 保留站点图标的原始颜色和透明通道；若来源图片带有覆盖整个方形画布
+ * 的中性深色展示底，只移除外围底色并保留被图形包围的深色 Logo。
+ * 只有整张可见图形几乎都是浅色时才整体转为中性深色，避免白色单色
+ * Logo 在固定白色承载层上消失。背景始终由 SiteThumbnail 的 CSS 负责。
  */
-export function composeSiteIconPixels(
+export function normalizeSiteIconPixels(
   sourcePixels: Uint8ClampedArray,
   surface: SiteIconSurface,
   contentRect: SiteIconContentRect
-): CompositedSiteIcon {
-  const output = new Uint8ClampedArray(sourcePixels.length);
+): NormalizedSiteIcon {
   const canvasWidth = Math.max(1, Math.floor(contentRect.canvasWidth));
   const canvasHeight = Math.ceil(
     sourcePixels.length / 4 / canvasWidth
@@ -387,50 +659,60 @@ export function composeSiteIconPixels(
     Math.ceil(contentRect.y + contentRect.height)
   );
   const contentArea = Math.max(1, (right - left) * (bottom - top));
-  const surfaceLuminance = relativeLuminance(
-    surface.red,
-    surface.green,
-    surface.blue
+  const output = removeOpaqueDarkOuterMatte(
+    sourcePixels,
+    canvasWidth,
+    canvasHeight,
+    left,
+    top,
+    right,
+    bottom
   );
-  const fallback = surfaceLuminance < 0.5 ? 242 : 24;
-  let ink = 0;
-
-  for (let index = 0; index < sourcePixels.length; index += 4) {
-    const alpha = (sourcePixels[index + 3] || 0) / 255;
-    const sourceRed = sourcePixels[index] || 0;
-    const sourceGreen = sourcePixels[index + 1] || 0;
-    const sourceBlue = sourcePixels[index + 2] || 0;
+  const fallback = 24;
+  let visible = 0;
+  let contrasting = 0;
+  for (let index = 0; index < output.length; index += 4) {
+    const alpha = (output[index + 3] || 0) / 255;
+    if (alpha < 24 / 255) continue;
+    visible += 1;
     const renderedRed = Math.round(
-      sourceRed * alpha + surface.red * (1 - alpha)
+      (output[index] || 0) * alpha + surface.red * (1 - alpha)
     );
     const renderedGreen = Math.round(
-      sourceGreen * alpha + surface.green * (1 - alpha)
+      (output[index + 1] || 0) * alpha + surface.green * (1 - alpha)
     );
     const renderedBlue = Math.round(
-      sourceBlue * alpha + surface.blue * (1 - alpha)
+      (output[index + 2] || 0) * alpha + surface.blue * (1 - alpha)
     );
-    const needsContrastLift =
-      alpha >= 24 / 255 &&
-      contrastRatio(
-        renderedRed,
-        renderedGreen,
-        renderedBlue,
-        surface
-      ) < 1.8;
-    const red = needsContrastLift
-      ? Math.round(fallback * alpha + surface.red * (1 - alpha))
-      : renderedRed;
-    const green = needsContrastLift
-      ? Math.round(fallback * alpha + surface.green * (1 - alpha))
-      : renderedGreen;
-    const blue = needsContrastLift
-      ? Math.round(fallback * alpha + surface.blue * (1 - alpha))
-      : renderedBlue;
+    if (contrastRatio(renderedRed, renderedGreen, renderedBlue, surface) >= 1.8) {
+      contrasting += 1;
+    }
+  }
+  const liftEntireLightArtwork = visible > 0 && contrasting / visible < 0.08;
+  let ink = 0;
+
+  for (let index = 0; index < output.length; index += 4) {
+    const alpha = (output[index + 3] || 0) / 255;
+    const red = liftEntireLightArtwork && alpha >= 24 / 255
+      ? fallback
+      : output[index] || 0;
+    const green = liftEntireLightArtwork && alpha >= 24 / 255
+      ? fallback
+      : output[index + 1] || 0;
+    const blue = liftEntireLightArtwork && alpha >= 24 / 255
+      ? fallback
+      : output[index + 2] || 0;
+    const visibleRed = Math.round(red * alpha + surface.red * (1 - alpha));
+    const visibleGreen = Math.round(
+      green * alpha + surface.green * (1 - alpha)
+    );
+    const visibleBlue = Math.round(
+      blue * alpha + surface.blue * (1 - alpha)
+    );
 
     output[index] = red;
     output[index + 1] = green;
     output[index + 2] = blue;
-    output[index + 3] = 255;
     const pixel = index / 4;
     const x = pixel % canvasWidth;
     const y = Math.floor(pixel / canvasWidth);
@@ -440,11 +722,7 @@ export function composeSiteIconPixels(
       y >= top &&
       y < bottom &&
       alpha >= 24 / 255 &&
-      Math.max(
-        Math.abs(red - surface.red),
-        Math.abs(green - surface.green),
-        Math.abs(blue - surface.blue)
-      ) >= 28
+      contrastRatio(visibleRed, visibleGreen, visibleBlue, surface) >= 1.8
     ) {
       ink += 1;
     }
@@ -457,16 +735,25 @@ export function composeSiteIconPixels(
 }
 
 async function bitmapFromBlob(blob: Blob): Promise<ImageBitmap> {
-  return Promise.race([
-    createImageBitmap(blob),
-    new Promise<never>((_, reject) => {
-      globalThis.setTimeout(() => reject(new Error("image-decode-timeout")), 3_000);
-    })
-  ]);
+  let timeout: ReturnType<typeof globalThis.setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      createImageBitmap(blob),
+      new Promise<never>((_, reject) => {
+        timeout = globalThis.setTimeout(
+          () => reject(new Error("image-decode-timeout")),
+          3_000
+        );
+      })
+    ]);
+  } finally {
+    if (timeout !== undefined) globalThis.clearTimeout(timeout);
+  }
 }
 
 async function cacheSiteIconCandidate(
-  candidate: SiteIconCandidate
+  candidate: SiteIconCandidate,
+  decodeFallback?: SiteIconDecodeFallback
 ): Promise<CachedSiteIcon> {
   let source = await fetchImage(
     candidate.url,
@@ -479,6 +766,19 @@ async function cacheSiteIconCandidate(
     | Extract<IcoPngExtraction, { kind: "png" }>
     | undefined;
   if (ico.kind === "unsupported-ico") {
+    if (decodeFallback) {
+      const result = await decodeFallback({
+        source: new Blob([sourceBytes], { type: "image/x-icon" }),
+        vector: false
+      });
+      return result.iconDataUrlLight
+        ? {
+            ...result,
+            iconSource: candidate.source,
+            iconAssetUrl: candidate.url
+          }
+        : result;
+    }
     return { iconRejectReason: "unsupported-ico-frame" };
   }
   if (ico.kind === "png") {
@@ -506,7 +806,29 @@ async function cacheSiteIconCandidate(
       source = new Blob([normalized.source], { type: "image/svg+xml" });
     }
   }
-  const bitmap = await bitmapFromBlob(source);
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await bitmapFromBlob(source);
+  } catch (error) {
+    if (!decodeFallback) throw error;
+    const result = await decodeFallback({
+      source,
+      vector: Boolean(viewport || candidate.vector),
+      ...(viewport?.intrinsicWidth
+        ? { nativeWidth: viewport.intrinsicWidth }
+        : {}),
+      ...(viewport?.intrinsicHeight
+        ? { nativeHeight: viewport.intrinsicHeight }
+        : {})
+    });
+    return result.iconDataUrlLight
+      ? {
+          ...result,
+          iconSource: candidate.source,
+          iconAssetUrl: candidate.url
+        }
+      : result;
+  }
   try {
     // 固有尺寸用于上报和方形判定；绘制一律用解码后的实际位图尺寸，
     // 矢量图这两者不同。
@@ -564,69 +886,43 @@ async function cacheSiteIconCandidate(
       SITE_ICON_SIZE,
       SITE_ICON_SIZE
     ).data;
-
-    const renderVariant = async (
-      surface: SiteIconSurface
-    ): Promise<{ dataUrl: string; inkCoverage: number }> => {
-      const canvas = new OffscreenCanvas(
-        SITE_ICON_SIZE,
-        SITE_ICON_SIZE
-      );
-      const context = canvas.getContext("2d", {
-        willReadFrequently: true
-      });
-      if (!context) throw new Error("image-processing-unavailable");
-
-      // 输出图像必须自带与 UI 相同的承载色，不能依赖透明底碰巧可见。
-      context.fillStyle = `rgb(${surface.red} ${surface.green} ${surface.blue})`;
-      context.fillRect(0, 0, SITE_ICON_SIZE, SITE_ICON_SIZE);
-      context.drawImage(
-        bitmap,
-        x,
-        y,
-        width,
-        height
-      );
-      const composed = composeSiteIconPixels(sourcePixels, surface, {
-        x,
-        y,
-        width,
-        height,
-        canvasWidth: SITE_ICON_SIZE
-      });
-      const imageData = context.createImageData(
-        SITE_ICON_SIZE,
-        SITE_ICON_SIZE
-      );
-      imageData.data.set(composed.pixels);
-      context.putImageData(imageData, 0, 0);
-      return {
-        dataUrl: await blobToDataUrl(
-          await canvas.convertToBlob({
-            type: "image/webp",
-            quality: 0.85
-          })
-        ),
-        inkCoverage: composed.inkCoverage
-      };
+    const contentRect = {
+      x,
+      y,
+      width,
+      height,
+      canvasWidth: SITE_ICON_SIZE
     };
-
-    const [light, dark] = await Promise.all([
-      renderVariant(SITE_ICON_SURFACES.light),
-      renderVariant(SITE_ICON_SURFACES.dark)
-    ]);
-    if (light.inkCoverage < 0.15 || dark.inkCoverage < 0.15) {
+    const normalized = normalizeSiteIconPixels(
+      sourcePixels,
+      SITE_ICON_SURFACE,
+      contentRect
+    );
+    if (normalized.inkCoverage < 0.15) {
       return {
         iconRejectReason: "low-ink-or-contrast",
         nativeWidth,
         nativeHeight
       };
     }
+    const imageData = sourceContext.createImageData(
+      SITE_ICON_SIZE,
+      SITE_ICON_SIZE
+    );
+    imageData.data.set(normalized.pixels);
+    sourceContext.putImageData(imageData, 0, 0);
+    const transparentDataUrl = await blobToDataUrl(
+      await sourceCanvas.convertToBlob({
+        type: "image/webp",
+        quality: 0.85
+      })
+    );
     return {
-      iconDataUrl: light.dataUrl,
-      iconDataUrlLight: light.dataUrl,
-      iconDataUrlDark: dark.dataUrl,
+      iconDataUrl: transparentDataUrl,
+      iconDataUrlLight: transparentDataUrl,
+      iconRenderVersion: SITE_ICON_RENDER_VERSION,
       iconSource: candidate.source,
+      iconAssetUrl: candidate.url,
       nativeWidth,
       nativeHeight
     };
@@ -636,13 +932,14 @@ async function cacheSiteIconCandidate(
 }
 
 export async function cacheSiteBrandIcon(
-  candidates: SiteIconCandidate[]
+  candidates: SiteIconCandidate[],
+  decodeFallback?: SiteIconDecodeFallback
 ): Promise<CachedSiteIcon> {
   let lastRejection = "no-candidate";
   for (const candidate of candidates) {
     try {
-      const result = await cacheSiteIconCandidate(candidate);
-      if (result.iconDataUrlLight && result.iconDataUrlDark) return result;
+      const result = await cacheSiteIconCandidate(candidate, decodeFallback);
+      if (result.iconDataUrlLight) return result;
       lastRejection = result.iconRejectReason || lastRejection;
     } catch (error) {
       lastRejection =
@@ -689,6 +986,14 @@ export async function cacheRepresentativeImage(
     ) {
       throw new Error("near-solid-image");
     }
+    // Make the cached page cover opaque before encoding it. A transparent
+    // canvas carries black RGB channels underneath its zero-alpha pixels; if
+    // the image is ever rendered outside SiteThumbnail, those pixels must not
+    // become a dark background.
+    context.globalCompositeOperation = "destination-over";
+    context.fillStyle = `rgb(${SITE_ICON_SURFACE.red} ${SITE_ICON_SURFACE.green} ${SITE_ICON_SURFACE.blue})`;
+    context.fillRect(0, 0, width, height);
+    context.globalCompositeOperation = "source-over";
     return blobToDataUrl(
       await canvas.convertToBlob({
         type: "image/webp",

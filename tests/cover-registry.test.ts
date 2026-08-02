@@ -1,21 +1,89 @@
+import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import {
   AARRE_FALLBACK_COVER_IDS,
   aarreFallbackCoverId,
+  CATEGORY_COVER_BACKGROUNDS,
   CATEGORY_COVER_FILES,
   categoryCoverForResource,
+  categoryCoverBackground,
   categoryCoverUrl,
   coverBrightnessForHost,
   listCoverPipeline,
   matchCoverRule,
+  pinnedBrandAssetNeedsRefresh,
   recordPageImageSample,
   registrableHost,
   resolveRuleAsset,
   stableFallbackCoverId
 } from "../src/lib/cover-registry";
 import { COVER_RULES } from "../src/lib/cover-rules";
+import { bundledPinnedBrandIcon } from "../src/lib/bundled-brand-icons";
 
 describe("cover registry", () => {
+  it.each([
+    "https://github.com/signerlabs/ShipSwift",
+    "https://www.github.com/signerlabs/ShipSwift",
+    "https://gist.github.com/example/123456"
+  ])("pins GitHub hosts to the official vector favicon: %s", (url) => {
+    expect(matchCoverRule(url)).toMatchObject({
+      id: "github",
+      pinBrandAsset: true
+    });
+    expect(listCoverPipeline(url)).toBe("site-brand");
+    expect(resolveRuleAsset(url, "brandAsset")).toBe(
+      "https://github.githubassets.com/favicons/favicon.svg"
+    );
+    expect(
+      pinnedBrandAssetNeedsRefresh(
+        url,
+        "https://github.com/apple-touch-icon-180x180.png"
+      )
+    ).toBe(true);
+    expect(
+      pinnedBrandAssetNeedsRefresh(
+        url,
+        "https://github.githubassets.com/favicons/favicon.svg"
+      )
+    ).toBe(false);
+  });
+
+  it("does not invalidate non-pinned site-brand caches", () => {
+    expect(
+      pinnedBrandAssetNeedsRefresh(
+        "https://www.youtube.com/watch?v=abc123",
+        "https://www.youtube.com/apple-touch-icon.png"
+      )
+    ).toBe(false);
+  });
+
+  it("bundles the pinned GitHub mark so cache repair does not depend on remote SVG decoding", async () => {
+    const bundled = bundledPinnedBrandIcon(
+      "https://github.com/signerlabs/ShipSwift"
+    );
+
+    expect(bundled).toMatchObject({
+      assetUrl: "https://github.githubassets.com/favicons/favicon.svg",
+      nativeWidth: 32,
+      nativeHeight: 32
+    });
+    expect(bundled?.dataUrl).toMatch(/^data:image\/webp;base64,/);
+    const encoded = bundled?.dataUrl.split(",", 2)[1] || "";
+    const { data, info } = await sharp(Buffer.from(encoded, "base64"))
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const pixel = (x: number, y: number) =>
+      [...data.subarray((y * info.width + x) * 4, (y * info.width + x) * 4 + 4)];
+    expect(info).toMatchObject({ width: 192, height: 192, channels: 4 });
+    expect(pixel(0, 0)[3]).toBe(0);
+    expect(pixel(8, 96)).toEqual([36, 41, 46, 255]);
+    expect(pixel(96, 96)[3]).toBe(0);
+    expect(
+      bundledPinnedBrandIcon("https://www.youtube.com/watch?v=abc123")
+    ).toBeUndefined();
+  });
+
   it("resolves structured YouTube covers without scraping HTML", () => {
     const url = "https://www.youtube.com/watch?v=abc123";
     expect(matchCoverRule(url)?.id).toBe("youtube");
@@ -70,7 +138,14 @@ describe("cover registry", () => {
       expect(categoryCoverUrl(id), `${id} should resolve`).toContain(
         CATEGORY_COVER_FILES[id]
       );
+      expect(CATEGORY_COVER_BACKGROUNDS[id], `${id} should have a base color`).toMatch(
+        /^#[0-9A-F]{6}$/i
+      );
+      expect(categoryCoverBackground(id)).toBe(CATEGORY_COVER_BACKGROUNDS[id]);
     }
+    expect(categoryCoverBackground("missing")).toBe(
+      CATEGORY_COVER_BACKGROUNDS["generic-webpage"]
+    );
   });
 
   it("keeps a reliable semantic fallback before stable hash distribution", () => {

@@ -55,7 +55,7 @@ describe("extension message compatibility", () => {
       skipped: 0,
       currentTitle: "Example",
       errors: [],
-      concurrency: 1 as const,
+      concurrency: 3 as const,
       requiresForeground: false as const,
       tabId: 42
     };

@@ -132,6 +132,30 @@ export async function getAiSettingsStatus(): Promise<AiSettingsStatus> {
   };
 }
 
+/** Restore only provider/model preferences from cloud. API keys stay on this device. */
+export async function saveAiModelPreferences(input: {
+  provider: AiProviderId;
+  models: Partial<Record<AiProviderId, string>>;
+}): Promise<AiSettingsStatus> {
+  const stored = await getStoredAiSettings();
+  const models = Object.fromEntries(
+    AI_PROVIDER_PRESETS.map((preset) => [
+      preset.id,
+      typeof input.models[preset.id] === "string" && input.models[preset.id]!.trim()
+        ? input.models[preset.id]!.trim().slice(0, 240)
+        : providerModel(stored, preset.id)
+    ])
+  ) as Record<AiProviderId, string>;
+  await chrome.storage.local.set({
+    [AI_SETTINGS_KEY]: {
+      ...stored,
+      provider: isAiProviderId(input.provider) ? input.provider : stored.provider,
+      models
+    }
+  });
+  return getAiSettingsStatus();
+}
+
 async function apiErrorMessage(response: Response): Promise<string> {
   try {
     const body = (await response.json()) as {
@@ -172,7 +196,18 @@ export async function validateAiApiKey(
               : "https://api.deepseek.com/models",
           headers: { Authorization: `Bearer ${normalized}` }
         };
-  const response = await fetch(request.url, { headers: request.headers });
+  let response: Response;
+  try {
+    response = await fetch(request.url, {
+      headers: request.headers,
+      signal: AbortSignal.timeout(15_000)
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "TimeoutError") {
+      throw new Error(`${preset.name} 验证超时，请检查网络后重试。`);
+    }
+    throw new Error(`${preset.name} 暂时无法连接，请检查网络后重试。`);
+  }
 
   if (!response.ok) {
     const detail = await apiErrorMessage(response);

@@ -6,7 +6,7 @@ import {
   useState,
   type CSSProperties,
   type HTMLAttributes,
-  type ReactNode
+  type ReactNode,
 } from "react";
 
 interface StableMasonryProps extends HTMLAttributes<HTMLElement> {
@@ -21,13 +21,10 @@ type MasonryStyle = CSSProperties & {
 
 export function distributeMasonryItems<T>(
   items: readonly T[],
-  columnCount: number
+  columnCount: number,
 ): T[][] {
   const safeColumnCount = Math.max(1, Math.floor(columnCount));
-  const columns = Array.from(
-    { length: safeColumnCount },
-    () => [] as T[]
-  );
+  const columns = Array.from({ length: safeColumnCount }, () => [] as T[]);
   items.forEach((item, index) => {
     columns[index % safeColumnCount].push(item);
   });
@@ -38,7 +35,7 @@ function columnCountForWidth(
   width: number,
   gap: number,
   minColumnWidth: number,
-  maxColumns: number
+  maxColumns: number,
 ): number {
   const safeGap = Math.max(0, gap);
   const safeMinWidth = Math.max(1, minColumnWidth);
@@ -47,11 +44,8 @@ function columnCountForWidth(
     1,
     Math.min(
       safeMaxColumns,
-      Math.floor(
-        (Math.max(0, width) + safeGap) /
-          (safeMinWidth + safeGap)
-      )
-    )
+      Math.floor((Math.max(0, width) + safeGap) / (safeMinWidth + safeGap)),
+    ),
   );
 }
 
@@ -65,7 +59,7 @@ export function StableMasonry({
 }: StableMasonryProps) {
   const rootRef = useRef<HTMLElement>(null);
   const [columnCount, setColumnCount] = useState(
-    Math.max(1, Math.floor(maxColumns))
+    Math.max(1, Math.floor(maxColumns)),
   );
 
   useLayoutEffect(() => {
@@ -73,17 +67,15 @@ export function StableMasonry({
     if (!root) return;
 
     function update(width: number) {
-      const gap = Number.parseFloat(
-        window.getComputedStyle(root!).columnGap
-      );
+      const gap = Number.parseFloat(window.getComputedStyle(root!).columnGap);
       const nextCount = columnCountForWidth(
         width,
         Number.isFinite(gap) ? gap : 0,
         minColumnWidth,
-        maxColumns
+        maxColumns,
       );
       setColumnCount((current) =>
-        current === nextCount ? current : nextCount
+        current === nextCount ? current : nextCount,
       );
     }
 
@@ -98,16 +90,12 @@ export function StableMasonry({
   }, [maxColumns, minColumnWidth]);
 
   const columns = useMemo(
-    () =>
-      distributeMasonryItems(
-        Children.toArray(children),
-        columnCount
-      ),
-    [children, columnCount]
+    () => distributeMasonryItems(Children.toArray(children), columnCount),
+    [children, columnCount],
   );
   const masonryStyle: MasonryStyle = {
     ...style,
-    "--masonry-column-count": columnCount
+    "--masonry-column-count": columnCount,
   };
 
   return (

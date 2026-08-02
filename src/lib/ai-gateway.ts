@@ -7,6 +7,8 @@ import type {
 
 const ENTITLEMENT_KEY = "aarre:ai-entitlement:v1";
 const GATEWAY_USAGE_KEY = "aarre:ai-gateway-usage:v1";
+let gatewayUsageMutation: Promise<void> = Promise.resolve();
+let quotaCallMutation: Promise<void> = Promise.resolve();
 
 interface StoredEntitlement {
   tier?: UserTier;
@@ -89,21 +91,25 @@ async function recordGatewayUsage(
   usage: AiTokenUsage
 ): Promise<void> {
   if (typeof chrome.storage.local.set !== "function") return;
-  const current = await getAiGatewayUsage();
-  const tokens = Math.max(
-    0,
-    usage.inputTokens + usage.outputTokens
-  );
-  await chrome.storage.local.set({
-    [GATEWAY_USAGE_KEY]: {
-      period: current.period,
-      tokens: current.tokens + tokens,
-      operations: {
-        ...current.operations,
-        [operation]: (current.operations[operation] || 0) + 1
-      }
-    } satisfies GatewayUsage
+  const mutation = gatewayUsageMutation.then(async () => {
+    const current = await getAiGatewayUsage();
+    const tokens = Math.max(
+      0,
+      usage.inputTokens + usage.outputTokens
+    );
+    await chrome.storage.local.set({
+      [GATEWAY_USAGE_KEY]: {
+        period: current.period,
+        tokens: current.tokens + tokens,
+        operations: {
+          ...current.operations,
+          [operation]: (current.operations[operation] || 0) + 1
+        }
+      } satisfies GatewayUsage
+    });
   });
+  gatewayUsageMutation = mutation.catch(() => undefined);
+  await mutation;
 }
 
 export async function runAiGatewayCall<
@@ -114,8 +120,26 @@ export async function runAiGatewayCall<
   operation: "enrichment" | "agent" | "report";
   call: () => Promise<TResult>;
 }): Promise<TResult> {
-  await assertQuotaAvailable();
-  const result = await input.call();
-  await recordGatewayUsage(input.operation, result.usage);
-  return result;
+  const entitlement = await assertQuotaAvailable();
+  const run = async () => {
+    const result = await input.call();
+    await recordGatewayUsage(input.operation, result.usage);
+    return result;
+  };
+  if (entitlement.monthlyTokenQuota === null) {
+    return run();
+  }
+
+  // A finite product quota needs a serialized check immediately before the
+  // provider call. BYOK remains fully concurrent, while free/pro calls cannot
+  // all pass the same stale usage snapshot and overshoot together.
+  const queued = quotaCallMutation.then(async () => {
+    await assertQuotaAvailable();
+    return run();
+  });
+  quotaCallMutation = queued.then(
+    () => undefined,
+    () => undefined
+  );
+  return queued;
 }

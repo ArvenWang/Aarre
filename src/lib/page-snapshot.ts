@@ -193,7 +193,22 @@ export async function waitForStablePageInDocument(
       if (!options.waitForPendingImages && image.complete) return false;
       // 已成功解码或根本没有资源的空图视为就绪；未开始的懒加载图
       // complete=true 但 naturalWidth=0，必须继续等待。
-      if (imageIsReadyForCapture(image)) return false;
+      const hasPendingSource = Boolean(
+        image.getAttribute("src") ||
+          image.getAttribute("srcset") ||
+          image.getAttribute("data-src") ||
+          image.getAttribute("data-srcset") ||
+          image.getAttribute("data-lazy-src") ||
+          image.getAttribute("data-original")
+      );
+      if (
+        image.complete &&
+        (image.naturalWidth > 0 ||
+          image.naturalHeight > 0 ||
+          !hasPendingSource)
+      ) {
+        return false;
+      }
       const rect = image.getBoundingClientRect();
       return (
         rect.width > 0 &&
@@ -336,7 +351,20 @@ export async function prepareBackgroundPageForCaptureInDocument(
   let forcedImages = 0;
 
   const forceImage = (image: HTMLImageElement): void => {
-    if (forcedImages >= maxImages || imageIsReadyForCapture(image)) {
+    const hasPendingSource = Boolean(
+      image.getAttribute("src") ||
+        image.getAttribute("srcset") ||
+        image.getAttribute("data-src") ||
+        image.getAttribute("data-srcset") ||
+        image.getAttribute("data-lazy-src") ||
+        image.getAttribute("data-original")
+    );
+    const imageReady =
+      image.complete &&
+      (image.naturalWidth > 0 ||
+        image.naturalHeight > 0 ||
+        !hasPendingSource);
+    if (forcedImages >= maxImages || imageReady) {
       return;
     }
     const src = image.getAttribute("src");

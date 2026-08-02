@@ -1,0 +1,38 @@
+{
+  "version": "2.0",
+  "statement": [
+    {
+      "effect": "allow",
+      "action": [
+        "name/cos:PutObject",
+        "name/cos:InitiateMultipartUpload",
+        "name/cos:UploadPart",
+        "name/cos:ListParts",
+        "name/cos:CompleteMultipartUpload",
+        "name/cos:AbortMultipartUpload",
+        "name/cos:GetObject",
+        "name/cos:HeadObject",
+        "name/cos:DeleteObject",
+        "name/cos:DeleteMultipleObjects"
+      ],
+      "resource": [
+        "qcs::cos:ap-hongkong:uid/<APPID>:<PRIMARY_BUCKET>/users/*"
+      ]
+    },
+    {
+      "effect": "allow",
+      "action": [
+        "name/cos:ListMultipartUploads",
+        "name/cos:GetBucketObjectVersions"
+      ],
+      "resource": [
+        "qcs::cos:ap-hongkong:uid/<APPID>:<PRIMARY_BUCKET>/*"
+      ],
+      "condition": {
+        "string_like": {
+          "cos:prefix": "users%2F*"
+        }
+      }
+    }
+  ]
+}

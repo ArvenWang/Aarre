@@ -8,11 +8,13 @@ import {
   type ReactNode,
 } from "react";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
-import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { spring, exitFallbackMs } from "@/lib/springs";
 import { fontWeights } from "@/lib/font-weight";
 import { useShape } from "@/lib/shape-context";
+
+// Enter/exit is a CSS transition on opacity and translate. The deferred
+// unmount below waits this long before removing the node.
+const TRANSITION_MS = 140;
 
 // ---------------------------------------------------------------------------
 // Portal container context
@@ -102,16 +104,16 @@ interface TooltipProps {
 // Animation helpers
 // ---------------------------------------------------------------------------
 
-function getSlideOffset(side: TooltipSide) {
+function getSlideOffset(side: TooltipSide): string {
   switch (side) {
     case "top":
-      return { y: 4 };
+      return "0 4px";
     case "bottom":
-      return { y: -4 };
+      return "0 -4px";
     case "left":
-      return { x: 4 };
+      return "4px 0";
     case "right":
-      return { x: -4 };
+      return "-4px 0";
   }
 }
 
@@ -136,23 +138,31 @@ function Tooltip({
   const portalContainer = useContext(TooltipPortalContainerContext);
   const hasAmbientProvider = useContext(TooltipGroupContext);
 
+  // Two frames: the first mounts the node in its "closed" position, the second
+  // flips the data attribute so the CSS transition has something to animate
+  // from. Setting both in one paint would show the tooltip fully formed.
+  const [entered, setEntered] = useState(false);
+
   useEffect(() => {
     if (open) setMounted(true);
   }, [open]);
 
-  // Fallback release for the deferred unmount: onAnimationComplete is the
-  // primary signal, but rAF-driven animation callbacks can stall in
-  // throttled/background tabs. The exit tween runs at spring.fast.exit, so
-  // the fallback tracks that tier.
+  useEffect(() => {
+    if (!mounted) return;
+    if (!open) {
+      setEntered(false);
+      return;
+    }
+    const frame = requestAnimationFrame(() => setEntered(true));
+    return () => cancelAnimationFrame(frame);
+  }, [mounted, open]);
+
+  // Deferred unmount so the exit transition can play out.
   useEffect(() => {
     if (open) return;
-    const id = setTimeout(() => setMounted(false), exitFallbackMs(spring.fast));
+    const id = setTimeout(() => setMounted(false), TRANSITION_MS);
     return () => clearTimeout(id);
   }, [open]);
-
-  const handleExitComplete = () => {
-    if (!open) setMounted(false);
-  };
 
   const slideOffset = getSlideOffset(side);
 
@@ -171,28 +181,25 @@ function Tooltip({
             forceMount
             className="z-50"
           >
-            <motion.div
+            <div
               className={cn(
                 // Trim recenters the label; the padding bump only applies
                 // where text-box is supported, keeping the same overall
                 // height (~26px) as untrimmed browsers.
                 "bg-foreground text-background text-[12px] px-2 py-1",
                 "[text-box:trim-both_cap_alphabetic] supports-[text-box:trim-both]:py-2",
+                "transition-[opacity,translate] duration-140 ease-out",
                 shape.bg,
                 className
               )}
-              style={{ fontVariationSettings: fontWeights.medium }}
-              initial={{ opacity: 0, ...slideOffset }}
-              animate={{
-                opacity: open ? 1 : 0,
-                x: 0,
-                y: 0,
+              style={{
+                fontVariationSettings: fontWeights.medium,
+                opacity: entered && open ? 1 : 0,
+                translate: entered && open ? "0 0" : slideOffset,
               }}
-              transition={open ? spring.fast : spring.fast.exit}
-              onAnimationComplete={handleExitComplete}
             >
               {content}
-            </motion.div>
+            </div>
           </TooltipPrimitive.Content>
         </TooltipPrimitive.Portal>
       )}

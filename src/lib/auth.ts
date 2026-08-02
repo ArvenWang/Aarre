@@ -1,5 +1,32 @@
 import type { AuthState } from "./types";
-import { getSupabase, isCloudConfigured } from "./supabase";
+
+const CLOUD_SESSION_KEY = "aarre:cloud-session:v1";
+const CLOUD_DEVICE_ID_KEY = "aarre:cloud-device-id:v1";
+const CONFIGURED_CLOUD_API_BASE_URL = import.meta.env.VITE_AARRE_API_BASE_URL || "";
+
+export const CLOUD_API_BASE_URL = CONFIGURED_CLOUD_API_BASE_URL.replace(/\/+$/, "");
+export const CLOUD_AUTH_CONFIGURED = /^https:\/\/[^/]+$/i.test(CLOUD_API_BASE_URL);
+
+function requireCloudConfiguration(): void {
+  if (!CLOUD_AUTH_CONFIGURED) {
+    throw new Error("这个构建尚未连接 Aarre 生产云端。");
+  }
+}
+
+interface CloudSession {
+  accessToken: string;
+  refreshToken: string;
+  accessExpiresAt: string;
+  refreshExpiresAt: string;
+  userId: string;
+  profile: {
+    email: string;
+    name: string;
+    avatarUrl: string;
+  };
+}
+
+let refreshPromise: Promise<CloudSession> | null = null;
 
 async function getChromeProfileEmail(): Promise<string | undefined> {
   try {
@@ -12,127 +39,232 @@ async function getChromeProfileEmail(): Promise<string | undefined> {
   }
 }
 
-export async function getAuthState(): Promise<AuthState> {
-  const redirectUrl = chrome.identity.getRedirectURL("auth");
-  const chromeProfileEmail = await getChromeProfileEmail();
-  const supabase = getSupabase();
-
-  if (!supabase) {
-    return {
-      configured: false,
-      signedIn: false,
-      chromeProfileEmail,
-      accountMatches: null,
-      redirectUrl
-    };
+async function readSession(): Promise<CloudSession | null> {
+  const stored = (await chrome.storage.local.get(CLOUD_SESSION_KEY))[CLOUD_SESSION_KEY];
+  if (!stored || typeof stored !== "object") return null;
+  const candidate = stored as Partial<CloudSession>;
+  if (
+    typeof candidate.accessToken !== "string" ||
+    typeof candidate.refreshToken !== "string" ||
+    typeof candidate.accessExpiresAt !== "string" ||
+    typeof candidate.refreshExpiresAt !== "string" ||
+    typeof candidate.userId !== "string" ||
+    !candidate.profile ||
+    typeof candidate.profile.email !== "string"
+  ) {
+    return null;
   }
+  if (Date.parse(candidate.refreshExpiresAt) <= Date.now()) {
+    await chrome.storage.local.remove(CLOUD_SESSION_KEY);
+    return null;
+  }
+  return candidate as CloudSession;
+}
 
-  const { data } = await supabase.auth.getSession();
-  const user = data.session?.user;
-  const userEmail = user?.email;
-  const accountMatches =
-    chromeProfileEmail && userEmail
-      ? chromeProfileEmail.toLowerCase() === userEmail.toLowerCase()
-      : null;
+async function saveSession(session: CloudSession): Promise<CloudSession> {
+  await chrome.storage.local.set({ [CLOUD_SESSION_KEY]: session });
+  return session;
+}
 
+async function deviceId(): Promise<string> {
+  const stored = (await chrome.storage.local.get(CLOUD_DEVICE_ID_KEY))[CLOUD_DEVICE_ID_KEY];
+  if (typeof stored === "string" && /^[0-9a-f-]{36}$/i.test(stored)) return stored;
+  const created = crypto.randomUUID();
+  await chrome.storage.local.set({ [CLOUD_DEVICE_ID_KEY]: created });
+  return created;
+}
+
+function randomVerifier(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(48));
+  return btoa(String.fromCharCode(...bytes))
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replace(/=+$/, "");
+}
+
+async function challengeForVerifier(verifier: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replace(/=+$/, "");
+}
+
+async function responseError(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as { message?: string; error?: string };
+    return body.message || body.error || `云端服务返回 ${response.status}`;
+  } catch {
+    return `云端服务返回 ${response.status}`;
+  }
+}
+
+export function retryAfterMilliseconds(
+  headers: Pick<Headers, "get">,
+  now = Date.now()
+): number {
+  const value = headers.get("retry-after")?.trim() || "";
+  const seconds = Number(value);
+  const parsed = Number.isFinite(seconds) && seconds >= 0
+    ? seconds * 1_000
+    : Math.max(0, Date.parse(value) - now);
+  const fallback = 5_000;
+  return Math.min(65_000, Math.max(1_000, parsed || fallback));
+}
+
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function fetchJson<T>(path: string, init: RequestInit): Promise<T> {
+  requireCloudConfiguration();
+  const response = await fetch(`${CLOUD_API_BASE_URL}${path}`, {
+    ...init,
+    headers: {
+      "content-type": "application/json",
+      ...(init.headers || {})
+    },
+    signal: AbortSignal.timeout(30_000)
+  });
+  if (!response.ok) throw Object.assign(new Error(await responseError(response)), { status: response.status });
+  return (await response.json()) as T;
+}
+
+async function refreshSession(session: CloudSession): Promise<CloudSession> {
+  if (!refreshPromise) {
+    refreshPromise = fetchJson<Omit<CloudSession, "profile" | "userId">>(
+      "/v1/auth/refresh",
+      {
+        method: "POST",
+        body: JSON.stringify({ refreshToken: session.refreshToken })
+      }
+    )
+      .then((tokens) =>
+        saveSession({
+          ...session,
+          ...tokens
+        })
+      )
+      .catch(async (error) => {
+        await chrome.storage.local.remove(CLOUD_SESSION_KEY);
+        throw error;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
+}
+
+export async function cloudRequest<T>(
+  path: string,
+  init: RequestInit = {}
+): Promise<T> {
+  requireCloudConfiguration();
+  let session = await readSession();
+  if (!session) throw new Error("请先登录 Aarre 云端。");
+  if (Date.parse(session.accessExpiresAt) <= Date.now() + 30_000) {
+    session = await refreshSession(session);
+  }
+  const send = (current: CloudSession) =>
+    fetch(`${CLOUD_API_BASE_URL}${path}`, {
+      ...init,
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${current.accessToken}`,
+        ...(init.headers || {})
+      },
+      signal: AbortSignal.timeout(30_000)
+    });
+  let refreshed = false;
+  let rateLimitRetries = 0;
+  while (true) {
+    const response = await send(session);
+    if (response.status === 401 && !refreshed) {
+      session = await refreshSession(session);
+      refreshed = true;
+      continue;
+    }
+    if (response.status === 429 && rateLimitRetries < 2) {
+      rateLimitRetries += 1;
+      await wait(retryAfterMilliseconds(response.headers));
+      continue;
+    }
+    if (!response.ok) {
+      throw Object.assign(new Error(await responseError(response)), {
+        status: response.status
+      });
+    }
+    return (await response.json()) as T;
+  }
+}
+
+export async function hardenCloudTokenStorage(): Promise<void> {
+  await chrome.storage.local.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
+}
+
+export async function getAuthState(): Promise<AuthState> {
+  const [session, chromeProfileEmail] = await Promise.all([
+    readSession(),
+    getChromeProfileEmail()
+  ]);
+  const signedIn = Boolean(session);
+  const accountMatches = !session
+    ? null
+    : chromeProfileEmail
+      ? session.profile.email.toLocaleLowerCase() === chromeProfileEmail.toLocaleLowerCase()
+      : true;
   return {
-    configured: isCloudConfigured,
-    signedIn: Boolean(user),
-    userEmail,
-    userName:
-      typeof user?.user_metadata?.full_name === "string"
-        ? user.user_metadata.full_name
-        : undefined,
-    userAvatarUrl:
-      typeof user?.user_metadata?.avatar_url === "string"
-        ? user.user_metadata.avatar_url
-        : undefined,
+    configured: CLOUD_AUTH_CONFIGURED,
+    signedIn,
+    ...(session?.profile.email ? { userEmail: session.profile.email } : {}),
+    ...(session?.profile.name ? { userName: session.profile.name } : {}),
+    ...(session?.profile.avatarUrl ? { userAvatarUrl: session.profile.avatarUrl } : {}),
     chromeProfileEmail,
     accountMatches,
-    redirectUrl
+    redirectUrl: chrome.identity.getRedirectURL("auth")
   };
 }
 
 export async function signInWithGoogle(): Promise<AuthState> {
-  const supabase = getSupabase();
-  if (!supabase) {
-    throw new Error("云端尚未配置，无法发起 Google 登录。");
-  }
-
-  const chromeProfileEmail = await getChromeProfileEmail();
-  if (!chromeProfileEmail) {
-    throw new Error(
-      "请先在当前 Chrome 配置文件中登录 Google 账号，再连接 Aarre。"
-    );
-  }
-
-  const redirectTo = chrome.identity.getRedirectURL("auth");
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo,
-      skipBrowserRedirect: true,
-      queryParams: {
-        prompt: "select_account"
-      }
-    }
-  });
-
-  if (error || !data.url) {
-    throw new Error(error?.message || "无法创建 Google 登录请求。");
-  }
-
-  const redirectedTo = await chrome.identity.launchWebAuthFlow({
-    url: data.url,
+  requireCloudConfiguration();
+  const verifier = randomVerifier();
+  const codeChallenge = await challengeForVerifier(verifier);
+  const redirectUri = chrome.identity.getRedirectURL("auth");
+  const currentDeviceId = await deviceId();
+  const start = new URL(`${CLOUD_API_BASE_URL}/v1/auth/google/start`);
+  start.searchParams.set("codeChallenge", codeChallenge);
+  start.searchParams.set("deviceId", currentDeviceId);
+  start.searchParams.set("redirectUri", redirectUri);
+  const callbackUrl = await chrome.identity.launchWebAuthFlow({
+    url: start.toString(),
     interactive: true
   });
-
-  if (!redirectedTo) {
-    throw new Error("Google 登录未完成。");
-  }
-
-  const callbackUrl = new URL(redirectedTo);
-  const code = callbackUrl.searchParams.get("code");
-
-  if (code) {
-    const { error: exchangeError } =
-      await supabase.auth.exchangeCodeForSession(code);
-    if (exchangeError) {
-      throw new Error(exchangeError.message);
-    }
-  } else {
-    const fragment = new URLSearchParams(callbackUrl.hash.replace(/^#/, ""));
-    const accessToken = fragment.get("access_token");
-    const refreshToken = fragment.get("refresh_token");
-
-    if (!accessToken || !refreshToken) {
-      throw new Error("Google 登录回调缺少有效会话。");
-    }
-
-    const { error: sessionError } = await supabase.auth.setSession({
-      access_token: accessToken,
-      refresh_token: refreshToken
-    });
-
-    if (sessionError) {
-      throw new Error(sessionError.message);
-    }
-  }
-
-  const state = await getAuthState();
-  if (state.accountMatches !== true) {
-    await supabase.auth.signOut();
-    throw new Error(
-      `登录账号与当前 Chrome 配置文件不一致。请使用 ${state.chromeProfileEmail} 登录。`
-    );
-  }
-
-  return state;
+  if (!callbackUrl) throw new Error("登录已取消。");
+  const callback = new URL(callbackUrl);
+  const ticket = callback.searchParams.get("ticket") ||
+    new URLSearchParams(callback.hash.replace(/^#/, "")).get("ticket");
+  if (!ticket) throw new Error("登录回调缺少一次性票据。");
+  const session = await fetchJson<CloudSession>("/v1/auth/ticket", {
+    method: "POST",
+    body: JSON.stringify({
+      ticket,
+      codeVerifier: verifier,
+      deviceId: currentDeviceId,
+      deviceName: `${navigator.platform || "Chrome"} · Aarre`
+    })
+  });
+  await saveSession(session);
+  return getAuthState();
 }
 
 export async function signOut(): Promise<void> {
-  const supabase = getSupabase();
-  if (supabase) {
-    await supabase.auth.signOut();
+  const session = await readSession();
+  try {
+    if (session) {
+      await cloudRequest<{ signedOut: true }>("/v1/auth/logout", { method: "POST", body: "{}" });
+    }
+  } finally {
+    await chrome.storage.local.remove(CLOUD_SESSION_KEY);
   }
 }

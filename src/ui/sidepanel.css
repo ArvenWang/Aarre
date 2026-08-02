@@ -1,10 +1,48 @@
 .native-panel,
-.sidepanel-recovery {
+.sidepanel-recovery,
+.sidepanel-boot-screen {
   min-width: 0;
   min-height: 100vh;
   height: 100vh;
   color: var(--ink);
   background: var(--bg);
+}
+
+.sidepanel-boot-screen {
+  padding: var(--sp-4);
+  display: grid;
+  align-content: start;
+  gap: var(--sp-5);
+}
+
+.sidepanel-boot-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.sidepanel-boot-mark {
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
+  flex: 0 0 auto;
+  border-radius: var(--radius-control);
+  background: var(--ink);
+}
+
+.sidepanel-boot-heading strong {
+  font-size: var(--fs-lead);
+  font-weight: var(--fw-strong);
+}
+
+.sidepanel-boot-lines {
+  display: grid;
+  gap: var(--sp-3);
+}
+
+.sidepanel-boot-line {
+  height: var(--control-h-lg);
+  border-radius: var(--radius-module);
+  background: var(--surface-sunken);
 }
 
 .native-panel {
@@ -48,7 +86,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 }
 
 .sidepanel-recovery button {
-  min-height: 34px;
+  min-height: var(--control-h-sm);
   margin-top: var(--sp-2);
   padding-inline: var(--sp-4);
   border: 0;
@@ -89,7 +127,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 
 .native-actions .icon-button {
   width: 34px;
-  height: 34px;
+  height: var(--control-h-sm);
   flex: 0 0 auto;
   border-radius: calc(var(--radius-md) - 2px);
 }
@@ -133,8 +171,12 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   justify-content: space-between;
   gap: var(--sp-3);
   border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-module);
   background: var(--surface-sunken);
+}
+
+.organization-notice-banner .button {
+  border-radius: var(--radius-control);
 }
 
 .organization-notice-banner > div:first-child {
@@ -164,7 +206,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 }
 
 [data-density="compact"] .search-box {
-  min-height: 40px;
+  min-height: var(--control-h-lg);
   margin: 0 var(--sp-3) var(--sp-2);
   padding: 0 var(--sp-3);
   display: flex;
@@ -243,26 +285,42 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   text-align: center;
 }
 
+/* Status strips used to sit in the panel grid as another sunken row, so they
+   fused with the bookmark list. They now live inside the content frame and
+   float over the scroll surface — same role as the manager toast, just pinned
+   to the top of the list instead of the bottom of the page. */
 .native-error-layout,
 .native-notice {
-  margin: 0 var(--sp-3) var(--sp-2);
+  position: absolute;
+  top: var(--sp-2);
+  left: var(--sp-3);
+  right: var(--sp-3);
+  z-index: 8;
+  margin: 0;
   padding: var(--sp-2) var(--sp-3);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-2);
+  min-height: var(--control-h-lg);
+  border: 1px solid var(--line);
   border-radius: var(--radius-md);
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
   font-size: var(--fs-caption);
+  line-height: 1.45;
 }
 
-.native-error-layout {
-  color: var(--ink);
-  background: var(--surface-sunken);
+.native-error-layout > span,
+.native-notice > span {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-wrap: anywhere;
 }
 
 .native-notice {
   color: var(--ink-muted);
-  background: var(--surface-sunken);
 }
 
 .native-error-layout > div {
@@ -272,7 +330,9 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 }
 
 .native-error-layout button,
-.native-notice button {
+.native-notice button,
+.native-status-dismiss {
+  flex: 0 0 auto;
   min-width: 26px;
   min-height: 26px;
   padding: var(--sp-1);
@@ -286,12 +346,14 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 }
 
 .native-error-layout button:hover,
-.native-notice button:hover {
+.native-notice button:hover,
+.native-status-dismiss:hover {
   background: color-mix(in srgb, currentColor 8%, transparent);
 }
 
 .native-error-layout button svg,
-.native-notice button svg {
+.native-notice button svg,
+.native-status-dismiss svg {
   width: 14px;
   height: 14px;
 }
@@ -469,7 +531,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 }
 
 .bookmark-row[data-folder="true"] .bookmark-main {
-  min-height: 40px;
+  min-height: var(--control-h-lg);
   padding: var(--sp-1) var(--sp-6) var(--sp-1)
     calc(var(--sp-2) + var(--tree-depth, 0px));
   grid-template-columns: 18px 26px minmax(0, 1fr);
@@ -485,14 +547,15 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 .bookmark-row:not([data-folder="true"]) .bookmark-main {
   height: 68px;
   min-height: 68px;
-  padding: var(--sp-2) var(--sp-6) var(--sp-2) 0;
+  padding: var(--sp-2) var(--sp-6) var(--sp-2)
+    var(--tree-depth, 0px);
   grid-template-columns: minmax(0, 1fr);
   gap: var(--sp-3);
 }
 
 .tree-chevron {
   width: 18px;
-  height: 28px;
+  height: var(--control-h-xs);
   padding: 0;
   display: grid;
   place-items: center;
@@ -531,8 +594,8 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 }
 
 .bookmark-thumbnail {
-  width: 48px;
-  height: 48px;
+  width: 42px;
+  height: 42px;
   flex: 0 0 auto;
   border-radius: var(--radius-md);
 }
@@ -579,8 +642,8 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   top: 50%;
   right: var(--sp-2);
   z-index: 2;
-  width: 30px;
-  height: 30px;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
   padding: 0;
   display: grid;
   place-items: center;
@@ -663,7 +726,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 }
 
 .library-search-summary {
-  min-height: 32px;
+  min-height: var(--control-h-sm);
   padding: var(--sp-1) var(--sp-2) var(--sp-2);
   display: flex;
   align-items: center;
@@ -710,8 +773,8 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 }
 
 .library-search-result-main .bookmark-thumbnail {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
 }
 
 .library-search-result-main > span:last-child {
@@ -742,14 +805,14 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   padding: var(--sp-3);
   display: grid;
   gap: var(--sp-1);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-module);
   background: var(--surface-sunken);
 }
 
 .context-resurfacing-top {
   margin: 0 var(--sp-3) var(--sp-2);
   border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-module);
 }
 
 .context-resurfacing > header {
@@ -770,16 +833,18 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 }
 
 .context-resurfacing > button {
+  width: 100%;
   min-width: 0;
-  padding: var(--sp-2);
+  min-height: var(--control-h-lg);
+  padding: var(--sp-2) var(--sp-3);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--sp-2);
+  gap: var(--sp-3);
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-control);
   color: var(--ink);
-  background: transparent;
+  background: var(--surface);
   text-align: left;
 }
 
@@ -828,7 +893,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 
 [data-density="compact"] .empty-state > span {
   width: 40px;
-  height: 40px;
+  height: var(--control-h-lg);
   display: grid;
   place-items: center;
   margin-bottom: var(--sp-1);
@@ -854,10 +919,6 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   font-size: var(--fs-caption);
 }
 
-.library-search-empty .button {
-  margin-top: var(--sp-1);
-}
-
 .agent-composer {
   min-width: 0;
   margin: 0 var(--sp-3) var(--sp-3);
@@ -865,9 +926,9 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
     calc(var(--sp-3) + 2px);
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
+  gap: var(--agent-content-gap);
   border: 1px solid var(--line);
-  border-radius: calc(var(--radius-lg) + 2px);
+  border-radius: var(--radius-shell);
   background: var(--surface);
   box-shadow: var(--shadow-composer);
   transition:
@@ -903,7 +964,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 }
 
 .agent-composer-toolbar {
-  min-height: 32px;
+  min-height: var(--control-h-sm);
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -911,8 +972,8 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 
 .agent-send-button {
   position: relative;
-  width: 32px;
-  height: 32px;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
   padding: 0;
   display: grid;
   place-items: center;
@@ -937,13 +998,22 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 }
 
 .agent-send-button:disabled {
-  color: var(--ink-faint);
-  background: var(--surface-sunken);
+  color: var(--ink-muted);
+  background: var(--line-strong);
 }
 
 .agent-send-button svg {
   width: 14px;
   height: 14px;
+}
+
+.agent-stop-button {
+  color: var(--bg);
+  background: var(--ink);
+}
+
+.agent-stop-button:not(:disabled):hover {
+  background: color-mix(in srgb, var(--ink) 86%, var(--bg));
 }
 
 .agent-composer-setup {
@@ -997,7 +1067,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   padding: var(--sp-4);
   display: grid;
   place-items: center;
-  background: color-mix(in srgb, var(--ink) 30%, transparent);
+  background: var(--scrim-modal);
   animation: dialog-backdrop-in var(--dur-base) var(--ease) both;
 }
 
@@ -1008,7 +1078,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   overflow-x: hidden;
   overflow-y: auto;
   border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-shell);
   color: var(--ink);
   background: var(--surface);
   box-shadow: var(--shadow-float);
@@ -1037,26 +1107,27 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 }
 
 .dialog-close {
-  width: 32px;
-  height: 32px;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
+  min-height: var(--control-h-sm);
   padding: 0;
   display: grid;
   place-items: center;
   flex: 0 0 auto;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-control);
   color: var(--ink-muted);
   background: transparent;
 }
 
 .dialog-close:hover {
   color: var(--ink);
-  background: var(--surface-sunken);
+  background: transparent;
 }
 
 .dialog-close svg {
-  width: 15px;
-  height: 15px;
+  width: 18px;
+  height: 18px;
 }
 
 .dialog-loading {
@@ -1081,10 +1152,9 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 .native-field input,
 .native-field select,
 .native-field textarea,
-.settings-field input,
-.tag-entry input {
+.settings-field input {
   width: 100%;
-  min-height: 42px;
+  min-height: var(--control-h-lg);
   padding: var(--sp-2) var(--sp-3);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-md);
@@ -1105,8 +1175,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 .native-field input:hover,
 .native-field select:hover,
 .native-field textarea:hover,
-.settings-field input:hover,
-.tag-entry input:hover {
+.settings-field input:hover {
   border-color: color-mix(in srgb, var(--ink) 18%, transparent);
   background: color-mix(
     in srgb,
@@ -1118,8 +1187,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 .native-field input:focus,
 .native-field select:focus,
 .native-field textarea:focus,
-.settings-field input:focus,
-.tag-entry input:focus {
+.settings-field input:focus {
   border-color: color-mix(in srgb, var(--ink) 28%, transparent);
   background: var(--surface);
 }
@@ -1129,7 +1197,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 }
 
 .readonly-folder-value {
-  min-height: 42px;
+  min-height: var(--control-h-lg);
   padding: 0 var(--sp-3);
   display: flex;
   align-items: center;
@@ -1142,7 +1210,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 
 .folder-select-trigger {
   width: 100%;
-  min-height: 42px;
+  min-height: var(--control-h-lg);
   padding: 0 var(--sp-3);
   display: flex;
   align-items: center;
@@ -1196,7 +1264,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 
 .folder-select-option {
   width: 100%;
-  min-height: 36px;
+  min-height: var(--control-h-md);
   padding: var(--sp-2)
     calc(var(--sp-2) + var(--folder-depth, 0) * var(--sp-3));
   display: grid;
@@ -1241,7 +1309,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 }
 
 .folder-suggestions button {
-  min-height: 38px;
+  min-height: var(--control-h-md);
   padding: var(--sp-2) var(--sp-3);
   display: flex;
   align-items: center;
@@ -1398,172 +1466,64 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   font-size: var(--fs-caption);
 }
 
+/* Locked to one control row so switching into the delete confirmation cannot
+   change the dialog height. Both states are the same single flex row: a left
+   slot and a right button group. */
 .native-dialog-actions {
+  min-height: var(--control-h-lg);
   margin-top: var(--sp-5);
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}
+
+.native-dialog-actions > div:not(.delete-confirmation) {
+  display: flex;
+  flex: 0 0 auto;
   justify-content: flex-end;
   gap: var(--sp-2);
 }
 
 .delete-confirmation {
   width: 100%;
-  padding-top: var(--sp-3);
-  border-top: 1px solid var(--line);
-}
-
-.delete-confirmation p {
-  margin: 0;
-  color: var(--ink-muted);
-  font-size: var(--fs-caption);
-}
-
-.delete-confirmation > div {
-  margin-top: var(--sp-3);
+  min-height: var(--control-h-lg);
   display: flex;
-  justify-content: flex-end;
-  gap: var(--sp-2);
-}
-
-.bookmark-analysis {
-  margin-top: var(--sp-5);
-  padding-top: var(--sp-5);
-  border-top: 1px solid var(--line);
-}
-
-.bookmark-analysis > header,
-.analysis-tags-heading {
-  display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--sp-3);
 }
 
-.bookmark-analysis > header strong,
-.bookmark-analysis > header small {
-  display: block;
-}
-
-.bookmark-analysis > header strong {
-  font-size: var(--fs-small);
-  font-weight: var(--fw-strong);
-}
-
-.bookmark-analysis > header small {
-  margin-top: var(--sp-1);
-  color: var(--ink-muted);
-  font-size: var(--fs-caption);
-}
-
-.bookmark-analysis > header > span {
-  padding: var(--sp-1) var(--sp-2);
-  border-radius: var(--radius-md);
-  color: var(--ink-muted);
-  background: var(--surface-sunken);
-  font-size: var(--fs-caption);
-}
-
-.analysis-copy {
-  margin-top: var(--sp-4);
-  padding: var(--sp-3);
-  border-radius: var(--radius-md);
-  background: var(--surface-sunken);
-}
-
-.analysis-copy p {
+.delete-confirmation p {
+  min-width: 0;
   margin: 0;
-  color: var(--ink);
-  font-size: var(--fs-small);
-  line-height: var(--lh-body);
-  white-space: pre-wrap;
-}
-
-.analysis-topics,
-.analysis-tags {
-  margin-top: var(--sp-4);
-}
-
-.analysis-topics > span,
-.analysis-tags-heading > span {
-  color: var(--ink-muted);
-  font-size: var(--fs-caption);
-  font-weight: var(--fw-strong);
-}
-
-.analysis-topics > div,
-.editable-tag-list {
-  margin-top: var(--sp-2);
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: var(--sp-2);
-}
-
-.analysis-topics em,
-.editable-tag-list > span {
-  min-height: 28px;
-  padding: var(--sp-1) var(--sp-2);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  border-radius: var(--radius-md);
-  color: var(--ink-muted);
-  background: var(--surface-sunken);
+  color: var(--negative);
   font-size: var(--fs-caption);
-  font-style: normal;
-}
-
-.analysis-topics > p,
-.editable-tag-list > small {
-  margin: var(--sp-2) 0 0;
-  color: var(--ink-faint);
-  font-size: var(--fs-caption);
-}
-
-.editable-tag-list > span button {
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  display: grid;
-  place-items: center;
-  border: 0;
-  border-radius: 50%;
-  color: var(--ink-muted);
-  background: transparent;
-}
-
-.editable-tag-list > span button:hover {
-  color: var(--ink);
-  background: color-mix(in srgb, var(--ink) 7%, transparent);
-}
-
-.editable-tag-list > span button svg {
-  width: 11px;
-  height: 11px;
-}
-
-.tag-entry {
-  margin-top: var(--sp-2);
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--sp-2);
-}
-
-.tag-entry button {
-  min-width: 54px;
-  min-height: 42px;
-  padding-inline: var(--sp-3);
-  border: 0;
-  border-radius: var(--radius-md);
-  color: var(--bg);
-  background: var(--ink);
-  font-size: var(--fs-small);
   font-weight: var(--fw-medium);
+  line-height: 1.3;
 }
 
-.tag-entry button:disabled {
-  color: var(--ink-faint);
-  background: var(--surface-sunken);
+.delete-confirmation p svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.delete-confirmation p small {
+  display: block;
+  color: var(--ink-muted);
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-regular);
+}
+
+.delete-confirmation > div {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  gap: var(--sp-2);
 }
 
 .native-settings-panel,
@@ -1584,7 +1544,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 
 .settings-back-button {
   width: 34px;
-  height: 34px;
+  height: var(--control-h-sm);
   margin-left: calc(var(--sp-1) * -1);
   border-radius: calc(var(--radius-md) - 2px);
 }
@@ -1628,8 +1588,12 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 .settings-notice {
   margin-bottom: var(--sp-2);
   padding: var(--sp-2) var(--sp-3);
+  min-height: var(--control-h-sm);
+  display: flex;
+  align-items: center;
   border-radius: var(--radius-md);
   font-size: var(--fs-caption);
+  line-height: 1.45;
 }
 
 .settings-notice[data-tone="error"] {
@@ -1640,6 +1604,10 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 .settings-notice[data-tone="success"] {
   color: var(--ink-muted);
   background: var(--surface-sunken);
+}
+
+.settings-inline-feedback {
+  margin: var(--sp-3) 0 0;
 }
 
 .settings-section {
@@ -1674,7 +1642,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 }
 
 .settings-status {
-  padding: var(--sp-1) var(--sp-2);
+  padding: var(--sp-1) var(--sp-3);
   flex: 0 0 auto;
   border-radius: var(--radius-md);
   color: var(--ink-muted);
@@ -1687,20 +1655,26 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   color: var(--ink);
 }
 
+/* Sunken track with a raised thumb. The thumb is the animated pill inside
+   TabsSubtle, so the tab element itself must stay transparent — painting a
+   second background on the selected tab produced two stacked indicators with
+   two different radii. */
 .settings-provider-tabs,
 .settings-cover-tabs {
+  --tabs-pill-radius: var(--radius-inset-module);
+  --tabs-pill-bg: var(--surface);
   margin-top: var(--sp-3);
   padding: var(--sp-1);
   gap: var(--sp-1);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-module);
   background: var(--surface-sunken);
 }
 
 .settings-provider-tab {
-  min-height: 36px;
+  min-height: var(--control-h-md);
   padding-inline: var(--sp-2);
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-inset-module);
   color: var(--ink-muted);
   background: transparent;
   font-size: var(--fs-caption);
@@ -1710,13 +1684,9 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 .settings-provider-tab[data-active="true"],
 .settings-provider-tab[aria-selected="true"] {
   color: var(--ink);
-  background: var(--surface);
 }
 
 .settings-provider-help,
-.settings-scan-privacy,
-.settings-scan-estimate,
-.settings-scan-limit,
 .settings-field-footer,
 .settings-usage-summary,
 .settings-empty-state {
@@ -1724,8 +1694,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   font-size: var(--fs-caption);
 }
 
-.settings-provider-help,
-.settings-scan-privacy {
+.settings-provider-help {
   margin: var(--sp-3) 0 0;
 }
 
@@ -1740,37 +1709,174 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 
 .settings-scan-progress {
   margin-top: var(--sp-4);
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.settings-scan-progress progress {
+  width: 100%;
   height: 6px;
+  appearance: none;
   overflow: hidden;
+  border: 0;
   border-radius: var(--radius-sm);
   background: var(--surface-sunken);
 }
 
-.settings-scan-progress > span {
-  height: 100%;
-  display: block;
-  border-radius: inherit;
+.settings-scan-progress progress::-webkit-progress-bar {
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+
+.settings-scan-progress progress::-webkit-progress-value {
+  border-radius: var(--radius-sm);
   background: var(--ink);
 }
 
-.settings-scan-estimate,
+.settings-scan-progress p {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-muted);
+  font-size: var(--fs-caption);
+}
+
 .settings-usage-summary {
   margin-top: var(--sp-3);
   padding: var(--sp-3);
+  display: grid;
+  gap: var(--sp-1);
   border-radius: var(--radius-md);
   background: var(--surface-sunken);
 }
 
-.settings-scan-limit {
-  margin-top: var(--sp-3);
+/* Secondary page entry: one row, one destination. Same outer width as other
+   settings sections; inner padding matches other title+chevron rows
+   (agent-composer-setup / agent-history-open). */
+.settings-more-entry {
+  padding-block: var(--sp-2);
+}
+
+.settings-more-button {
+  /* A button's auto width shrinks to its content even as a flex container, so
+     space-between has nothing to distribute without this. */
+  width: 100%;
+  min-height: var(--control-h-touch);
+  margin: 0;
+  padding: var(--sp-3);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  text-align: start;
+  background: transparent;
 }
 
-.settings-scan-limit input {
-  width: 86px;
+.settings-more-button:hover {
+  background: var(--surface-sunken);
+}
+
+.settings-more-button > [data-slot="button-content"] {
+  display: contents;
+}
+
+.settings-more-button strong {
+  display: block;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-medium);
+}
+
+.settings-more-button small {
+  display: block;
+  color: var(--ink-muted);
+  font-size: var(--fs-caption);
+}
+
+.settings-more-button svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  color: var(--ink-faint);
+}
+
+/* Time, concurrency and estimated token volume only matter at the moment of
+   committing to a scan, so they live here instead of permanently on settings. */
+.settings-scan-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  padding: var(--sp-4);
+  display: grid;
+  place-items: center;
+  background: var(--scrim-modal);
+}
+
+.settings-scan-dialog {
+  width: 100%;
+  max-width: 360px;
+  max-height: calc(100dvh - 2 * var(--sp-4));
+  padding: var(--sp-4);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-shell);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.settings-scan-dialog h2 {
+  margin: 0;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-strong);
+}
+
+.settings-scan-dialog > p {
+  margin: var(--sp-2) 0 0;
+  color: var(--ink-muted);
+  font-size: var(--fs-caption);
+  line-height: 1.5;
+}
+
+.settings-scan-dialog dl {
+  margin: var(--sp-3) 0 0;
+  display: grid;
+  gap: var(--sp-1);
+}
+
+.settings-scan-dialog dl > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  font-size: var(--fs-caption);
+}
+
+.settings-scan-dialog dt {
+  color: var(--ink-muted);
+}
+
+.settings-scan-dialog dd {
+  margin: 0;
+  font-weight: var(--fw-medium);
+}
+
+.settings-scan-dialog > small {
+  margin-top: var(--sp-2);
+  display: block;
+  color: var(--ink-faint);
+  font-size: var(--fs-caption);
+  line-height: 1.5;
+}
+
+.settings-scan-dialog-actions {
+  min-height: var(--control-h-lg);
+  margin-top: var(--sp-4);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-2);
 }
 
 .settings-change-list {
@@ -1785,8 +1891,12 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--sp-2);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-module);
   background: var(--surface-sunken);
+}
+
+.settings-change-list article .button {
+  border-radius: var(--radius-control);
 }
 
 .settings-change-list article[data-destructive="true"] {
@@ -1817,21 +1927,47 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 
 .settings-onboarding-section,
 .settings-account-row {
+  margin-top: var(--sp-3);
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--sp-3);
 }
 
-.settings-account-row {
-  margin-top: var(--sp-3);
-}
-
+/* The text block takes the free space, which is what pushes the trailing
+   button to the end of the row. */
+.settings-onboarding-section > div,
 .settings-account-row > div {
   min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
+  flex: 1 1 auto;
+}
+
+/* Name over status. */
+.settings-account-row > div {
+  display: grid;
+  gap: 2px;
+}
+
+.settings-account-row > div strong {
+  font-size: var(--fs-small);
+  font-weight: var(--fw-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-account-row > div small {
+  color: var(--ink-muted);
+  font-size: var(--fs-caption);
+}
+
+.settings-cloud-controls {
+  margin-top: var(--sp-4);
+  display: grid;
+  gap: var(--sp-1);
+}
+
+.settings-cloud-controls .settings-field-footer {
+  margin-top: var(--sp-2);
 }
 
 .settings-account-avatar {
@@ -1867,7 +2003,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   margin: auto;
   padding: var(--sp-5);
   border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-shell);
   background: var(--surface);
   box-shadow: var(--shadow-float);
 }
@@ -1891,10 +2027,15 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 }
 
 .onboarding-card > p,
+.onboarding-provider-form > p,
 .onboarding-privacy {
   margin: 0;
   color: var(--ink-muted);
   font-size: var(--fs-small);
+}
+
+.onboarding-provider-form {
+  display: contents;
 }
 
 .onboarding-facts,
@@ -1932,10 +2073,10 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 }
 
 .agent-page-header .icon-button {
-  width: 34px;
-  height: 34px;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
   flex: 0 0 auto;
-  border-radius: calc(var(--radius-md) - 2px);
+  border-radius: var(--agent-control-radius);
 }
 
 .agent-thread {
@@ -1945,7 +2086,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 .agent-message {
   margin-bottom: var(--sp-4);
   display: grid;
-  gap: var(--sp-2);
+  gap: var(--agent-content-gap);
   animation: agent-message-in var(--dur-base) var(--ease) both;
 }
 
@@ -1954,24 +2095,44 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 }
 
 .agent-message-copy {
+  width: fit-content;
   max-width: 92%;
   padding: var(--sp-3);
-  border-radius: var(--radius-md);
+  align-self: start;
+  border-radius: var(--agent-radius);
   color: var(--ink);
-  background: var(--surface-sunken);
+  background: var(--agent-surface);
   font-size: var(--fs-small);
   line-height: var(--lh-body);
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.agent-message-copy p {
+  margin: 0;
 }
 
 .agent-message[data-role="assistant"] .agent-message-copy {
+  width: 100%;
   max-width: 100%;
   padding-inline: 0;
   background: transparent;
 }
 
+.agent-message[data-role="user"] .agent-message-copy {
+  justify-self: end;
+}
+
+.agent-message-copy > small {
+  display: block;
+  margin-top: var(--sp-2);
+  color: var(--ink-muted);
+  font-size: var(--fs-caption);
+  line-height: 1.35;
+}
+
 .agent-thinking {
-  min-height: 60px;
+  min-height: var(--control-h-lg);
   display: flex;
   align-items: center;
   gap: var(--sp-1);
@@ -1979,29 +2140,117 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   font-size: var(--fs-small);
 }
 
+.agent-thinking-steps {
+  min-height: var(--control-h-lg);
+  padding-block: var(--sp-2);
+  display: grid;
+  gap: var(--sp-2);
+  color: var(--ink-muted);
+  font-size: var(--fs-small);
+}
+
+.agent-thinking-step {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: var(--sp-4) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--sp-1);
+  line-height: 1.35;
+}
+
+.agent-thinking-step-mark {
+  width: var(--sp-4);
+  height: var(--sp-4);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--ink-faint);
+  background: var(--surface-sunken);
+  font-size: var(--fs-caption);
+}
+
+.agent-thinking-step[data-state="done"] {
+  color: var(--ink-muted);
+}
+
+.agent-thinking-step[data-state="done"] .agent-thinking-step-mark {
+  color: var(--ink-muted);
+  background: var(--surface-sunken);
+}
+
+.agent-thinking-step[data-state="current"] {
+  color: var(--ink);
+  font-weight: var(--fw-medium);
+}
+
+.agent-thinking-step[data-state="current"] .agent-thinking-step-mark {
+  color: var(--bg);
+  background: var(--ink);
+  animation: agent-thinking-pulse 900ms var(--ease) infinite alternate;
+}
+
+.agent-thinking-steps > small {
+  margin-top: var(--sp-1);
+  color: var(--ink-muted);
+  font-size: var(--fs-caption);
+}
+
 .agent-message-sources {
+  min-width: 0;
+  width: 100%;
   display: grid;
   gap: var(--sp-1);
 }
 
-.agent-message-sources > button {
+.agent-message-sources > .agent-source-button {
+  width: 100%;
   min-width: 0;
-  min-height: 42px;
+  min-height: calc(var(--control-h-lg) + var(--sp-2));
+  height: auto;
   padding: var(--sp-2);
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr);
+  grid-template-columns: var(--control-h-md) minmax(0, 1fr);
   align-items: center;
   gap: var(--sp-2);
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--agent-control-radius);
   color: var(--ink);
-  background: var(--surface-sunken);
+  background: var(--agent-surface);
   text-align: left;
+  overflow: hidden;
+}
+
+.agent-message-sources > .agent-source-button:hover,
+.agent-message-sources > .agent-source-button:focus-visible {
+  background: color-mix(in srgb, var(--agent-surface) 78%, var(--ink));
+}
+
+.agent-message-sources > .agent-source-button > [data-slot="button-content"] {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: var(--control-h-md) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--sp-2);
+  justify-content: stretch;
+  text-align: left;
+  overflow: hidden;
+}
+
+.agent-message-sources
+  > .agent-source-button
+  > [data-slot="button-content"]
+  > span:last-child {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .agent-source-thumbnail {
-  width: 32px;
-  height: 32px;
+  width: var(--control-h-md);
+  height: var(--control-h-md);
+  flex: 0 0 auto;
 }
 
 .agent-message-sources strong,
@@ -2024,7 +2273,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 .agent-action-card {
   padding: var(--sp-3);
   border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border-radius: var(--agent-radius);
 }
 
 .agent-action-card > header,
@@ -2052,10 +2301,40 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   list-style: none;
 }
 
+.agent-action-group {
+  margin: var(--sp-3) 0 0;
+  color: var(--ink-muted);
+  font-size: var(--fs-caption);
+}
+
+.agent-action-group + ul {
+  margin-top: var(--sp-2);
+}
+
 .agent-action-card li {
   display: grid;
-  grid-template-columns: 8px minmax(0, 1fr);
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: start;
   gap: var(--sp-2);
+}
+
+.agent-action-card li[data-status="cancelled"] {
+  opacity: 0.55;
+}
+
+.agent-action-drop {
+  margin-top: calc(var(--sp-1) * -1);
+  color: var(--ink-muted);
+}
+
+.agent-action-drop:hover {
+  color: var(--ink);
+  background: var(--surface-sunken);
+}
+
+.agent-action-drop svg {
+  width: 14px;
+  height: 14px;
 }
 
 .agent-action-card li > span {
@@ -2091,10 +2370,10 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 
 .agent-action-card footer button,
 .agent-undo-button {
-  min-height: 34px;
+  min-height: var(--control-h-md);
   padding-inline: var(--sp-3);
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--agent-control-radius);
   color: var(--ink);
   background: var(--surface);
   font-size: var(--fs-caption);
@@ -2108,7 +2387,11 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 }
 
 .agent-action-confirm-danger {
-  background: var(--ink);
+  background: var(--negative);
+}
+
+.agent-action-confirm-danger:not(:disabled):hover {
+  background: color-mix(in srgb, var(--negative) 88%, var(--ink));
 }
 
 .agent-undo-button {
@@ -2117,9 +2400,9 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 
 .agent-thread-error {
   padding: var(--sp-2) var(--sp-3);
-  border-radius: var(--radius-md);
+  border-radius: var(--agent-radius);
   color: var(--ink);
-  background: var(--surface-sunken);
+  background: var(--agent-surface);
   font-size: var(--fs-caption);
 }
 
@@ -2133,18 +2416,23 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 
 .agent-history-list > article {
   position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--sp-2);
+  padding-block: var(--sp-2);
   border-bottom: 1px solid var(--line);
 }
 
 .agent-history-open {
   width: 100%;
   min-width: 0;
-  padding: var(--sp-3) var(--sp-8) var(--sp-3) var(--sp-3);
+  padding: var(--sp-3);
   display: grid;
   grid-template-columns: minmax(0, 1fr) 16px;
   gap: var(--sp-1) var(--sp-2);
   border: 0;
-  border-radius: var(--radius-md);
+  border-radius: var(--agent-radius);
   color: var(--ink);
   background: transparent;
   text-align: left;
@@ -2156,17 +2444,29 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 
 .agent-history-open > span {
   min-width: 0;
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
   gap: var(--sp-2);
 }
 
-.agent-history-open strong,
+.agent-history-open strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
 .agent-history-open small {
+  min-width: 0;
+  grid-column: 1 / -1;
+  margin-top: var(--sp-1);
+  display: -webkit-box;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .agent-history-open strong {
@@ -2180,6 +2480,10 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   font-size: var(--fs-caption);
 }
 
+.agent-history-open time {
+  white-space: nowrap;
+}
+
 .agent-history-open > svg {
   grid-column: 2;
   grid-row: 1 / 3;
@@ -2189,28 +2493,33 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 }
 
 .agent-history-actions {
-  position: absolute;
-  right: var(--sp-2);
-  bottom: var(--sp-3);
+  align-self: start;
+  padding: var(--sp-3) var(--sp-2) 0 0;
   display: flex;
   gap: var(--sp-1);
 }
 
-.agent-history-actions button,
-.agent-history-rename button {
+.agent-history-action {
+  min-height: var(--control-h-xs);
   padding: var(--sp-1) var(--sp-2);
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--agent-control-radius);
   color: var(--ink-muted);
-  background: var(--surface-sunken);
+  background: var(--agent-surface);
   font-size: var(--fs-caption);
 }
 
-.agent-history-actions button[data-danger="true"] {
+.agent-history-action:hover {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--agent-surface) 78%, var(--ink));
+}
+
+.agent-history-action[data-danger="true"] {
   color: var(--ink);
 }
 
 .agent-history-rename {
+  grid-column: 1 / -1;
   min-height: 70px;
   padding: var(--sp-3);
   display: grid;
@@ -2223,7 +2532,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   min-width: 0;
   padding: var(--sp-2);
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
+  border-radius: var(--agent-control-radius);
   outline: 0;
   color: var(--ink);
   background: var(--surface);
@@ -2250,8 +2559,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   font-size: var(--fs-small);
 }
 
-.agent-history-empty p,
-.agent-history-limit {
+.agent-history-empty p {
   color: var(--ink-muted);
   font-size: var(--fs-caption);
 }
@@ -2259,10 +2567,6 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 .agent-history-empty p {
   max-width: 28ch;
   margin: var(--sp-2) 0 0;
-}
-
-.agent-history-limit {
-  margin: var(--sp-3);
 }
 
 .bookmark-preview-card {
@@ -2326,6 +2630,21 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   }
 }
 
+@keyframes agent-thinking-pulse {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-thinking-step[data-state="current"] .agent-thinking-step-mark {
+    animation: none;
+  }
+}
+
 @keyframes bookmark-preview-in {
   from {
     opacity: 0;
@@ -2341,15 +2660,18 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   }
 }
 
-/* Fluid Button owns an inner background/content layer. Side-panel controls
-   already have a complete compact visual system, so the generated layer must
-   stay transparent and let the existing button class provide the surface. */
-.native-panel button > [data-slot="button-background"] {
-  background: transparent;
-}
-
 .native-panel button {
   color: var(--ink);
+}
+
+/* The generic native-panel rule is intentionally last, so this explicit
+   exception keeps the send glyph readable on its dark circular control. */
+.native-panel .agent-send-button {
+  color: var(--bg);
+}
+
+.native-panel .agent-send-button:disabled {
+  color: var(--ink-muted);
 }
 
 .native-panel .bookmark-main {
@@ -2359,6 +2681,11 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 .native-panel button.button-dark,
 .native-panel button.button-danger {
   color: var(--bg);
+}
+
+.native-panel button.button-danger-quiet,
+.native-panel button.text-button-danger {
+  color: var(--negative);
 }
 
 /* Layout buttons use their original Grid/Flex children rather than a single

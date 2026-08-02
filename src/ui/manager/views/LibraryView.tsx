@@ -1,20 +1,21 @@
-import { FluidInput, FluidTextarea, FluidSelect } from "../../components/FluidControls";
+import {
+  FluidInput,
+  FluidTextarea,
+  FluidSelect,
+} from "../../components/FluidControls";
 import {
   Fragment,
   useEffect,
   useState,
   type MouseEvent,
-  type ReactNode
+  type ReactNode,
 } from "react";
 import type {
   BookmarkBarSnapshot,
   SearchResult,
-  SiteBrandRecord
+  SiteBrandRecord,
 } from "../../../lib/types";
-import {
-  CloseIcon,
-  SearchIcon
-} from "../../components/Icons";
+import { CloseIcon, SearchIcon } from "../../components/Icons";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../../components/ui/button";
 import { Card } from "../../components/ui/card";
@@ -22,9 +23,10 @@ import {
   Select,
   SelectContent,
   SelectItem,
-  SelectTrigger
+  SelectTrigger,
 } from "../../../components/ui/select";
 import { ResourceIdentity } from "../../components/ResourceIdentity";
+import { currentSiteBrandImageUrl } from "../../../lib/thumbnail";
 import { LibraryCardEditor } from "../components/LibraryCardEditor";
 import { LibraryCardCover } from "../components/LibraryCardCover";
 import { SnapshotBackfillControl } from "../components/SnapshotBackfillControl";
@@ -33,17 +35,10 @@ import {
   ALL_LIBRARY_FOLDERS,
   resourceFolderLabel,
   type LibraryFolderFacet,
-  type LibraryResourceLocation
+  type LibraryResourceLocation,
 } from "../library-collection";
-import type {
-  LibraryFilter,
-  LibrarySort
-} from "../types";
-import {
-  brandForUrl,
-  displayDate,
-  hostFromUrl
-} from "../utils";
+import type { LibraryFilter, LibrarySort } from "../types";
+import { brandForUrl, hostFromUrl } from "../utils";
 
 interface LibraryViewProps {
   results: SearchResult[];
@@ -90,18 +85,20 @@ function highlightMatches(value: string, query: string): ReactNode {
   const terms = queryTerms(query);
   if (!terms.length) return value;
   const escaped = terms.map((term) =>
-    term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
   );
   const expression = new RegExp(`(${escaped.join("|")})`, "gi");
-  return value.split(expression).map((part, index) =>
-    terms.some(
-      (term) => term.toLocaleLowerCase() === part.toLocaleLowerCase()
-    ) ? (
-      <mark key={`${part}:${index}`}>{part}</mark>
-    ) : (
-      <Fragment key={`${part}:${index}`}>{part}</Fragment>
-    )
-  );
+  return value
+    .split(expression)
+    .map((part, index) =>
+      terms.some(
+        (term) => term.toLocaleLowerCase() === part.toLocaleLowerCase(),
+      ) ? (
+        <mark key={`${part}:${index}`}>{part}</mark>
+      ) : (
+        <Fragment key={`${part}:${index}`}>{part}</Fragment>
+      ),
+    );
 }
 
 interface LibrarySearchFormProps {
@@ -117,7 +114,7 @@ export function LibrarySearchForm({
   appliedQuery,
   onQueryDraftChange,
   onSearch,
-  onClearSearch
+  onClearSearch,
 }: LibrarySearchFormProps) {
   return (
     <form
@@ -136,15 +133,13 @@ export function LibrarySearchForm({
       <FluidInput
         id="library-search"
         value={queryDraft}
-        onChange={(event) =>
-          onQueryDraftChange(event.currentTarget.value)
-        }
+        onChange={(event) => onQueryDraftChange(event.currentTarget.value)}
         placeholder="搜索收藏标题、标签、摘要或文件夹"
       />
       {queryDraft || appliedQuery ? (
         <Button
           type="button"
-          variant="ghost"
+          variant="unstyled"
           size="icon-sm"
           className="library-search-clear"
           aria-label="清除收藏搜索"
@@ -155,9 +150,8 @@ export function LibrarySearchForm({
         </Button>
       ) : null}
       <Button
+        variant="unstyled"
         type="submit"
-        variant="primary"
-        size="sm"
         className="button button-dark button-small library-search-submit"
       >
         搜索
@@ -192,7 +186,7 @@ export function LibraryView({
   onClearSearch,
   onResourceChanged,
   onSnapshotBackfillChanged,
-  onOpenResource
+  onOpenResource,
 }: LibraryViewProps) {
   const [snapshotRevisions, setSnapshotRevisions] = useState<
     Map<string, string>
@@ -233,18 +227,12 @@ export function LibraryView({
     window.addEventListener("focus", refreshAfterReturning);
     return () => {
       runtimeMessageEvent?.removeListener(handleSnapshotUpdated);
-      document.removeEventListener(
-        "visibilitychange",
-        refreshAfterReturning
-      );
+      document.removeEventListener("visibilitychange", refreshAfterReturning);
       window.removeEventListener("focus", refreshAfterReturning);
     };
   }, []);
 
-  function openResource(
-    event: MouseEvent<HTMLAnchorElement>,
-    url: string
-  ) {
+  function openResource(event: MouseEvent<HTMLAnchorElement>, url: string) {
     if (
       event.button !== 0 ||
       event.metaKey ||
@@ -276,12 +264,12 @@ export function LibraryView({
                 [
                   ["all", "全部", scopeCount],
                   ["ready", "已理解", readyCount],
-                  ["pending", "待处理", pendingCount]
+                  ["pending", "待处理", pendingCount],
                 ] as const
               ).map(([value, label, count]) => (
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="unstyled"
                   size="sm"
                   active={filter === value}
                   className="library-tab-button"
@@ -302,10 +290,7 @@ export function LibraryView({
           <div className="library-controls" aria-label="收藏筛选与排序">
             <label className="library-select-control">
               <span>文件夹</span>
-              <Select
-                value={folderId}
-                onValueChange={onFolderChange}
-              >
+              <Select value={folderId} onValueChange={onFolderChange}>
                 <SelectTrigger
                   className="library-select-trigger"
                   aria-label="按 Chrome 书签文件夹筛选"
@@ -316,7 +301,11 @@ export function LibraryView({
                     所有文件夹（{libraryCount}）
                   </SelectItem>
                   {folders.map((folder, index) => (
-                    <SelectItem value={folder.id} key={folder.id} index={index + 1}>
+                    <SelectItem
+                      value={folder.id}
+                      key={folder.id}
+                      index={index + 1}
+                    >
                       {folder.label}（{folder.count}）
                     </SelectItem>
                   ))}
@@ -339,11 +328,21 @@ export function LibraryView({
                   <SelectItem value="default" index={0}>
                     {query ? "搜索相关度" : "Chrome 顺序"}
                   </SelectItem>
-                  <SelectItem value="bookmarked-desc" index={1}>最近收藏</SelectItem>
-                  <SelectItem value="bookmarked-asc" index={2}>最早收藏</SelectItem>
-                  <SelectItem value="used-desc" index={3}>最近使用</SelectItem>
-                  <SelectItem value="updated-desc" index={4}>最近更新</SelectItem>
-                  <SelectItem value="title-asc" index={5}>标题 A–Z</SelectItem>
+                  <SelectItem value="bookmarked-desc" index={1}>
+                    最近收藏
+                  </SelectItem>
+                  <SelectItem value="bookmarked-asc" index={2}>
+                    最早收藏
+                  </SelectItem>
+                  <SelectItem value="used-desc" index={3}>
+                    最近使用
+                  </SelectItem>
+                  <SelectItem value="updated-desc" index={4}>
+                    最近更新
+                  </SelectItem>
+                  <SelectItem value="title-asc" index={5}>
+                    标题 A–Z
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </label>
@@ -353,109 +352,102 @@ export function LibraryView({
               onCollectionChanged={onSnapshotBackfillChanged}
             />
           </div>
-
         </div>
       </section>
 
       {visibleResults.length ? (
-        <StableMasonry
-          className="library-masonry"
-          aria-label="收藏列表"
-        >
-          {visibleResults.map(
-            ({ resource, matchReason }) => {
-              const brand = brandForUrl(siteBrandByHost, resource.url);
-              const host = resource.siteName || hostFromUrl(resource.url);
-              const location = locations.get(resource.resourceKey);
-              const locationLabel = resourceFolderLabel(location);
-              const summary =
-                resource.summary ||
-                resource.contentExcerpt ||
-                "尚未读取网页正文。再次打开该网页，Aarre 会在页面稳定后自动补全。";
-              return (
-                <Card
-                  role="article"
-                  className="library-card"
-                  key={resource.resourceKey}
-                >
-                  {bookmarkSnapshot ? (
-                    <LibraryCardEditor
-                      resource={resource}
-                      bookmarkSnapshot={bookmarkSnapshot}
-                      onChanged={onResourceChanged}
-                    />
-                  ) : null}
-                  <a
-                    className="library-card-cover"
-                    href={resource.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label={`打开 ${resource.title}`}
-                    onClick={(event) =>
-                      openResource(event, resource.url)
-                    }
-                  >
+        <StableMasonry className="library-masonry" aria-label="收藏列表">
+          {visibleResults.map(({ resource, matchReason }) => {
+            const brand = brandForUrl(siteBrandByHost, resource.url);
+            const host = resource.siteName || hostFromUrl(resource.url);
+            const location = locations.get(resource.resourceKey);
+            const locationLabel = resourceFolderLabel(location);
+            const summary =
+              resource.summary ||
+              resource.contentExcerpt ||
+              "尚未读取网页正文。再次打开该网页，Aarre 会在页面稳定后自动补全。";
+            return (
+              <Card
+                role="article"
+                className="library-card"
+                key={resource.resourceKey}
+              >
+                {bookmarkSnapshot ? (
+                  <LibraryCardEditor
+                    resource={resource}
+                    bookmarkSnapshot={bookmarkSnapshot}
+                    onChanged={onResourceChanged}
+                  />
+                ) : null}
+                <div className="library-card-cover-frame">
+                  <div className="library-card-cover">
                     <LibraryCardCover
                       canonicalUrl={resource.canonicalUrl}
                       label={resource.title}
                       fallbackResource={resource}
                       snapshotRevision={`${resource.snapshotAt || ""}:${snapshotRevisions.get(resource.canonicalUrl) || ""}:${focusRevision}`}
                     />
-                  </a>
-
-                  <div className="library-card-copy">
-                    <h3>
-                      <a
-                        href={resource.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        onClick={(event) =>
-                          openResource(event, resource.url)
+                    {/* Detail lives over the artwork rather than below it, so
+                          revealing it cannot change the card's height and shift
+                          the cards below it in the same masonry column. */}
+                    <div
+                      className="library-card-extra"
+                      aria-hidden="true"
+                      onClick={(event) => {
+                        // Mask sits above the stretched title link so it can
+                        // scroll; clicks still open the bookmark.
+                        if (
+                          event.button !== 0 ||
+                          event.metaKey ||
+                          event.ctrlKey ||
+                          event.shiftKey ||
+                          event.altKey
+                        ) {
+                          return;
                         }
-                      >
-                        {highlightMatches(resource.title, query)}
-                      </a>
-                    </h3>
-                    <ResourceIdentity
-                      url={resource.url}
-                      brandImageUrl={
-                        brand?.iconDataUrlLight || brand?.iconDataUrl
-                      }
-                      brandImageUrlDark={brand?.iconDataUrlDark}
-                      categoryCoverId={resource.categoryCoverId}
-                      forceSiteBrand
-                      label={host}
-                      title={host}
-                      meta={
-                        query && matchReason
-                          ? `${matchReason}匹配 · ${locationLabel}`
-                          : locationLabel
-                      }
-                      className="library-card-site"
-                      thumbnailClassName="library-card-favicon"
-                    />
-                  </div>
-
-                  <div className="library-card-extra">
-                    <p>{highlightMatches(summary, query)}</p>
-                    <div>
-                      <span>
-                        {resource.tags.length
-                          ? resource.tags
-                              .slice(0, 3)
-                              .map((tag) => `#${tag}`)
-                              .join("  ")
-                          : matchReason || "暂无标签"}
-                      </span>
-                      <time dateTime={resource.updatedAt}>
-                        {displayDate(resource.updatedAt)}
-                      </time>
+                        event.preventDefault();
+                        onOpenResource(resource.url);
+                      }}
+                    >
+                      <p>{highlightMatches(summary, query)}</p>
                     </div>
                   </div>
-                </Card>
-              );
-            }
-          )}
+                </div>
+
+                <div className="library-card-copy">
+                  <h3>
+                    {/* The title link stretches over the whole card via a
+                          pseudo-element, so cover, site row, summary and tags
+                          are all one click target with one accessible name. */}
+                    <a
+                      className="library-card-link"
+                      href={resource.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(event) => openResource(event, resource.url)}
+                    >
+                      {highlightMatches(resource.title, query)}
+                    </a>
+                  </h3>
+                  <ResourceIdentity
+                    url={resource.url}
+                    brandImageUrl={currentSiteBrandImageUrl(brand)}
+                    categoryCoverId={resource.categoryCoverId}
+                    forceSiteBrand
+                    label={host}
+                    title={host}
+                    meta={
+                      query && matchReason
+                        ? `${matchReason}匹配 · ${locationLabel}`
+                        : locationLabel
+                    }
+                    className="library-card-site"
+                    thumbnailClassName="library-card-favicon"
+                  />
+                </div>
+              </Card>
+            );
+          })}
         </StableMasonry>
       ) : (
         <div className="empty-state">
@@ -481,6 +473,7 @@ export function LibraryView({
           </p>
           {query ? (
             <Button
+              variant="unstyled"
               type="button"
               className="button button-quiet"
               onClick={onClearSearch}

@@ -25,7 +25,7 @@ function backfillStatus(
     skipped: 0,
     currentTitle: "",
     errors: [],
-    concurrency: 1,
+    concurrency: 3,
     requiresForeground: false,
     ...values
   };

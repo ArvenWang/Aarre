@@ -163,6 +163,23 @@ export function normalizeResourceRecord(value: unknown): ResourceRecord {
     ...(stringArray(record.aliases).length
       ? { aliases: stringArray(record.aliases) }
       : {}),
+    ...(stringArray(record.useCases).length
+      ? { useCases: stringArray(record.useCases) }
+      : {}),
+    ...(stringValue(record.contentType)
+      ? { contentType: stringValue(record.contentType) }
+      : {}),
+    ...(stringArray(record.questions).length
+      ? { questions: stringArray(record.questions) }
+      : {}),
+    ...(Array.isArray(record.entities)
+      ? { entities: stringArray(record.entities) }
+      : {}),
+    ...(typeof record.aiSchemaVersion === "number" &&
+    Number.isFinite(record.aiSchemaVersion) &&
+    record.aiSchemaVersion > 0
+      ? { aiSchemaVersion: Math.floor(record.aiSchemaVersion) }
+      : {}),
     contentExcerpt: stringValue(record.contentExcerpt),
     contentHash: stringValue(record.contentHash),
     selectedText: stringValue(record.selectedText),
@@ -280,7 +297,13 @@ function normalizeSiteBrand(value: SiteBrandRecord): SiteBrandRecord {
     ...(value.iconDataUrlDark
       ? { iconDataUrlDark: value.iconDataUrlDark }
       : {}),
+    ...(typeof value.iconRenderVersion === "number"
+      ? { iconRenderVersion: value.iconRenderVersion }
+      : {}),
     ...(value.iconSource ? { iconSource: value.iconSource } : {}),
+    ...(value.iconAssetUrl
+      ? { iconAssetUrl: value.iconAssetUrl.slice(0, 2_000) }
+      : {}),
     ...(value.iconRejectReason
       ? { iconRejectReason: value.iconRejectReason }
       : {}),
@@ -317,6 +340,40 @@ export async function getSiteBrand(
 export async function getSiteBrands(): Promise<SiteBrandRecord[]> {
   const db = await database();
   return db.getAll("siteBrands");
+}
+
+/**
+ * Remove rendered icon bytes produced by an older compositor. The host-level
+ * record and its diagnostics remain so the normal site scan can regenerate a
+ * current alpha-preserving icon without losing other metadata.
+ */
+export async function invalidateStaleSiteBrandIcons(
+  currentRenderVersion: number,
+): Promise<number> {
+  const db = await database();
+  const brands = await db.getAll("siteBrands");
+  const stale = brands.filter(
+    (brand) =>
+      brand.iconRenderVersion !== currentRenderVersion &&
+      Boolean(
+        brand.iconDataUrl || brand.iconDataUrlLight || brand.iconDataUrlDark,
+      ),
+  );
+  if (!stale.length) return 0;
+
+  const transaction = db.transaction("siteBrands", "readwrite");
+  for (const brand of stale) {
+    const {
+      iconDataUrl: _iconDataUrl,
+      iconDataUrlLight: _iconDataUrlLight,
+      iconDataUrlDark: _iconDataUrlDark,
+      iconRenderVersion: _iconRenderVersion,
+      ...withoutRenderedIcon
+    } = brand;
+    await transaction.store.put(withoutRenderedIcon);
+  }
+  await transaction.done;
+  return stale.length;
 }
 
 export async function putPageSnapshot(

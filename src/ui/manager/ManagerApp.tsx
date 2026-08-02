@@ -4,17 +4,23 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
-  type ReactNode
+  type ReactNode,
 } from "react";
 import {
   getDisplaySettings,
-  requestPageSnapshotPermission
+  requestPageSnapshotPermission,
 } from "../../lib/display-settings";
 import { sendExtensionRequest } from "../../lib/messages";
 import { isSnapshotSensitiveUrl } from "../../lib/page-snapshot";
 import { searchLocalResources } from "../../lib/search";
-import { applyTheme, initializeTheme, type ThemeMode } from "../../lib/theme";
+import {
+  applyTheme,
+  initializeTheme,
+  THEME_CHANGE_EVENT,
+  type ThemeMode
+} from "../../lib/theme";
 import type {
   AppState,
   BookmarkBarSnapshot,
@@ -23,21 +29,17 @@ import type {
   LibraryInsights,
   ResourceRecord,
   SearchResult,
-  SiteBrandRecord
+  SiteBrandRecord,
 } from "../../lib/types";
 import { BookmarkIcon, MoonIcon, SunIcon } from "../components/Icons";
-import type {
-  LibraryFilter,
-  LibrarySort,
-  ManagerView
-} from "./types";
+import type { LibraryFilter, LibrarySort, ManagerView } from "./types";
 import {
   ALL_LIBRARY_FOLDERS,
   buildLibraryCollection,
   filterAndSortLibraryResults,
   readLibraryControls,
   writeLibraryControls,
-  writeLibraryQuery
+  writeLibraryQuery,
 } from "./library-collection";
 import { LibraryView } from "./views/LibraryView";
 import { OrganizeView } from "./views/OrganizeView";
@@ -45,6 +47,7 @@ import { ReadingView } from "./views/ReadingView";
 import { ReportView } from "./views/ReportView";
 import { ResurfaceView } from "./views/ResurfaceView";
 import { TopicsView } from "./views/TopicsView";
+import { FloatingScrollbar } from "./components/FloatingScrollbar";
 
 const VALID_VIEWS: ManagerView[] = [
   "library",
@@ -52,7 +55,7 @@ const VALID_VIEWS: ManagerView[] = [
   "reading",
   "report",
   "topics",
-  "resurface"
+  "resurface",
 ];
 
 const VIEW_LABELS: Record<ManagerView, string> = {
@@ -61,15 +64,13 @@ const VIEW_LABELS: Record<ManagerView, string> = {
   reading: "待读队列",
   report: "报告",
   topics: "主题图谱",
-  resurface: "重新发现"
+  resurface: "重新发现",
 };
 
 function asSearchResults(
-  items: ResourceRecord[] | SearchResult[]
+  items: ResourceRecord[] | SearchResult[],
 ): SearchResult[] {
-  return items.map((item) =>
-    "resource" in item ? item : { resource: item }
-  );
+  return items.map((item) => ("resource" in item ? item : { resource: item }));
 }
 
 function initialLocationState(): {
@@ -88,13 +89,23 @@ function initialLocationState(): {
       requestedView && VALID_VIEWS.includes(requestedView)
         ? requestedView
         : "library",
-    ...controls
+    ...controls,
   };
 }
 
 export function ManagerApp() {
   const initial = useMemo(initialLocationState, []);
-  const [themeMode, setThemeMode] = useState<ThemeMode>(() => initializeTheme());
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() =>
+    initializeTheme(),
+  );
+  useEffect(() => {
+    const onThemeChange = (event: Event) => {
+      const mode = (event as CustomEvent<ThemeMode>).detail;
+      if (mode === "light" || mode === "dark") setThemeMode(mode);
+    };
+    window.addEventListener(THEME_CHANGE_EVENT, onThemeChange);
+    return () => window.removeEventListener(THEME_CHANGE_EVENT, onThemeChange);
+  }, []);
   const [appState, setAppState] = useState<AppState | null>(null);
   const [queryDraft, setQueryDraft] = useState(initial.query);
   const [appliedQuery, setAppliedQuery] = useState(initial.query);
@@ -106,89 +117,112 @@ export function ManagerApp() {
   const [bookmarkSnapshot, setBookmarkSnapshot] =
     useState<BookmarkBarSnapshot | null>(null);
   const [insights, setInsights] = useState<LibraryInsights | null>(null);
-  const [dashboard, setDashboard] =
-    useState<KnowledgeDashboard | null>(null);
-  const [reportPeriod, setReportPeriod] = useState<"week" | "month">(
-    "week"
-  );
+  const [dashboard, setDashboard] = useState<KnowledgeDashboard | null>(null);
+  const [reportPeriod, setReportPeriod] = useState<"week" | "month">("week");
   const [selectedActionIds, setSelectedActionIds] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
   const [applyResults, setApplyResults] = useState<
     BookmarkAgentActionExecutionResult[]
   >([]);
   const [undoBatchId, setUndoBatchId] = useState("");
-  const [confirmDestructiveApply, setConfirmDestructiveApply] =
-    useState(false);
+  const [confirmDestructiveApply, setConfirmDestructiveApply] = useState(false);
   const [siteBrands, setSiteBrands] = useState<SiteBrandRecord[]>([]);
   const [pageSnapshotsEnabled, setPageSnapshotsEnabled] = useState(true);
-  const [snapshotExcludedHosts, setSnapshotExcludedHosts] = useState<
-    string[]
-  >([]);
+  const [snapshotExcludedHosts, setSnapshotExcludedHosts] = useState<string[]>(
+    [],
+  );
   const [loading, setLoading] = useState(true);
   const [action, setAction] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const derivedLoadRef = useRef<Promise<void> | null>(null);
 
   const loadResources = useCallback(async () => {
     const items = await sendExtensionRequest({
-      type: "GET_RESOURCES"
+      type: "GET_RESOURCES",
     });
     setLibraryResults(asSearchResults(items));
   }, []);
 
-  const refresh = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    setError("");
-    try {
-      const state = await sendExtensionRequest({ type: "GET_APP_STATE" });
-      setAppState(state);
-      setBookmarkSnapshot(
-        await sendExtensionRequest({ type: "GET_BOOKMARK_BAR" })
-      );
-      setSiteBrands(
-        await sendExtensionRequest({ type: "GET_SITE_BRANDS" })
-      );
-      const displaySettings = await getDisplaySettings();
-      setPageSnapshotsEnabled(displaySettings.pageSnapshotsEnabled);
-      setSnapshotExcludedHosts(displaySettings.snapshotExcludedHosts);
-      const nextInsights = await sendExtensionRequest({
-        type: "GET_LIBRARY_INSIGHTS"
-      });
+  const loadDerivedData = useCallback(() => {
+    if (derivedLoadRef.current) return derivedLoadRef.current;
+
+    const request = Promise.all([
+      sendExtensionRequest({ type: "GET_LIBRARY_INSIGHTS" }),
+      sendExtensionRequest({ type: "GET_KNOWLEDGE_DASHBOARD" }),
+    ]).then(([nextInsights, nextDashboard]) => {
       setInsights(nextInsights);
-      setDashboard(
-        await sendExtensionRequest({ type: "GET_KNOWLEDGE_DASHBOARD" })
-      );
+      setDashboard(nextDashboard);
       setSelectedActionIds(
         new Set(
           nextInsights.organizationPlan.proposals
             .filter((proposal) => proposal.selectedByDefault)
-            .flatMap((proposal) =>
-              proposal.actions.map((item) => item.id)
-            )
-        )
+            .flatMap((proposal) => proposal.actions.map((item) => item.id)),
+        ),
       );
-      if (
-        state.auth.configured &&
-        state.auth.signedIn &&
-        state.auth.accountMatches === true
-      ) {
-        try {
-          await sendExtensionRequest({ type: "SYNC_NOW" });
-        } catch {
-          // 网络不可用时，本地收藏仍然要完整可用。
+    });
+    derivedLoadRef.current = request;
+    request
+      .finally(() => {
+        if (derivedLoadRef.current === request) {
+          derivedLoadRef.current = null;
         }
+      })
+      .catch(() => undefined);
+    return request;
+  }, []);
+
+  const refresh = useCallback(
+    async (silent = false, waitForDerived = false) => {
+      if (!silent) setLoading(true);
+      setError("");
+      try {
+        const [state, nextBookmarkSnapshot, nextSiteBrands, displaySettings] =
+          await Promise.all([
+            sendExtensionRequest({ type: "GET_APP_STATE" }),
+            sendExtensionRequest({ type: "GET_BOOKMARK_BAR" }),
+            sendExtensionRequest({ type: "GET_SITE_BRANDS" }),
+            getDisplaySettings(),
+          ]);
+        setAppState(state);
+        setBookmarkSnapshot(nextBookmarkSnapshot);
+        setSiteBrands(nextSiteBrands);
+        setPageSnapshotsEnabled(displaySettings.pageSnapshotsEnabled);
+        setSnapshotExcludedHosts(displaySettings.snapshotExcludedHosts);
+        if (
+          state.auth.configured &&
+          state.auth.signedIn &&
+          state.auth.accountMatches === true
+        ) {
+          try {
+            await sendExtensionRequest({ type: "SYNC_NOW" });
+          } catch {
+            // 网络不可用时，本地收藏仍然要完整可用。
+          }
+        }
+        await loadResources();
+        const derived = loadDerivedData();
+        if (waitForDerived) {
+          await derived;
+        } else {
+          void derived.catch((caught) => {
+            setError(caught instanceof Error ? caught.message : "分析加载失败");
+          });
+        }
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : "加载失败");
+      } finally {
+        if (!silent) setLoading(false);
       }
-      await loadResources();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "加载失败");
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  }, [loadResources]);
+    },
+    [loadDerivedData, loadResources],
+  );
 
   useEffect(() => {
-    void refresh();
+    // 收藏库先显示真实书签；整理、报告和主题计算在后台继续准备，
+    // 避免把首次打开时间交给非首屏功能。
+    void refresh(false, initial.view !== "library");
     // 首次加载使用 URL 查询词；之后只在用户提交搜索时访问数据层。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -208,19 +242,19 @@ export function ManagerApp() {
       appliedQuery
         ? searchLocalResources(
             libraryResults.map((item) => item.resource),
-            appliedQuery
+            appliedQuery,
           )
         : libraryResults,
-    [appliedQuery, libraryResults]
+    [appliedQuery, libraryResults],
   );
 
   const libraryCollection = useMemo(
     () =>
       buildLibraryCollection(
         libraryResults.map((item) => item.resource),
-        bookmarkSnapshot
+        bookmarkSnapshot,
       ),
-    [bookmarkSnapshot, libraryResults]
+    [bookmarkSnapshot, libraryResults],
   );
 
   useEffect(() => {
@@ -230,23 +264,14 @@ export function ManagerApp() {
       !libraryCollection.folders.some((folder) => folder.id === folderId)
     ) {
       setFolderId(ALL_LIBRARY_FOLDERS);
-      const controls = writeLibraryControls(
-        new URL(window.location.href),
-        {
-          filter,
-          folderId: ALL_LIBRARY_FOLDERS,
-          sort
-        }
-      );
+      const controls = writeLibraryControls(new URL(window.location.href), {
+        filter,
+        folderId: ALL_LIBRARY_FOLDERS,
+        sort,
+      });
       window.history.replaceState(null, "", controls);
     }
-  }, [
-    bookmarkSnapshot,
-    filter,
-    folderId,
-    libraryCollection.folders,
-    sort
-  ]);
+  }, [bookmarkSnapshot, filter, folderId, libraryCollection.folders, sort]);
 
   const folderScopedResults = useMemo(
     () =>
@@ -255,19 +280,18 @@ export function ManagerApp() {
         {
           filter: "all",
           folderId,
-          sort: "default"
+          sort: "default",
         },
         libraryCollection.locations,
-        appliedQuery
+        appliedQuery,
       ),
-    [appliedQuery, folderId, libraryCollection.locations, results]
+    [appliedQuery, folderId, libraryCollection.locations, results],
   );
   const readyCount = useMemo(
     () =>
-      folderScopedResults.filter(
-        (item) => item.resource.aiStatus === "ready"
-      ).length,
-    [folderScopedResults]
+      folderScopedResults.filter((item) => item.resource.aiStatus === "ready")
+        .length,
+    [folderScopedResults],
   );
   const pendingCount = folderScopedResults.length - readyCount;
   const missingSnapshotCount = useMemo(
@@ -276,9 +300,9 @@ export function ManagerApp() {
         ({ resource }) =>
           resource.nativeBookmarkIds.length > 0 &&
           !resource.snapshotAt &&
-          !isSnapshotSensitiveUrl(resource.url, snapshotExcludedHosts)
+          !isSnapshotSensitiveUrl(resource.url, snapshotExcludedHosts),
       ).length,
-    [libraryResults, snapshotExcludedHosts]
+    [libraryResults, snapshotExcludedHosts],
   );
   const visibleResults = useMemo(
     () =>
@@ -286,7 +310,7 @@ export function ManagerApp() {
         results,
         { filter, folderId, sort },
         libraryCollection.locations,
-        appliedQuery
+        appliedQuery,
       ),
     [
       appliedQuery,
@@ -294,23 +318,20 @@ export function ManagerApp() {
       folderId,
       libraryCollection.locations,
       results,
-      sort
-    ]
+      sort,
+    ],
   );
   const siteBrandByHost = useMemo(
     () =>
       new Map(
-        siteBrands.map((brand) => [
-          brand.host.toLocaleLowerCase(),
-          brand
-        ])
+        siteBrands.map((brand) => [brand.host.toLocaleLowerCase(), brand]),
       ),
-    [siteBrands]
+    [siteBrands],
   );
   const selectedActions = useMemo(() => {
     const actions =
       insights?.organizationPlan.proposals.flatMap(
-        (proposal) => proposal.actions
+        (proposal) => proposal.actions,
       ) || [];
     return actions.filter((item) => selectedActionIds.has(item.id));
   }, [insights, selectedActionIds]);
@@ -337,15 +358,12 @@ export function ManagerApp() {
     const controls = {
       filter: next.filter ?? filter,
       folderId: next.folderId ?? folderId,
-      sort: next.sort ?? sort
+      sort: next.sort ?? sort,
     };
     setFilter(controls.filter);
     setFolderId(controls.folderId);
     setSort(controls.sort);
-    const url = writeLibraryControls(
-      new URL(window.location.href),
-      controls
-    );
+    const url = writeLibraryControls(new URL(window.location.href), controls);
     window.history.replaceState(null, "", url);
   }
 
@@ -375,16 +393,14 @@ export function ManagerApp() {
     try {
       const result = await sendExtensionRequest({
         type: "APPLY_ORGANIZATION_ACTIONS",
-        actions: selectedActions.slice(0, 200)
+        actions: selectedActions.slice(0, 200),
       });
       setApplyResults(result.results);
       setUndoBatchId(result.batchId || "");
       setConfirmDestructiveApply(false);
-      await refresh();
+      await refresh(false, true);
     } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "整理操作执行失败"
-      );
+      setError(caught instanceof Error ? caught.message : "整理操作执行失败");
     } finally {
       setAction("");
     }
@@ -397,11 +413,11 @@ export function ManagerApp() {
     try {
       await sendExtensionRequest({
         type: "UNDO_BOOKMARK_BATCH",
-        batchId: undoBatchId
+        batchId: undoBatchId,
       });
       setUndoBatchId("");
       setApplyResults([]);
-      await refresh();
+      await refresh(false, true);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "撤销整理失败");
     } finally {
@@ -413,10 +429,7 @@ export function ManagerApp() {
     const nextQuery = queryDraft.trim();
     setError("");
     setAppliedQuery(nextQuery);
-    const url = writeLibraryQuery(
-      new URL(window.location.href),
-      nextQuery
-    );
+    const url = writeLibraryQuery(new URL(window.location.href), nextQuery);
     window.history.replaceState(null, "", url);
   }
 
@@ -444,8 +457,8 @@ export function ManagerApp() {
         payload: {
           text: url,
           url,
-          disposition: "new"
-        }
+          disposition: "new",
+        },
       });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "无法打开网页");
@@ -484,9 +497,9 @@ export function ManagerApp() {
                   insights?.organizationPlan.proposals
                     .filter((proposal) => !proposal.destructive)
                     .flatMap((proposal) =>
-                      proposal.actions.map((item) => item.id)
-                    ) || []
-                )
+                      proposal.actions.map((item) => item.id),
+                    ) || [],
+                ),
               )
             }
             onToggleProposal={toggleProposal}
@@ -546,15 +559,11 @@ export function ManagerApp() {
             action={action}
             siteBrandByHost={siteBrandByHost}
             missingSnapshotCount={missingSnapshotCount}
-            onFilterChange={(value) =>
-              updateLibraryControls({ filter: value })
-            }
+            onFilterChange={(value) => updateLibraryControls({ filter: value })}
             onFolderChange={(value) =>
               updateLibraryControls({ folderId: value })
             }
-            onSortChange={(value) =>
-              updateLibraryControls({ sort: value })
-            }
+            onSortChange={(value) => updateLibraryControls({ sort: value })}
             onQueryDraftChange={setQueryDraft}
             onSearch={handleSearch}
             onClearSearch={clearSearch}
@@ -567,7 +576,8 @@ export function ManagerApp() {
   }
 
   return (
-    <main className="manager-shell">
+    <>
+      <main className="manager-shell">
       <header className="manager-header">
         <div className="manager-topbar">
           <div className="manager-brand">
@@ -593,12 +603,12 @@ export function ManagerApp() {
               [
                 "organize",
                 "整理提案",
-                insights?.organizationPlan.proposalCount || 0
+                insights?.organizationPlan.proposalCount || 0,
               ],
               ["reading", "待读队列", insights?.readingQueue.length || 0],
               ["report", "报告", dashboard?.weekly.createdCount || 0],
               ["topics", "主题图谱", dashboard?.topicGraph.nodes.length || 0],
-              ["resurface", "重新发现", dashboard?.resurfacing.length || 0]
+              ["resurface", "重新发现", dashboard?.resurfacing.length || 0],
             ] as const
           ).map(([value, label, count], index) => (
             <TabsSubtleItem
@@ -609,17 +619,23 @@ export function ManagerApp() {
           ))}
         </TabsSubtle>
 
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="manager-theme-button"
-        aria-label={themeMode === "dark" ? "切换到日间模式" : "切换到夜间模式"}
-        title={themeMode === "dark" ? "切换到日间模式" : "切换到夜间模式"}
-        onClick={toggleTheme}
-      >
-        {themeMode === "dark" ? <MoonIcon aria-hidden="true" /> : <SunIcon aria-hidden="true" />}
-      </Button>
+        <Button
+          type="button"
+          variant="unstyled"
+          size="icon"
+          className="manager-theme-button"
+          aria-label={
+            themeMode === "dark" ? "切换到日间模式" : "切换到夜间模式"
+          }
+          title={themeMode === "dark" ? "切换到日间模式" : "切换到夜间模式"}
+          onClick={toggleTheme}
+        >
+          {themeMode === "dark" ? (
+            <MoonIcon aria-hidden="true" />
+          ) : (
+            <SunIcon aria-hidden="true" />
+          )}
+        </Button>
       </header>
 
       <h1 className="visually-hidden">{`Aarre · ${VIEW_LABELS[view]}`}</h1>
@@ -642,9 +658,11 @@ export function ManagerApp() {
         </div>
       ) : null}
 
-      <div className="manager-view" data-view={view}>
-        {viewContent}
-      </div>
-    </main>
+        <div className="manager-view" data-view={view}>
+          {viewContent}
+        </div>
+      </main>
+      <FloatingScrollbar />
+    </>
   );
 }

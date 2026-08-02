@@ -8,7 +8,58 @@
     <title>Aarre</title>
   </head>
   <body>
-    <div id="root" data-density="compact"></div>
+    <div id="root" data-density="compact">
+      <style>
+        html,
+        body {
+          background: #ffffff;
+        }
+
+        .sidepanel-static-boot {
+          min-height: 100vh;
+          padding: 16px;
+          color: #17191c;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        .sidepanel-static-boot-heading {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          min-height: 36px;
+        }
+
+        .sidepanel-static-boot-mark {
+          width: 32px;
+          height: 32px;
+          border-radius: 8px;
+          background: #17191c;
+        }
+
+        .sidepanel-static-boot-lines {
+          display: grid;
+          gap: 12px;
+          margin-top: 24px;
+        }
+
+        .sidepanel-static-boot-line {
+          height: 40px;
+          border-radius: 14px;
+          background: #f5f6f7;
+        }
+      </style>
+      <main class="sidepanel-static-boot" aria-busy="true" aria-label="正在打开 Aarre">
+        <div class="sidepanel-static-boot-heading">
+          <span class="sidepanel-static-boot-mark" aria-hidden="true"></span>
+          <strong>Aarre</strong>
+        </div>
+        <div class="sidepanel-static-boot-lines" aria-hidden="true">
+          <span class="sidepanel-static-boot-line"></span>
+          <span class="sidepanel-static-boot-line"></span>
+          <span class="sidepanel-static-boot-line"></span>
+        </div>
+      </main>
+    </div>
     <script type="module" src="/src/ui/sidepanel/main.tsx"></script>
   </body>
 </html>

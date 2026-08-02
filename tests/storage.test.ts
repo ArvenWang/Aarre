@@ -15,6 +15,7 @@ import {
   getSiteBrands,
   getUndoSnapshot,
   getUndoSnapshots,
+  invalidateStaleSiteBrandIcons,
   mergeLocalResources,
   normalizeResourceRecord,
   putUndoSnapshot,
@@ -90,6 +91,28 @@ describe("IndexedDB storage", () => {
     );
   });
 
+  it("preserves every retrieval field produced by AI", () => {
+    const normalized = normalizeResourceRecord({
+      resourceKey: "retrieval-fields",
+      url: "https://example.com/retrieval-fields",
+      aliases: ["component library"],
+      useCases: ["搭建设计系统时参考"],
+      contentType: "文档",
+      questions: ["有哪些组件库"],
+      entities: [],
+      aiSchemaVersion: 2
+    });
+
+    expect(normalized).toMatchObject({
+      aliases: ["component library"],
+      useCases: ["搭建设计系统时参考"],
+      contentType: "文档",
+      questions: ["有哪些组件库"],
+      entities: [],
+      aiSchemaVersion: 2
+    });
+  });
+
   it("stores shared site-brand diagnostics independently of resources", async () => {
     await putSiteBrand({
       host: "Docs.Example.com",
@@ -97,6 +120,8 @@ describe("IndexedDB storage", () => {
       iconDataUrl: "data:image/webp;base64,BRAND",
       iconDataUrlLight: "data:image/webp;base64,LIGHT",
       iconDataUrlDark: "data:image/webp;base64,DARK",
+      iconRenderVersion: 6,
+      iconAssetUrl: "https://docs.example.com/manifest-icon.png",
       nativeWidth: 512,
       nativeHeight: 512,
       updatedAt: "2026-07-30T00:00:00.000Z"
@@ -107,6 +132,8 @@ describe("IndexedDB storage", () => {
       iconSource: "manifest",
       iconDataUrlLight: "data:image/webp;base64,LIGHT",
       iconDataUrlDark: "data:image/webp;base64,DARK",
+      iconRenderVersion: 6,
+      iconAssetUrl: "https://docs.example.com/manifest-icon.png",
       nativeWidth: 512
     });
     expect(
@@ -114,6 +141,36 @@ describe("IndexedDB storage", () => {
         (brand) => brand.host === "docs.example.com"
       )
     ).toBe(true);
+  });
+
+  it("clears rendered bytes from legacy site-brand caches without losing diagnostics", async () => {
+    await putSiteBrand({
+      host: "legacy.example.com",
+      iconDataUrl: "data:image/webp;base64,LEGACY",
+      iconDataUrlLight: "data:image/webp;base64,LEGACY_LIGHT",
+      iconDataUrlDark: "data:image/webp;base64,LEGACY_DARK",
+      iconRenderVersion: 1,
+      iconSource: "svg-icon",
+      nativeWidth: 192,
+      nativeHeight: 192,
+      skipPageImage: true,
+      updatedAt: "2026-07-30T00:00:00.000Z",
+    });
+
+    expect(await invalidateStaleSiteBrandIcons(6)).toBe(1);
+    expect(await getSiteBrand("legacy.example.com")).toMatchObject({
+      host: "legacy.example.com",
+      iconSource: "svg-icon",
+      nativeWidth: 192,
+      nativeHeight: 192,
+      skipPageImage: true,
+    });
+    expect(await getSiteBrand("legacy.example.com")).not.toHaveProperty(
+      "iconDataUrlLight",
+    );
+    expect(await getSiteBrand("legacy.example.com")).not.toHaveProperty(
+      "iconDataUrlDark",
+    );
   });
 
   it("evicts the oldest page snapshot above the local capacity", async () => {

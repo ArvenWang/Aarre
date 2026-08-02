@@ -69,4 +69,62 @@ describe("AI gateway", () => {
     ).rejects.toThrow("配额");
     expect(call).not.toHaveBeenCalled();
   });
+
+  it("does not lose usage when provider calls finish concurrently", async () => {
+    await Promise.all(
+      Array.from({ length: 6 }, () =>
+        runAiGatewayCall({
+          provider: "deepseek" as const,
+          model: "deepseek-v4-flash",
+          operation: "agent" as const,
+          call: async () => ({
+            content: "{}",
+            usage: {
+              inputTokens: 10,
+              outputTokens: 5,
+              cachedInputTokens: 0,
+              estimated: false
+            }
+          })
+        })
+      )
+    );
+
+    expect((await getAiEntitlement()).usedTokensThisMonth).toBe(90);
+  });
+
+  it("serializes finite-quota calls so concurrent requests cannot all pass stale usage", async () => {
+    values.set("aarre:ai-entitlement:v1", {
+      tier: "free",
+      monthlyTokenQuota: 20
+    });
+    const call = vi.fn(async () => ({
+      content: "{}",
+      usage: {
+        inputTokens: 15,
+        outputTokens: 10,
+        cachedInputTokens: 0,
+        estimated: false
+      }
+    }));
+
+    const results = await Promise.allSettled(
+      Array.from({ length: 3 }, () =>
+        runAiGatewayCall({
+          provider: "gemini" as const,
+          model: "gemini-2.5-flash-lite",
+          operation: "agent" as const,
+          call
+        })
+      )
+    );
+
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(
+      1
+    );
+    expect(results.filter((result) => result.status === "rejected")).toHaveLength(
+      2
+    );
+    expect(call).toHaveBeenCalledTimes(1);
+  });
 });

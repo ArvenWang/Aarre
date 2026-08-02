@@ -170,6 +170,22 @@ export function ArrowUpIcon(props: IconProps) {
   );
 }
 
+export function StopIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <rect
+        x="7"
+        y="7"
+        width="10"
+        height="10"
+        rx="1"
+        fill="currentColor"
+        stroke="none"
+      />
+    </IconBase>
+  );
+}
+
 export function SettingsIcon(props: IconProps) {
   return (
     <IconBase {...props}>

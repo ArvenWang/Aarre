@@ -1,60 +1,69 @@
 import { Button } from "../../components/ui/button";
 import { TabsSubtle, TabsSubtleItem } from "../../components/ui/tabs-subtle";
-import { FluidInput, FluidTextarea, FluidSelect } from "../components/FluidControls";
 import {
+  FluidInput,
+  FluidTextarea,
+  FluidSelect,
+} from "../components/FluidControls";
+import {
+  Fragment,
   useCallback,
   useEffect,
   useId,
   useLayoutEffect,
   useMemo,
   useRef,
-  useState
+  useState,
 } from "react";
-import { signInWithGoogle, signOut } from "../../lib/auth";
 import {
   bookmarkMatchUrls,
   bookmarkNodesByUrl,
   collectFolderIds,
-  filterBookmarkTree
+  filterBookmarkTree,
 } from "../../lib/bookmark-search";
 import {
-  visibleBookmarkRootChildren
+  buildBookmarkBarSnapshot,
+  visibleBookmarkRootChildren,
 } from "../../lib/bookmark-tree";
+import {
+  buildBookmarkEditorModel,
+  mergeBookmarkEditorTags,
+} from "../../lib/bookmark-editor";
 import { buildBookmarkSaveState } from "../../lib/bookmark-save-state";
 import { registrableHost } from "../../lib/cover-registry";
 import { sendExtensionRequest } from "../../lib/messages";
 import { pendingSaveReadyTabId } from "../../lib/pending-save";
+import { currentSiteBrandImageUrl } from "../../lib/thumbnail";
 import {
   initialSaveFolderId,
   visibleFolderLabel,
-  visibleFolderPath
+  visibleFolderPath,
 } from "../../lib/folder-options";
 import {
   buildLocalSearchIndex,
   hydratePinyinSearchIndex,
   isPinyinSearchQuery,
-  searchLocalIndex
+  searchLocalIndex,
 } from "../../lib/search";
 import { canonicalizeUrl } from "../../lib/url";
 import { downloadAarreDataExport } from "../../lib/data-export";
-import {
-  AI_PROVIDER_PRESETS,
-  getAiProviderPreset
-} from "../../lib/settings";
+import { AI_PROVIDER_PRESETS, getAiProviderPreset } from "../../lib/settings";
 import {
   getDisplaySettings,
   requestPageSnapshotPermission,
   saveDisplaySettings,
-  type ListCoverStyle
+  type ListCoverStyle,
 } from "../../lib/display-settings";
+import { needsAiEnrichment } from "../../lib/ai-fields";
+import { estimateScanTokens } from "../../lib/ai-cost";
 import {
   getSidepanelState,
-  saveSidepanelState
+  saveSidepanelState,
 } from "../../lib/sidepanel-state";
 import {
   completeOnboarding,
   getOnboardingState,
-  restartOnboarding
+  restartOnboarding,
 } from "../../lib/onboarding";
 import type {
   AiProviderId,
@@ -62,6 +71,8 @@ import type {
   AiUsageStats,
   AgentChatMessage,
   AgentConversation,
+  BookmarkAgentProgress,
+  BookmarkAgentProgressStage,
   AppState,
   BookmarkAgentActionProposal,
   BookmarkBarSnapshot,
@@ -78,9 +89,12 @@ import type {
   ResourceRecord,
   ResurfacingItem,
   SiteBrandRecord,
-  UndoSnapshotBatch
+  UndoSnapshotBatch,
 } from "../../lib/types";
 import { ResourceIdentity } from "../components/ResourceIdentity";
+import { BookmarkEditorFields } from "../components/BookmarkEditorFields";
+import { CloudConflictNotice } from "../components/CloudConflictNotice";
+import { ProtectionControl } from "../components/ProtectionControl";
 import {
   ArrowLeftIcon,
   ArrowUpIcon,
@@ -94,10 +108,16 @@ import {
   PlusIcon,
   SearchIcon,
   SettingsIcon,
-  StarIcon
+  StarIcon,
+  StopIcon,
+  TrashIcon,
 } from "../components/Icons";
 import { SiteThumbnail } from "../components/SiteThumbnail";
 import { useDebouncedSearchQuery } from "../hooks/useDebouncedSearchQuery";
+import type {
+  CloudStorageUsage,
+  CloudSyncSettings,
+} from "../../lib/cloud-settings";
 
 type EditorState =
   | {
@@ -109,9 +129,33 @@ type EditorState =
   | { kind: "save" }
   | null;
 
+function formatStorageBytes(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.max(0, bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
+/**
+ * The native tree is the first-paint source of truth. Reading it in the
+ * side-panel keeps the initial list independent from the service worker's
+ * IndexedDB reconciliation, which may still be processing a large library.
+ * The message fallback keeps the local design preview working, where the
+ * Chrome bookmarks API is intentionally only mocked through runtime messages.
+ */
+async function readNativeBookmarkSnapshot(): Promise<BookmarkBarSnapshot> {
+  const nativeBookmarks =
+    typeof chrome !== "undefined" ? chrome.bookmarks : undefined;
+  if (nativeBookmarks && typeof nativeBookmarks.getTree === "function") {
+    return buildBookmarkBarSnapshot(await nativeBookmarks.getTree());
+  }
+  return sendExtensionRequest({ type: "GET_BOOKMARK_BAR" });
+}
+
 function resourceForUrl(
   resourceByUrl: Map<string, ResourceRecord>,
-  url: string
+  url: string,
 ): ResourceRecord | undefined {
   const direct = resourceByUrl.get(url);
   if (direct) return direct;
@@ -124,57 +168,32 @@ function resourceForUrl(
 
 function siteBrandForUrl(
   siteBrandByHost: Map<string, SiteBrandRecord>,
-  input: string
+  input: string,
 ): SiteBrandRecord | undefined {
   try {
     const host = new URL(input).hostname.toLocaleLowerCase();
     return (
-      siteBrandByHost.get(host) ||
-      siteBrandByHost.get(registrableHost(host))
+      siteBrandByHost.get(host) || siteBrandByHost.get(registrableHost(host))
     );
   } catch {
     return undefined;
   }
 }
 
-function parseEditableTags(value: string): string[] {
-  return value
-    .split(/[,，;；\n]+/)
-    .map((tag) => tag.trim().replace(/^#+\s*/, "").slice(0, 40))
-    .filter(Boolean);
-}
-
 function bookmarkMatchLocation(match: BookmarkSaveMatch): string {
   return match.folderPath.filter(Boolean).join(" / ") || "Chrome 书签";
 }
 
-function mergeEditableTags(
-  current: string[],
-  value: string
-): string[] {
-  const seen = new Set(
-    current.map((tag) => tag.toLocaleLowerCase())
-  );
-  const next = [...current];
-  for (const tag of parseEditableTags(value)) {
-    const key = tag.toLocaleLowerCase();
-    if (seen.has(key) || next.length >= 16) continue;
-    seen.add(key);
-    next.push(tag);
-  }
-  return next;
-}
-
 export function highlightTextMatches(
   text: string,
-  query: string
+  query: string,
 ): React.ReactNode {
   const needle = query.trim();
   if (!needle) return text;
 
   const expression = new RegExp(
     needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-    "giu"
+    "giu",
   );
   const parts: React.ReactNode[] = [];
   let cursor = 0;
@@ -188,7 +207,7 @@ export function highlightTextMatches(
     parts.push(
       <mark key={`${matchIndex}:${matchEnd}`}>
         {text.slice(matchIndex, matchEnd)}
-      </mark>
+      </mark>,
     );
     cursor = matchEnd;
   }
@@ -209,7 +228,7 @@ function FolderSelect({
   options,
   value,
   onChange,
-  disabled = false
+  disabled = false,
 }: FolderSelectProps) {
   const listboxId = useId();
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -217,7 +236,7 @@ function FolderSelect({
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const selectedIndex = Math.max(
     0,
-    options.findIndex((option) => option.id === value)
+    options.findIndex((option) => option.id === value),
   );
   const selected = options[selectedIndex];
   const [open, setOpen] = useState(false);
@@ -271,9 +290,7 @@ function FolderSelect({
         event.key === " "
       ) {
         event.preventDefault();
-        openMenu(
-          event.key === "ArrowUp" ? options.length - 1 : selectedIndex
-        );
+        openMenu(event.key === "ArrowUp" ? options.length - 1 : selectedIndex);
       }
       return;
     }
@@ -313,6 +330,7 @@ function FolderSelect({
       onKeyDown={handleKeyDown}
     >
       <Button
+        variant="unstyled"
         ref={triggerRef}
         type="button"
         className="folder-select-trigger"
@@ -323,8 +341,7 @@ function FolderSelect({
         disabled={disabled || !options.length}
       >
         <span>
-          {selected?.name ||
-            (options.length ? "选择文件夹" : "暂无自建文件夹")}
+          {selected?.name || (options.length ? "选择文件夹" : "暂无自建文件夹")}
         </span>
         <ChevronDownIcon />
       </Button>
@@ -342,14 +359,17 @@ function FolderSelect({
                 optionRefs.current[index] = element;
               }}
               type="button"
+              variant="ghost"
               role="option"
               aria-selected={option.id === value}
               tabIndex={index === activeIndex ? 0 : -1}
               className="folder-select-option"
               data-active={index === activeIndex}
-              style={{
-                "--folder-depth": option.depth
-              } as React.CSSProperties}
+              style={
+                {
+                  "--folder-depth": option.depth,
+                } as React.CSSProperties
+              }
               onPointerMove={() => setActiveIndex(index)}
               onClick={() => selectOption(index)}
             >
@@ -373,7 +393,7 @@ interface OnboardingPageProps {
 function OnboardingPage({
   resourceCount,
   initialAiConfigured,
-  onComplete
+  onComplete,
 }: OnboardingPageProps) {
   const [step, setStep] = useState(0);
   const [provider, setProvider] = useState<AiProviderId>("gemini");
@@ -381,15 +401,14 @@ function OnboardingPage({
   const [models, setModels] = useState<Record<AiProviderId, string>>({
     gemini: getAiProviderPreset("gemini").defaultModel,
     openai: getAiProviderPreset("openai").defaultModel,
-    deepseek: getAiProviderPreset("deepseek").defaultModel
+    deepseek: getAiProviderPreset("deepseek").defaultModel,
   });
   const [apiKey, setApiKey] = useState("");
   const [configured, setConfigured] = useState(initialAiConfigured);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const estimatedMinutes = Math.max(1, Math.ceil(resourceCount / 60));
-  const estimatedCostLow = (resourceCount * 0.0015).toFixed(1);
-  const estimatedCostHigh = (resourceCount * 0.004).toFixed(1);
+  const estimatedTokens = estimateScanTokens(resourceCount);
 
   async function saveProvider() {
     if (!apiKey.trim() || busy) return;
@@ -401,8 +420,8 @@ function OnboardingPage({
         payload: {
           provider,
           model: models[provider],
-          apiKey: apiKey.trim()
-        }
+          apiKey: apiKey.trim(),
+        },
       });
       setConfigured(true);
       setApiKey("");
@@ -426,7 +445,7 @@ function OnboardingPage({
         }
         await sendExtensionRequest({
           type: "START_LIBRARY_SCAN",
-          force: false
+          force: false,
         });
       }
       await completeOnboarding(skipped);
@@ -443,6 +462,7 @@ function OnboardingPage({
       <header>
         <span className="eyebrow">AARRE · {step + 1}/3</span>
         <Button
+          variant="unstyled"
           type="button"
           className="text-button"
           disabled={Boolean(busy)}
@@ -459,17 +479,17 @@ function OnboardingPage({
             </div>
             <h1>你的 Chrome 书签，原样保留</h1>
             <p>
-              Aarre 直接读取你已有的 Chrome 原生书签，不需要导入，也不会偷偷移动或删除。Chrome
+              Aarre 直接读取你已有的 Chrome
+              原生书签，不需要导入，也不会偷偷移动或删除。Chrome
               始终是唯一事实来源。
             </p>
             <div className="onboarding-facts">
               <span>已发现 {resourceCount.toLocaleString("zh-CN")} 条书签</span>
               <span>所有写操作先确认，并可在 30 天内撤销</span>
-              <span>
-                新收藏和正常打开的缺图旧收藏会在本机补齐真实预览快照
-              </span>
+              <span>新收藏和正常打开的缺图旧收藏会在本机补齐真实预览快照</span>
             </div>
             <Button
+              variant="unstyled"
               type="button"
               className="button button-dark"
               onClick={() => setStep(1)}
@@ -478,7 +498,17 @@ function OnboardingPage({
             </Button>
           </>
         ) : step === 1 ? (
-          <>
+          <form
+            className="onboarding-provider-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (configured && !apiKey.trim()) {
+                setStep(2);
+              } else {
+                void saveProvider();
+              }
+            }}
+          >
             <h1>连接你自己的 AI 服务</h1>
             <p>
               API Key 只保存在当前 Chrome 配置文件中，扩展直接调用服务商；Aarre
@@ -487,7 +517,7 @@ function OnboardingPage({
             <TabsSubtle
               selectedIndex={Math.max(
                 0,
-                AI_PROVIDER_PRESETS.findIndex((item) => item.id === provider)
+                AI_PROVIDER_PRESETS.findIndex((item) => item.id === provider),
               )}
               onSelect={(index) => {
                 const next = AI_PROVIDER_PRESETS[index];
@@ -513,7 +543,7 @@ function OnboardingPage({
                 onChange={(event) =>
                   setModels((current) => ({
                     ...current,
-                    [provider]: event.target.value
+                    [provider]: event.target.value,
                   }))
                 }
               />
@@ -529,12 +559,13 @@ function OnboardingPage({
               />
             </label>
             {error ? (
-              <div className="settings-notice" data-tone="error">
+              <div className="settings-notice" data-tone="error" role="alert">
                 {error}
               </div>
             ) : null}
             <div className="onboarding-actions">
               <Button
+                variant="unstyled"
                 type="button"
                 className="button button-quiet"
                 disabled={Boolean(busy)}
@@ -543,17 +574,13 @@ function OnboardingPage({
                 先跳过，只管理书签
               </Button>
               <Button
-                type="button"
+                variant="unstyled"
+                type="submit"
                 className="button button-dark"
                 disabled={
                   (!configured && !apiKey.trim()) ||
                   !models[provider].trim() ||
                   Boolean(busy)
-                }
-                onClick={() =>
-                  configured && !apiKey.trim()
-                    ? setStep(2)
-                    : void saveProvider()
                 }
               >
                 {busy === "provider"
@@ -563,7 +590,7 @@ function OnboardingPage({
                     : "验证并继续"}
               </Button>
             </div>
-          </>
+          </form>
         ) : (
           <>
             <h1>让收藏变得可搜索</h1>
@@ -576,14 +603,18 @@ function OnboardingPage({
               <span>预计约 {estimatedMinutes} 分钟</span>
               {configured ? (
                 <span>
-                  AI 费用粗估 ¥{estimatedCostLow}–{estimatedCostHigh}
+                  预计用量 输入约{" "}
+                  {estimatedTokens.estimatedInputTokens.toLocaleString()} ·
+                  输出约{" "}
+                  {estimatedTokens.estimatedOutputTokens.toLocaleString()}
                 </span>
               ) : (
-                <span>未连接 AI，本轮不会产生 AI 费用</span>
+                <span>未连接 AI，本轮不会消耗 token</span>
               )}
             </div>
             <p className="onboarding-privacy">
-              费用取决于服务商、模型和网页长度，以服务商账单为准。内网、银行、支付和医疗站点不处理；新收藏或正常打开的缺图旧收藏会生成页面快照，已有截图最多每 7 天静默刷新一次，并且只保存在本机。
+              用量取决于服务商、模型和网页长度，以服务商实际返回为准。内网、银行、支付和医疗站点不处理；新收藏或正常打开的缺图旧收藏会生成页面快照，已有截图最多每
+              7 天静默刷新一次，并且只保存在本机。
             </p>
             {error ? (
               <div className="settings-notice" data-tone="error">
@@ -592,6 +623,7 @@ function OnboardingPage({
             ) : null}
             <div className="onboarding-actions">
               <Button
+                variant="unstyled"
                 type="button"
                 className="button button-quiet"
                 disabled={Boolean(busy)}
@@ -600,6 +632,7 @@ function OnboardingPage({
                 以后再说
               </Button>
               <Button
+                variant="unstyled"
                 type="button"
                 className="button button-dark"
                 disabled={!resourceCount || Boolean(busy)}
@@ -630,22 +663,38 @@ function SettingsPage({
   onListCoverStyleChange,
   onRestartOnboarding,
   onAppStateChange,
-  onClose
+  onClose,
 }: SettingsPageProps) {
   const [settings, setSettings] = useState<AiSettingsStatus | null>(null);
   const [provider, setProvider] = useState<AiProviderId>("gemini");
   const [model, setModel] = useState(
-    getAiProviderPreset("gemini").defaultModel
+    getAiProviderPreset("gemini").defaultModel,
   );
   const [apiKey, setApiKey] = useState("");
   const [action, setAction] = useState("");
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
-  const [scanCostLimitCny, setScanCostLimitCny] = useState(10);
+  const [providerFeedback, setProviderFeedback] = useState<{
+    tone: "error" | "success";
+    message: string;
+  } | null>(null);
+  const [scanFeedback, setScanFeedback] = useState<{
+    tone: "error" | "success";
+    message: string;
+  } | null>(null);
   const [undoBatches, setUndoBatches] = useState<UndoSnapshotBatch[]>([]);
-  const [scanEstimate, setScanEstimate] =
-    useState<LibraryScanEstimate | null>(null);
+  const [scanEstimate, setScanEstimate] = useState<LibraryScanEstimate | null>(
+    null,
+  );
   const [usageStats, setUsageStats] = useState<AiUsageStats | null>(null);
+  const [cloudSettings, setCloudSettings] =
+    useState<CloudSyncSettings | null>(null);
+  const [cloudUsage, setCloudUsage] = useState<CloudStorageUsage | null>(null);
+  const [cloudFeedback, setCloudFeedback] = useState<{
+    tone: "error" | "success";
+    message: string;
+  } | null>(null);
+  // Everything that is read once and then never touched again lives on a
+  // second page, so the first screen stays at three decisions.
+  const [settingsPage, setSettingsPage] = useState<"main" | "more">("main");
   const backButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
@@ -656,25 +705,38 @@ function SettingsPage({
         setProvider(next.provider);
         setModel(next.model);
       })
-      .catch((caught) =>
-        setError(
-          caught instanceof Error ? caught.message : "无法读取 AI 设置"
-        )
-      );
+      .catch((caught) => {
+        setProviderFeedback({
+          tone: "error",
+          message:
+            caught instanceof Error
+              ? caught.message
+              : "无法读取 AI 服务配置。",
+        });
+      });
     void sendExtensionRequest({ type: "GET_UNDO_SNAPSHOTS" })
       .then(setUndoBatches)
-      .catch((caught) =>
-        setError(
-          caught instanceof Error ? caught.message : "无法读取最近的更改"
-        )
-      );
+      .catch(() => {
+        /* 设置页不再展示顶部提示条 */
+      });
     void sendExtensionRequest({ type: "GET_AI_USAGE" })
       .then(setUsageStats)
       .catch(() => undefined);
-    void getDisplaySettings().then((display) => {
-      setScanCostLimitCny(display.scanCostLimitCny);
-    });
   }, []);
+
+  useEffect(() => {
+    if (!appState?.auth.signedIn) {
+      setCloudSettings(null);
+      setCloudUsage(null);
+      return;
+    }
+    void sendExtensionRequest({ type: "GET_CLOUD_SETTINGS" })
+      .then(setCloudSettings)
+      .catch(() => undefined);
+    void sendExtensionRequest({ type: "GET_CLOUD_USAGE" })
+      .then(setCloudUsage)
+      .catch(() => undefined);
+  }, [appState?.auth.signedIn]);
 
   useEffect(() => {
     if (appState?.libraryScan.state !== "running") return;
@@ -689,26 +751,30 @@ function SettingsPage({
   async function saveApiSettings() {
     if (!model.trim() || action) return;
     setAction("save-key");
-    setError("");
-    setMessage("");
+    setProviderFeedback(null);
     try {
       const next = await sendExtensionRequest({
         type: "SAVE_AI_SETTINGS",
         payload: {
           provider,
           model: model.trim(),
-          apiKey: apiKey.trim() || undefined
-        }
+          apiKey: apiKey.trim() || undefined,
+        },
       });
       setSettings(next);
       setProvider(next.provider);
       setModel(next.model);
       setApiKey("");
-      setMessage(`${next.providerName} 已验证并保存。`);
+      setProviderFeedback({
+        tone: "success",
+        message: `${next.providerName} 已验证并保存。`,
+      });
     } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "API Key 保存失败"
-      );
+      setProviderFeedback({
+        tone: "error",
+        message:
+          caught instanceof Error ? caught.message : "API Key 验证失败。",
+      });
     } finally {
       setAction("");
     }
@@ -717,15 +783,19 @@ function SettingsPage({
   async function handleLogin() {
     if (action) return;
     setAction("login");
-    setError("");
-    setMessage("");
+    setCloudFeedback(null);
     try {
-      await signInWithGoogle();
-      const state = await sendExtensionRequest({ type: "AUTH_CHANGED" });
+      const state = await sendExtensionRequest({ type: "SIGN_IN_CLOUD" });
       onAppStateChange(state);
-      setMessage("Google 账号已连接。");
+      setCloudFeedback({
+        tone: "success",
+        message: "账号已连接。请选择要同步的范围后再开启云端同步。",
+      });
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "登录失败");
+      setCloudFeedback({
+        tone: "error",
+        message: caught instanceof Error ? caught.message : "Google 登录失败。",
+      });
     } finally {
       setAction("");
     }
@@ -734,52 +804,81 @@ function SettingsPage({
   async function handleSignOut() {
     if (action) return;
     setAction("logout");
-    setError("");
-    setMessage("");
+    setCloudFeedback(null);
     try {
-      await signOut();
-      const state = await sendExtensionRequest({ type: "GET_APP_STATE" });
+      const state = await sendExtensionRequest({ type: "SIGN_OUT_CLOUD" });
       onAppStateChange(state);
-      setMessage("已退出 Google 账号。");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "退出失败");
+      setCloudFeedback({
+        tone: "error",
+        message: caught instanceof Error ? caught.message : "退出账号失败。",
+      });
+    } finally {
+      setAction("");
+    }
+  }
+
+  async function handleCloudSettings(
+    next: Pick<CloudSyncSettings, "enabled" | "scope">,
+  ) {
+    if (action) return;
+    setAction("cloud-settings");
+    setCloudFeedback(null);
+    try {
+      const saved = await sendExtensionRequest({
+        type: "SAVE_CLOUD_SETTINGS",
+        payload: next,
+      });
+      setCloudSettings(saved);
+      onAppStateChange(
+        await sendExtensionRequest({ type: "GET_APP_STATE" }),
+      );
+      setCloudUsage(
+        await sendExtensionRequest({ type: "GET_CLOUD_USAGE" }),
+      );
+      setCloudFeedback({
+        tone: "success",
+        message: saved.enabled
+          ? saved.scope === "complete"
+            ? "完整云端备份已开启，图片会在后台分批加密上传。"
+            : "文字与设置同步已开启。"
+          : "云端同步已暂停，云端现有数据仍然保留。",
+      });
+    } catch (caught) {
+      setCloudFeedback({
+        tone: "error",
+        message: caught instanceof Error ? caught.message : "云端设置保存失败。",
+      });
     } finally {
       setAction("");
     }
   }
 
   async function handleLibraryScan(
-    intent: "start" | "pause" | "resume" | "cancel"
+    intent: "start" | "pause" | "resume" | "cancel",
   ) {
     if (action) return;
     setAction(`scan-${intent}`);
-    setError("");
-    setMessage("");
+    setScanFeedback(null);
     try {
       if (intent === "start") {
         if (!scanEstimate) {
           const estimate = await sendExtensionRequest({
             type: "GET_LIBRARY_SCAN_ESTIMATE",
-            force: false
+            force: false,
           });
           setScanEstimate(estimate);
-          setMessage(
-            estimate.total
-              ? "请核对预计时间和费用，再确认开始。"
-              : "当前没有需要补充或复查的收藏。"
-          );
           return;
         }
-        await saveDisplaySettings({ scanCostLimitCny });
         const granted = await requestPageSnapshotPermission();
         if (!granted) {
           throw new Error(
-            "需要网页读取权限，才能为整个书签目录提取代表图、简介和标签。"
+            "需要网页读取权限，才能为整个书签目录提取代表图、简介和标签。",
           );
         }
         await sendExtensionRequest({
           type: "START_LIBRARY_SCAN",
-          force: false
+          force: false,
         });
         setScanEstimate(null);
       } else {
@@ -789,25 +888,29 @@ function SettingsPage({
               ? "PAUSE_LIBRARY_SCAN"
               : intent === "resume"
                 ? "RESUME_LIBRARY_SCAN"
-                : "CANCEL_LIBRARY_SCAN"
+                : "CANCEL_LIBRARY_SCAN",
         });
       }
       const state = await sendExtensionRequest({ type: "GET_APP_STATE" });
       onAppStateChange(state);
-      setUsageStats(
-        await sendExtensionRequest({ type: "GET_AI_USAGE" })
-      );
-      setMessage(
-        intent === "start"
-          ? "全目录扫描已开始，可以关闭设置页，任务会继续运行。"
-          : intent === "pause"
-            ? "扫描已暂停。"
-            : intent === "resume"
-              ? "扫描已继续。"
-              : "扫描已取消。"
-      );
+      setUsageStats(await sendExtensionRequest({ type: "GET_AI_USAGE" }));
+      setScanFeedback({
+        tone: "success",
+        message:
+          intent === "start"
+            ? "书签增强已开始，将在后台继续处理。"
+            : intent === "pause"
+              ? "书签增强已暂停。"
+              : intent === "resume"
+                ? "书签增强已继续。"
+                : "书签增强已取消。",
+      });
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "扫描操作失败");
+      setScanFeedback({
+        tone: "error",
+        message:
+          caught instanceof Error ? caught.message : "书签增强操作失败。",
+      });
     } finally {
       setAction("");
     }
@@ -816,23 +919,16 @@ function SettingsPage({
   async function handleUndoBatch(batchId: string) {
     if (action) return;
     setAction(`undo-${batchId}`);
-    setError("");
-    setMessage("");
     try {
-      const result = await sendExtensionRequest({
+      await sendExtensionRequest({
         type: "UNDO_BOOKMARK_BATCH",
-        batchId
+        batchId,
       });
       setUndoBatches((current) =>
-        current.filter((batch) => batch.batchId !== batchId)
+        current.filter((batch) => batch.batchId !== batchId),
       );
-      setMessage(
-        result.failed
-          ? `已恢复 ${result.restored} 项，${result.failed} 项需要手动处理。`
-          : `已撤销 ${result.restored} 项更改。`
-      );
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "撤销失败");
+    } catch {
+      /* 设置页不再展示顶部提示条 */
     } finally {
       setAction("");
     }
@@ -841,15 +937,10 @@ function SettingsPage({
   async function exportLocalData() {
     if (action) return;
     setAction("export-data");
-    setError("");
-    setMessage("");
     try {
-      const result = await downloadAarreDataExport();
-      setMessage(
-        `已导出 ${result.filename}（${Math.max(1, Math.round(result.bytes / 1024)).toLocaleString()} KB）。`
-      );
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "数据导出失败");
+      await downloadAarreDataExport();
+    } catch {
+      /* 设置页不再展示顶部提示条 */
     } finally {
       setAction("");
     }
@@ -858,36 +949,30 @@ function SettingsPage({
   async function handleCoverStyle(style: ListCoverStyle) {
     if (action) return;
     setAction("cover-style");
-    setError("");
     try {
       const next = await saveDisplaySettings({
-        listCoverStyle: style
+        listCoverStyle: style,
       });
       onListCoverStyleChange(next.listCoverStyle);
-      setMessage(
-        style === "site"
-          ? "列表已优先显示清晰的站点标识。"
-          : "列表已优先显示页面封面；没有合格封面时仍会安全回退。"
-      );
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "封面设置保存失败");
+    } catch {
+      /* 设置页不再展示顶部提示条 */
     } finally {
       setAction("");
     }
   }
 
-  const accountName =
+  const accountIdentity =
     appState?.auth.userName ||
     appState?.auth.userEmail ||
     appState?.auth.chromeProfileEmail ||
-    "尚未连接";
+    "";
+  const accountName = accountIdentity || "尚未连接";
   const providerPreset = getAiProviderPreset(provider);
   const providerConfigured = Boolean(
-    settings?.configuredProviders.includes(provider)
+    settings?.configuredProviders.includes(provider),
   );
   const canSaveProvider =
-    Boolean(model.trim()) &&
-    (Boolean(apiKey.trim()) || providerConfigured);
+    Boolean(model.trim()) && (Boolean(apiKey.trim()) || providerConfigured);
 
   return (
     <main className="native-panel native-settings-panel">
@@ -895,499 +980,651 @@ function SettingsPage({
         <Button
           ref={backButtonRef}
           type="button"
-          variant="ghost"
+          variant="unstyled"
           size="icon-sm"
           className="icon-button settings-back-button"
-          aria-label="返回我的书签"
+          aria-label={settingsPage === "more" ? "返回设置" : "返回我的书签"}
           title="返回"
-          onClick={onClose}
+          onClick={() => {
+            if (settingsPage === "more") {
+              setSettingsPage("main");
+              return;
+            }
+            onClose();
+          }}
         >
           <ArrowLeftIcon />
         </Button>
         <div>
-          <h1>设置</h1>
+          <h1>{settingsPage === "more" ? "更多" : "设置"}</h1>
         </div>
       </header>
 
       <section className="settings-page-content">
-        {error ? (
-          <div className="settings-notice" data-tone="error" role="alert">
-            {error}
-          </div>
-        ) : null}
-        {message ? (
-          <div className="settings-notice" data-tone="success" role="status">
-            {message}
-          </div>
-        ) : null}
-
-        <section className="settings-section" aria-labelledby="ai-settings-title">
-          <div className="settings-section-heading">
-            <div>
-              <h2 id="ai-settings-title">AI 服务</h2>
-              <p>生成摘要与标签，增强本地检索。</p>
-            </div>
-            <span
-              className="settings-status"
-              data-active={providerConfigured}
+        {settingsPage === "main" ? (
+          <>
+            <form
+              className="settings-section"
+              aria-labelledby="ai-settings-title"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void saveApiSettings();
+              }}
             >
-              {providerConfigured ? "已配置" : "需要 API Key"}
-            </span>
-          </div>
-
-          <TabsSubtle
-            selectedIndex={Math.max(
-              0,
-              AI_PROVIDER_PRESETS.findIndex((preset) => preset.id === provider)
-            )}
-            onSelect={(index) => {
-              const preset = AI_PROVIDER_PRESETS[index];
-              if (!preset) return;
-              setProvider(preset.id);
-              setModel(
-                settings?.providerModels[preset.id] || preset.defaultModel
-              );
-              setApiKey("");
-              setError("");
-              setMessage("");
-            }}
-            equalWidth
-            className="settings-provider-tabs"
-            aria-label="AI 服务商"
-          >
-            {AI_PROVIDER_PRESETS.map((preset, index) => (
-              <TabsSubtleItem
-                key={preset.id}
-                index={index}
-                label={preset.name}
-                className="settings-provider-tab"
-              />
-            ))}
-          </TabsSubtle>
-          <p className="settings-provider-help">
-            {settings?.provider === provider &&
-            settings.apiKeyConfigured &&
-            settings.apiKeySuffix
-              ? `已保存 Key：•••• ${settings.apiKeySuffix}`
-              : "选择服务商并填写自己的 API Key。"}
-          </p>
-
-          <label className="settings-field">
-            <span>模型</span>
-            <FluidInput
-              type="text"
-              value={model}
-              onChange={(event) => setModel(event.target.value)}
-              autoComplete="off"
-              spellCheck={false}
-              placeholder={providerPreset.defaultModel}
-            />
-          </label>
-
-          <label className="settings-field">
-            <span>API Key</span>
-            <FluidInput
-              type="password"
-              value={apiKey}
-              onChange={(event) => setApiKey(event.target.value)}
-              autoComplete="off"
-              spellCheck={false}
-              placeholder={
-                providerConfigured
-                  ? "输入新的 Key 可替换当前配置"
-                  : providerPreset.apiKeyPlaceholder
-              }
-            />
-          </label>
-          <div className="settings-field-footer">
-            <p>Key 仅保存在当前 Chrome 配置文件。</p>
-            <Button
-              type="button"
-              className="button button-dark button-small"
-              disabled={!canSaveProvider || Boolean(action)}
-              onClick={() => void saveApiSettings()}
-            >
-              {action === "save-key"
-                ? "正在验证…"
-                : "验证并保存"}
-            </Button>
-          </div>
-        </section>
-
-        <section
-          className="settings-section"
-          aria-labelledby="cover-style-title"
-        >
-          <div className="settings-section-heading">
-            <div>
-              <h2 id="cover-style-title">列表封面风格</h2>
-              <p>选择列表中优先显示的图片类型。</p>
-            </div>
-          </div>
-          <TabsSubtle
-            selectedIndex={listCoverStyle === "site" ? 0 : 1}
-            onSelect={(index) =>
-              void handleCoverStyle(index === 0 ? "site" : "page")
-            }
-            equalWidth
-            className="settings-provider-tabs settings-cover-tabs"
-            aria-label="列表封面风格"
-          >
-            <TabsSubtleItem
-              index={0}
-              label="站点标识"
-              className="settings-provider-tab"
-            />
-            <TabsSubtleItem
-              index={1}
-              label="页面封面"
-              className="settings-provider-tab"
-            />
-          </TabsSubtle>
-        </section>
-
-        <section
-          className="settings-section settings-scan-section"
-          aria-labelledby="library-scan-title"
-        >
-          <div className="settings-section-heading">
-            <div>
-              <h2 id="library-scan-title">全目录扫描</h2>
-              <p>更新站点图标、摘要和标签。</p>
-            </div>
-            <span
-              className="settings-status"
-              data-active={
-                appState?.libraryScan.state === "running" ||
-                appState?.libraryScan.state === "completed"
-              }
-            >
-              {appState?.libraryScan.state === "running"
-                ? "扫描中"
-                : appState?.libraryScan.state === "paused"
-                  ? "已暂停"
-                  : appState?.libraryScan.state === "completed"
-                    ? "已完成"
-                    : "未开始"}
-            </span>
-          </div>
-          <div className="settings-scan-progress">
-            <div>
-              <strong>
-                {appState?.aiReadyResourceCount ?? 0}
-                <span> / {appState?.localResourceCount ?? 0}</span>
-              </strong>
-              <small>已具备 AI 元数据</small>
-            </div>
-            <progress
-              max={Math.max(1, appState?.libraryScan.total || 1)}
-              value={appState?.libraryScan.processed || 0}
-              aria-label="全目录扫描进度"
-            />
-            {appState?.libraryScan.currentTitle ? (
-              <p title={appState.libraryScan.currentTitle}>
-                正在处理：{appState.libraryScan.currentTitle}
-              </p>
-            ) : null}
-            {appState?.libraryScan.total ? (
-              <p>
-                本次 {appState.libraryScan.processed}/
-                {appState.libraryScan.total} · 成功{" "}
-                {appState.libraryScan.succeeded} · 跳过{" "}
-                {appState.libraryScan.skipped} · 失败{" "}
-                {appState.libraryScan.failed}
-              </p>
-            ) : null}
-            {(appState?.libraryScan.actualInputTokens ||
-              appState?.libraryScan.actualOutputTokens) ? (
-              <p>
-                实际令牌：输入{" "}
-                {appState.libraryScan.actualInputTokens || 0} · 输出{" "}
-                {appState.libraryScan.actualOutputTokens || 0} · 估算费用 ¥
-                {(appState.libraryScan.actualCostCny || 0).toFixed(4)}
-              </p>
-            ) : null}
-          </div>
-          {scanEstimate ? (
-            <div className="settings-scan-estimate" role="status">
-              <strong>开始前确认</strong>
-              <p>
-                共检查 {scanEstimate.total} 条，其中{" "}
-                {scanEstimate.aiResourceCount} 条会调用{" "}
-                {scanEstimate.providerName} {scanEstimate.model}。
-              </p>
-              <dl>
+              <div className="settings-section-heading">
                 <div>
-                  <dt>预计时间</dt>
-                  <dd>约 {scanEstimate.estimatedMinutes} 分钟</dd>
+                  <h2 id="ai-settings-title">AI 服务</h2>
+                  <p>生成摘要与标签，增强本地检索。</p>
                 </div>
-                <div>
-                  <dt>并发</dt>
-                  <dd>{scanEstimate.concurrency} 条任务</dd>
-                </div>
-                <div>
-                  <dt>估算费用</dt>
-                  <dd>
-                    {scanEstimate.priceAvailable
-                      ? `¥${(scanEstimate.estimatedCostCny || 0).toFixed(4)}`
-                      : "自定义模型，无法可靠估算"}
-                  </dd>
-                </div>
-              </dl>
-              <label className="settings-scan-limit">
-                <span>单次 AI 费用上限（人民币）</span>
+                <span
+                  className="settings-status"
+                  data-active={providerConfigured}
+                >
+                  {providerConfigured ? "已配置" : "需要 API Key"}
+                </span>
+              </div>
+
+              <TabsSubtle
+                selectedIndex={Math.max(
+                  0,
+                  AI_PROVIDER_PRESETS.findIndex(
+                    (preset) => preset.id === provider,
+                  ),
+                )}
+                onSelect={(index) => {
+                  const preset = AI_PROVIDER_PRESETS[index];
+                  if (!preset) return;
+                  setProvider(preset.id);
+                  setModel(
+                    settings?.providerModels[preset.id] || preset.defaultModel,
+                  );
+                  setApiKey("");
+                  setProviderFeedback(null);
+                }}
+                equalWidth
+                className="settings-provider-tabs"
+                aria-label="AI 服务商"
+              >
+                {AI_PROVIDER_PRESETS.map((preset, index) => (
+                  <TabsSubtleItem
+                    key={preset.id}
+                    index={index}
+                    label={preset.name}
+                    className="settings-provider-tab"
+                  />
+                ))}
+              </TabsSubtle>
+              <p className="settings-provider-help">
+                {settings?.provider === provider &&
+                settings.apiKeyConfigured &&
+                settings.apiKeySuffix
+                  ? `已保存 Key：•••• ${settings.apiKeySuffix}`
+                  : "选择服务商并填写自己的 API Key。"}
+              </p>
+
+              <label className="settings-field">
+                <span>模型</span>
                 <FluidInput
-                  type="number"
-                  min="0.01"
-                  max="10000"
-                  step="0.1"
-                  value={scanCostLimitCny}
-                  onChange={(event) =>
-                    setScanCostLimitCny(
-                      Math.min(
-                        10_000,
-                        Math.max(0.01, Number(event.target.value) || 0.01)
-                      )
-                    )
+                  type="text"
+                  value={model}
+                  onChange={(event) => setModel(event.target.value)}
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder={providerPreset.defaultModel}
+                />
+              </label>
+
+              <label className="settings-field">
+                <span>API Key</span>
+                <FluidInput
+                  type="password"
+                  value={apiKey}
+                  onChange={(event) => setApiKey(event.target.value)}
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder={
+                    providerConfigured
+                      ? "输入新的 Key 可替换当前配置"
+                      : providerPreset.apiKeyPlaceholder
                   }
                 />
               </label>
-              <small>
-                价格表更新于 {scanEstimate.pricingUpdatedAt}；人民币金额按估算汇率计算，以服务商账单为准。
-              </small>
-            </div>
-          ) : null}
-          <p className="settings-scan-privacy">
-            扫描结果保存在本机；AI 请求直接发送到所选服务商。
-          </p>
-          <div className="settings-scan-actions">
-            {appState?.libraryScan.state === "running" ? (
-              <Button
-                type="button"
-                className="button button-quiet button-small"
-                disabled={Boolean(action)}
-                onClick={() => void handleLibraryScan("pause")}
-              >
-                暂停
-              </Button>
-            ) : appState?.libraryScan.state === "paused" ? (
-              <>
+              <div className="settings-field-footer">
+                <p>Key 仅保存在当前 Chrome 配置文件。</p>
                 <Button
-                  type="button"
-                  className="button button-quiet button-small"
-                  disabled={Boolean(action)}
-                  onClick={() => void handleLibraryScan("cancel")}
-                >
-                  取消
-                </Button>
-                <Button
-                  type="button"
+                  variant="unstyled"
+                  type="submit"
                   className="button button-dark button-small"
-                  disabled={Boolean(action)}
-                  onClick={() => void handleLibraryScan("resume")}
+                  disabled={!canSaveProvider || Boolean(action)}
                 >
-                  继续扫描
+                  {action === "save-key" ? "正在验证…" : "验证并保存"}
                 </Button>
-              </>
-            ) : (
-              <Button
-                type="button"
-                className="button button-dark button-small"
-                disabled={
-                  Boolean(action) ||
-                  !appState?.localResourceCount ||
-                  Boolean(scanEstimate && !scanEstimate.total)
-                }
-                onClick={() => void handleLibraryScan("start")}
-              >
-                {action === "scan-start"
-                  ? scanEstimate
-                    ? "正在启动…"
-                    : "正在估算…"
-                  : scanEstimate
-                    ? scanEstimate.total
-                      ? "确认并开始"
-                      : "无需扫描"
-                  : appState?.aiReadyResourceCount ===
-                    appState?.localResourceCount &&
-                    Boolean(appState?.localResourceCount)
-                    ? "检查并补全"
-                    : settings?.apiKeyConfigured
-                      ? "扫描全部书签"
-                      : "更新站点标识"}
-              </Button>
-            )}
-          </div>
-          {scanEstimate ? (
-            <Button
-              type="button"
-              className="text-button"
-              disabled={Boolean(action)}
-              onClick={() => {
-                setScanEstimate(null);
-                setMessage("");
-              }}
-            >
-              取消本次扫描
-            </Button>
-          ) : null}
-          {usageStats ? (
-            <div className="settings-usage-summary">
-              <strong>累计 AI 用量（仅本机）</strong>
-              <span>
-                {usageStats.scanCount} 次扫描 · 输入{" "}
-                {usageStats.inputTokens.toLocaleString()} · 输出{" "}
-                {usageStats.outputTokens.toLocaleString()} · 估算 ¥
-                {usageStats.estimatedCostCny.toFixed(4)}
-              </span>
-              {usageStats.estimatedTokens ? (
-                <small>
-                  其中 {usageStats.estimatedTokens.toLocaleString()} 个令牌为服务商未返回用量时的本地估算。
-                </small>
+              </div>
+              {providerFeedback ? (
+                <div
+                  className="settings-notice settings-inline-feedback"
+                  data-tone={providerFeedback.tone}
+                  role={providerFeedback.tone === "error" ? "alert" : "status"}
+                >
+                  {providerFeedback.message}
+                </div>
               ) : null}
-            </div>
-          ) : null}
-        </section>
+            </form>
 
-        <section
-          className="settings-section"
-          aria-labelledby="recent-changes-title"
-        >
-          <div className="settings-section-heading">
-            <div>
-              <h2 id="recent-changes-title">最近的更改</h2>
-              <p>删除的书签和文件夹保留 30 天。</p>
-            </div>
-          </div>
-          {undoBatches.length ? (
-            <div className="settings-change-list">
-              {undoBatches.slice(0, 12).map((batch) => (
-                <article key={batch.batchId} data-destructive={batch.destructive}>
-                  <div>
-                    <strong>{batch.label}</strong>
-                    <small>
-                      {conversationDate(batch.createdAt)}
-                      {batch.source === "chrome"
-                        ? " · Chrome 书签管理器"
-                        : ""}
-                      {batch.destructive ? " · 回收站" : ""}
-                    </small>
-                  </div>
+            <section
+              className="settings-section"
+              aria-labelledby="cover-style-title"
+            >
+              <div className="settings-section-heading">
+                <div>
+                  <h2 id="cover-style-title">显示</h2>
+                  <p>列表中优先显示的图片类型。</p>
+                </div>
+              </div>
+              <TabsSubtle
+                selectedIndex={listCoverStyle === "site" ? 0 : 1}
+                onSelect={(index) =>
+                  void handleCoverStyle(index === 0 ? "site" : "page")
+                }
+                equalWidth
+                className="settings-provider-tabs settings-cover-tabs"
+                aria-label="列表封面风格"
+              >
+                <TabsSubtleItem
+                  index={0}
+                  label="站点标识"
+                  className="settings-provider-tab"
+                />
+                <TabsSubtleItem
+                  index={1}
+                  label="页面封面"
+                  className="settings-provider-tab"
+                />
+              </TabsSubtle>
+            </section>
+
+            <section
+              className="settings-section settings-scan-section"
+              aria-labelledby="library-scan-title"
+            >
+              <div className="settings-section-heading">
+                <div>
+                  <h2 id="library-scan-title">书签增强</h2>
+                  <p>
+                    {appState?.aiReadyResourceCount ?? 0} /{" "}
+                    {appState?.aiEligibleResourceCount ?? 0} 条已增强
+                    {appState?.aiPrivacyProtectedCount
+                      ? ` · ${appState.aiPrivacyProtectedCount} 条受保护`
+                      : ""}
+                    。
+                  </p>
+                </div>
+                <span
+                  className="settings-status"
+                  data-active={
+                    appState?.libraryScan.state === "running" ||
+                    appState?.libraryScan.state === "completed"
+                  }
+                >
+                  {appState?.libraryScan.state === "running"
+                    ? "扫描中"
+                    : appState?.libraryScan.state === "paused"
+                      ? "已暂停"
+                      : appState?.libraryScan.state === "completed"
+                        ? appState.libraryScan.failed
+                          ? "部分完成"
+                          : "已完成"
+                        : appState?.libraryScan.state === "failed"
+                          ? "失败"
+                        : "未开始"}
+                </span>
+              </div>
+              {/* Only a scan in flight earns progress detail on the first screen;
+              estimates, concurrency and token counts live in the confirm
+              dialog and the usage page. */}
+              {appState?.libraryScan.state === "running" ||
+              appState?.libraryScan.state === "paused" ? (
+                <div className="settings-scan-progress">
+                  <progress
+                    max={Math.max(1, appState?.libraryScan.total || 1)}
+                    value={appState?.libraryScan.processed || 0}
+                    aria-label="全目录扫描进度"
+                  />
+                  <p title={appState.libraryScan.currentTitle || undefined}>
+                    {appState.libraryScan.processed}/
+                    {appState.libraryScan.total} · 成功{" "}
+                    {appState.libraryScan.succeeded} · 跳过{" "}
+                    {appState.libraryScan.skipped} · 失败{" "}
+                    {appState.libraryScan.failed}
+                  </p>
+                </div>
+              ) : null}
+              <div className="settings-scan-actions">
+                {appState?.libraryScan.state === "running" ? (
                   <Button
+                    variant="unstyled"
                     type="button"
                     className="button button-quiet button-small"
                     disabled={Boolean(action)}
-                    onClick={() => void handleUndoBatch(batch.batchId)}
+                    onClick={() => void handleLibraryScan("pause")}
                   >
-                    {action === `undo-${batch.batchId}` ? "恢复中…" : "撤销"}
+                    暂停
                   </Button>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <p className="settings-empty-state">最近没有可撤销的更改。</p>
-          )}
-        </section>
+                ) : appState?.libraryScan.state === "paused" ? (
+                  <>
+                    <Button
+                      variant="unstyled"
+                      type="button"
+                      className="button button-quiet button-small"
+                      disabled={Boolean(action)}
+                      onClick={() => void handleLibraryScan("cancel")}
+                    >
+                      取消
+                    </Button>
+                    <Button
+                      variant="unstyled"
+                      type="button"
+                      className="button button-dark button-small"
+                      disabled={Boolean(action)}
+                      onClick={() => void handleLibraryScan("resume")}
+                    >
+                      继续扫描
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    variant="unstyled"
+                    type="button"
+                    className="button button-dark button-small"
+                    disabled={Boolean(action) || !appState?.localResourceCount}
+                    onClick={() => void handleLibraryScan("start")}
+                  >
+                    {action === "scan-start"
+                      ? "正在估算…"
+                      : appState?.aiReadyResourceCount ===
+                            appState?.aiEligibleResourceCount &&
+                          Boolean(appState?.aiEligibleResourceCount)
+                        ? "检查并补全"
+                        : settings?.apiKeyConfigured
+                          ? "扫描全部书签"
+                          : "更新站点标识"}
+                  </Button>
+                )}
+              </div>
+              {scanFeedback ? (
+                <div
+                  className="settings-notice settings-inline-feedback"
+                  data-tone={scanFeedback.tone}
+                  role={scanFeedback.tone === "error" ? "alert" : "status"}
+                >
+                  {scanFeedback.message}
+                </div>
+              ) : null}
+              {!scanFeedback &&
+              appState?.libraryScan.state === "failed" ? (
+                <div
+                  className="settings-notice settings-inline-feedback"
+                  data-tone="error"
+                  role="alert"
+                >
+                  {appState.libraryScan.errors.at(-1)?.message ||
+                    "书签增强未完成，请检查 AI 配置或网络后重试。"}
+                </div>
+              ) : !scanFeedback &&
+                appState?.libraryScan.state === "completed" &&
+                appState.libraryScan.failed > 0 ? (
+                <div
+                  className="settings-notice settings-inline-feedback"
+                  data-tone="error"
+                  role="status"
+                >
+                  已处理 {appState.libraryScan.processed} 条，其中失败{" "}
+                  {appState.libraryScan.failed} 条；可再次运行补齐。
+                </div>
+              ) : null}
+            </section>
 
-        <section className="settings-section settings-onboarding-section">
-          <div>
-            <h2>首次使用引导</h2>
-            <p>重新查看主要功能说明。</p>
-          </div>
-          <Button
-            type="button"
-            className="button button-quiet button-small"
-            disabled={Boolean(action)}
-            onClick={onRestartOnboarding}
-          >
-            重新查看引导
-          </Button>
-        </section>
-
-        <section
-          className="settings-section"
-          aria-labelledby="privacy-settings-title"
-        >
-          <div className="settings-section-heading">
-            <div>
-              <h2 id="privacy-settings-title">隐私与数据自主权</h2>
-              <p>导出本地数据，不包含 API Key 或登录信息。</p>
-            </div>
-          </div>
-          <div className="settings-field-footer">
-            <a
-              className="button button-quiet button-small"
-              href={chrome.runtime.getURL("privacy.html")}
-              target="_blank"
-              rel="noreferrer"
-            >
-              查看隐私政策
-            </a>
-            <Button
-              type="button"
-              className="button button-dark button-small"
-              disabled={Boolean(action)}
-              onClick={() => void exportLocalData()}
-            >
-              {action === "export-data" ? "正在打包…" : "导出全部本地数据"}
-            </Button>
-          </div>
-        </section>
-
-        <section
-          className="settings-section"
-          aria-labelledby="account-settings-title"
-        >
-          <div className="settings-section-heading">
-            <div>
-              <h2 id="account-settings-title">Google 账号</h2>
-              <p>云端同步正在重做，当前版本未启用。</p>
-            </div>
-          </div>
-          <div className="settings-account-row">
-            {appState?.auth.userAvatarUrl ? (
-              <img src={appState.auth.userAvatarUrl} alt="" />
-            ) : (
-              <span className="settings-account-avatar">
-                {accountName.slice(0, 1).toUpperCase()}
-              </span>
-            )}
-            <div>
-              <strong>{accountName}</strong>
-              <small>
-                {!appState?.auth.configured
-                  ? "云端登录尚未配置"
-                  : appState.auth.signedIn
-                    ? appState.auth.accountMatches === false
-                      ? "与当前 Chrome 账号不一致"
-                      : "已连接"
-                    : "未登录"}
-              </small>
-            </div>
-            {appState?.auth.configured ? (
+            <section className="settings-section settings-more-entry">
               <Button
+                type="button"
+                variant="unstyled"
+                size="unstyled"
+                className="settings-more-button"
+                onClick={() => {
+                  setSettingsPage("more");
+                }}
+              >
+                <span>
+                  <strong>更多</strong>
+                  <small>最近的更改、导出数据、隐私、引导与账号</small>
+                </span>
+                <ChevronRightIcon />
+              </Button>
+            </section>
+          </>
+        ) : (
+          <>
+            <section
+              className="settings-section"
+              aria-labelledby="recent-changes-title"
+            >
+              <div className="settings-section-heading">
+                <div>
+                  <h2 id="recent-changes-title">最近的更改</h2>
+                  <p>删除的书签和文件夹保留 30 天。</p>
+                </div>
+              </div>
+              {undoBatches.length ? (
+                <div className="settings-change-list">
+                  {undoBatches.slice(0, 12).map((batch) => (
+                    <article
+                      key={batch.batchId}
+                      data-destructive={batch.destructive}
+                    >
+                      <div>
+                        <strong>{batch.label}</strong>
+                        <small>
+                          {conversationDate(batch.createdAt)}
+                          {batch.source === "chrome"
+                            ? " · Chrome 书签管理器"
+                            : ""}
+                          {batch.destructive ? " · 回收站" : ""}
+                        </small>
+                      </div>
+                      <Button
+                        variant="unstyled"
+                        type="button"
+                        className="button button-quiet button-small"
+                        disabled={Boolean(action)}
+                        onClick={() => void handleUndoBatch(batch.batchId)}
+                      >
+                        {action === `undo-${batch.batchId}`
+                          ? "恢复中…"
+                          : "撤销"}
+                      </Button>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p className="settings-empty-state">最近没有可撤销的更改。</p>
+              )}
+            </section>
+
+            <section className="settings-section settings-onboarding-section">
+              <div>
+                <h2>首次使用引导</h2>
+                <p>重新查看主要功能说明。</p>
+              </div>
+              <Button
+                variant="unstyled"
                 type="button"
                 className="button button-quiet button-small"
                 disabled={Boolean(action)}
-                onClick={() =>
-                  void (appState.auth.signedIn
-                    ? handleSignOut()
-                    : handleLogin())
-                }
+                onClick={onRestartOnboarding}
               >
-                {action === "login"
-                  ? "登录中…"
-                  : action === "logout"
-                    ? "退出中…"
-                    : appState.auth.signedIn
-                      ? "退出"
-                      : "登录"}
+                重新查看引导
               </Button>
-            ) : null}
-          </div>
-        </section>
+            </section>
 
+            <section
+              className="settings-section"
+              aria-labelledby="privacy-settings-title"
+            >
+              <div className="settings-section-heading">
+                <div>
+                  <h2 id="privacy-settings-title">隐私与数据自主权</h2>
+                  <p>导出本地数据，不包含 API Key 或登录信息。</p>
+                </div>
+              </div>
+              <div className="settings-field-footer">
+                <a
+                  className="button button-quiet button-small"
+                  href={chrome.runtime.getURL("privacy.html")}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  查看隐私政策
+                </a>
+                <Button
+                  variant="unstyled"
+                  type="button"
+                  className="button button-dark button-small"
+                  disabled={Boolean(action)}
+                  onClick={() => void exportLocalData()}
+                >
+                  {action === "export-data" ? "正在打包…" : "导出全部本地数据"}
+                </Button>
+              </div>
+            </section>
+
+            <section
+              className="settings-section"
+              aria-labelledby="account-settings-title"
+            >
+              <div className="settings-section-heading">
+                <div>
+                  <h2 id="account-settings-title">Google 账号</h2>
+                  <p>换电脑或重装后，恢复摘要、标签、备注和封面。</p>
+                </div>
+              </div>
+              <div className="settings-account-row">
+                {appState?.auth.userAvatarUrl ? (
+                  <img src={appState.auth.userAvatarUrl} alt="" />
+                ) : accountIdentity ? (
+                  <span className="settings-account-avatar">
+                    {accountIdentity.slice(0, 1).toUpperCase()}
+                  </span>
+                ) : null}
+                <div>
+                  <strong>{accountName}</strong>
+                  <small>
+                    {!appState?.auth.configured
+                      ? "云端登录尚未配置"
+                      : appState.auth.signedIn
+                        ? appState.auth.accountMatches === false
+                          ? "与当前 Chrome 账号不一致"
+                          : "已连接"
+                        : "未登录"}
+                  </small>
+                </div>
+                {appState?.auth.configured ? (
+                  <Button
+                    variant="unstyled"
+                    type="button"
+                    className="button button-quiet button-small"
+                    disabled={Boolean(action)}
+                    onClick={() =>
+                      void (appState.auth.signedIn
+                        ? handleSignOut()
+                        : handleLogin())
+                    }
+                  >
+                    {action === "login"
+                      ? "登录中…"
+                      : action === "logout"
+                        ? "退出中…"
+                        : appState.auth.signedIn
+                          ? "退出"
+                          : "登录"}
+                  </Button>
+                ) : null}
+              </div>
+              {appState?.auth.signedIn && cloudSettings ? (
+                <div className="settings-cloud-controls">
+                  <TabsSubtle
+                    selectedIndex={cloudSettings.scope === "complete" ? 1 : 0}
+                    onSelect={(index) =>
+                      void handleCloudSettings({
+                        enabled: cloudSettings.enabled,
+                        scope: index === 1 ? "complete" : "text",
+                      })
+                    }
+                    equalWidth
+                    className="settings-provider-tabs"
+                    aria-label="云端同步范围"
+                  >
+                    <TabsSubtleItem
+                      index={0}
+                      label="文字与设置"
+                      className="settings-provider-tab"
+                    />
+                    <TabsSubtleItem
+                      index={1}
+                      label="完整备份"
+                      className="settings-provider-tab"
+                    />
+                  </TabsSubtle>
+                  <p className="settings-provider-help">
+                    {cloudSettings.scope === "complete"
+                      ? "除文字外，还会加密上传页面快照、页面封面和站点标识；受保护网页与文件夹始终排除。"
+                      : "同步摘要、标签、备注、设置、会话和报告，不上传任何图片。"}
+                  </p>
+                  <div className="settings-field-footer">
+                    <p>
+                      {cloudUsage
+                        ? `已用 ${formatStorageBytes(cloudUsage.usedBytes)} / ${formatStorageBytes(cloudUsage.quotaBytes)}`
+                        : "云端容量读取中…"}
+                    </p>
+                    <Button
+                      variant="unstyled"
+                      type="button"
+                      className={
+                        cloudSettings.enabled
+                          ? "button button-quiet button-small"
+                          : "button button-dark button-small"
+                      }
+                      disabled={Boolean(action)}
+                      onClick={() =>
+                        void handleCloudSettings({
+                          enabled: !cloudSettings.enabled,
+                          scope: cloudSettings.scope,
+                        })
+                      }
+                    >
+                      {action === "cloud-settings"
+                        ? "正在处理…"
+                        : cloudSettings.enabled
+                          ? "暂停同步"
+                          : "开启同步"}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+              {cloudFeedback ? (
+                <div
+                  className="settings-notice settings-inline-feedback"
+                  data-tone={cloudFeedback.tone}
+                  role={cloudFeedback.tone === "error" ? "alert" : "status"}
+                >
+                  {cloudFeedback.message}
+                </div>
+              ) : null}
+            </section>
+
+            {usageStats ? (
+              <section className="settings-section">
+                <div className="settings-section-heading">
+                  <div>
+                    <h2>全目录扫描用量</h2>
+                    <p>仅记录在本机，用于查看 token 消耗。</p>
+                  </div>
+                </div>
+                <div className="settings-usage-summary">
+                  <span>
+                    {usageStats.scanCount} 次扫描 · 输入{" "}
+                    {usageStats.inputTokens.toLocaleString()} · 输出{" "}
+                    {usageStats.outputTokens.toLocaleString()} · 合计{" "}
+                    {(
+                      usageStats.inputTokens + usageStats.outputTokens
+                    ).toLocaleString()}
+                  </span>
+                  {usageStats.estimatedTokens ? (
+                    <small>
+                      其中 {usageStats.estimatedTokens.toLocaleString()}{" "}
+                      个 token 为服务商未返回用量时的本地估算。
+                    </small>
+                  ) : null}
+                </div>
+              </section>
+            ) : null}
+          </>
+        )}
       </section>
+
+      {scanEstimate ? (
+        <div
+          className="settings-scan-dialog-backdrop"
+          role="presentation"
+          onClick={() => {
+            if (action) return;
+            setScanEstimate(null);
+          }}
+        >
+          <div
+            className="settings-scan-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="scan-confirm-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="scan-confirm-title">开始前确认</h2>
+            <p>
+              共检查 {scanEstimate.total} 条，其中{" "}
+              {scanEstimate.aiResourceCount} 条会调用{" "}
+              {scanEstimate.providerName} {scanEstimate.model}。
+              只补齐缺失的字段，已完成的收藏不会再次调用；中途可以随时暂停，下次从断点继续。
+            </p>
+            <dl>
+              <div>
+                <dt>预计时间</dt>
+                <dd>约 {scanEstimate.estimatedMinutes} 分钟</dd>
+              </div>
+              <div>
+                <dt>并发</dt>
+                <dd>{scanEstimate.concurrency} 条任务</dd>
+              </div>
+              <div>
+                <dt>预计用量</dt>
+                <dd>
+                  输入约 {scanEstimate.estimatedInputTokens.toLocaleString()} ·
+                  输出约 {scanEstimate.estimatedOutputTokens.toLocaleString()}
+                </dd>
+              </div>
+            </dl>
+            <small>
+              用量按每条收藏的大致 token
+              估算，实际消耗以服务商返回为准。扫描结果保存在本机，AI
+              请求直接发送到所选服务商。
+            </small>
+            <div className="settings-scan-dialog-actions">
+              <Button
+                variant="unstyled"
+                type="button"
+                className="button button-quiet button-small"
+                disabled={Boolean(action)}
+                onClick={() => {
+                  setScanEstimate(null);
+                }}
+              >
+                取消
+              </Button>
+              <Button
+                variant="unstyled"
+                type="button"
+                className="button button-dark button-small"
+                disabled={Boolean(action) || !scanEstimate.total}
+                onClick={() => void handleLibraryScan("start")}
+              >
+                {action === "scan-start"
+                  ? "正在启动…"
+                  : scanEstimate.total
+                    ? "确认并开始"
+                    : "无需扫描"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
@@ -1417,7 +1654,7 @@ function emptyCapture(appState: AppState): PageCapture {
     siteName: hostFromUrl(tab.url),
     language: "",
     imageUrl: "",
-    faviconUrl: tab.faviconUrl
+    faviconUrl: tab.faviconUrl,
   };
 }
 
@@ -1434,16 +1671,8 @@ function captureFromDraft(draft: PendingSaveDraft): PageCapture {
     siteName: hostFromUrl(draft.url),
     language: "",
     imageUrl: "",
-    faviconUrl: draft.faviconUrl
+    faviconUrl: draft.faviconUrl,
   };
-}
-
-function countBookmarks(node: NativeBookmarkNode): number {
-  if (node.url) return 1;
-  return (node.children || []).reduce(
-    (total, child) => total + countBookmarks(child),
-    0
-  );
 }
 
 interface TreeProps {
@@ -1452,10 +1681,7 @@ interface TreeProps {
   siteBrandByHost: Map<string, SiteBrandRecord>;
   coverStyle: ListCoverStyle;
   highlightQuery: string;
-  onPreviewIntent: (
-    node: NativeBookmarkNode,
-    rect: DOMRect
-  ) => void;
+  onPreviewIntent: (node: NativeBookmarkNode, rect: DOMRect) => void;
   onPreviewLeave: () => void;
   depth?: number;
   expanded: Set<string>;
@@ -1465,11 +1691,7 @@ interface TreeProps {
   draggedId: string;
   onDragStart: (id: string) => void;
   onDragEnd: () => void;
-  onMove: (
-    id: string,
-    parentId: string,
-    index?: number
-  ) => Promise<void>;
+  onMove: (id: string, parentId: string, index?: number) => Promise<void>;
 }
 
 export type BookmarkPreviewMoveDecision = "keep" | "cancel" | "arm";
@@ -1506,7 +1728,7 @@ function BookmarkTree({
   draggedId,
   onDragStart,
   onDragEnd,
-  onMove
+  onMove,
 }: TreeProps) {
   const [orderedNodes, setOrderedNodes] = useState(nodes);
   const nodeElements = useRef(new Map<string, HTMLDivElement>());
@@ -1527,13 +1749,10 @@ function BookmarkTree({
         window.clearTimeout(previewTimer.current);
       }
     },
-    []
+    [],
   );
 
-  function armPreview(
-    node: NativeBookmarkNode,
-    target: HTMLElement
-  ) {
+  function armPreview(node: NativeBookmarkNode, target: HTMLElement) {
     if (!node.url) return;
     if (previewTimer.current !== undefined) {
       window.clearTimeout(previewTimer.current);
@@ -1579,12 +1798,12 @@ function BookmarkTree({
       element.animate(
         [
           { transform: `translateY(${deltaY}px)` },
-          { transform: "translateY(0)" }
+          { transform: "translateY(0)" },
         ],
         {
           duration: 240,
-          easing: "cubic-bezier(0.22, 1, 0.36, 1)"
-        }
+          easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+        },
       );
     }
   }, [orderedNodes]);
@@ -1596,19 +1815,15 @@ function BookmarkTree({
         return element
           ? [[node.id, element.getBoundingClientRect().top] as const]
           : [];
-      })
+      }),
     );
   }
 
   function moveDraggedNode(targetId: string) {
     const sourceId = activeDragId.current || draggedId;
     if (!sourceId || sourceId === targetId) return;
-    const sourceIndex = orderedNodes.findIndex(
-      (item) => item.id === sourceId
-    );
-    const targetIndex = orderedNodes.findIndex(
-      (item) => item.id === targetId
-    );
+    const sourceIndex = orderedNodes.findIndex((item) => item.id === sourceId);
+    const targetIndex = orderedNodes.findIndex((item) => item.id === targetId);
     if (sourceIndex < 0 || targetIndex < 0) return;
     const hoverKey = `${sourceId}:${targetId}`;
     if (lastHoverTarget.current === hoverKey) return;
@@ -1651,14 +1866,16 @@ function BookmarkTree({
               }
               data-dragging={draggedId === node.id}
               draggable={!node.unmodifiable}
-              style={{
-                "--tree-depth": `${depth * 20}px`
-              } as React.CSSProperties}
+              style={
+                {
+                  "--tree-depth": `${depth * 24}px`,
+                } as React.CSSProperties
+              }
               onDragStart={(event) => {
                 event.dataTransfer.effectAllowed = "move";
                 event.dataTransfer.setData(
                   "application/x-bookmark-layer-id",
-                  node.id
+                  node.id,
                 );
                 activeDragId.current = node.id;
                 onDragStart(node.id);
@@ -1676,26 +1893,23 @@ function BookmarkTree({
               onDrop={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                const id = event.dataTransfer.getData(
-                  "application/x-bookmark-layer-id"
-                ) || activeDragId.current;
+                const id =
+                  event.dataTransfer.getData(
+                    "application/x-bookmark-layer-id",
+                  ) || activeDragId.current;
                 if (!id || id === node.id) return;
                 const reorderedIndex = orderedNodes.findIndex(
-                  (item) => item.id === id
+                  (item) => item.id === id,
                 );
                 if (reorderedIndex >= 0) {
-                  void onMove(
-                    id,
-                    node.parentId || "",
-                    reorderedIndex
-                  );
+                  void onMove(id, node.parentId || "", reorderedIndex);
                   onDragEnd();
                   return;
                 }
                 void onMove(
                   id,
                   folder ? node.id : node.parentId || "",
-                  folder ? undefined : node.index
+                  folder ? undefined : node.index,
                 );
               }}
               onPointerEnter={(event) => {
@@ -1703,7 +1917,7 @@ function BookmarkTree({
                 pointerSample.current = {
                   x: event.clientX,
                   y: event.clientY,
-                  at: performance.now()
+                  at: performance.now(),
                 };
                 armPreview(node, event.currentTarget);
               }}
@@ -1714,20 +1928,20 @@ function BookmarkTree({
                 pointerSample.current = {
                   x: event.clientX,
                   y: event.clientY,
-                  at: nowAt
+                  at: nowAt,
                 };
                 if (!previous) return;
                 const elapsed = Math.max(1, nowAt - previous.at);
                 const distance = Math.hypot(
                   event.clientX - previous.x,
-                  event.clientY - previous.y
+                  event.clientY - previous.y,
                 );
                 const decision = decideBookmarkPreviewMove({
                   nodeId: node.id,
                   activeNodeId: previewIntentNodeId.current,
                   timerArmed: previewTimer.current !== undefined,
                   distance,
-                  elapsed
+                  elapsed,
                 });
                 if (decision === "cancel") {
                   cancelPreview();
@@ -1738,6 +1952,7 @@ function BookmarkTree({
               onPointerLeave={cancelPreview}
             >
               <Button
+                variant="unstyled"
                 type="button"
                 className="bookmark-main"
                 aria-expanded={folder ? isExpanded : undefined}
@@ -1758,7 +1973,7 @@ function BookmarkTree({
                       node,
                       event.currentTarget
                         .closest(".bookmark-row")!
-                        .getBoundingClientRect()
+                        .getBoundingClientRect(),
                     );
                   } else if (event.key === "Escape") {
                     cancelPreview();
@@ -1782,7 +1997,7 @@ function BookmarkTree({
                       <strong>
                         {highlightTextMatches(
                           node.title || "未命名",
-                          highlightQuery
+                          highlightQuery,
                         )}
                       </strong>
                     </span>
@@ -1791,28 +2006,15 @@ function BookmarkTree({
                   <ResourceIdentity
                     url={node.url || ""}
                     imageUrl={metadata?.thumbnailDataUrl}
-                    brandImageUrl={
-                      siteBrandForUrl(
-                        siteBrandByHost,
-                        node.url || ""
-                      )?.iconDataUrlLight ||
-                      siteBrandForUrl(
-                        siteBrandByHost,
-                        node.url || ""
-                      )?.iconDataUrl
-                    }
-                    brandImageUrlDark={
-                      siteBrandForUrl(
-                        siteBrandByHost,
-                        node.url || ""
-                      )?.iconDataUrlDark
-                    }
+                    brandImageUrl={currentSiteBrandImageUrl(
+                      siteBrandForUrl(siteBrandByHost, node.url || ""),
+                    )}
                     categoryCoverId={metadata?.categoryCoverId}
                     coverStyle={coverStyle}
                     label={node.title}
                     title={highlightTextMatches(
                       node.title || "未命名",
-                      highlightQuery
+                      highlightQuery,
                     )}
                     meta={hostFromUrl(node.url || "")}
                     className="bookmark-identity"
@@ -1824,7 +2026,7 @@ function BookmarkTree({
               {!node.unmodifiable && !node.folderType ? (
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="unstyled"
                   size="icon-sm"
                   className="row-menu"
                   aria-label={`编辑 ${node.title}`}
@@ -1881,7 +2083,7 @@ interface BookmarkPreviewCardProps {
 export function BookmarkPreviewCard({
   snapshot,
   flip,
-  offset
+  offset,
 }: BookmarkPreviewCardProps) {
   return (
     <aside
@@ -1891,11 +2093,11 @@ export function BookmarkPreviewCard({
         flip
           ? {
               bottom: offset,
-              maxHeight: `calc(100vh - ${offset + 12}px)`
+              maxHeight: `calc(100vh - ${offset + 12}px)`,
             }
           : {
               top: offset,
-              maxHeight: `calc(100vh - ${offset + 12}px)`
+              maxHeight: `calc(100vh - ${offset + 12}px)`,
             }
       }
       aria-hidden="true"
@@ -1919,7 +2121,7 @@ interface BookmarkPreviewLayerProps {
 export function BookmarkPreviewLayer({
   snapshot,
   hidden = false,
-  placement
+  placement,
 }: BookmarkPreviewLayerProps) {
   if (hidden || !snapshot || !placement) return null;
   return (
@@ -1938,6 +2140,7 @@ interface AgentComposerProps {
   placeholder?: string;
   onChange: (value: string) => void;
   onSubmit: (event: React.FormEvent) => void;
+  onCancel?: () => void;
   onConfigure?: () => void;
 }
 
@@ -1948,7 +2151,8 @@ function AgentComposer({
   placeholder = "询问你的收藏…",
   onChange,
   onSubmit,
-  onConfigure
+  onCancel,
+  onConfigure,
 }: AgentComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -1957,19 +2161,15 @@ function AgentComposer({
     if (!textarea || !configured) return;
     // 先归零再读取 scrollHeight，删除文字时高度才能一起回落。
     textarea.style.height = "auto";
-    const nextHeight = Math.max(
-      48,
-      Math.min(112, textarea.scrollHeight)
-    );
+    const nextHeight = Math.max(48, Math.min(112, textarea.scrollHeight));
     textarea.style.height = `${nextHeight}px`;
-    textarea.style.overflowY =
-      textarea.scrollHeight > 112 ? "auto" : "hidden";
+    textarea.style.overflowY = textarea.scrollHeight > 112 ? "auto" : "hidden";
   }, [configured, value]);
 
   if (!configured) {
     return (
       <div className="agent-composer agent-composer-setup">
-        <Button type="button" variant="ghost" onClick={onConfigure}>
+        <Button type="button" variant="unstyled" onClick={onConfigure}>
           <span>
             <strong>配置 AI 后可以直接问你的收藏</strong>
             <small>选择服务商并填写自己的 API Key</small>
@@ -1980,15 +2180,13 @@ function AgentComposer({
     );
   }
   return (
-    <form
-      className="agent-composer"
-      onSubmit={(event) => onSubmit(event)}
-    >
+    <form className="agent-composer" onSubmit={(event) => onSubmit(event)}>
       <FluidTextarea
         ref={textareaRef}
         id="bookmark-agent-prompt"
         value={value}
         onChange={(event) => onChange(event.target.value)}
+        disabled={busy}
         onKeyDown={(event) => {
           if (
             event.key === "Enter" &&
@@ -2004,18 +2202,90 @@ function AgentComposer({
         aria-label={placeholder}
       />
       <div className="agent-composer-toolbar">
-        <Button
-          type="submit"
-          size="icon-sm"
-          className="agent-send-button"
-          aria-label="发送给 Aarre"
-          title="发送"
-          disabled={!value.trim() || busy}
-        >
-          <ArrowUpIcon />
-        </Button>
+        {busy && onCancel ? (
+          <Button
+            variant="unstyled"
+            type="button"
+            size="icon-sm"
+            className="agent-send-button agent-stop-button"
+            aria-label="停止 AI 对话"
+            title="停止"
+            onClick={onCancel}
+          >
+            <StopIcon />
+          </Button>
+        ) : (
+          <Button
+            variant="unstyled"
+            type="submit"
+            size="icon-sm"
+            className="agent-send-button"
+            aria-label="发送给 Aarre"
+            title="发送"
+            disabled={!value.trim() || busy}
+          >
+            <ArrowUpIcon />
+          </Button>
+        )}
       </div>
     </form>
+  );
+}
+
+const AGENT_PROGRESS_STEPS: Array<{
+  stage: BookmarkAgentProgressStage;
+  label: string;
+}> = [
+  { stage: "preparing", label: "准备收藏库" },
+  { stage: "scanning", label: "分批检查收藏" },
+  { stage: "selecting", label: "筛选相关内容" },
+  { stage: "synthesizing", label: "整理并生成回答" },
+];
+
+function AgentThinkingSteps({
+  progress,
+}: {
+  progress?: BookmarkAgentProgress;
+}) {
+  const completedStages = new Set(progress?.completedStages || []);
+  const visibleStages = new Set(progress?.stages || ["preparing"]);
+  const visibleSteps = AGENT_PROGRESS_STEPS.filter((step) =>
+    visibleStages.has(step.stage),
+  );
+  const statusLabel = progress?.label || "正在准备收藏库";
+  return (
+    <div
+      className="agent-thinking-steps"
+      role="status"
+      aria-live="polite"
+      aria-label={statusLabel}
+    >
+      {visibleSteps.map((step, index) => {
+        const state = completedStages.has(step.stage)
+          ? "done"
+          : step.stage === progress?.stage || (!progress && index === 0)
+            ? "current"
+            : "pending";
+        return (
+          <div
+            className="agent-thinking-step"
+            data-state={state}
+            key={step.stage}
+          >
+            <span className="agent-thinking-step-mark" aria-hidden="true">
+              {state === "done" ? "✓" : state === "current" ? "•" : ""}
+            </span>
+            <span>
+              {step.label}
+              {step.stage === "scanning" && progress?.stage === "scanning"
+                ? ` · ${progress.completed}/${progress.total}`
+                : null}
+            </span>
+          </div>
+        );
+      })}
+      <small>{statusLabel}</small>
+    </div>
   );
 }
 
@@ -2026,8 +2296,38 @@ function conversationDate(value: string): string {
     month: "numeric",
     day: "numeric",
     hour: "2-digit",
-    minute: "2-digit"
+    minute: "2-digit",
   }).format(date);
+}
+
+/** Proposals answering one semantic instruction share a groupLabel, so the
+ *  confirm card can show the criterion once above its hit list. */
+function groupAgentActions(
+  actions: BookmarkAgentActionProposal[],
+): Array<{ label: string; actions: BookmarkAgentActionProposal[] }> {
+  const groups: Array<{
+    label: string;
+    actions: BookmarkAgentActionProposal[];
+  }> = [];
+  for (const action of actions) {
+    const label = action.groupLabel || "";
+    const last = groups[groups.length - 1];
+    if (last && last.label === label) {
+      last.actions.push(action);
+    } else {
+      groups.push({ label, actions: [action] });
+    }
+  }
+  return groups;
+}
+
+function agentActionCardTitle(actions: BookmarkAgentActionProposal[]): string {
+  if (!actions.some((action) => action.status === "pending")) {
+    return "操作结果";
+  }
+  return actions.every((action) => action.type === "update_metadata")
+    ? "确认后才会更新 Aarre 信息"
+    : "确认后才会修改 Chrome";
 }
 
 interface AgentChatPageProps {
@@ -2040,11 +2340,13 @@ interface AgentChatPageProps {
   error: string;
   onPromptChange: (value: string) => void;
   onConfigure: () => void;
+  onCancel?: () => void;
   onBack: () => void;
   onSubmit: (event: React.FormEvent) => void;
   onOpenSource: (url: string) => void;
   onConfirmActions: (messageId: string) => void;
   onCancelActions: (messageId: string) => void;
+  onDropAction: (messageId: string, actionId: string) => void;
   onUndoBatch: (messageId: string, batchId: string) => void;
 }
 
@@ -2058,12 +2360,14 @@ function AgentChatPage({
   error,
   onPromptChange,
   onConfigure,
+  onCancel,
   onBack,
   onSubmit,
   onOpenSource,
   onConfirmActions,
   onCancelActions,
-  onUndoBatch
+  onDropAction,
+  onUndoBatch,
 }: AgentChatPageProps) {
   const endRef = useRef<HTMLDivElement | null>(null);
 
@@ -2072,7 +2376,7 @@ function AgentChatPage({
       block: "end",
       behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
         ? "auto"
-        : "smooth"
+        : "smooth",
     });
   }, [conversation.messages.length]);
 
@@ -2081,7 +2385,7 @@ function AgentChatPage({
       <header className="agent-page-header">
         <Button
           type="button"
-          variant="ghost"
+          variant="unstyled"
           size="icon-sm"
           className="icon-button"
           aria-label="返回收藏列表"
@@ -2104,12 +2408,7 @@ function AgentChatPage({
           >
             <div className="agent-message-copy">
               {message.status === "sending" ? (
-                <div className="agent-thinking">
-                  <span />
-                  <span />
-                  <span />
-                  正在理解全部收藏…
-                </div>
+                <AgentThinkingSteps progress={message.progress} />
               ) : (
                 <p>{message.content}</p>
               )}
@@ -2123,6 +2422,9 @@ function AgentChatPage({
                 {message.sources.map((source) => (
                   <Button
                     type="button"
+                    variant="unstyled"
+                    size="unstyled"
+                    className="agent-source-button"
                     key={source.resourceKey}
                     onClick={() => onOpenSource(source.url)}
                   >
@@ -2132,16 +2434,9 @@ function AgentChatPage({
                         resourceForUrl(resourceByUrl, source.url)
                           ?.thumbnailDataUrl
                       }
-                      brandImageUrl={
-                        siteBrandForUrl(siteBrandByHost, source.url)
-                          ?.iconDataUrlLight ||
-                        siteBrandForUrl(siteBrandByHost, source.url)
-                          ?.iconDataUrl
-                      }
-                      brandImageUrlDark={
-                        siteBrandForUrl(siteBrandByHost, source.url)
-                          ?.iconDataUrlDark
-                      }
+                      brandImageUrl={currentSiteBrandImageUrl(
+                        siteBrandForUrl(siteBrandByHost, source.url),
+                      )}
                       categoryCoverId={
                         resourceForUrl(resourceByUrl, source.url)
                           ?.categoryCoverId
@@ -2164,57 +2459,91 @@ function AgentChatPage({
                 aria-label="待确认的书签操作"
               >
                 <header>
-                  <strong>
+                  <strong>{agentActionCardTitle(message.actions)}</strong>
+                  <small>
                     {message.actions.some(
-                      (action) => action.status === "pending"
+                      (action) => action.status === "pending",
                     )
-                      ? "确认后才会修改 Chrome"
-                      : "Chrome 操作结果"}
-                  </strong>
-                  <small>{message.actions.length} 项</small>
+                      ? `命中 ${
+                          message.actions.filter(
+                            (action) => action.status === "pending",
+                          ).length
+                        } 条`
+                      : `${message.actions.length} 项`}
+                  </small>
                 </header>
-                <ul>
-                  {message.actions.map((action) => (
-                    <li
-                      key={action.id}
-                      data-status={action.status}
-                      data-destructive={action.destructive}
-                    >
-                      <span aria-hidden="true" />
-                      <div>
-                        <strong>{action.label}</strong>
-                        <small>
-                          {action.resultMessage || action.description}
-                        </small>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                {groupAgentActions(message.actions).map((group) => (
+                  <Fragment key={group.label || "default"}>
+                    {group.label ? (
+                      <p className="agent-action-group">
+                        筛选条件：{group.label}
+                      </p>
+                    ) : null}
+                    <ul>
+                      {group.actions.map((action) => (
+                        <li
+                          key={action.id}
+                          data-status={action.status}
+                          data-destructive={action.destructive}
+                        >
+                          <span aria-hidden="true" />
+                          <div>
+                            <strong>{action.label}</strong>
+                            <small>
+                              {action.resultMessage || action.description}
+                            </small>
+                          </div>
+                          {action.status === "pending" ? (
+                            <Button
+                              type="button"
+                              variant="unstyled"
+                              size="icon-sm"
+                              className="agent-action-drop"
+                              aria-label={`不执行：${action.label}`}
+                              disabled={busy}
+                              onClick={() =>
+                                onDropAction(message.id, action.id)
+                              }
+                            >
+                              <CloseIcon />
+                            </Button>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </Fragment>
+                ))}
                 {message.actions.some(
-                  (action) => action.status === "pending"
+                  (action) => action.status === "pending",
                 ) ? (
                   <footer>
                     <Button
+                      variant="unstyled"
                       type="button"
-                      className="button-quiet"
+                      className="button button-quiet button-small"
                       disabled={busy}
                       onClick={() => onCancelActions(message.id)}
                     >
                       取消
                     </Button>
                     <Button
+                      variant="unstyled"
                       type="button"
                       className={
-                        message.actions.some(
-                          (action) => action.destructive
-                        )
+                        message.actions.some((action) => action.destructive)
                           ? "agent-action-confirm agent-action-confirm-danger"
                           : "agent-action-confirm"
                       }
                       disabled={busy}
                       onClick={() => onConfirmActions(message.id)}
                     >
-                      {busy ? "正在执行…" : "确认执行"}
+                      {busy
+                        ? "正在执行…"
+                        : `确认执行 ${
+                            message.actions.filter(
+                              (action) => action.status === "pending",
+                            ).length
+                          } 项`}
                     </Button>
                   </footer>
                 ) : null}
@@ -2222,10 +2551,13 @@ function AgentChatPage({
             ) : null}
             {message.undoBatchId ? (
               <Button
+                variant="unstyled"
                 type="button"
                 className="agent-undo-button"
                 disabled={busy}
-                onClick={() => onUndoBatch(message.id, message.undoBatchId || "")}
+                onClick={() =>
+                  onUndoBatch(message.id, message.undoBatchId || "")
+                }
               >
                 {busy ? "正在恢复…" : "撤销这批操作"}
               </Button>
@@ -2246,6 +2578,7 @@ function AgentChatPage({
         placeholder="继续询问…"
         onChange={onPromptChange}
         onSubmit={onSubmit}
+        onCancel={onCancel}
         onConfigure={onConfigure}
       />
     </main>
@@ -2257,10 +2590,7 @@ interface AgentHistoryPageProps {
   onBack: () => void;
   onOpen: (conversation: AgentConversation) => void;
   onDelete: (id: string) => Promise<void>;
-  onRename: (
-    conversation: AgentConversation,
-    title: string
-  ) => Promise<void>;
+  onRename: (conversation: AgentConversation, title: string) => Promise<void>;
 }
 
 function AgentHistoryPage({
@@ -2268,7 +2598,7 @@ function AgentHistoryPage({
   onBack,
   onOpen,
   onDelete,
-  onRename
+  onRename,
 }: AgentHistoryPageProps) {
   const [editingId, setEditingId] = useState("");
   const [editingTitle, setEditingTitle] = useState("");
@@ -2292,7 +2622,7 @@ function AgentHistoryPage({
       <header className="agent-page-header">
         <Button
           type="button"
-          variant="ghost"
+          variant="unstyled"
           size="icon-sm"
           className="icon-button"
           aria-label="返回收藏列表"
@@ -2326,12 +2656,12 @@ function AgentHistoryPage({
                       value={editingTitle}
                       maxLength={80}
                       aria-label="会话名称"
-                      onChange={(event) =>
-                        setEditingTitle(event.target.value)
-                      }
+                      onChange={(event) => setEditingTitle(event.target.value)}
                     />
                     <Button
                       type="button"
+                      variant="unstyled"
+                      className="agent-history-action"
                       disabled={Boolean(busyId)}
                       onClick={() => setEditingId("")}
                     >
@@ -2339,6 +2669,8 @@ function AgentHistoryPage({
                     </Button>
                     <Button
                       type="submit"
+                      variant="unstyled"
+                      className="agent-history-action"
                       disabled={!editingTitle.trim() || Boolean(busyId)}
                     >
                       保存
@@ -2347,6 +2679,7 @@ function AgentHistoryPage({
                 ) : (
                   <>
                     <Button
+                      variant="unstyled"
                       type="button"
                       className="agent-history-open"
                       onClick={() => onOpen(conversation)}
@@ -2361,6 +2694,8 @@ function AgentHistoryPage({
                     <div className="agent-history-actions">
                       <Button
                         type="button"
+                        variant="unstyled"
+                        className="agent-history-action"
                         onClick={() => {
                           setEditingId(conversation.id);
                           setEditingTitle(conversation.title);
@@ -2371,6 +2706,8 @@ function AgentHistoryPage({
                       </Button>
                       <Button
                         type="button"
+                        variant="unstyled"
+                        className="agent-history-action"
                         data-danger={confirmDeleteId === conversation.id}
                         disabled={busyId === conversation.id}
                         onClick={() => {
@@ -2402,9 +2739,6 @@ function AgentHistoryPage({
             <p>在收藏列表底部提问后，会话会自动保存在这里。</p>
           </div>
         )}
-        <p className="agent-history-limit">
-          最多保留 50 个会话；超出后自动移除最久未使用的会话。
-        </p>
       </section>
     </main>
   );
@@ -2420,15 +2754,13 @@ export function SidePanelApp() {
   >([]);
   const [organizationNotice, setOrganizationNotice] =
     useState<OrganizationNotice | null>(null);
-  const [organizationNoticeBusy, setOrganizationNoticeBusy] =
-    useState(false);
-  const [listCoverStyle, setListCoverStyle] =
-    useState<ListCoverStyle>("site");
+  const [organizationNoticeBusy, setOrganizationNoticeBusy] = useState(false);
+  const [listCoverStyle, setListCoverStyle] = useState<ListCoverStyle>("site");
   const [pageSnapshotsEnabled, setPageSnapshotsEnabled] = useState(true);
   const [aiConfigured, setAiConfigured] = useState(false);
-  const [onboardingVisible, setOnboardingVisible] = useState<
-    boolean | null
-  >(null);
+  const [onboardingVisible, setOnboardingVisible] = useState<boolean | null>(
+    null,
+  );
   const [folders, setFolders] = useState<NativeFolderOption[]>([]);
   const [folderSuggestions, setFolderSuggestions] = useState<
     FolderSuggestion[]
@@ -2442,25 +2774,28 @@ export function SidePanelApp() {
     useState<AgentConversation | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [libraryQuery, setLibraryQuery] = useState("");
-  const debouncedLibraryQuery =
-    useDebouncedSearchQuery(libraryQuery);
+  const debouncedLibraryQuery = useDebouncedSearchQuery(libraryQuery);
   const [pinyinIndexRevision, setPinyinIndexRevision] = useState(0);
-  const [librarySearchMode, setLibrarySearchMode] = useState<
-    "tree" | "ranked"
-  >("tree");
+  const [librarySearchMode, setLibrarySearchMode] = useState<"tree" | "ranked">(
+    "tree",
+  );
   const [bookmarkPreview, setBookmarkPreview] = useState<{
     node: NativeBookmarkNode;
     flip: boolean;
     offset: number;
   } | null>(null);
-  const [previewSnapshot, setPreviewSnapshot] =
-    useState<PageSnapshot | null>(null);
+  const [previewSnapshot, setPreviewSnapshot] = useState<PageSnapshot | null>(
+    null,
+  );
   const [draggedId, setDraggedId] = useState("");
   const [editor, setEditor] = useState<EditorState>(null);
+  const [editBookmarkId, setEditBookmarkId] = useState("");
+  const [editParentId, setEditParentId] = useState("");
   const [editTitle, setEditTitle] = useState("");
   const [editUrl, setEditUrl] = useState("");
   const [editTags, setEditTags] = useState<string[]>([]);
   const [editTagInput, setEditTagInput] = useState("");
+  const [editTagsChanged, setEditTagsChanged] = useState(false);
   const [capture, setCapture] = useState<PageCapture | null>(null);
   const [captureSourceTabId, setCaptureSourceTabId] = useState<
     number | undefined
@@ -2469,12 +2804,13 @@ export function SidePanelApp() {
   const [folderId, setFolderId] = useState("");
   const [bookmarkSaveState, setBookmarkSaveState] =
     useState<BookmarkSaveState | null>(null);
-  const [saveDisposition, setSaveDisposition] = useState<
-    "reuse" | "new" | ""
-  >("");
+  const [saveDisposition, setSaveDisposition] = useState<"reuse" | "new" | "">(
+    "",
+  );
   const [selectedBookmarkId, setSelectedBookmarkId] = useState("");
   const [captureWarning, setCaptureWarning] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState("");
+  const [removedNodeIds, setRemovedNodeIds] = useState<string[]>([]);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -2483,7 +2819,7 @@ export function SidePanelApp() {
     visible: false,
     height: 36,
     offset: 10,
-    atEnd: false
+    atEnd: false,
   });
   const pendingDraftInFlight = useRef(false);
   const pendingDraftTabQueue = useRef<number[]>([]);
@@ -2505,6 +2841,9 @@ export function SidePanelApp() {
   } | null>(null);
   const busyRef = useRef("");
   busyRef.current = busy;
+  const activeAgentRequestRef = useRef("");
+  const activeAgentMessageRef = useRef("");
+  const cancelledAgentRequestsRef = useRef(new Set<string>());
 
   const syncScrollThumb = useCallback((show = false) => {
     const content = contentRef.current;
@@ -2515,7 +2854,7 @@ export function SidePanelApp() {
       maxScroll > 0
         ? Math.max(
             36,
-            trackHeight * (content.clientHeight / content.scrollHeight)
+            trackHeight * (content.clientHeight / content.scrollHeight),
           )
         : trackHeight;
     const maxOffset = Math.max(0, trackHeight - height);
@@ -2526,8 +2865,7 @@ export function SidePanelApp() {
       visible: maxScroll > 1 && (show || current.visible),
       height,
       offset,
-      atEnd:
-        maxScroll <= 1 || content.scrollTop >= maxScroll - 1
+      atEnd: maxScroll <= 1 || content.scrollTop >= maxScroll - 1,
     }));
   }, []);
 
@@ -2538,7 +2876,7 @@ export function SidePanelApp() {
     scrollHideTimer.current = window.setTimeout(() => {
       setScrollThumb((current) => ({
         ...current,
-        visible: false
+        visible: false,
       }));
     }, 900);
   }, []);
@@ -2549,31 +2887,37 @@ export function SidePanelApp() {
   }, [scheduleScrollThumbHide, syncScrollThumb]);
 
   const refresh = useCallback(async () => {
-    const nextResources = await sendExtensionRequest({
-      type: "GET_LOCAL_RESOURCES"
-    });
+    // GET_LOCAL_RESOURCES reconciles the entire Chrome bookmark tree into
+    // IndexedDB. That is intentionally more expensive than reading the native
+    // tree itself, and must not keep the only visible list in a loading state.
+    // Paint the Chrome source of truth first; enrichment data can arrive after
+    // the list is already usable.
+    const nextSnapshot = await readNativeBookmarkSnapshot();
+    setSnapshot(nextSnapshot);
+    // Resource reconciliation is deliberately fire-and-update: thumbnails,
+    // AI metadata and local search enrichment must never hold the native list
+    // hostage after the first paint.
+    void sendExtensionRequest({ type: "GET_LOCAL_RESOURCES" })
+      .then(setResources)
+      .catch((caught) => {
+        setError(caught instanceof Error ? caught.message : "本地索引读取失败");
+      });
     const [
-      nextSnapshot,
       nextState,
       nextSiteBrands,
       nextAiSettings,
       nextResurfacing,
-      nextOrganizationNotice
+      nextOrganizationNotice,
     ] = await Promise.all([
-      sendExtensionRequest({ type: "GET_BOOKMARK_BAR" }),
       sendExtensionRequest({ type: "GET_APP_STATE" }),
       sendExtensionRequest({ type: "GET_SITE_BRANDS" }),
       sendExtensionRequest({ type: "GET_AI_SETTINGS" }),
-      sendExtensionRequest({ type: "GET_CONTEXT_RESURFACING" }).catch(
-        () => []
-      ),
+      sendExtensionRequest({ type: "GET_CONTEXT_RESURFACING" }).catch(() => []),
       sendExtensionRequest({
-        type: "GET_ORGANIZATION_NOTICE"
-      }).catch(() => null)
+        type: "GET_ORGANIZATION_NOTICE",
+      }).catch(() => null),
     ]);
-    setSnapshot(nextSnapshot);
     setAppState(nextState);
-    setResources(nextResources);
     setSiteBrands(nextSiteBrands);
     setAiConfigured(nextAiSettings.apiKeyConfigured);
     setContextResurfacing(nextResurfacing);
@@ -2582,31 +2926,42 @@ export function SidePanelApp() {
 
   const loadOrganizationNotice = useCallback(async () => {
     const next = await sendExtensionRequest({
-      type: "GET_ORGANIZATION_NOTICE"
+      type: "GET_ORGANIZATION_NOTICE",
     });
     setOrganizationNotice(next);
   }, []);
 
   const loadConversations = useCallback(async () => {
     const next = await sendExtensionRequest({
-      type: "GET_AGENT_CONVERSATIONS"
+      type: "GET_AGENT_CONVERSATIONS",
     });
     const nextConversations = Array.isArray(next) ? next : [];
-    setConversations(nextConversations);
-    return nextConversations;
+    const recoveredConversations = nextConversations.map((conversation) => ({
+      ...conversation,
+      messages: conversation.messages.map((message) =>
+        message.status === "sending"
+          ? {
+              ...message,
+              content: "上一次 AI 对话没有完成，请重新提问。",
+              status: "cancelled" as const,
+              progress: undefined,
+            }
+          : message,
+      ),
+    }));
+    setConversations(recoveredConversations);
+    return recoveredConversations;
   }, []);
 
   const deleteConversation = useCallback(async (id: string) => {
     await sendExtensionRequest({
       type: "DELETE_AGENT_CONVERSATION",
-      id
+      id,
     });
     setConversations((current) =>
-      current.filter((conversation) => conversation.id !== id)
+      current.filter((conversation) => conversation.id !== id),
     );
-    setActiveConversation((current) =>
-      current?.id === id ? null : current
-    );
+    setActiveConversation((current) => (current?.id === id ? null : current));
   }, []);
 
   const renameConversation = useCallback(
@@ -2616,27 +2971,24 @@ export function SidePanelApp() {
         conversation: {
           ...conversation,
           title,
-          updatedAt: new Date().toISOString()
-        }
+          updatedAt: new Date().toISOString(),
+        },
       });
       setConversations((current) =>
-        [saved, ...current.filter((item) => item.id !== saved.id)].slice(
-          0,
-          50
-        )
+        [saved, ...current.filter((item) => item.id !== saved.id)].slice(0, 50),
       );
       setActiveConversation((current) =>
-        current?.id === saved.id ? saved : current
+        current?.id === saved.id ? saved : current,
       );
     },
-    []
+    [],
   );
 
   useEffect(() => {
     void Promise.all([
       getDisplaySettings(),
       getSidepanelState(),
-      getOnboardingState()
+      getOnboardingState(),
     ])
       .then(([display, persisted, onboarding]) => {
         setListCoverStyle(display.listCoverStyle);
@@ -2658,16 +3010,12 @@ export function SidePanelApp() {
       setError(caught instanceof Error ? caught.message : "书签读取失败");
     });
     void loadConversations().catch((caught) => {
-      setError(
-        caught instanceof Error ? caught.message : "历史会话读取失败"
-      );
+      setError(caught instanceof Error ? caught.message : "历史会话读取失败");
     });
 
     const handleChange = () => {
       void refresh().catch((caught) => {
-        setError(
-          caught instanceof Error ? caught.message : "书签刷新失败"
-        );
+        setError(caught instanceof Error ? caught.message : "书签刷新失败");
       });
     };
     const bookmarks =
@@ -2691,16 +3039,13 @@ export function SidePanelApp() {
       type?: string;
       status?: AppState["libraryScan"];
     }) => {
-      if (
-        message.type !== "LIBRARY_SCAN_UPDATED" ||
-        !message.status
-      ) {
+      if (message.type !== "LIBRARY_SCAN_UPDATED" || !message.status) {
         return;
       }
       void sendExtensionRequest({ type: "GET_LOCAL_RESOURCES" })
         .then(async (nextResources) => {
           const nextSiteBrands = await sendExtensionRequest({
-            type: "GET_SITE_BRANDS"
+            type: "GET_SITE_BRANDS",
           });
           const safeResources = Array.isArray(nextResources)
             ? nextResources
@@ -2713,13 +3058,10 @@ export function SidePanelApp() {
                   ...current,
                   libraryScan: message.status!,
                   aiReadyResourceCount: safeResources.filter(
-                    (resource) =>
-                      resource.aiStatus === "ready" &&
-                      Boolean(resource.summary) &&
-                      resource.tags.length > 0
-                  ).length
+                    (resource) => !needsAiEnrichment(resource),
+                  ).length,
                 }
-              : current
+              : current,
           );
         })
         .catch(() => undefined);
@@ -2727,8 +3069,7 @@ export function SidePanelApp() {
     const runtimeMessageEvent =
       typeof chrome !== "undefined" ? chrome.runtime?.onMessage : undefined;
     runtimeMessageEvent?.addListener(handleScanUpdate);
-    return () =>
-      runtimeMessageEvent?.removeListener(handleScanUpdate);
+    return () => runtimeMessageEvent?.removeListener(handleScanUpdate);
   }, []);
 
   useEffect(() => {
@@ -2739,8 +3080,7 @@ export function SidePanelApp() {
     const runtimeMessageEvent =
       typeof chrome !== "undefined" ? chrome.runtime?.onMessage : undefined;
     runtimeMessageEvent?.addListener(handleOrganizationUpdate);
-    return () =>
-      runtimeMessageEvent?.removeListener(handleOrganizationUpdate);
+    return () => runtimeMessageEvent?.removeListener(handleOrganizationUpdate);
   }, [loadOrganizationNotice]);
 
   useEffect(() => {
@@ -2755,7 +3095,7 @@ export function SidePanelApp() {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ["data-expanded"]
+      attributeFilter: ["data-expanded"],
     });
     const frame = window.requestAnimationFrame(() => syncScrollThumb());
 
@@ -2776,10 +3116,65 @@ export function SidePanelApp() {
   }, [panelView, syncScrollThumb]);
 
   useEffect(() => {
+    const runtimeMessageEvent =
+      typeof chrome !== "undefined" ? chrome.runtime?.onMessage : undefined;
+    const handleAgentProgress = (message: unknown) => {
+      if (!message || typeof message !== "object") return;
+      const event = message as Partial<BookmarkAgentProgress> & {
+        type?: string;
+      };
+      if (
+        event.type !== "BOOKMARK_AGENT_PROGRESS" ||
+        event.requestId !== activeAgentRequestRef.current ||
+        !activeAgentMessageRef.current ||
+        !event.stage ||
+        !Array.isArray(event.stages) ||
+        !Array.isArray(event.completedStages) ||
+        typeof event.completed !== "number" ||
+        typeof event.total !== "number" ||
+        typeof event.label !== "string"
+      ) {
+        return;
+      }
+      const completedStages = event.completedStages.filter(
+        (stage): stage is BookmarkAgentProgressStage =>
+          AGENT_PROGRESS_STEPS.some((step) => step.stage === stage),
+      );
+      const stages = event.stages.filter(
+        (stage): stage is BookmarkAgentProgressStage =>
+          AGENT_PROGRESS_STEPS.some((step) => step.stage === stage),
+      );
+      if (!stages.includes(event.stage)) return;
+      const progress = {
+        requestId: event.requestId,
+        stage: event.stage,
+        stages,
+        completedStages,
+        completed: event.completed,
+        total: event.total,
+        label: event.label,
+      } as BookmarkAgentProgress;
+      setActiveConversation((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          messages: current.messages.map((message) =>
+            message.id === activeAgentMessageRef.current
+              ? { ...message, progress }
+              : message,
+          ),
+        };
+      });
+    };
+    runtimeMessageEvent?.addListener(handleAgentProgress);
+    return () => runtimeMessageEvent?.removeListener(handleAgentProgress);
+  }, []);
+
+  useEffect(() => {
     if (!persistentStateLoaded.current) return;
     void saveSidepanelState({
       expandedFolderIds: [...expanded],
-      scrollTop: contentRef.current?.scrollTop || 0
+      scrollTop: contentRef.current?.scrollTop || 0,
     });
   }, [expanded]);
 
@@ -2824,16 +3219,14 @@ export function SidePanelApp() {
           try {
             const draft = await sendExtensionRequest({
               type: "GET_PENDING_SAVE",
-              tabId
+              tabId,
             });
             if (draft) {
               await startSave(draft);
             }
           } catch (caught) {
             setError(
-              caught instanceof Error
-                ? caught.message
-                : "无法打开收藏表单"
+              caught instanceof Error ? caught.message : "无法打开收藏表单",
             );
           }
         }
@@ -2854,9 +3247,7 @@ export function SidePanelApp() {
 
     const handlePendingSave = (message: unknown) => {
       const tabId = pendingSaveReadyTabId(
-        message && typeof message === "object"
-          ? message
-          : {}
+        message && typeof message === "object" ? message : {},
       );
       // Chrome 的全局侧边栏会跨标签页保持开启，因此必须以消息里的
       // tabId 为准，不能用侧边栏启动时缓存的活动标签页 ID 过滤。
@@ -2883,12 +3274,9 @@ export function SidePanelApp() {
         : null;
     const frame = window.requestAnimationFrame(() => {
       const focusable = dialogRef.current?.querySelector<HTMLElement>(
-        "button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href]"
+        "button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href]",
       );
-      if (
-        focusable &&
-        !dialogRef.current?.contains(document.activeElement)
-      ) {
+      if (focusable && !dialogRef.current?.contains(document.activeElement)) {
         focusable.focus();
       }
     });
@@ -2904,8 +3292,8 @@ export function SidePanelApp() {
 
       const focusable = [
         ...dialogRef.current.querySelectorAll<HTMLElement>(
-          "button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href]"
-        )
+          "button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href]",
+        ),
       ];
       if (!focusable.length) return;
       const first = focusable[0];
@@ -2932,26 +3320,39 @@ export function SidePanelApp() {
     try {
       return buildBookmarkSaveState(
         snapshot.roots || [snapshot.root],
-        appState.activeTab.url
+        appState.activeTab.url,
       );
     } catch {
       return null;
     }
   }, [appState, snapshot]);
   const currentSaved = Boolean(
-    currentPageSaveState && currentPageSaveState.status !== "none"
+    currentPageSaveState && currentPageSaveState.status !== "none",
   );
   const selectedSaveMatch = useMemo(
     () =>
       bookmarkSaveState?.matches.find(
-        (match) => match.id === selectedBookmarkId
+        (match) => match.id === selectedBookmarkId,
       ),
-    [bookmarkSaveState, selectedBookmarkId]
+    [bookmarkSaveState, selectedBookmarkId],
   );
   const bookmarkRoots = useMemo(() => {
     if (!snapshot) return [];
-    return visibleBookmarkRootChildren(snapshot);
-  }, [snapshot]);
+    const visible = visibleBookmarkRootChildren(snapshot);
+    if (!removedNodeIds.length) return visible;
+    // A deleted bookmark leaves the list on click rather than when Chrome's
+    // own bookmark event finally arrives — until then it is still openable,
+    // which reads as "the delete did nothing". Pruning here also drops it from
+    // search results, which derive from this same tree.
+    const removed = new Set(removedNodeIds);
+    const prune = (nodes: NativeBookmarkNode[]): NativeBookmarkNode[] =>
+      nodes
+        .filter((node) => !removed.has(node.id))
+        .map((node) =>
+          node.children ? { ...node, children: prune(node.children) } : node,
+        );
+    return prune(visible);
+  }, [removedNodeIds, snapshot]);
   const resourceByUrl = useMemo(() => {
     const map = new Map<string, ResourceRecord>();
     for (const resource of Array.isArray(resources) ? resources : []) {
@@ -2963,16 +3364,13 @@ export function SidePanelApp() {
   const siteBrandByHost = useMemo(
     () =>
       new Map(
-        siteBrands.map((brand) => [
-          brand.host.toLocaleLowerCase(),
-          brand
-        ])
+        siteBrands.map((brand) => [brand.host.toLocaleLowerCase(), brand]),
       ),
-    [siteBrands]
+    [siteBrands],
   );
   const localSearchIndex = useMemo(
     () => buildLocalSearchIndex(resources),
-    [resources]
+    [resources],
   );
   useEffect(() => {
     let cancelled = false;
@@ -2991,15 +3389,11 @@ export function SidePanelApp() {
       debouncedLibraryQuery.trim()
         ? searchLocalIndex(localSearchIndex, debouncedLibraryQuery)
         : [],
-    [
-      debouncedLibraryQuery,
-      localSearchIndex,
-      pinyinIndexRevision
-    ]
+    [debouncedLibraryQuery, localSearchIndex, pinyinIndexRevision],
   );
   const nativeNodeByUrl = useMemo(
     () => bookmarkNodesByUrl(bookmarkRoots),
-    [bookmarkRoots]
+    [bookmarkRoots],
   );
   const rankedNativeResults = useMemo(
     () =>
@@ -3009,7 +3403,7 @@ export function SidePanelApp() {
           nativeNodeByUrl.get(result.resource.canonicalUrl);
         return node ? [{ ...result, node }] : [];
       }),
-    [nativeNodeByUrl, rankedSearchResults]
+    [nativeNodeByUrl, rankedSearchResults],
   );
   const filteredBookmarkNodes = useMemo(
     () =>
@@ -3018,40 +3412,28 @@ export function SidePanelApp() {
             bookmarkRoots,
             debouncedLibraryQuery,
             bookmarkMatchUrls(
-              rankedSearchResults.map((result) => result.resource.url)
-            )
+              rankedSearchResults.map((result) => result.resource.url),
+            ),
           )
         : bookmarkRoots,
-    [
-      bookmarkRoots,
-      debouncedLibraryQuery,
-      rankedSearchResults
-    ]
+    [bookmarkRoots, debouncedLibraryQuery, rankedSearchResults],
   );
   const visibleBookmarkNodes =
     librarySearchMode === "ranked" && libraryQuery.trim()
       ? []
       : filteredBookmarkNodes;
   const visibleExpanded = useMemo(() => {
-    if (
-      !debouncedLibraryQuery.trim() ||
-      librarySearchMode === "ranked"
-    ) {
+    if (!debouncedLibraryQuery.trim() || librarySearchMode === "ranked") {
       return expanded;
     }
-    return new Set([
-      ...expanded,
-      ...collectFolderIds(filteredBookmarkNodes)
-    ]);
+    return new Set([...expanded, ...collectFolderIds(filteredBookmarkNodes)]);
   }, [
     expanded,
     filteredBookmarkNodes,
     debouncedLibraryQuery,
-    librarySearchMode
+    librarySearchMode,
   ]);
-  const hasVisibleFolders = visibleBookmarkNodes.some(
-    (node) => !node.url
-  );
+  const hasVisibleFolders = visibleBookmarkNodes.some((node) => !node.url);
   const editorResource = useMemo(() => {
     if (editor?.kind !== "bookmark" || !editor.node.url) {
       return undefined;
@@ -3059,12 +3441,44 @@ export function SidePanelApp() {
     return (
       (editor.resourceKey
         ? resources.find(
-            (resource) => resource.resourceKey === editor.resourceKey
+            (resource) => resource.resourceKey === editor.resourceKey,
           )
-        : undefined) ||
-      resourceForUrl(resourceByUrl, editor.node.url)
+      : undefined) || resourceForUrl(resourceByUrl, editor.node.url)
     );
   }, [editor, resourceByUrl, resources]);
+  const editorModel = useMemo(() => {
+    if (editor?.kind !== "bookmark") {
+      return { locations: [], folders: [] };
+    }
+    const bookmarkIds = editorResource?.nativeBookmarkIds?.length
+      ? editorResource.nativeBookmarkIds
+      : [editor.node.id];
+    if (snapshot) {
+      const model = buildBookmarkEditorModel(bookmarkIds, snapshot);
+      if (model.locations.length) return model;
+    }
+    return {
+      locations: [
+        {
+          bookmarkId: editor.node.id,
+          parentId: editor.node.parentId || "",
+          title: editor.node.title,
+          url: editor.node.url || "",
+          label: "根目录",
+          writable: !editor.node.unmodifiable && !editor.node.folderType,
+        },
+      ],
+      folders: [],
+    };
+  }, [editor, editorResource, snapshot]);
+  const selectedEditorLocation = useMemo(
+    () =>
+      editorModel.locations.find(
+        (location) => location.bookmarkId === editBookmarkId,
+      ) || editorModel.locations[0],
+    [editBookmarkId, editorModel.locations],
+  );
+  const editorWritable = selectedEditorLocation?.writable ?? true;
 
   function keepBookmarkPreviewOpen() {
     if (previewCloseTimer.current !== undefined) {
@@ -3096,10 +3510,7 @@ export function SidePanelApp() {
     }, 200);
   }
 
-  function showBookmarkPreview(
-    node: NativeBookmarkNode,
-    rect: DOMRect
-  ) {
+  function showBookmarkPreview(node: NativeBookmarkNode, rect: DOMRect) {
     if (!node.url) return;
     keepBookmarkPreviewOpen();
     setBookmarkPreview(null);
@@ -3113,23 +3524,19 @@ export function SidePanelApp() {
     previewCanonicalUrl.current = canonicalUrl;
     void sendExtensionRequest({
       type: "GET_PAGE_SNAPSHOT",
-      canonicalUrl
+      canonicalUrl,
     })
       .then((next) => {
-        if (
-          previewCanonicalUrl.current === canonicalUrl &&
-          next
-        ) {
+        if (previewCanonicalUrl.current === canonicalUrl && next) {
           const gap = 14;
           const spaceBelow = window.innerHeight - rect.bottom - gap;
           const spaceAbove = rect.top - gap;
           const previewWidth = Math.min(
             286,
-            Math.max(0, window.innerWidth - 72)
+            Math.max(0, window.innerWidth - 72),
           );
           const previewHeight = (previewWidth * 10) / 16 + 2;
-          const flip =
-            spaceBelow < previewHeight && spaceAbove > spaceBelow;
+          const flip = spaceBelow < previewHeight && spaceAbove > spaceBelow;
           setBookmarkPreview({
             node,
             flip,
@@ -3137,7 +3544,7 @@ export function SidePanelApp() {
             // 两种情况都保留间隔，绝不覆盖当前鼠标热区。
             offset: flip
               ? Math.max(12, window.innerHeight - rect.top + gap)
-              : Math.max(12, rect.bottom + gap)
+              : Math.max(12, rect.bottom + gap),
           });
           setPreviewSnapshot(next);
         }
@@ -3147,7 +3554,7 @@ export function SidePanelApp() {
 
   async function openNavigation(
     input: { text: string; url?: string },
-    newTab = false
+    newTab = false,
   ) {
     setError("");
     try {
@@ -3160,8 +3567,8 @@ export function SidePanelApp() {
         payload: {
           text: input.text,
           url: input.url,
-          disposition: newTab ? "new" : "current"
-        }
+          disposition: newTab ? "new" : "current",
+        },
       });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "无法打开");
@@ -3171,34 +3578,41 @@ export function SidePanelApp() {
   async function persistConversation(conversation: AgentConversation) {
     const saved = await sendExtensionRequest({
       type: "SAVE_AGENT_CONVERSATION",
-      conversation
+      conversation,
     });
     setConversations((current) => [
       saved,
-      ...current.filter((item) => item.id !== saved.id)
+      ...current.filter((item) => item.id !== saved.id),
     ]);
     return saved;
   }
 
-  async function runAgentTurn(
-    conversation: AgentConversation,
-    query: string
-  ) {
+  async function runAgentTurn(conversation: AgentConversation, query: string) {
     if (!query || busy) return;
+    const requestId = crypto.randomUUID();
     const timestamp = new Date().toISOString();
     const userMessage: AgentChatMessage = {
       id: crypto.randomUUID(),
       role: "user",
       content: query,
       createdAt: timestamp,
-      status: "complete"
+      status: "complete",
     };
     const pendingMessage: AgentChatMessage = {
       id: crypto.randomUUID(),
       role: "assistant",
       content: "",
       createdAt: timestamp,
-      status: "sending"
+      status: "sending",
+      progress: {
+        requestId,
+        stage: "preparing",
+        stages: ["preparing"],
+        completedStages: [],
+        completed: 0,
+        total: 0,
+        label: "正在准备收藏库",
+      },
     };
     const pendingConversation: AgentConversation = {
       ...conversation,
@@ -3207,11 +3621,7 @@ export function SidePanelApp() {
           ? conversation.title
           : query.slice(0, 36),
       updatedAt: timestamp,
-      messages: [
-        ...conversation.messages,
-        userMessage,
-        pendingMessage
-      ]
+      messages: [...conversation.messages, userMessage, pendingMessage],
     };
     setActiveConversation(pendingConversation);
     setPanelView("chat");
@@ -3219,24 +3629,29 @@ export function SidePanelApp() {
     setBusy("agent");
     setError("");
     setNotice("");
+    activeAgentRequestRef.current = requestId;
+    activeAgentMessageRef.current = pendingMessage.id;
+    cancelledAgentRequestsRef.current.delete(requestId);
 
     try {
       await persistConversation(pendingConversation);
       const response = await sendExtensionRequest({
         type: "ASK_BOOKMARK_AGENT",
         query,
+        requestId,
         history: conversation.messages
           .filter(
             (message) =>
-              message.status !== "sending" &&
-              Boolean(message.content.trim())
+              (message.status === undefined || message.status === "complete") &&
+              Boolean(message.content.trim()),
           )
           .slice(-10)
           .map((message) => ({
             role: message.role,
-            content: message.content
-          }))
+            content: message.content,
+          })),
       });
+      if (cancelledAgentRequestsRef.current.has(requestId)) return;
       const completed: AgentConversation = {
         ...pendingConversation,
         updatedAt: new Date().toISOString(),
@@ -3246,18 +3661,28 @@ export function SidePanelApp() {
                 ...message,
                 content: response.answer,
                 providerName: response.providerName
-                  ? `${response.providerName} · 已查看 ${response.examinedCount}/${response.catalogSize} 条收藏`
+                  ? `${response.providerName} · ${
+                      response.catalogScanComplete ? "已检查" : "已召回"
+                    } ${response.examinedCount}/${response.catalogSize} 条收藏${
+                      response.excludedCount
+                        ? ` · ${response.excludedCount} 条受隐私保护`
+                        : ""
+                    }`
                   : undefined,
                 sources: response.sources,
                 actions: response.actions,
-                status: "complete"
+                status: "complete",
+                progress: undefined,
               }
-            : message
-        )
+            : message,
+        ),
       };
       setActiveConversation(completed);
       await persistConversation(completed);
     } catch (caught) {
+      if (cancelledAgentRequestsRef.current.has(requestId)) {
+        return;
+      }
       const message =
         caught instanceof Error ? caught.message : "AI 暂时无法回答";
       const failed: AgentConversation = {
@@ -3268,42 +3693,81 @@ export function SidePanelApp() {
             ? {
                 ...item,
                 content: `这次没有完成：${message}`,
-                status: "failed"
+                status: "failed",
               }
-            : item
-        )
+            : item,
+        ),
       };
       setActiveConversation(failed);
-      setError(message);
+      setError("");
       await persistConversation(failed).catch(() => undefined);
     } finally {
-      setBusy("");
+      if (activeAgentRequestRef.current === requestId) {
+        activeAgentRequestRef.current = "";
+        activeAgentMessageRef.current = "";
+        setBusy("");
+      }
+      cancelledAgentRequestsRef.current.delete(requestId);
     }
+  }
+
+  async function cancelAgentRun() {
+    const requestId = activeAgentRequestRef.current;
+    const messageId = activeAgentMessageRef.current;
+    if (!requestId || !messageId || busy !== "agent") return;
+    cancelledAgentRequestsRef.current.add(requestId);
+    activeAgentMessageRef.current = "";
+    setBusy("");
+    setError("");
+    const updated: AgentConversation | null = activeConversation
+      ? {
+          ...activeConversation,
+          updatedAt: new Date().toISOString(),
+          messages: activeConversation.messages.map((message) =>
+            message.id === messageId
+              ? {
+                  ...message,
+                  content: "已停止本次回答。",
+                  status: "cancelled",
+                  progress: undefined,
+                }
+              : message,
+          ),
+        }
+      : null;
+    if (updated) {
+      setActiveConversation(updated);
+      await persistConversation(updated).catch(() => undefined);
+    }
+    await sendExtensionRequest({
+      type: "CANCEL_BOOKMARK_AGENT",
+      requestId,
+    }).catch(() => undefined);
   }
 
   async function handleConfirmAgentActions(messageId: string) {
     if (!activeConversation || busy) return;
     const sourceMessage = activeConversation.messages.find(
-      (message) => message.id === messageId
+      (message) => message.id === messageId,
     );
     const pendingActions = (sourceMessage?.actions || []).filter(
-      (action) => action.status === "pending"
+      (action) => action.status === "pending",
     );
     if (!sourceMessage || !pendingActions.length) return;
 
     const markActions = (
       actions: BookmarkAgentActionProposal[],
       status: BookmarkAgentActionProposal["status"],
-      resultMessage = ""
+      resultMessage = "",
     ) =>
       actions.map((action) =>
         action.status === "pending" || action.status === "executing"
           ? {
               ...action,
               status,
-              ...(resultMessage ? { resultMessage } : {})
+              ...(resultMessage ? { resultMessage } : {}),
             }
-          : action
+          : action,
       );
 
     const executingConversation: AgentConversation = {
@@ -3313,13 +3777,10 @@ export function SidePanelApp() {
         message.id === messageId
           ? {
               ...message,
-              actions: markActions(
-                message.actions || [],
-                "executing"
-              )
+              actions: markActions(message.actions || [], "executing"),
             }
-          : message
-      )
+          : message,
+      ),
     };
     setActiveConversation(executingConversation);
     setBusy("agent-actions");
@@ -3328,24 +3789,22 @@ export function SidePanelApp() {
     try {
       const response = await sendExtensionRequest({
         type: "EXECUTE_BOOKMARK_AGENT_ACTIONS",
-        actions: pendingActions
+        actions: pendingActions,
       });
       const resultById = new Map(
-        response.results.map((result) => [result.actionId, result])
+        response.results.map((result) => [result.actionId, result]),
       );
-      const completedActions = (sourceMessage.actions || []).map(
-        (action) => {
-          const result = resultById.get(action.id);
-          if (!result) return action;
-          return {
-            ...action,
-            status: result.success ? "completed" : "failed",
-            resultMessage: result.message
-          } satisfies BookmarkAgentActionProposal;
-        }
-      );
+      const completedActions = (sourceMessage.actions || []).map((action) => {
+        const result = resultById.get(action.id);
+        if (!result) return action;
+        return {
+          ...action,
+          status: result.success ? "completed" : "failed",
+          resultMessage: result.message,
+        } satisfies BookmarkAgentActionProposal;
+      });
       const succeeded = response.results.filter(
-        (result) => result.success
+        (result) => result.success,
       ).length;
       const failed = response.results.length - succeeded;
       const timestamp = new Date().toISOString();
@@ -3358,7 +3817,7 @@ export function SidePanelApp() {
             : `没有完成任何操作。${response.results[0]?.message ? `原因：${response.results[0].message}` : ""}`,
         createdAt: timestamp,
         ...(response.batchId ? { undoBatchId: response.batchId } : {}),
-        status: failed && !succeeded ? "failed" : "complete"
+        status: failed && !succeeded ? "failed" : "complete",
       };
       const completed: AgentConversation = {
         ...executingConversation,
@@ -3367,10 +3826,10 @@ export function SidePanelApp() {
           ...executingConversation.messages.map((message) =>
             message.id === messageId
               ? { ...message, actions: completedActions }
-              : message
+              : message,
           ),
-          resultMessage
-        ]
+          resultMessage,
+        ],
       };
       setActiveConversation(completed);
       await persistConversation(completed);
@@ -3387,29 +3846,51 @@ export function SidePanelApp() {
             item.id === messageId
               ? {
                   ...item,
-                  actions: markActions(
-                    item.actions || [],
-                    "failed",
-                    message
-                  )
+                  actions: markActions(item.actions || [], "failed", message),
                 }
-              : item
+              : item,
           ),
           {
             id: crypto.randomUUID(),
             role: "assistant",
             content: `没有完成任何操作。原因：${message}`,
             createdAt: timestamp,
-            status: "failed"
-          }
-        ]
+            status: "failed",
+          },
+        ],
       };
       setActiveConversation(failed);
-      setError(message);
+      setError("");
       await persistConversation(failed).catch(() => undefined);
     } finally {
       setBusy("");
     }
+  }
+
+  function handleDropAgentAction(messageId: string, actionId: string) {
+    if (!activeConversation || busy) return;
+    const updated: AgentConversation = {
+      ...activeConversation,
+      updatedAt: new Date().toISOString(),
+      messages: activeConversation.messages.map((message) =>
+        message.id === messageId
+          ? {
+              ...message,
+              actions: (message.actions || []).map((action) =>
+                action.id === actionId && action.status === "pending"
+                  ? {
+                      ...action,
+                      status: "cancelled" as const,
+                      resultMessage: "已从这批操作中移除。",
+                    }
+                  : action,
+              ),
+            }
+          : message,
+      ),
+    };
+    setActiveConversation(updated);
+    void persistConversation(updated);
   }
 
   function handleCancelAgentActions(messageId: string) {
@@ -3426,13 +3907,13 @@ export function SidePanelApp() {
                   ? {
                       ...action,
                       status: "cancelled" as const,
-                      resultMessage: "已取消，没有修改 Chrome。"
+                      resultMessage: "已取消，没有修改 Chrome。",
                     }
-                  : action
-              )
+                  : action,
+              ),
             }
-          : message
-      )
+          : message,
+      ),
     };
     setActiveConversation(updated);
     void persistConversation(updated);
@@ -3445,7 +3926,7 @@ export function SidePanelApp() {
     try {
       const result = await sendExtensionRequest({
         type: "UNDO_BOOKMARK_BATCH",
-        batchId
+        batchId,
       });
       const updated: AgentConversation = {
         ...activeConversation,
@@ -3455,10 +3936,10 @@ export function SidePanelApp() {
             ? {
                 ...message,
                 content: `${message.content}\n${result.failed ? `已恢复 ${result.restored} 项，${result.failed} 项需要手动处理。` : `已撤销 ${result.restored} 项更改。`}`,
-                undoBatchId: undefined
+                undoBatchId: undefined,
               }
-            : message
-        )
+            : message,
+        ),
       };
       setActiveConversation(updated);
       await persistConversation(updated);
@@ -3486,7 +3967,7 @@ export function SidePanelApp() {
             title: query.slice(0, 36),
             createdAt: timestamp,
             updatedAt: timestamp,
-            messages: []
+            messages: [],
           };
     void runAgentTurn(conversation, query);
   }
@@ -3519,7 +4000,7 @@ export function SidePanelApp() {
     ) {
       librarySearchSnapshot.current = {
         expanded: new Set(expanded),
-        scrollTop: contentRef.current?.scrollTop || 0
+        scrollTop: contentRef.current?.scrollTop || 0,
       };
     }
     if (!value.trim()) {
@@ -3545,41 +4026,27 @@ export function SidePanelApp() {
     setSaveDisposition("");
     setSelectedBookmarkId("");
     try {
-      const targetUrl =
-        draft?.url || appState.activeTab?.url || "";
+      const targetUrl = draft?.url || appState.activeTab?.url || "";
       const [folderOptions, saveState] = await Promise.all([
         sendExtensionRequest({ type: "GET_FOLDERS" }),
         sendExtensionRequest({
           type: "GET_BOOKMARK_SAVE_STATE",
-          url: targetUrl
-        })
+          url: targetUrl,
+        }),
       ]);
       setBookmarkSaveState(saveState);
       const initialMatch =
-        (saveState.status === "exact" ||
-        saveState.status === "readonly"
+        saveState.status === "exact" || saveState.status === "readonly"
           ? saveState.matches[0]
-          : undefined);
-      const existingResource = resourceForUrl(
-        resourceByUrl,
-        targetUrl
-      );
+          : undefined;
+      const existingResource = resourceForUrl(resourceByUrl, targetUrl);
       setNote(existingResource?.userNote || "");
       setSelectedBookmarkId(initialMatch?.id || "");
       setSaveDisposition(
-        saveState.status === "none"
-          ? "new"
-          : initialMatch
-            ? "reuse"
-            : ""
+        saveState.status === "none" ? "new" : initialMatch ? "reuse" : "",
       );
       setFolders(folderOptions);
-      setFolderId(
-        initialSaveFolderId(
-          folderOptions,
-          initialMatch?.parentId
-        )
-      );
+      setFolderId(initialSaveFolderId(folderOptions, initialMatch?.parentId));
 
       if (draft?.kind === "link") {
         const page = captureFromDraft(draft);
@@ -3588,50 +4055,46 @@ export function SidePanelApp() {
         setFolderSuggestions(
           await sendExtensionRequest({
             type: "GET_FOLDER_SUGGESTIONS",
-            capture: page
-          }).catch(() => [])
+            capture: page,
+          }).catch(() => []),
         );
         setCaptureWarning(
-          "这是链接收藏。保存后打开该网页，可继续补充正文摘要和 AI 标签。"
+          "这是链接收藏。保存后打开该网页，可继续补充正文摘要和 AI 标签。",
         );
-      } else try {
-        const page = await sendExtensionRequest({
-          type: "CAPTURE_ACTIVE_PAGE",
-          tabId: draft?.tabId
-        });
-        const merged = draft
-          ? {
-              ...page,
-              selectedText:
-                draft.selectedText || page.selectedText
-            }
-          : page;
-        setCapture(merged);
-        setEditTitle(
-          initialMatch?.title || draft?.title || merged.title
-        );
-        setFolderSuggestions(
-          await sendExtensionRequest({
-            type: "GET_FOLDER_SUGGESTIONS",
-            capture: merged
-          }).catch(() => [])
-        );
-      } catch {
-        const page = draft
-          ? captureFromDraft(draft)
-          : emptyCapture(appState);
-        setCapture(page);
-        setEditTitle(initialMatch?.title || page.title);
-        setFolderSuggestions(
-          await sendExtensionRequest({
-            type: "GET_FOLDER_SUGGESTIONS",
-            capture: page
-          }).catch(() => [])
-        );
-        setCaptureWarning(
-          "此页面受 Chrome 保护，仍可保存原生书签，但不会读取正文。"
-        );
-      }
+      } else
+        try {
+          const page = await sendExtensionRequest({
+            type: "CAPTURE_ACTIVE_PAGE",
+            tabId: draft?.tabId,
+          });
+          const merged = draft
+            ? {
+                ...page,
+                selectedText: draft.selectedText || page.selectedText,
+              }
+            : page;
+          setCapture(merged);
+          setEditTitle(initialMatch?.title || draft?.title || merged.title);
+          setFolderSuggestions(
+            await sendExtensionRequest({
+              type: "GET_FOLDER_SUGGESTIONS",
+              capture: merged,
+            }).catch(() => []),
+          );
+        } catch {
+          const page = draft ? captureFromDraft(draft) : emptyCapture(appState);
+          setCapture(page);
+          setEditTitle(initialMatch?.title || page.title);
+          setFolderSuggestions(
+            await sendExtensionRequest({
+              type: "GET_FOLDER_SUGGESTIONS",
+              capture: page,
+            }).catch(() => []),
+          );
+          setCaptureWarning(
+            "此页面受 Chrome 保护，仍可保存原生书签，但不会读取正文。",
+          );
+        }
     } catch (caught) {
       setEditor(null);
       setError(caught instanceof Error ? caught.message : "无法读取当前页面");
@@ -3648,13 +4111,21 @@ export function SidePanelApp() {
     setEditor({
       kind: "bookmark",
       node,
-      ...(resource ? { resourceKey: resource.resourceKey } : {})
+      ...(resource ? { resourceKey: resource.resourceKey } : {}),
     });
     setConfirmDeleteId("");
+    // A previous save/delete leaves `busy` set until its own request settles.
+    // Without this reset, reopening the editor renders every field disabled and
+    // greyed out for an operation that is no longer running.
+    setBusy("");
+    setEditBookmarkId(node.id);
+    setEditParentId(node.parentId || "");
     setEditTitle(node.title);
     setEditUrl(node.url || "");
     setEditTags(resource?.tags || []);
     setEditTagInput("");
+    setEditTagsChanged(false);
+    setNote(resource?.userNote || "");
     setError("");
   }
 
@@ -3662,17 +4133,35 @@ export function SidePanelApp() {
     dismissBookmarkPreviewImmediately();
     setEditor({ kind: "folder", parentId });
     setConfirmDeleteId("");
+    setBusy("");
+    setEditBookmarkId("");
+    setEditParentId("");
     setEditTitle("");
     setEditUrl("");
     setEditTags([]);
     setEditTagInput("");
+    setEditTagsChanged(false);
     setError("");
   }
 
   function addEditTags(value = editTagInput) {
-    if (!parseEditableTags(value).length) return;
-    setEditTags((current) => mergeEditableTags(current, value));
+    if (!mergeBookmarkEditorTags([], value).length) return;
+    setEditTags((current) => mergeBookmarkEditorTags(current, value));
     setEditTagInput("");
+    setEditTagsChanged(true);
+  }
+
+  function resetEditLocation(bookmarkId: string) {
+    const location = editorModel.locations.find(
+      (candidate) => candidate.bookmarkId === bookmarkId,
+    );
+    if (!location) return;
+    setEditBookmarkId(location.bookmarkId);
+    setEditParentId(location.parentId);
+    setEditTitle(location.title);
+    setEditUrl(location.url);
+    setEditTagInput("");
+    setConfirmDeleteId("");
   }
 
   async function saveEditor() {
@@ -3684,26 +4173,39 @@ export function SidePanelApp() {
       if (editor.kind === "folder") {
         await sendExtensionRequest({
           type: "CREATE_NATIVE_FOLDER",
-          payload: { parentId: editor.parentId, title: editTitle }
+          payload: { parentId: editor.parentId, title: editTitle },
         });
       } else if (editor.kind === "bookmark") {
-        if (editor.resourceKey) {
-          await sendExtensionRequest({
-            type: "UPDATE_RESOURCE_TAGS",
+        const bookmarkId = editBookmarkId || editor.node.id;
+        if (editor.resourceKey && editorResource) {
+          const result = await sendExtensionRequest({
+            type: "UPDATE_BOOKMARK_DETAILS",
             payload: {
+              bookmarkId,
               resourceKey: editor.resourceKey,
-              tags: mergeEditableTags(editTags, editTagInput)
-            }
+              title: editTitle,
+              url: editUrl,
+              parentId: editParentId,
+              tags: mergeBookmarkEditorTags(editTags, editTagInput),
+              tagsChanged: editTagsChanged || Boolean(editTagInput.trim()),
+              userNote: note,
+            },
+          });
+          setNotice(
+            result.urlChanged
+              ? "收藏信息已更新；新网址将在下次打开时重新生成摘要和封面。"
+              : "收藏信息已更新",
+          );
+        } else {
+          await sendExtensionRequest({
+            type: "UPDATE_NATIVE_BOOKMARK",
+            payload: {
+              id: bookmarkId,
+              title: editTitle,
+              ...(editor.node.url ? { url: editUrl } : {}),
+            },
           });
         }
-        await sendExtensionRequest({
-          type: "UPDATE_NATIVE_BOOKMARK",
-          payload: {
-            id: editor.node.id,
-            title: editTitle,
-            ...(editor.node.url ? { url: editUrl } : {})
-          }
-        });
       } else {
         if (!capture) throw new Error("当前页面尚未读取完成。");
         if (pageSnapshotsEnabled) {
@@ -3729,11 +4231,11 @@ export function SidePanelApp() {
               : {}),
             ...(saveDisposition === "reuse" &&
             bookmarkSaveState?.matches.find(
-              (match) => match.id === selectedBookmarkId
+              (match) => match.id === selectedBookmarkId,
             )?.matchKind === "canonical"
               ? { confirmedCanonicalReuse: true }
-              : {})
-          }
+              : {}),
+          },
         });
         if (result.aiWarning) {
           setNotice(result.aiWarning);
@@ -3753,37 +4255,36 @@ export function SidePanelApp() {
 
   async function deleteEditorNode() {
     if (editor?.kind !== "bookmark") return;
-    setBusy("delete");
+    const target = editor.node;
+    const targetId = editBookmarkId || target.id;
+    setRemovedNodeIds((current) =>
+      current.includes(targetId) ? current : [...current, targetId],
+    );
+    setEditor(null);
+    setConfirmDeleteId("");
+    setBusy("");
     setError("");
     try {
       await sendExtensionRequest({
         type: "DELETE_NATIVE_BOOKMARK",
-        payload: {
-          id: editor.node.id,
-          recursive: !editor.node.url
-        }
+        payload: { id: targetId, recursive: !target.url },
       });
-      setEditor(null);
-      setConfirmDeleteId("");
       await refresh();
+      setRemovedNodeIds((current) => current.filter((id) => id !== targetId));
     } catch (caught) {
+      // Put the row back; the bookmark still exists in Chrome.
+      setRemovedNodeIds((current) => current.filter((id) => id !== targetId));
       setError(caught instanceof Error ? caught.message : "删除失败");
-    } finally {
-      setBusy("");
     }
   }
 
-  async function moveNode(
-    id: string,
-    parentId: string,
-    index?: number
-  ) {
+  async function moveNode(id: string, parentId: string, index?: number) {
     if (!parentId) return;
     setError("");
     try {
       await sendExtensionRequest({
         type: "MOVE_NATIVE_BOOKMARK",
-        payload: { id, parentId, index }
+        payload: { id, parentId, index },
       });
       await refresh();
     } catch (caught) {
@@ -3800,13 +4301,13 @@ export function SidePanelApp() {
     scrollSaveTimer.current = window.setTimeout(() => {
       void saveSidepanelState({
         expandedFolderIds: [...expanded],
-        scrollTop: contentRef.current?.scrollTop || 0
+        scrollTop: contentRef.current?.scrollTop || 0,
       });
     }, 180);
   }
 
   function handleScrollThumbPointerDown(
-    event: React.PointerEvent<HTMLDivElement>
+    event: React.PointerEvent<HTMLDivElement>,
   ) {
     const content = contentRef.current;
     if (!content) return;
@@ -3816,14 +4317,14 @@ export function SidePanelApp() {
     scrollDrag.current = {
       pointerId: event.pointerId,
       startY: event.clientY,
-      startScrollTop: content.scrollTop
+      startScrollTop: content.scrollTop,
     };
     event.currentTarget.setPointerCapture(event.pointerId);
     syncScrollThumb(true);
   }
 
   function handleScrollThumbPointerMove(
-    event: React.PointerEvent<HTMLDivElement>
+    event: React.PointerEvent<HTMLDivElement>,
   ) {
     const content = contentRef.current;
     const drag = scrollDrag.current;
@@ -3837,7 +4338,7 @@ export function SidePanelApp() {
   }
 
   function handleScrollThumbPointerEnd(
-    event: React.PointerEvent<HTMLDivElement>
+    event: React.PointerEvent<HTMLDivElement>,
   ) {
     if (scrollDrag.current?.pointerId !== event.pointerId) return;
     scrollDrag.current = null;
@@ -3849,8 +4350,16 @@ export function SidePanelApp() {
 
   if (onboardingVisible === null) {
     return (
-      <main className="native-panel">
-        <div className="empty-state">正在准备 Aarre…</div>
+      <main className="sidepanel-boot-screen" aria-busy="true">
+        <div className="sidepanel-boot-heading">
+          <span className="sidepanel-boot-mark" aria-hidden="true" />
+          <strong>Aarre</strong>
+        </div>
+        <div className="sidepanel-boot-lines" aria-hidden="true">
+          <span className="sidepanel-boot-line" />
+          <span className="sidepanel-boot-line" />
+          <span className="sidepanel-boot-line" />
+        </div>
       </main>
     );
   }
@@ -3921,18 +4430,20 @@ export function SidePanelApp() {
         error={error}
         onPromptChange={setAgentPrompt}
         onConfigure={() => setPanelView("settings")}
+        onCancel={
+          busy === "agent" ? () => void cancelAgentRun() : undefined
+        }
         onBack={() => {
           setError("");
           setPanelView("library");
         }}
         onSubmit={handleAgentSubmit}
-        onOpenSource={(url) =>
-          void openNavigation({ text: url, url }, true)
-        }
+        onOpenSource={(url) => void openNavigation({ text: url, url }, true)}
         onConfirmActions={(messageId) =>
           void handleConfirmAgentActions(messageId)
         }
         onCancelActions={handleCancelAgentActions}
+        onDropAction={handleDropAgentAction}
         onUndoBatch={(messageId, batchId) =>
           void handleUndoAgentBatch(messageId, batchId)
         }
@@ -3949,16 +4460,14 @@ export function SidePanelApp() {
         <div className="native-actions">
           <Button
             type="button"
-            variant="ghost"
+            variant="unstyled"
             size="icon-sm"
             className="icon-button"
             title="新建文件夹"
             aria-label="新建文件夹"
             onClick={() =>
               snapshot &&
-              startCreateFolder(
-                snapshot.primaryRootId || snapshot.root.id
-              )
+              startCreateFolder(snapshot.primaryRootId || snapshot.root.id)
             }
             disabled={!snapshot}
           >
@@ -3966,22 +4475,20 @@ export function SidePanelApp() {
           </Button>
           <Button
             type="button"
-            variant="ghost"
+            variant="unstyled"
             size="icon-sm"
             className="icon-button star-button"
             data-saved={currentSaved}
             title={currentSaved ? "管理当前页面收藏" : "添加到收藏"}
             aria-label={currentSaved ? "管理当前页面收藏" : "添加到收藏"}
-            onClick={() =>
-              void startSave()
-            }
+            onClick={() => void startSave()}
             disabled={!appState?.activeTab?.url}
           >
             <StarIcon filled={currentSaved} />
           </Button>
           <Button
             type="button"
-            variant="ghost"
+            variant="unstyled"
             size="icon-sm"
             className="icon-button history-button"
             title="历史会话"
@@ -3995,20 +4502,18 @@ export function SidePanelApp() {
           </Button>
           <Button
             type="button"
-            variant="ghost"
+            variant="unstyled"
             size="icon-sm"
             className="icon-button"
             title="打开批量整理工作台"
             aria-label="打开批量整理工作台"
-            onClick={() =>
-              void sendExtensionRequest({ type: "OPEN_MANAGER" })
-            }
+            onClick={() => void sendExtensionRequest({ type: "OPEN_MANAGER" })}
           >
             <ExternalLinkIcon />
           </Button>
           <Button
             type="button"
-            variant="ghost"
+            variant="unstyled"
             size="icon-sm"
             className="icon-button settings-button"
             title="设置"
@@ -4020,6 +4525,7 @@ export function SidePanelApp() {
         </div>
         {appState?.libraryScan.state === "running" ? (
           <Button
+            variant="unstyled"
             type="button"
             className="library-scan-indicator"
             aria-label={`扫描进度 ${appState.libraryScan.processed}/${appState.libraryScan.total}`}
@@ -4033,7 +4539,7 @@ export function SidePanelApp() {
                         appState.libraryScan.total) *
                       100
                     : 0
-                }%`
+                }%`,
               }}
             />
           </Button>
@@ -4052,21 +4558,22 @@ export function SidePanelApp() {
           </div>
           <div>
             <Button
+              variant="unstyled"
               type="button"
               className="button button-quiet button-small"
               disabled={organizationNoticeBusy}
               onClick={() => {
                 setOrganizationNoticeBusy(true);
                 void sendExtensionRequest({
-                  type: "DISMISS_ORGANIZATION_NOTICE"
+                  type: "DISMISS_ORGANIZATION_NOTICE",
                 })
                   .then(() => setOrganizationNotice(null))
                   .catch((caught) =>
                     setError(
                       caught instanceof Error
                         ? caught.message
-                        : "暂时无法隐藏整理提示"
-                    )
+                        : "暂时无法隐藏整理提示",
+                    ),
                   )
                   .finally(() => setOrganizationNoticeBusy(false));
               }}
@@ -4074,19 +4581,20 @@ export function SidePanelApp() {
               暂不
             </Button>
             <Button
+              variant="unstyled"
               type="button"
               className="button button-dark button-small"
               disabled={organizationNoticeBusy}
               onClick={() =>
                 void sendExtensionRequest({
                   type: "OPEN_MANAGER",
-                  view: "organize"
+                  view: "organize",
                 }).catch((caught) =>
                   setError(
                     caught instanceof Error
                       ? caught.message
-                      : "无法打开整理提案"
-                  )
+                      : "无法打开整理提案",
+                  ),
                 )
               }
             >
@@ -4105,10 +4613,11 @@ export function SidePanelApp() {
             <strong>这会儿值得重看</strong>
             <Button
               type="button"
+              variant="unstyled"
               onClick={() =>
                 void sendExtensionRequest({
                   type: "OPEN_MANAGER",
-                  view: "resurface"
+                  view: "resurface",
                 })
               }
             >
@@ -4118,11 +4627,13 @@ export function SidePanelApp() {
           {contextResurfacing.map((item) => (
             <Button
               type="button"
+              variant="unstyled"
+              size="unstyled"
               key={item.resourceKey}
               onClick={() =>
                 void openNavigation({
                   text: item.url,
-                  url: item.url
+                  url: item.url,
                 })
               }
             >
@@ -4148,9 +4659,7 @@ export function SidePanelApp() {
         <FluidInput
           type="search"
           value={libraryQuery}
-          onChange={(event) =>
-            handleLibraryQueryChange(event.target.value)
-          }
+          onChange={(event) => handleLibraryQueryChange(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Escape" && libraryQuery) {
               event.preventDefault();
@@ -4176,55 +4685,61 @@ export function SidePanelApp() {
         )}
       </form>
 
-      {error ? (
-        <div className="notice notice-error native-error-layout" role="alert">
-          <span>{error}</span>
-          <div>
-            {!snapshot ? (
-              <Button
-                type="button"
-                className="native-error-retry"
-                onClick={() =>
-                  void refresh().catch((caught) =>
-                    setError(
-                      caught instanceof Error
-                        ? caught.message
-                        : "重新读取失败"
-                    )
-                  )
-                }
-              >
-                重试
-              </Button>
-            ) : null}
-            <Button
-              type="button"
-              aria-label="关闭错误提示"
-              onClick={() => setError("")}
-            >
-              <CloseIcon />
-            </Button>
-          </div>
-        </div>
-      ) : null}
-      {notice && !error ? (
-        <div className="native-notice" role="status">
-          <span>{notice}</span>
-          <Button
-            type="button"
-            aria-label="关闭提示"
-            onClick={() => setNotice("")}
-          >
-            <CloseIcon />
-          </Button>
-        </div>
-      ) : null}
-
       <div
         className="native-content-frame"
         data-has-folders={hasVisibleFolders}
         data-at-end={scrollThumb.atEnd}
       >
+        {error ? (
+          <div className="native-error-layout" role="alert">
+            <span>{error}</span>
+            <div>
+              {!snapshot ? (
+                <Button
+                  variant="unstyled"
+                  type="button"
+                  className="native-error-retry"
+                  onClick={() =>
+                    void refresh().catch((caught) =>
+                      setError(
+                        caught instanceof Error
+                          ? caught.message
+                          : "重新读取失败",
+                      ),
+                    )
+                  }
+                >
+                  重试
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                variant="unstyled"
+                size="icon-sm"
+                className="native-status-dismiss"
+                aria-label="关闭错误提示"
+                onClick={() => setError("")}
+              >
+                <CloseIcon />
+              </Button>
+            </div>
+          </div>
+        ) : null}
+        {notice && !error ? (
+          <div className="native-notice" role="status">
+            <span>{notice}</span>
+            <Button
+              type="button"
+              variant="unstyled"
+              size="icon-sm"
+              className="native-status-dismiss"
+              aria-label="关闭提示"
+              onClick={() => setNotice("")}
+            >
+              <CloseIcon />
+            </Button>
+          </div>
+        ) : null}
         <section
           id="bookmark-list"
           ref={contentRef}
@@ -4235,44 +4750,37 @@ export function SidePanelApp() {
           onDragOver={(event) => event.preventDefault()}
           onDrop={(event) => {
             const id = event.dataTransfer.getData(
-              "application/x-bookmark-layer-id"
+              "application/x-bookmark-layer-id",
             );
             if (id && snapshot) {
-              void moveNode(
-                id,
-                snapshot.primaryRootId || snapshot.root.id
-              );
+              void moveNode(id, snapshot.primaryRootId || snapshot.root.id);
             }
           }}
         >
           {snapshot ? (
-            librarySearchMode === "ranked" &&
-            libraryQuery.trim() ? (
+            librarySearchMode === "ranked" && libraryQuery.trim() ? (
               rankedNativeResults.length ? (
                 <div className="library-search-results">
                   <div className="library-search-summary">
-                    <span>
-                      找到 {rankedNativeResults.length} 条相关收藏
-                    </span>
+                    <span>找到 {rankedNativeResults.length} 条相关收藏</span>
                     <Button
                       type="button"
+                      variant="ghost"
                       onClick={() => setLibrarySearchMode("tree")}
                     >
                       在文件夹中查看
                     </Button>
                   </div>
                   {rankedNativeResults.map((result) => (
-                    <div
-                      className="library-search-result"
-                      key={result.node.id}
-                    >
+                    <div className="library-search-result" key={result.node.id}>
                       <Button
+                        variant="unstyled"
                         type="button"
                         className="library-search-result-main"
                         onClick={() =>
                           void openNavigation({
                             text: result.node.url || "",
-                            url: result.node.url
+                            url: result.node.url,
                           })
                         }
                         onAuxClick={(event) => {
@@ -4281,34 +4789,22 @@ export function SidePanelApp() {
                           void openNavigation(
                             {
                               text: result.node.url || "",
-                              url: result.node.url
+                              url: result.node.url,
                             },
-                            true
+                            true,
                           );
                         }}
                       >
                         <SiteThumbnail
                           url={result.resource.url}
                           imageUrl={result.resource.thumbnailDataUrl}
-                          brandImageUrl={
+                          brandImageUrl={currentSiteBrandImageUrl(
                             siteBrandForUrl(
                               siteBrandByHost,
-                              result.resource.url
-                            )?.iconDataUrlLight ||
-                            siteBrandForUrl(
-                              siteBrandByHost,
-                              result.resource.url
-                            )?.iconDataUrl
-                          }
-                          brandImageUrlDark={
-                            siteBrandForUrl(
-                              siteBrandByHost,
-                              result.resource.url
-                            )?.iconDataUrlDark
-                          }
-                          categoryCoverId={
-                            result.resource.categoryCoverId
-                          }
+                              result.resource.url,
+                            ),
+                          )}
+                          categoryCoverId={result.resource.categoryCoverId}
                           coverStyle={listCoverStyle}
                           label={result.resource.title}
                           className="bookmark-thumbnail"
@@ -4317,13 +4813,13 @@ export function SidePanelApp() {
                           <strong>
                             {highlightTextMatches(
                               result.resource.title,
-                              debouncedLibraryQuery
+                              debouncedLibraryQuery,
                             )}
                           </strong>
                           <small>
                             {visibleFolderLabel(
                               result.resource.nativeFolderPath,
-                              hostFromUrl(result.resource.url)
+                              hostFromUrl(result.resource.url),
                             )}
                             {result.matchReason
                               ? ` · 匹配${result.matchReason}`
@@ -4334,7 +4830,7 @@ export function SidePanelApp() {
                       {!result.node.unmodifiable ? (
                         <Button
                           type="button"
-                          variant="ghost"
+                          variant="unstyled"
                           size="icon-sm"
                           className="row-menu"
                           aria-label={`编辑 ${result.node.title}`}
@@ -4353,21 +4849,6 @@ export function SidePanelApp() {
                     <SearchIcon />
                   </span>
                   <strong>没有找到相关收藏</strong>
-                  <p>可以换个关键词，或让 AI 理解你的描述。</p>
-                  <Button
-                    type="button"
-                    className="button button-dark button-small"
-                    disabled={Boolean(busy)}
-                    onClick={() =>
-                      aiConfigured
-                        ? submitAgentQuery(libraryQuery)
-                        : setPanelView("settings")
-                    }
-                  >
-                    {aiConfigured
-                      ? "让 AI 帮我找"
-                      : "配置 AI 后可以让它帮你找"}
-                  </Button>
                 </div>
               )
             ) : visibleBookmarkNodes.length ? (
@@ -4393,9 +4874,9 @@ export function SidePanelApp() {
                     void openNavigation(
                       {
                         text: node.url || "",
-                        url: node.url
+                        url: node.url,
                       },
-                      newTab
+                      newTab,
                     )
                   }
                   onEdit={startEdit}
@@ -4411,21 +4892,6 @@ export function SidePanelApp() {
                   <SearchIcon />
                 </span>
                 <strong>没有找到相关收藏</strong>
-                <p>按回车查看完整排序，或让 AI 理解你的描述。</p>
-                <Button
-                  type="button"
-                  className="button button-dark button-small"
-                  disabled={Boolean(busy)}
-                  onClick={() =>
-                    aiConfigured
-                      ? submitAgentQuery(libraryQuery)
-                      : setPanelView("settings")
-                  }
-                >
-                  {aiConfigured
-                    ? "让 AI 帮我找"
-                    : "配置 AI 后可以让它帮你找"}
-                </Button>
               </div>
             ) : (
               <div className="empty-state">
@@ -4446,7 +4912,7 @@ export function SidePanelApp() {
             data-visible={scrollThumb.visible}
             style={{
               height: `${scrollThumb.height}px`,
-              transform: `translateY(${scrollThumb.offset}px)`
+              transform: `translateY(${scrollThumb.offset}px)`,
             }}
             role="scrollbar"
             aria-controls="bookmark-list"
@@ -4460,9 +4926,9 @@ export function SidePanelApp() {
                       Math.max(
                         1,
                         contentRef.current.scrollHeight -
-                          contentRef.current.clientHeight
+                          contentRef.current.clientHeight,
                       )) *
-                      100
+                      100,
                   )
                 : 0
             }
@@ -4480,14 +4946,19 @@ export function SidePanelApp() {
         placement={bookmarkPreview}
       />
 
-      <AgentComposer
-        value={agentPrompt}
-        busy={Boolean(busy)}
-        configured={aiConfigured}
-        onChange={setAgentPrompt}
-        onSubmit={handleAgentSubmit}
-        onConfigure={() => setPanelView("settings")}
-      />
+      {aiConfigured ? (
+        <AgentComposer
+          value={agentPrompt}
+          busy={Boolean(busy)}
+          configured
+          onChange={setAgentPrompt}
+          onSubmit={handleAgentSubmit}
+          onCancel={
+            busy === "agent" ? () => void cancelAgentRun() : undefined
+          }
+          onConfigure={() => setPanelView("settings")}
+        />
+      ) : null}
 
       {editor ? (
         <div
@@ -4520,11 +4991,17 @@ export function SidePanelApp() {
                     : editor.kind === "folder"
                       ? "新建文件夹"
                       : editor.node.url
-                        ? "编辑书签"
+                        ? "编辑收藏"
                         : "编辑文件夹"}
                 </h2>
+                {editor.kind === "bookmark" && editor.node.url ? (
+                  <p>
+                    Chrome 保存名称、网址和文件夹；Aarre 保存备注与自定义标签。
+                  </p>
+                ) : null}
               </div>
               <Button
+                variant="unstyled"
                 className="dialog-close"
                 onClick={() => {
                   setEditor(null);
@@ -4543,134 +5020,77 @@ export function SidePanelApp() {
               </div>
             ) : (
               <>
-                <label className="native-field">
-                  <span>名称</span>
-                  <FluidInput
-                    value={editTitle}
-                    onChange={(event) => setEditTitle(event.target.value)}
-                    maxLength={240}
-                    autoFocus
-                    disabled={
-                      editor.kind === "save" &&
-                      saveDisposition === "reuse" &&
-                      Boolean(selectedSaveMatch?.unmodifiable)
-                    }
+                {editor.kind === "bookmark" && editor.node.url ? null : (
+                  <label className="native-field">
+                    <span>名称</span>
+                    <FluidInput
+                      value={editTitle}
+                      onChange={(event) => setEditTitle(event.target.value)}
+                      maxLength={240}
+                      autoFocus
+                      disabled={
+                        editor.kind === "save" &&
+                        saveDisposition === "reuse" &&
+                        Boolean(selectedSaveMatch?.unmodifiable)
+                      }
+                    />
+                  </label>
+                )}
+
+                {editor.kind === "bookmark" && !editor.node.url ? (
+                  <ProtectionControl
+                    target={{ kind: "folder", id: editor.node.id }}
+                    disabled={Boolean(busy)}
+                    onChanged={() => {
+                      setNotice("保护设置已更新");
+                      void refresh();
+                    }}
                   />
-                </label>
+                ) : null}
 
                 {editor.kind === "bookmark" && editor.node.url ? (
                   <>
-                    <label className="native-field">
-                      <span>网址</span>
-                      <FluidInput
-                        value={editUrl}
-                        onChange={(event) => setEditUrl(event.target.value)}
+                    {editorResource ? (
+                      <CloudConflictNotice
+                        resourceKey={editorResource.resourceKey}
+                        currentUserNote={note}
+                        currentTags={editTags}
+                        disabled={Boolean(busy)}
+                        onResolved={() => setNotice("云端编辑冲突已处理")}
                       />
-                    </label>
-
-                    <section
-                      className="bookmark-analysis"
-                      aria-labelledby="bookmark-analysis-title"
-                    >
-                      <header>
-                        <div>
-                          <strong id="bookmark-analysis-title">
-                            AI 分析
-                          </strong>
-                          <small>
-                            主题是 AI 归纳的内容方向；标签是用于查找和整理的关键词，可以自行修改。
-                          </small>
-                        </div>
-                        {editorResource?.aiStatus !== "ready" ? (
-                          <span data-tone="pending">
-                            {editorResource?.aiStatus === "processing"
-                              ? "分析中"
-                              : "待分析"}
-                          </span>
-                        ) : null}
-                      </header>
-
-                      <div className="analysis-copy">
-                        <p>
-                          {editorResource?.summary ||
-                            "这个书签还没有生成简介。连接 AI 后，可在设置中启动全目录扫描。"}
-                        </p>
-                      </div>
-
-                      <div className="analysis-topics">
-                        <span>主题</span>
-                        {editorResource?.topics.length ? (
-                          <div>
-                            {editorResource.topics.map((topic) => (
-                              <em key={topic}>{topic}</em>
-                            ))}
-                          </div>
-                        ) : (
-                          <p>尚未识别主题</p>
-                        )}
-                      </div>
-
-                      <div className="analysis-tags">
-                        <div className="analysis-tags-heading">
-                          <span>标签</span>
-                        </div>
-                        <div
-                          className="editable-tag-list"
-                          aria-label="当前标签"
-                        >
-                          {editTags.length ? (
-                            editTags.map((tag) => (
-                              <span key={tag}>
-                                {tag}
-                                <Button
-                                  type="button"
-                                  aria-label={`移除标签 ${tag}`}
-                                  onClick={() =>
-                                    setEditTags((current) =>
-                                      current.filter(
-                                        (item) => item !== tag
-                                      )
-                                    )
-                                  }
-                                >
-                                  <CloseIcon />
-                                </Button>
-                              </span>
-                            ))
-                          ) : (
-                            <small>还没有标签</small>
-                          )}
-                        </div>
-                        <div className="tag-entry">
-                          <FluidInput
-                            value={editTagInput}
-                            onChange={(event) =>
-                              setEditTagInput(event.target.value)
-                            }
-                            onKeyDown={(event) => {
-                              if (
-                                event.key === "Enter" ||
-                                event.key === "," ||
-                                event.key === "，"
-                              ) {
-                                event.preventDefault();
-                                addEditTags();
-                              }
-                            }}
-                            maxLength={120}
-                            aria-label="添加标签"
-                            placeholder="输入标签，按回车添加"
-                          />
-                          <Button
-                            type="button"
-                            onClick={() => addEditTags()}
-                            disabled={!editTagInput.trim()}
-                          >
-                            添加
-                          </Button>
-                        </div>
-                      </div>
-                    </section>
+                    ) : null}
+                    <BookmarkEditorFields
+                      resource={editorResource}
+                      locations={editorModel.locations}
+                      folders={editorModel.folders}
+                      selectedLocation={selectedEditorLocation}
+                      title={editTitle}
+                      url={editUrl}
+                      parentId={editParentId}
+                      tags={editTags}
+                      tagInput={editTagInput}
+                      userNote={note}
+                      writable={editorWritable}
+                      disabled={Boolean(busy)}
+                      autoFocusTitle
+                      onLocationChange={resetEditLocation}
+                      onTitleChange={setEditTitle}
+                      onUrlChange={setEditUrl}
+                      onParentIdChange={setEditParentId}
+                      onTagInputChange={setEditTagInput}
+                      onAddTag={addEditTags}
+                      onRemoveTag={(tag) => {
+                        setEditTags((current) =>
+                          current.filter((item) => item !== tag),
+                        );
+                        setEditTagsChanged(true);
+                      }}
+                      onUserNoteChange={setNote}
+                      onProtectionChanged={() => {
+                        setNotice("保护设置已更新");
+                        void refresh();
+                      }}
+                    />
                   </>
                 ) : null}
 
@@ -4679,9 +5099,7 @@ export function SidePanelApp() {
                     {bookmarkSaveState?.status === "exact" ? (
                       <div className="save-state-note" role="status">
                         <strong>此页面已经收藏</strong>
-                        <span>
-                          保存后会更新原记录，不会创建重复收藏。
-                        </span>
+                        <span>保存后会更新原记录，不会创建重复收藏。</span>
                       </div>
                     ) : null}
                     {bookmarkSaveState?.status === "readonly" ? (
@@ -4694,7 +5112,7 @@ export function SidePanelApp() {
                     ) : null}
                     {bookmarkSaveState &&
                     ["canonical", "multiple"].includes(
-                      bookmarkSaveState.status
+                      bookmarkSaveState.status,
                     ) ? (
                       <fieldset className="save-match-picker">
                         <legend>
@@ -4722,9 +5140,7 @@ export function SidePanelApp() {
                               <strong>{match.title}</strong>
                               <small>
                                 {bookmarkMatchLocation(match)}
-                                {match.unmodifiable
-                                  ? " · 受 Chrome 管理"
-                                  : ""}
+                                {match.unmodifiable ? " · 受 Chrome 管理" : ""}
                               </small>
                             </span>
                           </label>
@@ -4737,9 +5153,7 @@ export function SidePanelApp() {
                             onChange={() => {
                               setSaveDisposition("new");
                               setSelectedBookmarkId("");
-                              setEditTitle(
-                                capture?.title || editTitle
-                              );
+                              setEditTitle(capture?.title || editTitle);
                             }}
                           />
                           <span>
@@ -4773,18 +5187,13 @@ export function SidePanelApp() {
                           {folderSuggestions.map((suggestion) => (
                             <Button
                               type="button"
+                              variant="ghost"
                               key={suggestion.folderId}
-                              data-selected={
-                                folderId === suggestion.folderId
-                              }
-                              onClick={() =>
-                                setFolderId(suggestion.folderId)
-                              }
+                              data-selected={folderId === suggestion.folderId}
+                              onClick={() => setFolderId(suggestion.folderId)}
                               title={suggestion.reason}
                             >
-                              {visibleFolderPath(
-                                suggestion.path
-                              ).join(" / ")}
+                              {visibleFolderPath(suggestion.path).join(" / ")}
                               <span>{suggestion.reason}</span>
                             </Button>
                           ))}
@@ -4806,7 +5215,8 @@ export function SidePanelApp() {
                       <span>
                         <strong>自动完成智能增强</strong>
                         <small>
-                          Aarre 会生成 AI 摘要与标签，并在网页加载稳定后补齐封面截图。暂时失败的任务会保留并重试。
+                          Aarre 会生成 AI
+                          摘要与标签，并在网页加载稳定后补齐封面截图。暂时失败的任务会保留并重试。
                         </small>
                       </span>
                     </div>
@@ -4819,60 +5229,66 @@ export function SidePanelApp() {
                 <div className="native-dialog-actions">
                   {editor.kind === "bookmark" &&
                   !editor.node.folderType &&
-                  confirmDeleteId === editor.node.id ? (
+                  confirmDeleteId === (editBookmarkId || editor.node.id) ? (
                     <div
                       className="delete-confirmation"
                       role="group"
                       aria-label="确认删除"
                     >
                       <p role="alert">
-                        {editor.node.url
-                          ? "将从 Chrome 删除这个书签。30 天内可以在设置页「最近的更改」里恢复。"
-                          : `将删除整个文件夹及其中 ${countBookmarks(editor.node)} 个书签。30 天内可以在设置页「最近的更改」里恢复。`}
+                        <TrashIcon aria-hidden="true" />
+                        <span>
+                          {editorModel.locations.length > 1
+                            ? "只删除当前选中的收藏位置？"
+                            : "确认从 Chrome 删除？"}
+                          <small>
+                            {editorModel.locations.length > 1
+                              ? "其他位置与 Aarre 智能信息保留"
+                              : "30 天内可在侧边栏设置撤销"}
+                          </small>
+                        </span>
                       </p>
                       <div>
                         <Button
+                          variant="unstyled"
                           type="button"
                           className="button button-quiet"
                           onClick={() => setConfirmDeleteId("")}
-                          disabled={Boolean(busy)}
                         >
                           取消
                         </Button>
                         <Button
+                          variant="unstyled"
                           type="button"
                           className="button button-danger"
                           data-confirming="true"
                           onClick={() => void deleteEditorNode()}
-                          disabled={Boolean(busy)}
                         >
-                          {busy === "delete"
-                            ? "正在删除…"
-                            : "确认"}
+                          确认删除
                         </Button>
                       </div>
                     </div>
                   ) : (
                     <>
-                      {editor.kind === "bookmark" &&
-                      !editor.node.folderType ? (
+                      {editor.kind === "bookmark" && !editor.node.folderType ? (
                         <Button
+                          variant="unstyled"
                           type="button"
-                          className="button button-danger"
+                          className="button button-danger-quiet"
                           onClick={() =>
-                            setConfirmDeleteId(editor.node.id)
+                            setConfirmDeleteId(editBookmarkId || editor.node.id)
                           }
                           disabled={Boolean(busy)}
                         >
-                          {editor.node.url
-                            ? "删除书签"
-                            : "删除整个文件夹"}
+                          <TrashIcon />
+                          删除
                         </Button>
                       ) : (
                         <span />
                       )}
                       <div>
                         <Button
+                          variant="unstyled"
                           type="button"
                           className="button button-quiet"
                           onClick={() => {
@@ -4884,16 +5300,20 @@ export function SidePanelApp() {
                           取消
                         </Button>
                         <Button
+                          variant="unstyled"
                           type="button"
                           className="button button-dark"
                           onClick={() => void saveEditor()}
                           disabled={
                             Boolean(busy) ||
                             !editTitle.trim() ||
+                            (editor.kind === "bookmark" &&
+                              Boolean(editor.node.url) &&
+                              (!editBookmarkId ||
+                                !editUrl.trim() ||
+                                !editParentId)) ||
                             (editor.kind === "save" &&
-                              (!capture ||
-                                !folderId ||
-                                !saveDisposition))
+                              (!capture || !folderId || !saveDisposition))
                           }
                         >
                           {busy === "save"
@@ -4902,7 +5322,9 @@ export function SidePanelApp() {
                               ? saveDisposition === "reuse"
                                 ? "更新收藏"
                                 : "添加到 Chrome"
-                              : "保存"}
+                              : editor.kind === "bookmark"
+                                ? "保存修改"
+                                : "保存"}
                         </Button>
                       </div>
                     </>

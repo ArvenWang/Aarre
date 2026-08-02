@@ -1,14 +1,9 @@
-import type {
-  AnchorHTMLAttributes,
-  MouseEvent,
-  ReactNode
-} from "react";
+import type { AnchorHTMLAttributes, MouseEvent, ReactNode } from "react";
 
-interface ResourceLinkProps
-  extends Omit<
-    AnchorHTMLAttributes<HTMLAnchorElement>,
-    "children" | "href" | "onClick" | "rel" | "target"
-  > {
+interface ResourceLinkProps extends Omit<
+  AnchorHTMLAttributes<HTMLAnchorElement>,
+  "children" | "href" | "onClick" | "rel" | "target"
+> {
   children: ReactNode;
   url: string;
   onOpenResource: (url: string) => void;

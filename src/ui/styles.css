@@ -12,7 +12,6 @@
   --border: var(--line);
   --hover: color-mix(in srgb, var(--ink) 6%, transparent);
   --active: color-mix(in srgb, var(--ink) 10%, transparent);
-  --focus-ring: var(--accent);
   --destructive: var(--negative);
   --radius-pill: 999px;
 }
@@ -28,7 +27,11 @@
   --color-accent-foreground: var(--ink);
   --color-border: var(--line);
   --color-input: var(--line);
-  --color-ring: var(--accent);
+  --color-ring: var(--focus-ring);
+  --color-danger: var(--negative);
+  --color-danger-foreground: var(--bg);
+  --color-danger-hover: color-mix(in srgb, var(--negative) 88%, var(--ink));
+  --color-danger-soft: color-mix(in srgb, var(--negative) 10%, transparent);
   --color-hover: color-mix(in srgb, var(--ink) 6%, transparent);
   --color-active: color-mix(in srgb, var(--ink) 10%, transparent);
   --color-surface-1: var(--bg);
@@ -39,19 +42,19 @@
   --color-surface-6: color-mix(in srgb, var(--surface-sunken) 76%, var(--ink));
   --color-surface-7: color-mix(in srgb, var(--surface-sunken) 68%, var(--ink));
   --color-surface-8: color-mix(in srgb, var(--surface-sunken) 60%, var(--ink));
-  --shadow-surface-1: 0 2px 8px color-mix(in srgb, var(--ink) 8%, transparent);
-  --shadow-surface-2: 0 8px 24px color-mix(in srgb, var(--ink) 12%, transparent);
-  --shadow-surface-3: 0 14px 34px color-mix(in srgb, var(--ink) 18%, transparent);
-  --shadow-surface-4: 0 20px 44px color-mix(in srgb, var(--ink) 22%, transparent);
-  --shadow-surface-5: 0 24px 52px color-mix(in srgb, var(--ink) 25%, transparent);
-  --shadow-surface-6: 0 28px 60px color-mix(in srgb, var(--ink) 28%, transparent);
-  --shadow-surface-7: 0 32px 68px color-mix(in srgb, var(--ink) 30%, transparent);
-  --shadow-surface-8: 0 36px 76px color-mix(in srgb, var(--ink) 32%, transparent);
+  --shadow-surface-1: 0 2px 8px color-mix(in srgb, var(--shade) 8%, transparent);
+  --shadow-surface-2: 0 8px 24px color-mix(in srgb, var(--shade) 12%, transparent);
+  --shadow-surface-3: 0 14px 34px color-mix(in srgb, var(--shade) 18%, transparent);
+  --shadow-surface-4: 0 20px 44px color-mix(in srgb, var(--shade) 22%, transparent);
+  --shadow-surface-5: 0 24px 52px color-mix(in srgb, var(--shade) 25%, transparent);
+  --shadow-surface-6: 0 28px 60px color-mix(in srgb, var(--shade) 28%, transparent);
+  --shadow-surface-7: 0 32px 68px color-mix(in srgb, var(--shade) 30%, transparent);
+  --shadow-surface-8: 0 36px 76px color-mix(in srgb, var(--shade) 32%, transparent);
 }
 
 .fluid-control:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 .fluid-select {
-  min-height: 36px;
+  min-height: var(--control-h-md);
   padding: 8px 12px;
   border-radius: var(--shape-input-radius, var(--radius-md));
   line-height: 1.35;
@@ -73,7 +76,7 @@
 }
 
 .fluid-control[type="file"] {
-  min-height: 36px;
+  min-height: var(--control-h-md);
   padding: 7px 10px;
   border-radius: var(--shape-input-radius, var(--radius-md));
 }
@@ -87,4 +90,91 @@
   display: none;
   width: 0;
   height: 0;
+}
+
+.cloud-conflict-notice {
+  display: grid;
+  gap: var(--space-3);
+  margin-block-end: var(--space-5);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-module);
+  background: var(--surface-sunken);
+}
+
+.cloud-conflict-heading,
+.cloud-conflict-actions,
+.cloud-conflict-versions dl > div {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cloud-conflict-heading {
+  justify-content: space-between;
+}
+
+.cloud-conflict-heading span,
+.cloud-conflict-notice > p,
+.cloud-conflict-versions dt {
+  color: var(--ink-muted);
+}
+
+.cloud-conflict-notice > p,
+.cloud-conflict-versions dl,
+.cloud-conflict-versions dd {
+  margin: 0;
+}
+
+.cloud-conflict-versions {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.cloud-conflict-versions > div {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.cloud-conflict-versions dl {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.cloud-conflict-versions dt {
+  flex: 0 0 64px;
+}
+
+.cloud-conflict-versions dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.cloud-conflict-actions {
+  flex-wrap: wrap;
+}
+
+.cloud-conflict-notice > p.cloud-conflict-error {
+  color: var(--negative);
+}
+
+/* Checkmark stroke draws itself in as the selection acknowledgment. The path
+   declares pathLength=1, so the dash values are a 0–1 fraction. */
+@keyframes select-check-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.select-check-draw {
+  animation: select-check-draw 80ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .select-check-draw {
+    animation: none;
+  }
 }

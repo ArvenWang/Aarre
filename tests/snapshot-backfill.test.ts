@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   emptySnapshotBackfillStatus,
+  SNAPSHOT_BACKFILL_CONCURRENCY,
   recordSnapshotBackfillOutcome,
   snapshotBackfillCaptureAllowed,
   snapshotBackfillCandidates,
   snapshotBackfillLeaseAllowsCapture,
   snapshotBackfillStateAfterFocusCheck
 } from "../src/lib/snapshot-backfill";
+import { buildProtectionPolicy } from "../src/lib/protection";
 import type { ResourceRecord } from "../src/lib/types";
 
 function resource(
@@ -60,7 +62,7 @@ describe("snapshot backfill planning", () => {
     ]);
   });
 
-  it("round-robins hosts while keeping screenshot concurrency at one", () => {
+  it("round-robins hosts while keeping screenshot concurrency bounded at three", () => {
     const candidates = snapshotBackfillCandidates(
       [
         resource("a1", "https://a.example/a1"),
@@ -77,9 +79,51 @@ describe("snapshot backfill planning", () => {
       "a2"
     ]);
     expect(emptySnapshotBackfillStatus()).toMatchObject({
-      concurrency: 1,
+      concurrency: SNAPSHOT_BACKFILL_CONCURRENCY,
       requiresForeground: false
     });
+  });
+
+  it("excludes explicitly protected pages and folder descendants from backfill", () => {
+    const policy = buildProtectionPolicy(
+      [
+        {
+          id: "root",
+          children: [
+            { id: "explicit", url: "https://explicit.example" },
+            {
+              id: "private-folder",
+              children: [
+                { id: "inherited", url: "https://inherited.example" }
+              ]
+            },
+            { id: "public", url: "https://public.example" }
+          ]
+        }
+      ],
+      {
+        resourceKeys: ["explicit-resource"],
+        folderIds: ["private-folder"]
+      }
+    );
+    const explicit = resource(
+      "explicit-resource",
+      "https://explicit.example",
+      ["explicit"]
+    );
+
+    expect(
+      snapshotBackfillCandidates(
+        [
+          explicit,
+          resource("inherited", "https://inherited.example"),
+          resource("public", "https://public.example")
+        ],
+        new Set(),
+        [],
+        policy
+      ).map((item) => item.resourceKey)
+    ).toEqual(["public"]);
   });
 
   it("records isolated failures and completes without losing earlier counts", () => {
@@ -206,6 +250,7 @@ describe("snapshot backfill planning", () => {
 
   it("requires the exact job and attempt lease before a capture may commit", () => {
     const lease = {
+      workerId: 1,
       jobId: "job-a",
       resourceKey: "resource-a",
       tabId: 42,
@@ -214,6 +259,7 @@ describe("snapshot backfill planning", () => {
     const running = {
       state: "running" as const,
       jobId: "job-a",
+      expectedWorkerId: 1,
       currentResourceKey: "resource-a",
       expectedTabId: 42,
       currentLease: "lease-a"
@@ -232,10 +278,17 @@ describe("snapshot backfill planning", () => {
         lease
       )
     ).toBe(false);
+    expect(
+      snapshotBackfillLeaseAllowsCapture(
+        { ...running, expectedWorkerId: 2 },
+        lease
+      )
+    ).toBe(false);
   });
 
   it("does not revive an old in-flight capture after focus or pause recovery", () => {
     const oldLease = {
+      workerId: 1,
       jobId: "job-a",
       resourceKey: "resource-a",
       tabId: 42,

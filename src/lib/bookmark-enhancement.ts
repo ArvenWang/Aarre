@@ -32,6 +32,7 @@ export interface SnapshotEnhancementProgress {
     | "aarre_save"
     | "aarre_open"
     | "normal_browse"
+    | "manual_refresh"
     | "batch_backfill"
     | "recovery";
   updatedAt: string;
@@ -59,9 +60,9 @@ export interface BookmarkEnhancementJob {
 export function enhancementTriggerAllowsRenderedAi(
   trigger: SnapshotEnhancementProgress["trigger"]
 ): boolean {
-  // “补齐缺失封面”是零 AI 费用的截图任务。AI 全目录增强必须继续走
-  // 另一个显式扫描入口、费用预估和用户确认，不能被截图队列暗中触发。
-  return trigger !== "batch_backfill";
+  // “补齐缺失封面”是不消耗 AI token 的截图任务。AI 全目录增强必须继续走
+  // 另一个显式扫描入口、用量预估和用户确认，不能被截图队列暗中触发。
+  return trigger !== "batch_backfill" && trigger !== "manual_refresh";
 }
 
 export function snapshotCapturePolicy(input: {
@@ -73,16 +74,18 @@ export function snapshotCapturePolicy(input: {
   refreshExisting: boolean;
   showToast: boolean;
 } {
+  const explicitlyRequested = input.trigger === "manual_refresh";
   const openedForRecovery =
     input.trigger === "aarre_open" || input.trigger === "normal_browse";
   const refreshExisting =
-    input.hasSnapshot && input.snapshotIsStale && openedForRecovery;
+    (explicitlyRequested && input.hasSnapshot) ||
+    (input.hasSnapshot && input.snapshotIsStale && openedForRecovery);
   return {
-    capture: !input.hasSnapshot || refreshExisting,
+    capture: !input.hasSnapshot || explicitlyRequested || refreshExisting,
     refreshExisting,
-    // Chrome 星标与 Aarre 保存后的首拍保持无感；以后正常访问缺图收藏
-    // 已属于自动补拍，成功后给出一次明确反馈。
-    showToast: !input.hasSnapshot && openedForRecovery
+    // Chrome 星标与 Aarre 保存后的首拍保持无感；显式更新封面和正常访问
+    // 时为缺图收藏补拍，都给出明确反馈。
+    showToast: explicitlyRequested || (!input.hasSnapshot && openedForRecovery)
   };
 }
 

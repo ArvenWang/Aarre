@@ -28,31 +28,35 @@ interface ShapeClasses {
   mergedRadius: number;
 }
 
+// Radii come from the semantic design tokens rather than literal pixel values,
+// so a change in tokens.css moves the React controls and hand-written CSS
+// together. Menu shells use concentric pairs: container − content padding
+// (--sp-1 / p-1) = row highlight. The inner corner must be smaller than the
+// shell — never equal or larger — or the selected pill reads as ballooned.
 const shapeMap: Record<ShapeVariant, ShapeClasses> = {
   pill: {
-    item: "rounded-[20px]",
-    bg: "rounded-[20px]",
-    // +2px over `item` because the focus ring sits 2px outside the element
-    // (top/left -2, width/height +4); this keeps the corners concentric so a
-    // pill element gets a pill ring (matches the rounded-mode 8px→10px bump).
-    focusRing: "rounded-[22px]",
-    mergedBg: "rounded-2xl",
-    container: "rounded-3xl",
-    button: "rounded-[20px]",
-    input: "rounded-[20px]",
-    bgRadius: 20,
-    mergedRadius: 16,
+    // Menus sit at the md scale (14 outer / 10 inner). lg/xl read as soft as
+    // search fields and make the highlight look rounder than the shell.
+    item: "rounded-[var(--radius-inset-module)]",
+    bg: "rounded-[var(--radius-inset-module)]",
+    focusRing: "rounded-[var(--radius-inset-module)]",
+    mergedBg: "rounded-[var(--radius-control)]",
+    container: "rounded-[var(--radius-module)]",
+    button: "rounded-[var(--radius-control)]",
+    input: "rounded-[var(--radius-module)]",
+    bgRadius: 10,
+    mergedRadius: 8,
   },
   rounded: {
-    item: "rounded-lg",
-    bg: "rounded-lg",
-    focusRing: "rounded-[10px]",
-    mergedBg: "rounded-lg",
-    container: "rounded-xl",
-    button: "rounded-lg",
-    input: "rounded-lg",
-    bgRadius: 8,
-    mergedRadius: 8,
+    item: "rounded-[var(--radius-compact)]",
+    bg: "rounded-[var(--radius-compact)]",
+    focusRing: "rounded-[var(--radius-compact)]",
+    mergedBg: "rounded-[var(--radius-compact)]",
+    container: "rounded-[var(--radius-control)]",
+    button: "rounded-[var(--radius-control)]",
+    input: "rounded-[var(--radius-control)]",
+    bgRadius: 2,
+    mergedRadius: 2,
   },
 };
 

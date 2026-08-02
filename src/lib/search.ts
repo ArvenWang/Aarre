@@ -16,9 +16,13 @@ let defaultPinyinLoader: Promise<PinyinConverter | null> | undefined;
 
 interface IndexedFields {
   title: string;
+  questions: string;
   aliases: string;
   tags: string;
+  useCases: string;
+  entities: string;
   topics: string;
+  contentType: string;
   summary: string;
   note: string;
   excerpt: string;
@@ -57,9 +61,13 @@ function bigrams(value: string): Set<string> {
 function searchableText(fields: IndexedFields): string {
   return [
     fields.title,
+    fields.questions,
     fields.aliases,
     fields.tags,
+    fields.useCases,
+    fields.entities,
     fields.topics,
+    fields.contentType,
     fields.summary,
     fields.note,
     fields.excerpt,
@@ -75,9 +83,13 @@ export function buildLocalSearchIndex(
   return resources.map((resource) => {
     const fields: IndexedFields = {
       title: normalize(resource.title),
+      questions: normalize((resource.questions || []).join(" ")),
       aliases: normalize((resource.aliases || []).join(" ")),
       tags: normalize(resource.tags.join(" ")),
+      useCases: normalize((resource.useCases || []).join(" ")),
+      entities: normalize((resource.entities || []).join(" ")),
       topics: normalize(resource.topics.join(" ")),
+      contentType: normalize(resource.contentType || ""),
       summary: normalize(resource.summary),
       note: normalize(resource.userNote),
       excerpt: normalize(resource.contentExcerpt),
@@ -172,10 +184,16 @@ function matchScore(
     }
   };
 
+  // questions outranks title on purpose: it holds the phrasing people actually
+  // use when trying to find a bookmark again, which the title rarely matches.
+  scoreField("questions", 34, "可能的提问");
   scoreField("title", 30, "标题");
   scoreField("aliases", 26, "检索别名");
   scoreField("tags", 20, "标签");
+  scoreField("useCases", 18, "使用场景");
+  scoreField("entities", 17, "关键实体");
   scoreField("topics", 16, "主题");
+  scoreField("contentType", 14, "内容类型");
   scoreField("summary", 12, "摘要");
   scoreField("note", 12, "备注");
   scoreField("folder", 8, "文件夹");

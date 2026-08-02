@@ -2,16 +2,22 @@
   color-scheme: light dark;
 
   --bg: #ffffff;
+  --page-bg-light: #ffffff;
   --surface: #ffffff;
   --surface-sunken: #f5f6f7;
+  /* Transparent site-brand artwork always sits on a white carrier. */
+  --site-icon-canvas: #ffffff;
   --ink: #17191c;
   --ink-muted: #6c7278;
   --ink-faint: #a0a5aa;
   --line: #ebedef;
   --line-strong: #dadde0;
+  --card-outline: rgb(0 0 0 / 6%);
   --accent: #12a594;
   --positive: #12a594;
   --negative: #d2493a;
+  --cover-action-bg: var(--surface);
+  --cover-action-ink: var(--ink);
 
   --chart-1: #12a594;
   --chart-2: #5b7cd8;
@@ -19,10 +25,62 @@
   --chart-4: #7b6bc4;
   --chart-5: #4d9c5a;
 
+  --radius-xs: 2px;
   --radius-sm: 8px;
   --radius-md: 14px;
   --radius-lg: 20px;
   --radius-xl: 30px;
+
+  /* Radius of a child that sits inset by --sp-1 inside a --radius-md shell.
+     Concentric corners require inner = outer - inset, otherwise the gap between
+     the two curves reads as a misalignment. */
+  --radius-nested-md: calc(var(--radius-md) - var(--sp-1));
+  --radius-nested-lg: calc(var(--radius-lg) - var(--sp-1));
+
+  /* Semantic shape ladder. Use these names at component boundaries so an
+     outer shell never accidentally shares its radius with an inset control:
+     shell (20) > module (14) > control (8). The inset token is geometric and
+     is reserved for a child painted inside a 4px padded track. */
+  --radius-shell: var(--radius-lg);
+  --radius-module: var(--radius-md);
+  --radius-control: var(--radius-sm);
+  --radius-inset-module: var(--radius-nested-md);
+  --radius-compact: var(--radius-xs);
+  --radius-chip: var(--radius-md);
+
+  /* Scrims and shadows mix from a fixed dark ink rather than from --ink, which
+     inverts for the dark theme: mixing from --ink there turned every overlay
+     into a white haze and every shadow into a glow. --scrim and its stronger
+     sibling sit on top of artwork, so their ink is fixed white in both themes. */
+  --shade: #0f1113;
+  --scrim-modal: color-mix(in srgb, #0f1113 45%, transparent);
+  --scrim: color-mix(in srgb, #0f1113 78%, transparent);
+  --scrim-strong: color-mix(in srgb, #0f1113 92%, transparent);
+  /* Full-bleed cover hover: cool-neutral dark, never a warm/brown tint. */
+  --scrim-cover: color-mix(in srgb, #12161c 68%, transparent);
+  --scrim-ink: #ffffff;
+  --scrim-ink-muted: color-mix(in srgb, #ffffff 72%, transparent);
+
+  /* Keyboard/selection rings stay cool-neutral. Accent is brand colour for
+     charts and status — not for focus chrome, which read as a green frame. */
+  --focus-ring: color-mix(in srgb, #1c2430 70%, transparent);
+
+  /* Every interactive control resolves to one of these heights. Declared as
+     tokens so a control can never collapse to its text line box, and so the
+     scale stays a closed set instead of drifting to 34/38/42. */
+  --control-h-2xs: 22px;
+  --control-h-xs: 28px;
+  /* Compact action buttons such as dismiss/confirm controls. */
+  --control-h-button: 30px;
+  --control-h-sm: 32px;
+  --control-h-md: 36px;
+  --control-h-lg: 40px;
+  /* Coarse-pointer minimum, not a visual size. */
+  --control-h-touch: 44px;
+  --toggle-track-w: 40px;
+  --toggle-track-h: 24px;
+  --toggle-thumb: 18px;
+  --toggle-inset: 2px;
 
   --sp-1: 4px;
   --sp-2: 8px;
@@ -54,9 +112,29 @@
   --lh-body: 1.7;
 
   --shadow-composer:
-    0 12px 32px color-mix(in srgb, var(--ink) 8%, transparent);
+    0 12px 32px color-mix(in srgb, var(--shade) 8%, transparent);
   --shadow-float:
-    0 20px 56px color-mix(in srgb, var(--ink) 14%, transparent);
+    0 20px 56px color-mix(in srgb, var(--shade) 14%, transparent);
+
+  /* AI conversation surfaces share one small shape vocabulary. These tokens
+     keep bubbles, source rows, history actions and error notices from slowly
+     becoming separate visual systems. */
+  --agent-surface: var(--surface-sunken);
+  --agent-radius: var(--radius-module);
+  --agent-control-radius: var(--radius-control);
+  --agent-content-gap: var(--sp-2);
+
+  /* The manager page uses a floating thumb instead of a browser-owned track.
+     Geometry stays tokenized so the overlay never changes document width. */
+  --scrollbar-inset: var(--sp-2);
+  --scrollbar-thumb-min: 32px;
+  --scrollbar-thumb-size: 6px;
+  --scrollbar-thumb-color: color-mix(in srgb, var(--ink) 36%, transparent);
+  --scrollbar-thumb-color-hover: color-mix(
+    in srgb,
+    var(--ink) 54%,
+    transparent
+  );
 }
 
 [data-density="compact"] {
@@ -91,9 +169,14 @@
   --ink-faint: #676d72;
   --line: #24272a;
   --line-strong: #34383c;
+  --card-outline: rgb(255 255 255 / 6%);
   --accent: #2ec4b0;
   --positive: #2ec4b0;
   --negative: #e0776a;
+  --cover-action-bg: var(--ink);
+  --cover-action-ink: var(--bg);
+  --focus-ring: color-mix(in srgb, #c5ceda 55%, transparent);
+  --scrim-cover: color-mix(in srgb, #0a0d12 72%, transparent);
 
   --chart-1: #2ec4b0;
   --chart-2: #7d9ce8;
@@ -112,9 +195,14 @@
     --ink-faint: #676d72;
     --line: #24272a;
     --line-strong: #34383c;
+    --card-outline: rgb(255 255 255 / 6%);
     --accent: #2ec4b0;
     --positive: #2ec4b0;
     --negative: #e0776a;
+    --cover-action-bg: var(--ink);
+    --cover-action-ink: var(--bg);
+    --focus-ring: color-mix(in srgb, #c5ceda 55%, transparent);
+    --scrim-cover: color-mix(in srgb, #0a0d12 72%, transparent);
 
     --chart-1: #2ec4b0;
     --chart-2: #7d9ce8;

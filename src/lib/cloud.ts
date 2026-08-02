@@ -1,4 +1,9 @@
-import { getAuthState } from "./auth";
+import { cloudRequest } from "./auth";
+import {
+  buildProtectionPolicy,
+  getProtectionSettings,
+  isResourceUserProtected
+} from "./protection";
 import {
   completeOutboxItem,
   deferOutboxItem,
@@ -7,276 +12,331 @@ import {
   mergeLocalResources,
   upsertLocalResource
 } from "./storage";
-import { getSupabase } from "./supabase";
-import { getAiRuntimeSettings } from "./settings";
-import type {
-  ResourceRecord,
-  SearchResult
-} from "./types";
+import type { OutboxItem, ResourceRecord } from "./types";
 
-interface CloudResourceRow {
-  resource_key: string;
-  canonical_url: string;
-  url: string;
-  title: string;
-  user_note: string | null;
-  summary: string | null;
-  tags: string[] | null;
-  tags_source?: "ai" | "user" | null;
-  topics: string[] | null;
-  content_excerpt: string | null;
-  content_hash: string | null;
-  selected_text: string | null;
-  author: string | null;
-  site_name: string | null;
-  language: string | null;
-  image_url: string | null;
-  favicon_url: string | null;
-  native_folder_path: string[] | null;
-  ai_status: ResourceRecord["aiStatus"];
-  created_at: string;
-  updated_at: string;
+interface CloudResourcePayload {
+  canonicalUrl: string;
+  summary?: string;
+  userNote?: string;
+  tags?: string[];
+  tagsSource?: "ai" | "user";
+  topics?: string[];
+  aliases?: string[];
+  useCases?: string[];
+  contentType?: string;
+  questions?: string[];
+  entities?: string[];
+  aiSchemaVersion?: number;
+  selectedText?: string;
+  author?: string;
+  siteName?: string;
+  language?: string;
+  contentHash?: string;
+  linkHealth?: ResourceRecord["linkHealth"];
+  coverSource?: string;
+  coverUpdatedAt?: string;
+  categoryCoverId?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-function fromCloudRow(row: CloudResourceRow): ResourceRecord {
+interface CloudResourceResponse {
+  resourceKey: string;
+  payload: CloudResourcePayload;
+  revision: number;
+  fieldUpdatedAt: Record<string, string>;
+  deleted: boolean;
+  sequence?: number;
+  conflictCount?: number;
+}
+
+const CLOUD_CURSOR_KEY = "aarre:cloud-sync-cursor:v1";
+const CLOUD_RESOURCE_REVISIONS_KEY = "aarre:cloud-resource-revisions:v1";
+
+type CloudResourceRevisions = Record<string, number>;
+
+export interface CloudConflict {
+  conflictId: string;
+  resourceKey: string;
+  baseRevision: number;
+  serverRevision: number;
+  createdAt: string;
+  fields: Array<{
+    field: "userNote" | "tags";
+    current: string | string[];
+    incoming: string | string[];
+  }>;
+}
+
+async function readCloudResourceRevisions(): Promise<CloudResourceRevisions> {
+  const stored = (await chrome.storage.local.get(CLOUD_RESOURCE_REVISIONS_KEY))[
+    CLOUD_RESOURCE_REVISIONS_KEY
+  ];
+  return stored && typeof stored === "object"
+    ? stored as CloudResourceRevisions
+    : {};
+}
+
+/**
+ * The local sync status is not account-scoped and can survive upgrades from an
+ * older cloud implementation. The revision map, however, is cleared whenever
+ * the signed-in account changes and is rebuilt from that account's bootstrap.
+ * First-sync seeding must therefore use both signals: a record marked
+ * "synced" is only safe to skip when this account actually returned a
+ * revision for it.
+ */
+export async function getTrackedCloudResourceKeys(): Promise<ReadonlySet<string>> {
+  return new Set(Object.keys(await readCloudResourceRevisions()));
+}
+
+export function shouldQueueResourceForCloud(
+  resource: Pick<ResourceRecord, "resourceKey" | "nativeBookmarkIds" | "syncStatus">,
+  trackedResourceKeys: ReadonlySet<string>
+): boolean {
+  return (
+    resource.nativeBookmarkIds.length > 0 &&
+    (resource.syncStatus !== "synced" ||
+      !trackedResourceKeys.has(resource.resourceKey))
+  );
+}
+
+async function saveCloudResourceRevision(resourceKey: string, revision: number): Promise<void> {
+  const revisions = await readCloudResourceRevisions();
+  revisions[resourceKey] = revision;
+  await chrome.storage.local.set({ [CLOUD_RESOURCE_REVISIONS_KEY]: revisions });
+}
+
+export async function clearCloudResourceSyncTracking(): Promise<void> {
+  await chrome.storage.local.remove([
+    CLOUD_CURSOR_KEY,
+    CLOUD_RESOURCE_REVISIONS_KEY
+  ]);
+}
+
+function nonEmpty<T>(value: T | "" | undefined): T | undefined {
+  return value === "" || value === undefined ? undefined : value;
+}
+
+export function resourceCloudPayload(resource: ResourceRecord): CloudResourcePayload {
   return {
-    resourceKey: row.resource_key,
-    canonicalUrl: row.canonical_url,
-    url: row.url,
-    title: row.title,
-    userNote: row.user_note || "",
-    summary: row.summary || "",
-    tags: row.tags || [],
-    tagsSource: row.tags_source === "user" ? "user" : "ai",
-    topics: row.topics || [],
-    contentExcerpt: row.content_excerpt || "",
-    contentHash: row.content_hash || "",
-    selectedText: row.selected_text || "",
-    author: row.author || "",
-    siteName: row.site_name || "",
-    language: row.language || "",
-    imageUrl: row.image_url || "",
-    faviconUrl: row.favicon_url || "",
-    nativeBookmarkIds: [],
-    nativeFolderPath: row.native_folder_path || [],
-    aiStatus: row.ai_status || "not_requested",
+    canonicalUrl: resource.canonicalUrl,
+    ...(nonEmpty(resource.summary) ? { summary: resource.summary } : {}),
+    ...(nonEmpty(resource.userNote) ? { userNote: resource.userNote } : {}),
+    ...(resource.tags.length ? { tags: resource.tags } : {}),
+    ...(resource.tagsSource ? { tagsSource: resource.tagsSource } : {}),
+    ...(resource.topics.length ? { topics: resource.topics } : {}),
+    ...(resource.aliases?.length ? { aliases: resource.aliases } : {}),
+    ...(resource.useCases?.length ? { useCases: resource.useCases } : {}),
+    ...(resource.contentType ? { contentType: resource.contentType } : {}),
+    ...(resource.questions?.length ? { questions: resource.questions } : {}),
+    ...(resource.entities?.length ? { entities: resource.entities } : {}),
+    ...(resource.aiSchemaVersion ? { aiSchemaVersion: resource.aiSchemaVersion } : {}),
+    ...(nonEmpty(resource.selectedText) ? { selectedText: resource.selectedText.slice(0, 8_192) } : {}),
+    ...(nonEmpty(resource.author) ? { author: resource.author } : {}),
+    ...(nonEmpty(resource.siteName) ? { siteName: resource.siteName } : {}),
+    ...(nonEmpty(resource.language) ? { language: resource.language } : {}),
+    ...(nonEmpty(resource.contentHash) ? { contentHash: resource.contentHash } : {}),
+    ...(resource.linkHealth ? { linkHealth: resource.linkHealth } : {}),
+    ...(resource.coverSource ? { coverSource: resource.coverSource } : {}),
+    ...(resource.coverUpdatedAt ? { coverUpdatedAt: resource.coverUpdatedAt } : {}),
+    ...(resource.categoryCoverId ? { categoryCoverId: resource.categoryCoverId } : {}),
+    createdAt: resource.createdAt,
+    updatedAt: resource.updatedAt
+  };
+}
+
+async function resourceIsProtected(resource: ResourceRecord): Promise<boolean> {
+  const [settings, tree] = await Promise.all([
+    getProtectionSettings(),
+    chrome.bookmarks.getTree()
+  ]);
+  return isResourceUserProtected(
+    resource,
+    buildProtectionPolicy(tree, settings)
+  );
+}
+
+async function responseToLocal(cloud: CloudResourceResponse): Promise<ResourceRecord> {
+  const existing = await getLocalResource(cloud.resourceKey);
+  const payload = cloud.payload;
+  const timestamp = new Date().toISOString();
+  return {
+    resourceKey: cloud.resourceKey,
+    canonicalUrl: payload.canonicalUrl,
+    url: existing?.url || payload.canonicalUrl,
+    title: existing?.title || payload.canonicalUrl,
+    userNote: payload.userNote || "",
+    summary: payload.summary || "",
+    tags: payload.tags || [],
+    ...(payload.tagsSource ? { tagsSource: payload.tagsSource } : {}),
+    topics: payload.topics || [],
+    ...(payload.aliases?.length ? { aliases: payload.aliases } : {}),
+    ...(payload.useCases?.length ? { useCases: payload.useCases } : {}),
+    ...(payload.contentType ? { contentType: payload.contentType } : {}),
+    ...(payload.questions?.length ? { questions: payload.questions } : {}),
+    ...(payload.entities ? { entities: payload.entities } : {}),
+    ...(payload.aiSchemaVersion ? { aiSchemaVersion: payload.aiSchemaVersion } : {}),
+    contentExcerpt: existing?.contentExcerpt || "",
+    contentHash: payload.contentHash || "",
+    selectedText: payload.selectedText || "",
+    author: payload.author || "",
+    siteName: payload.siteName || existing?.siteName || "",
+    language: payload.language || "",
+    imageUrl: existing?.imageUrl || "",
+    ...(existing?.thumbnailDataUrl ? { thumbnailDataUrl: existing.thumbnailDataUrl } : {}),
+    ...(payload.coverSource ? { coverSource: payload.coverSource } : {}),
+    ...(payload.coverUpdatedAt ? { coverUpdatedAt: payload.coverUpdatedAt } : {}),
+    ...(payload.categoryCoverId ? { categoryCoverId: payload.categoryCoverId } : {}),
+    ...(existing?.snapshotAt ? { snapshotAt: existing.snapshotAt } : {}),
+    ...(payload.linkHealth ? { linkHealth: payload.linkHealth } : {}),
+    faviconUrl: existing?.faviconUrl || "",
+    nativeBookmarkIds: existing?.nativeBookmarkIds || [],
+    nativeFolderPath: existing?.nativeFolderPath || [],
+    aiStatus: payload.summary ? "ready" : existing?.aiStatus || "not_requested",
     syncStatus: "synced",
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    lastSyncedAt: new Date().toISOString()
-  };
-}
-
-function mutableFields(resource: ResourceRecord) {
-  return {
-    canonical_url: resource.canonicalUrl,
-    url: resource.url,
-    title: resource.title,
-    user_note: resource.userNote,
-    summary: resource.summary,
-    tags: resource.tags,
-    tags_source: resource.tagsSource || "ai",
-    topics: resource.topics,
-    content_excerpt: resource.contentExcerpt,
-    content_hash: resource.contentHash,
-    selected_text: resource.selectedText,
-    author: resource.author,
-    site_name: resource.siteName,
-    language: resource.language,
-    image_url: resource.imageUrl,
-    favicon_url: resource.faviconUrl,
-    native_folder_path: resource.nativeFolderPath,
-    ai_status: resource.aiStatus,
-    updated_at: new Date().toISOString()
-  };
-}
-
-async function persistIfCurrent(
-  source: ResourceRecord,
-  result: ResourceRecord
-): Promise<ResourceRecord> {
-  const current = await getLocalResource(source.resourceKey);
-  const mutationFingerprint = (resource: ResourceRecord) =>
-    JSON.stringify([
-      resource.updatedAt,
-      resource.url,
-      resource.title,
-      resource.userNote,
-      resource.tags,
-      resource.tagsSource,
-      resource.contentHash,
-      resource.selectedText,
-      resource.nativeBookmarkIds,
-      resource.nativeFolderPath
-    ]);
-  if (
-    current &&
-    mutationFingerprint(current) !== mutationFingerprint(source)
-  ) {
-    return current;
-  }
-  await upsertLocalResource(result);
-  return result;
-}
-
-async function assertCloudSession() {
-  const supabase = getSupabase();
-  if (!supabase) {
-    throw new Error("云端尚未配置。");
-  }
-
-  const auth = await getAuthState();
-  if (!auth.signedIn) {
-    throw new Error("请先使用 Google 账号登录。");
-  }
-  if (auth.accountMatches !== true) {
-    throw new Error("无法确认产品账号与 Chrome 当前账号一致。");
-  }
-
-  const { data, error } = await supabase.auth.getSession();
-  if (error || !data.session?.user) {
-    throw new Error(error?.message || "登录会话已失效。");
-  }
-
-  return {
-    supabase,
-    user: data.session.user
-  };
-}
-
-async function aiHeaders(
-  purpose: "generation" | "embedding"
-): Promise<Record<string, string> | undefined> {
-  const settings = await getAiRuntimeSettings();
-  if (purpose === "embedding") {
-    return settings.provider === "gemini" && settings.apiKey
-      ? { "x-bookmark-layer-gemini-key": settings.apiKey }
-      : undefined;
-  }
-
-  return {
-    "x-bookmark-layer-ai-provider": settings.provider,
-    "x-bookmark-layer-ai-model": settings.model,
-    ...(settings.apiKey
-      ? { "x-bookmark-layer-ai-key": settings.apiKey }
-      : {}),
-    ...(settings.provider === "gemini" && settings.apiKey
-      ? { "x-bookmark-layer-gemini-key": settings.apiKey }
-      : {})
+    createdAt: payload.createdAt || existing?.createdAt || timestamp,
+    updatedAt: payload.updatedAt || timestamp,
+    lastSyncedAt: timestamp
   };
 }
 
 export async function syncOneResource(
   resource: ResourceRecord,
-  content: string
+  _content: string,
+  operationId: string = crypto.randomUUID()
 ): Promise<ResourceRecord> {
-  const { supabase, user } = await assertCloudSession();
-  const { data: existing, error: readError } = await supabase
-    .from("resources")
-    .select("*")
-    .eq("user_id", user.id)
-    .eq("resource_key", resource.resourceKey)
-    .maybeSingle();
-
-  if (readError) {
-    throw new Error(readError.message);
+  if (await resourceIsProtected(resource)) {
+    throw Object.assign(new Error("受保护的收藏不会上传云端。"), { protectedResource: true });
   }
-
-  let row: CloudResourceRow;
-
-  if (existing) {
-    const { data, error } = await supabase
-      .from("resources")
-      .update(mutableFields(resource))
-      .eq("user_id", user.id)
-      .eq("resource_key", resource.resourceKey)
-      .select("*")
-      .single();
-
-    if (error) {
-      throw new Error(error.message);
-    }
-    row = data as CloudResourceRow;
-  } else {
-    const { data, error } = await supabase
-      .from("resources")
-      .insert({
-        user_id: user.id,
-        resource_key: resource.resourceKey,
-        ...mutableFields(resource),
-        summary: resource.summary,
-        tags: resource.tags,
-        topics: resource.topics,
-        ai_status: resource.aiStatus,
-        created_at: resource.createdAt
+  const payload = resourceCloudPayload(resource);
+  const baseRevision = (await readCloudResourceRevisions())[resource.resourceKey] || 0;
+  const response = await cloudRequest<CloudResourceResponse>(
+    `/v1/sync/resources/${encodeURIComponent(resource.resourceKey)}`,
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        operationId,
+        clientRevision: operationId,
+        baseRevision,
+        payload,
+        fieldUpdatedAt: Object.fromEntries(
+          Object.keys(payload).map((field) => [field, resource.updatedAt])
+        ),
+        deleted: false
       })
-      .select("*")
-      .single();
-
-    if (error) {
-      throw new Error(error.message);
     }
-    row = data as CloudResourceRow;
+  );
+  await saveCloudResourceRevision(resource.resourceKey, response.revision);
+  const local = await responseToLocal(response);
+  await upsertLocalResource(local);
+  return local;
+}
+
+async function pullFullCloudResources(): Promise<ResourceRecord[]> {
+  const incoming: ResourceRecord[] = [];
+  const revisions: CloudResourceRevisions = {};
+  let offset = 0;
+  let cursor = 0;
+  while (true) {
+    const page = await cloudRequest<{
+      resources: CloudResourceResponse[];
+      nextOffset: number | null;
+      cursor: number;
+    }>(`/v1/sync/bootstrap?offset=${offset}&limit=200`);
+    for (const cloud of page.resources) {
+      revisions[cloud.resourceKey] = cloud.revision;
+      if (!cloud.deleted) incoming.push(await responseToLocal(cloud));
+    }
+    cursor = Math.max(cursor, page.cursor);
+    if (page.nextOffset === null) break;
+    offset = page.nextOffset;
   }
-
-  if (
-    content.trim().length >= 80 &&
-    (resource.aiStatus === "pending" ||
-      resource.aiStatus === "failed" ||
-      resource.aiStatus === "not_requested")
-  ) {
-    const { data, error } = await supabase.functions.invoke(
-      "enrich-bookmark",
-      {
-        headers: await aiHeaders("generation"),
-        body: {
-          resource_key: resource.resourceKey,
-          content,
-          selected_text: resource.selectedText,
-          user_note: resource.userNote
-        }
-      }
-    );
-
-    if (error) {
-      const failed = {
-        ...resource,
-        aiStatus: "failed" as const,
-        syncStatus: "pending" as const
-      };
-      await persistIfCurrent(resource, failed);
-      throw new Error(`书签已同步，但 AI 处理失败：${error.message}`);
-    }
-
-    if (data?.resource) {
-      row = data.resource as CloudResourceRow;
-    }
-  }
-
-  const synced = {
-    ...resource,
-    ...fromCloudRow(row),
-    nativeBookmarkIds: resource.nativeBookmarkIds,
-    syncStatus: "synced" as const,
-    lastSyncedAt: new Date().toISOString()
-  };
-  return persistIfCurrent(resource, synced);
+  if (incoming.length) await mergeLocalResources(incoming);
+  await chrome.storage.local.set({
+    [CLOUD_CURSOR_KEY]: cursor,
+    [CLOUD_RESOURCE_REVISIONS_KEY]: revisions
+  });
+  return incoming;
 }
 
 export async function pullCloudResources(): Promise<ResourceRecord[]> {
-  const { supabase, user } = await assertCloudSession();
-  const { data, error } = await supabase
-    .from("resources")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("updated_at", { ascending: false });
+  const stored = (await chrome.storage.local.get(CLOUD_CURSOR_KEY))[CLOUD_CURSOR_KEY];
+  let cursor = typeof stored === "number" && Number.isSafeInteger(stored) && stored > 0
+    ? stored
+    : 0;
+  if (!cursor) return pullFullCloudResources();
 
-  if (error) {
-    throw new Error(error.message);
+  const incoming: ResourceRecord[] = [];
+  const revisions = await readCloudResourceRevisions();
+  while (true) {
+    const page = await cloudRequest<{
+      changes: Array<{
+        sequence: number;
+        entityType: string;
+        entityId: string;
+        revision: number;
+        deleted: boolean;
+        payload?: CloudResourcePayload | null;
+        fieldUpdatedAt?: Record<string, string>;
+      }>;
+      cursor: number;
+      hasMore: boolean;
+      fullResyncRequired: boolean;
+    }>(`/v1/sync/changes?cursor=${cursor}&limit=200`);
+    if (page.fullResyncRequired) return pullFullCloudResources();
+    for (const change of page.changes) {
+      if (change.entityType === "resource") {
+        revisions[change.entityId] = change.revision;
+      }
+      if (change.entityType !== "resource" || change.deleted || !change.payload) continue;
+      incoming.push(await responseToLocal({
+        resourceKey: change.entityId,
+        payload: change.payload,
+        revision: change.revision,
+        fieldUpdatedAt: change.fieldUpdatedAt || {},
+        deleted: false,
+        sequence: change.sequence
+      }));
+    }
+    cursor = Math.max(cursor, page.cursor);
+    await chrome.storage.local.set({
+      [CLOUD_CURSOR_KEY]: cursor,
+      [CLOUD_RESOURCE_REVISIONS_KEY]: revisions
+    });
+    if (!page.hasMore) break;
   }
+  if (incoming.length) await mergeLocalResources(incoming);
+  return incoming;
+}
 
-  const incoming = (data as CloudResourceRow[]).map(fromCloudRow);
-  return mergeLocalResources(incoming);
+export async function listCloudConflicts(): Promise<CloudConflict[]> {
+  const response = await cloudRequest<{ conflicts: CloudConflict[] }>(
+    "/v1/sync/conflicts"
+  );
+  return response.conflicts;
+}
+
+export async function resolveCloudConflict(
+  conflictId: string,
+  input: {
+    resolution: "current" | "incoming" | "merged";
+    mergedUserNote?: string;
+    mergedTags?: string[];
+  }
+): Promise<void> {
+  await cloudRequest(`/v1/sync/conflicts/${encodeURIComponent(conflictId)}/resolve`, {
+    method: "POST",
+    body: JSON.stringify({ operationId: crypto.randomUUID(), ...input })
+  });
+  await pullCloudResources();
+}
+
+function due(item: OutboxItem, at = Date.now()): boolean {
+  return !item.nextAttemptAt || Date.parse(item.nextAttemptAt) <= at;
+}
+
+function message(error: unknown): string {
+  return error instanceof Error ? error.message : "云端同步失败";
 }
 
 export async function processOutbox(): Promise<{
@@ -284,55 +344,26 @@ export async function processOutbox(): Promise<{
   synced: number;
   failed: number;
 }> {
-  const outbox = await getOutbox();
-  const timestamp = Date.now();
-  const batch = outbox
-    .filter((item) => {
-      if (!item.nextAttemptAt) return true;
-      const nextAttemptAt = new Date(item.nextAttemptAt).getTime();
-      return !Number.isFinite(nextAttemptAt) || nextAttemptAt <= timestamp;
-    })
-    .slice(0, 10);
+  const items = (await getOutbox()).filter((item) => due(item)).slice(0, 25);
   let synced = 0;
   let failed = 0;
-
-  for (const item of batch) {
+  for (const item of items) {
     try {
-      await syncOneResource(item.resource, item.content);
+      if (await resourceIsProtected(item.resource)) {
+        await completeOutboxItem(item);
+        continue;
+      }
+      await syncOneResource(item.resource, "", item.revision || crypto.randomUUID());
       await completeOutboxItem(item);
       synced += 1;
     } catch (error) {
-      await deferOutboxItem(
-        item,
-        error instanceof Error ? error.message : "同步失败"
-      );
+      if ((error as { protectedResource?: boolean })?.protectedResource) {
+        await completeOutboxItem(item);
+        continue;
+      }
+      await deferOutboxItem(item, message(error));
       failed += 1;
     }
   }
-
-  return { attempted: batch.length, synced, failed };
-}
-
-export async function semanticSearch(
-  query: string
-): Promise<SearchResult[]> {
-  const { supabase } = await assertCloudSession();
-  const { data, error } = await supabase.functions.invoke("search-bookmarks", {
-    headers: await aiHeaders("embedding"),
-    body: { query, limit: 20 }
-  });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return ((data?.results || []) as Array<{
-    resource: CloudResourceRow;
-    score: number;
-    match_reason?: string;
-  }>).map((item) => ({
-    resource: fromCloudRow(item.resource),
-    score: item.score,
-    matchReason: item.match_reason
-  }));
+  return { attempted: items.length, synced, failed };
 }

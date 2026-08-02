@@ -1,6 +1,6 @@
 # Aarre Chrome Web Store 上架材料
 
-更新日期：2026-07-31
+更新日期：2026-08-03
 
 ## 商店定位
 
@@ -18,7 +18,7 @@ Aarre 是 Chrome 原生书签的智能增强层，不建立一套需要重新导
 - 重复收藏、失效链接、散落主题和大文件夹整理提案
 - 所有移动和删除先预览，删除默认不选，执行前保存 30 天撤销快照
 - 待读队列、周/月洞察、主题图谱和旧收藏重新浮现
-- 页面快照仅保存在本机；API Key 和网页正文不经过 Aarre 服务器
+- 页面快照默认仅保存在本机；用户主动选择完整云端备份后可加密上传，API Key 和网页正文不经过 Aarre 服务器
 - 一键导出全部本地智能层数据，不锁定用户
 
 ## 单一用途声明
@@ -38,7 +38,7 @@ Aarre 的单一用途是增强 Chrome 原生书签的查找、理解、整理和
 | `history` | 仅在本机提供地址导航建议；浏览历史不会上传或用于广告。 |
 | `storage` | 保存扩展设置、状态和 AI 服务商 API Key；Key 不进入导出文件。 |
 | `unlimitedStorage` | 保存本机页面快照、封面和智能元数据，避免 IndexedDB 配额导致静默丢失。 |
-| `identity` / `identity.email` | 为未来可选的跨设备智能层同步确认 Chrome 账号；全部本地功能无需登录。 |
+| `identity` / `identity.email` | 用于用户主动选择的 Google 登录与跨设备智能层同步，并核对 Aarre 账号是否与当前 Chrome 配置一致；全部本地功能无需登录。 |
 | `sidePanel` | 提供 Chrome 侧边栏主界面。 |
 | `contextMenus` | 提供“收藏当前页面/链接”的右键入口。 |
 | `alarms` | 恢复长时间本地扫描和可选同步队列。 |
@@ -52,8 +52,10 @@ Aarre 的单一用途是增强 Chrome 原生书签的查找、理解、整理和
 - 不出售数据，不用于广告，不用于信用评估。
 - 书签标题、网址、备注、网页正文和页面快照均属于用户数据。
 - 默认本地处理；BYOK 调用只发送到用户选择的 AI 服务商。
-- 页面快照、API Key、网页正文和图片二进制不上传 Aarre 云端。
-- 隐私政策入口：扩展包内 `privacy.html`。发布前还需把同内容部署到公开 HTTPS 地址，并在商店后台填写该地址。
+- 云端默认关闭。“仅文字与设置”不上传图片；只有用户明确选择“完整云端备份”后，页面快照、封面和站点标识才会加密上传腾讯云私有 COS。
+- API Key、网页正文、Cookie、完整浏览历史、Chrome 原生 ID 和受保护资源不上传 Aarre 云端。
+- 云端使用服务端信封加密与 COS SSE-COS AES-256，不宣传为端到端加密；用户可以暂停同步、清除此设备或请求删除整个云端账号。
+- 隐私政策入口：扩展包内 `privacy.html`，公开地址为 `https://sync.nexvoice.cc/privacy`；服务条款地址为 `https://sync.nexvoice.cc/terms`。
 
 ## 视觉素材清单
 
@@ -72,7 +74,8 @@ Aarre 的单一用途是增强 Chrome 原生书签的查找、理解、整理和
 
 - 可选 1400×560 大型宣传图
 - 如需有声版视频，生成或录制旁白并明确披露 AI 配音；当前交付为可独立理解的中文字幕版
-- 把应用内隐私政策部署到公开 HTTPS 地址，并在商店后台填写
+- 在 Chrome Web Store 后台填写已部署的 `https://sync.nexvoice.cc/privacy`
 - Chrome Web Store 开发者后台生成的正式 Extension ID
+- 等待 Google OAuth 品牌审核通过，并在正式 Extension ID 下重新验证登录、CORS 与回调白名单
 
 正式 Extension ID 是 Google/Chrome 后台分配的外部资产，不能由仓库代码伪造。取得后必须同步核对 Google OAuth 重定向 URI 和 `manifest.json` 打包结果。

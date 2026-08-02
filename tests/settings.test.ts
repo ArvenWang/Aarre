@@ -97,7 +97,8 @@ describe("AI settings", () => {
       {
         headers: {
           Authorization: "Bearer openai-preview-key-1234"
-        }
+        },
+        signal: expect.any(AbortSignal)
       }
     );
     expect(status).toMatchObject({
@@ -156,6 +157,22 @@ describe("AI settings", () => {
         apiKey: "rejected-api-key-1234"
       })
     ).rejects.toThrow("无效或没有访问权限");
+    expect((await getAiSettingsStatus()).apiKeyConfigured).toBe(false);
+  });
+
+  it("shows a useful network error instead of waiting forever", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new DOMException("timeout", "TimeoutError"))
+    );
+
+    await expect(
+      saveAiSettings({
+        provider: "gemini",
+        model: "gemini-2.5-flash-lite",
+        apiKey: "timeout-api-key-1234"
+      })
+    ).rejects.toThrow("Gemini 验证超时");
     expect((await getAiSettingsStatus()).apiKeyConfigured).toBe(false);
   });
 });

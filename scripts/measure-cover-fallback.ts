@@ -11,10 +11,10 @@ import {
   isInternalOrSensitiveUrl
 } from "../src/lib/page-essence";
 import {
-  composeSiteIconPixels,
   extractLargestPngFromIco,
   normalizeSvgViewport,
-  SITE_ICON_SURFACES
+  normalizeSiteIconPixels,
+  SITE_ICON_SURFACE
 } from "../src/lib/thumbnail";
 import type {
   PageEssence,
@@ -27,7 +27,7 @@ const MAX_SVG_BYTES = 256 * 1024;
 const ICON_SIZE = 192;
 const DEFAULT_CONCURRENCY = 5;
 
-type CompositionMode = "legacy" | "themed";
+type CompositionMode = "legacy" | "white";
 type MeasuredSource =
   | "registry"
   | "apple-touch-icon"
@@ -69,7 +69,7 @@ interface HostResult {
 
 function usage(): never {
   console.error(
-    "用法：npm run measure:covers -- --input <书签 JSON/URL 文本> [--input <另一份书签>] --output <报告.json> [--composition legacy|themed] [--limit 500] [--concurrency 5]"
+    "用法：npm run measure:covers -- --input <书签 JSON/URL 文本> [--input <另一份书签>] --output <报告.json> [--composition legacy|white] [--limit 500] [--concurrency 5]"
   );
   process.exit(1);
 }
@@ -90,8 +90,8 @@ function parseArgs(argv: string[]): CliOptions {
   const output = values.get("output");
   if (!inputs.length || !output) usage();
   const composition = (values.get("composition") ||
-    "themed") as CompositionMode;
-  if (!["legacy", "themed"].includes(composition)) usage();
+    "white") as CompositionMode;
+  if (!["legacy", "white"].includes(composition)) usage();
   const limit = Number(values.get("limit") || 500);
   const concurrency = Number(
     values.get("concurrency") || DEFAULT_CONCURRENCY
@@ -592,20 +592,18 @@ async function inspectCandidate(
         pixels.byteOffset,
         pixels.byteLength
       );
-      for (const surface of Object.values(SITE_ICON_SURFACES)) {
-        if (
-          composeSiteIconPixels(
-            sourcePixels,
-            surface,
-            contentRect
-          ).inkCoverage < 0.15
-        ) {
-          return {
-            accepted: false,
-            scale,
-            rejection: { ...base, reason: "low-ink-or-contrast" }
-          };
-        }
+      if (
+        normalizeSiteIconPixels(
+          sourcePixels,
+          SITE_ICON_SURFACE,
+          contentRect
+        ).inkCoverage < 0.15
+      ) {
+        return {
+          accepted: false,
+          scale,
+          rejection: { ...base, reason: "low-ink-or-contrast" }
+        };
       }
     }
     return { accepted: true, scale };

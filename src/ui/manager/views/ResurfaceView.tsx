@@ -4,7 +4,7 @@ import { ResourceLink } from "../components/ResourceLink";
 
 export function ResurfaceView({
   dashboard,
-  onOpenResource
+  onOpenResource,
 }: {
   dashboard: KnowledgeDashboard | null;
   onOpenResource: (url: string) => void;
@@ -16,10 +16,7 @@ export function ResurfaceView({
         <article key={item.resourceKey}>
           <span>{item.ageDays} 天前收藏</span>
           <h3>
-            <ResourceLink
-              url={item.url}
-              onOpenResource={onOpenResource}
-            >
+            <ResourceLink url={item.url} onOpenResource={onOpenResource}>
               {item.title}
             </ResourceLink>
           </h3>

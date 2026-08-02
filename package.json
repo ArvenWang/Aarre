@@ -1,6 +1,6 @@
 {
   "name": "bookmark-layer",
-  "version": "0.4.6",
+  "version": "0.5.33",
   "private": true,
   "type": "module",
   "engines": {
@@ -14,8 +14,11 @@
     "typecheck": "tsc --noEmit",
     "check:node": "node scripts/check-node.mjs",
     "check:design": "tsx scripts/check-design-tokens.ts",
+    "ui:shots": "node scripts/shoot.mjs",
+    "ui:audit": "node scripts/audit-controls.mjs",
     "check": "npm run check:node && npm run check:design && npm run typecheck && npm run test && npm run build",
     "verify:artifacts": "node scripts/verify-artifacts.mjs",
+    "verify:ai-live": "tsx scripts/verify-live-ai.ts",
     "verify:store-assets": "node scripts/verify-store-assets.mjs",
     "measure:covers": "tsx scripts/measure-cover-fallback.ts",
     "package:artifacts": "npm run check && node scripts/package-artifacts.mjs"
@@ -35,10 +38,8 @@
     "@radix-ui/react-switch": "^1.3.7",
     "@radix-ui/react-tabs": "^1.1.21",
     "@radix-ui/react-tooltip": "^1.2.16",
-    "@supabase/supabase-js": "2.111.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "framer-motion": "^12.43.0",
     "idb": "8.0.3",
     "lucide-react": "^1.28.0",
     "pdfjs-dist": "^5.6.205",
@@ -58,6 +59,7 @@
     "esbuild": "0.28.1",
     "fake-indexeddb": "6.2.5",
     "jsdom": "30.0.0",
+    "playwright": "^1.62.1",
     "sharp": "0.35.0",
     "tailwindcss": "^4.3.3",
     "tsx": "4.20.6",

@@ -91,4 +91,23 @@ describe("agent conversations", () => {
       saved.some((item) => item.id === "conversation-0")
     ).toBe(false);
   });
+
+  it("ignores corrupted stored messages instead of crashing the chat UI", async () => {
+    store["aarre:agent-conversations"] = [
+      {
+        ...conversation("valid", "2026-07-29T01:00:00.000Z")
+      },
+      {
+        id: "broken",
+        title: "坏数据",
+        createdAt: "2026-07-29T01:00:00.000Z",
+        updatedAt: "2026-07-29T01:00:00.000Z",
+        messages: [{ role: "assistant", content: 42 }]
+      }
+    ];
+
+    expect((await getAgentConversations()).map((item) => item.id)).toEqual([
+      "valid"
+    ]);
+  });
 });

@@ -1,9 +1,4 @@
-import {
-  Component,
-  StrictMode,
-  type ErrorInfo,
-  type ReactNode
-} from "react";
+import { Component, StrictMode, type ErrorInfo, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { SidePanelApp } from "./SidePanelApp";
 import { Button } from "../../components/ui/button";
@@ -18,8 +13,7 @@ class SidePanelErrorBoundary extends Component<
 
   static getDerivedStateFromError(error: unknown) {
     return {
-      message:
-        error instanceof Error ? error.message : "侧边栏暂时无法打开"
+      message: error instanceof Error ? error.message : "侧边栏暂时无法打开",
     };
   }
 
@@ -34,7 +28,11 @@ class SidePanelErrorBoundary extends Component<
       <main className="sidepanel-recovery">
         <strong>Aarre 暂时无法打开</strong>
         <p>{this.state.message}</p>
-        <Button type="button" variant="primary" onClick={() => chrome.runtime.reload()}>
+        <Button
+          type="button"
+          variant="primary"
+          onClick={() => chrome.runtime.reload()}
+        >
           重新加载 Aarre
         </Button>
       </main>
@@ -65,7 +63,7 @@ async function bootstrap(): Promise<void> {
       <SidePanelErrorBoundary>
         <SidePanelApp />
       </SidePanelErrorBoundary>
-    </StrictMode>
+    </StrictMode>,
   );
 }
 

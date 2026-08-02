@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   bookmarkPageMenuPresentation,
+  bookmarkSnapshotMenuPresentation,
   buildBookmarkSaveState
 } from "../src/lib/bookmark-save-state";
 import type { NativeBookmarkNode } from "../src/lib/types";
@@ -148,5 +149,27 @@ describe("bookmarkPageMenuPresentation", () => {
       title: "暂时无法确认收藏状态",
       enabled: false
     });
+  });
+});
+
+describe("bookmarkSnapshotMenuPresentation", () => {
+  it("only exposes manual cover refresh for a confirmed bookmark", () => {
+    expect(
+      bookmarkSnapshotMenuPresentation({ status: "none", matches: [] })
+    ).toEqual({ title: "更新封面", enabled: false, visible: false });
+    expect(bookmarkSnapshotMenuPresentation(null)).toEqual({
+      title: "更新封面",
+      enabled: false,
+      visible: false
+    });
+    expect(
+      bookmarkSnapshotMenuPresentation({ status: "readonly", matches: [] })
+    ).toEqual({ title: "更新封面", enabled: true, visible: true });
+    expect(
+      bookmarkSnapshotMenuPresentation(
+        { status: "exact", matches: [] },
+        false
+      )
+    ).toEqual({ title: "更新封面", enabled: false, visible: false });
   });
 });

@@ -123,6 +123,19 @@ export function extractPage(
       "link[rel~='icon'], link[rel='shortcut icon']"
     )?.href || "";
 
+  // Readability flattens the document to prose, which drops the heading
+  // hierarchy — the part that says what the page is *about* most compactly.
+  const headings = [
+    ...new Set(
+      [
+        ...clone.querySelectorAll<HTMLElement>("h1"),
+        ...clone.querySelectorAll<HTMLElement>("h2")
+      ]
+        .map((node) => normalizeText(node.textContent || ""))
+        .filter((text) => text.length > 1 && text.length <= 120)
+    )
+  ].slice(0, 12);
+
   return {
     url: pageUrl,
     canonicalUrl,
@@ -148,6 +161,7 @@ export function extractPage(
       document.documentElement.lang ||
       metaContent(document, ["meta[property='og:locale']"]),
     imageUrl,
-    faviconUrl: absoluteUrl(faviconHref || "/favicon.ico", pageUrl)
+    faviconUrl: absoluteUrl(faviconHref || "/favicon.ico", pageUrl),
+    headings
   };
 }

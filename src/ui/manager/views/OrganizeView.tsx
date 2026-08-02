@@ -1,5 +1,9 @@
 import { Button } from "../../../components/ui/button";
-import { FluidInput, FluidTextarea, FluidSelect } from "../../components/FluidControls";
+import {
+  FluidInput,
+  FluidTextarea,
+  FluidSelect,
+} from "../../components/FluidControls";
 import type { LibraryInsights } from "../../../lib/types";
 import { ResourceLink } from "../components/ResourceLink";
 
@@ -32,7 +36,7 @@ export function OrganizeView({
   onToggleProposal,
   onApply,
   onUndo,
-  onOpenResource
+  onOpenResource,
 }: OrganizeViewProps) {
   const proposals = insights?.organizationPlan.proposals || [];
   return (
@@ -48,8 +52,8 @@ export function OrganizeView({
         </div>
         <div>
           <Button
+            variant="unstyled"
             type="button"
-            variant="tertiary"
             className="button button-quiet"
             onClick={onSelectSafe}
           >
@@ -80,8 +84,8 @@ export function OrganizeView({
             已执行 {appliedSuccessCount} 项；{appliedFailureCount} 项失败。
           </span>
           <Button
+            variant="unstyled"
             type="button"
-            variant="tertiary"
             className="button button-quiet"
             disabled={action === "undo-organize"}
             onClick={onUndo}
@@ -96,7 +100,7 @@ export function OrganizeView({
           {proposals.map((proposal) => {
             const actionIds = proposal.actions.map((item) => item.id);
             const selectedCount = actionIds.filter((id) =>
-              selectedActionIds.has(id)
+              selectedActionIds.has(id),
             ).length;
             return (
               <article
@@ -109,8 +113,7 @@ export function OrganizeView({
                     <FluidInput
                       type="checkbox"
                       checked={
-                        selectedCount > 0 &&
-                        selectedCount === actionIds.length
+                        selectedCount > 0 && selectedCount === actionIds.length
                       }
                       ref={(element) => {
                         if (element) {
@@ -120,10 +123,7 @@ export function OrganizeView({
                         }
                       }}
                       onChange={(event) =>
-                        onToggleProposal(
-                          actionIds,
-                          event.currentTarget.checked
-                        )
+                        onToggleProposal(actionIds, event.currentTarget.checked)
                       }
                       aria-label={`选择${proposal.title}`}
                     />
@@ -148,7 +148,8 @@ export function OrganizeView({
                   ))}
                   {proposal.previewLines.length > 12 ? (
                     <small>
-                      另有 {proposal.previewLines.length - 12} 项，将在应用时一并处理
+                      另有 {proposal.previewLines.length - 12}{" "}
+                      项，将在应用时一并处理
                     </small>
                   ) : null}
                 </div>

@@ -1,10 +1,26 @@
 # Aarre 项目进展
 
-最后更新：2026-07-31
+最后更新：2026-08-03（0.5.33 / 服务端 0.1.9 已上线；真实 metadata 首次同步通过，等待图片与重装恢复验收）
+
+> **并行说明：** 本轮账号交接包、同步契约和生产发布已完成代码与服务器写入；当前没有新增的独占编辑文件。0.5.33 及此前累积的 UI / AI / icon / 云端改动已作为同一套可构建状态纳入 Git，后续 Agent 不得 reset、回退或删除 `/opt/aarre` 发布目录。完整图片备份、真实卸载重装恢复和正式 Web Store ID 仍是外部验收门，不能写成已完成。云端接管先读 `ops/README.md`。
+
+**当前工作区最新状态：0.5.33。** 网页收藏与文件夹已有统一的本地/云端“受保护”规则；0.5.16–0.5.17 引入的网页端/侧边栏互斥已经完整撤销，两端允许同时存在。Aarre 整体仍支持日间与夜间主题；站点 icon 固定白色 CSS 承载层与主题隔离。当前 `dist/` 是显式连接 `https://sync.nexvoice.cc` 的 cloud-enabled 0.5.33 构建，Manifest 最低版本保持 134。真实账号的 metadata 首次同步已经写入生产；0.5.33 将同步范围立即保存、后台分批同步，并严格遵守 `Retry-After`。F14 生产 API、数据库、COS/CAM、Google Web OAuth、DNS/TLS、定时备份、两分钟健康巡检、独立 GlitchTip project 与含 SSH Key 的加密恢复包已经部署；Google 品牌审核、完整图片备份、卸载重装恢复和正式 Web Store ID 尚未完成。
 
 ## 当前进展
 
-**统一收藏增强协调器已落地到当前 0.4.5 工作区。** Chrome 星标与 Aarre 保存都先创建真实原生书签，再持久登记 AI 摘要、标签和截图任务；权限、Key、网络、前台页面或 Service Worker 暂时不可用时，任务继续等待，不用伪造摘要、标签或封面冒充完成。`"<all_urls>"` 已作为必需网页权限，普通打开方式统一覆盖 Aarre、地址栏、Chrome 书签栏、历史记录和网页普通链接。
+**F14 代码、本地集成和公网技术链路已经完成。** 扩展已接入 Google Web OAuth broker + 一次性 PKCE ticket、自建 REST bootstrap/change feed、持久 Outbox、文字/完整备份范围、COS 二进制直传/懒恢复、保护 purge、稳定收藏位置/文件夹重绑定、主题/设置/会话/报告/用量/操作历史同步和账号切换清理。服务端已实现 Fastify、8 组 PostgreSQL migration、逐用户 AES-GCM 信封加密、版本化 root-file KEK、Token rotation/replay revoke、配额、资产、账户导出/删除、加密冲突版本、异地备份/恢复和独立 deletion worker。首次同步按当前账号真实 revision 补种存量 Outbox；文件夹保护使用归一化资源映射阻止旧设备复传资源、收藏位置和图片；迁移器逐条执行 SQL 并过滤 macOS AppleDouble 伪文件。两端编辑器会显示备注/标签并发冲突，并允许保留云端版、采用离线版或以当前编辑内容合并。
+
+**当前账号与生产容量均已实测。** 当前 Mac 的 262 条原生书签、261 条 Aarre 资源可进入云端的有效数据为 5,422,378 B（5.17 MiB）。真实账号已写入 262 条资源、235 个收藏位置、4 组设置、1 个月度用量和 1 个设备；当前范围仍为文字同步，生产资产为 0。Aarre database 为 12,049,431 B，三份有效数据库备份共 158,468 B，主资产桶为 0 B；服务器仍有约 2 GiB 以上可用内存和约 40 GiB 可用磁盘。长期仍按 15–25 MiB/同类账号规划，当前不需要扩容或购买存储服务器；完整计划见 `docs/CLOUD_CAPACITY_PLAN.md`。
+
+**NexVoice 共机方案已真实运行。** 目标服务器位于腾讯云香港 `ap-hongkong-2`，Ubuntu 24.04、2 vCPU、3.57 GiB 内存，实际 Docker 网络为 `production_default`。独立 `aarre-api` 容器使用 320 MiB / 0.75 CPU 上限，当前健康且只监听 `127.0.0.1:8788`；Aarre 使用同一 PostgreSQL 16 实例内独立 `aarre_sync` database/role，以及独立 secrets、CAM 和 COS。图片不进入服务器系统盘。当前发布指向 `/opt/aarre/releases/20260803-sync-rate-v27`，服务端 0.1.9；每日、月度备份、5 分钟删除 Worker 和两分钟健康巡检 timers 已启用。GlitchTip 已建立独立 `aarre` team、`Aarre Sync API` project 和 5 分钟首次错误告警；公开 Caddy/Let's Encrypt TLS、允许 origin CORS 和错误 origin 拒绝均已验证。
+
+**0.5.19 站点 icon 固定纯白画布已构建到 `dist/`。** `SiteThumbnail` 不再接收或选择深色图标版本；缩略图样式增加不随主题覆盖的 `--site-icon-canvas: #FFFFFF`。生成器由浅/深双输出改为单一纯白输出，并用 `iconRenderVersion: 2` 淘汰旧缓存；旧 `iconDataUrlDark` 只为数据库兼容保留，任何界面和新生成路径都不会再使用。完整检查为 55 个测试文件 / 301 项测试全部通过。当前没有需要其他 Agent 暂停修改的独占文件。
+
+**0.5.6 圆角与编辑操作收口已写入源码并构建到 `dist/`。** 新增 `shell → module → control` 语义化圆角 token，并将整理提示、最近更改、编辑弹层、设置模块和 Select/菜单形状统一到阶梯规则；保留搜索框内胶囊控件作为有意例外。侧边栏编辑底部按钮组补齐间距，网页端与侧边栏关闭按钮统一为 32px 透明容器。下一位 Agent 先做真机复看，不要并行重写 `tokens.css` / `shape-context.tsx` / Select 形状系统，除非用户又点名新问题。
+
+**前一轮 UI 收口已写入源码并构建到 `dist/`。** 设置页不再刷顶部提示条；「更多」同行对齐且有内边距；卡片 hover 为冷暗色整面遮罩且可无滚动条滚完文案；Select 从 token/形状系统收紧圆角、去掉绿色焦点框与黑色 hover 描边、浮层加淡描边；网页端顶栏去掉底部分隔线。
+
+**统一收藏增强协调器已落地。** Chrome 星标与 Aarre 保存都先创建真实原生书签，再持久登记 AI 摘要、标签和截图任务；权限、Key、网络、前台页面或 Service Worker 暂时不可用时，任务继续等待，不用伪造摘要、标签或封面冒充完成。`"<all_urls>"` 已作为必需网页权限，普通打开方式统一覆盖 Aarre、地址栏、Chrome 书签栏、历史记录和网页普通链接。
 
 **当前截图交互以“是否已收藏、是否缺图、截图是否满 7 天”为唯一判断，不再依赖入口。** 已收藏且缺图时，页面完成并经过字体、首屏图片、DOM 稳定检查后自动补拍；从 Aarre 或正常浏览补旧图成功显示一次“封面截图已更新”，Chrome 星标与 Aarre 新收藏的首次截图静默。已有截图未满 7 天不处理，满 7 天后只在正常浏览时静默刷新，不会每次访问都重拍。后台标签页因普通路径 `captureVisibleTab()` 的能力边界只保留待办，切回前台后自动继续；收藏库新增用户显式启动的单标签、单并发「补齐缺失封面」任务，0.4.5 起改为不抢焦点的后台专用标签页 + `chrome.debugger` 截图，任务运行期间可正常使用 Chrome，支持暂停、继续和取消。
 
@@ -18,19 +34,434 @@
 
 **Aarre 0.3.8 已统一隐藏 Chrome 系统根目录，并完成整理提案的信息精简。** 侧边栏不再把“书签栏”“其他书签”或第二个本机书签栏作为普通文件夹展示，而是直接展示这些根目录下的真实内容；所有面向用户的文件夹路径统一从用户自建目录开始，根目录直存条目显示为“根目录”。归类提案改为“来源文件夹 / 网页名 → 目标文件夹”，网页名只出现一次；同位置的完全相同副本合并为“保留 1 个、删除 N 个副本”的明确说明。内部仍保留完整 Chrome 路径，移动、撤销、同步和删除目标不受影响。此前 0.3.7 已完成 `docs/REMEDIATION.md` v2 的第 1–7 批整改；F3 同源 300 条样本分类封面兜底为 46.67%，PRD 的 ≤12% 指标仍需产品决策。
 
-自动化与开发评审已经收口，但**不能把它说成全部上架验收完成**：当前浏览器控制工具明确禁止打开 `chrome://extensions` 和 `chrome-extension://` 页面，因此无法在本轮把最新 `dist/` 重新加载并操作安装扩展；Chrome Web Store 正式 Extension ID、公开 HTTPS 隐私政策地址、三条历史失败路径的安装态复测、真实 300/1,000/2,000 条书签指标与真人破坏性撤销门仍需外部环境。0.4.5 新增的 `debugger` 权限与后台截图链路尤其需要在真实 Chrome 安装态复测（后台标签是否正常渲染、调试提示条、Memory Saver 冻结行为、商店审核披露）。详见“未解决问题”和本页最新记录。
+自动化与开发评审已经收口，但**不能把它说成全部上架验收完成**：当前浏览器控制工具明确禁止打开 `chrome://extensions` 和 `chrome-extension://` 页面，因此无法在本轮把最新 `dist/` 重新加载并操作安装扩展；公开隐私政策与条款已经上线，Chrome Web Store 正式 Extension ID、三条历史失败路径的安装态复测、真实 300/1,000/2,000 条书签指标与真人破坏性撤销门仍需外部环境。0.4.5 新增的 `debugger` 权限与后台截图链路尤其需要在真实 Chrome 安装态复测（后台标签是否正常渲染、调试提示条、Memory Saver 冻结行为、商店审核披露）。详见“未解决问题”和本页最新记录。
 
-**`docs/PRD.md` 已定稿到可开工状态（v1.2）。** 22 个需求分四个里程碑，第 12 章给出了执行顺序、文件归属和纪律。开发 Agent 请从第 12 章读起。F22 已于 2026-07-30 修订为「悬浮层只有一张页面快照」，以修订后的版本为准。
+**`docs/PRD.md` 已修订到 v1.3。** 22 个需求分四个里程碑，第 12 章给出了执行顺序、文件归属和纪律。开发 Agent 请从第 12 章读起。F14 已从“只同步元数据”升级为完整持久数据与私有图片资产的同步/备份方案；F22 继续以 2026-07-30 修订后的「悬浮层只有一张页面快照」为准。
 
 **`docs/REMEDIATION.md` v2 的第 1–7 批已全部交付。** 下一轮不要重复调低 128px、宽高比或 0.15 墨迹阈值；这三条路线已经被实测证伪。尚未完成的主要是文档列出的真机规模验收与 F3 指标本身的产品决策。
 
-**云端方向已定：保留同步能力，但从 Supabase 迁到自建服务器**（腾讯云轻量应用服务器，与 NexVoice 共用机器，同技术栈）。职责收窄为只同步智能层元数据——语义检索已本地化、AI 富化走 BYOK 直连、封面靠来源信息本地重建、页面快照永不上传。现有 Supabase 实现从未真实跑通，将整体替换，`supabase/` 目录会随 F14 删除。
+**云端方向已定：完整持久资产同步与恢复，服务端使用腾讯云轻量应用服务器并与 NexVoice 共机。** 语义检索继续本地化、AI 富化继续 BYOK 直连；文字元数据进入独立 PostgreSQL database，用户选择完整云端备份后，封面与页面快照进入 Aarre 私有 COS。Aarre 与 NexVoice 只共用机器、Caddy/PostgreSQL 实例和实现模式，不共用 API 进程、database/user、业务密钥、COS 权限或故障边界。旧 Supabase 方案已经退出，禁止重新引入。
 
 正式产品名：`Aarre`。代码目录与内部包名暂时保留 `Bookmark-Layer`，避免无关路径迁移影响当前扩展。
 
-当前统一项目目录：`/Users/nefish/Desktop/WorkSpace/Coding/Aarre`。
+当前统一项目目录：`/Users/nefish/Desktop/Coding/Aarre`。
 
 ## 最近更新
+
+### 2026-08-03 · 0.5.33 / 服务端 0.1.9 同步契约、首次 metadata 与生产交接包
+
+- **真实故障根因。** 用户已登录并选择同步，但 `usage-period` 客户端带有成本估算所需的 `priceUpdatedAt`，服务端 strict schema 未声明该字段，生产连续返回 400 `unrecognized_keys`。这不是登录失败，也不是用户操作错误。客户端现改为显式白名单序列化；服务端正式接纳 `YYYY-MM-DD` 价格表日期并继续拒绝其他未知字段。
+- **首次同步不再把工作量绑在按钮上。** 显式范围选择立即保存并返回 UI，metadata/图片在后台分批推进；用户刚选的 scope 会先单独写云端，再恢复其他设备状态，避免旧的“文字与设置”覆盖新选的“完整备份”。从完整范围降到文字范围时先确认云端图片删除请求成功，再改变本地范围。
+- **限流续传。** 真实首次同步暴露单分钟 240 次写入会在约 500 个资源/收藏实体中命中 429。服务端受控同步额度提高到 600/min，客户端解析并遵守 `Retry-After`，较大收藏库会继续分批而不是把限流错误直接显示给用户。
+- **真实生产结果。** 0.1.9 已发布到 `/opt/aarre/releases/20260803-sync-rate-v27`，健康门通过。生产 HTTP 探针确认带 `priceUpdatedAt` 返回 200、下载 round-trip 保留字段、额外未知字段仍为 400；临时探针账号已删除。用户账号现有 262 资源、235 收藏位置、4 设置、1 月度用量和 1 设备；新容器日志显示批量请求持续 200。当前服务器保存的 scope 为文字同步，因此 0 图片资产不等于完整备份已经完成。
+- **可交接运维包。** `ops/README.md` 与 `ops/cloud-production/` 统一记录账号/资源/权限、控制台入口、SSH、部署、回滚、备份、轮换和故障定位。Git 中的 AES-256/PBKDF2 恢复包现额外包含 SSH 私钥；口令、腾讯/Google 交互账号、MFA、Cookie 和 BYOK Key 明确排除。恢复包已重新生成，SHA-256、解密路径白名单和无明文残留验证通过；只读脚本确认 release、容器、0.1.9、8 migration / 26 表、四个 timers、HTTPS 和证书。
+- **验证。** 根 `npm run check` 为 59 个测试文件 / 326 项，设计 token、TypeScript、生产构建和 JavaScript 语法全部通过；随后重新生成连接 `https://sync.nexvoice.cc` 的 cloud-enabled 0.5.33 `dist/`，API 域名只在 `background.js`。服务端在全新临时 PostgreSQL 库 22/22、typecheck/build/audit 0 通过，测试库删除。浏览器控制安全策略禁止直接打开 `chrome-extension://` 和 `chrome://extensions`，因此 0.5.33 的范围 UI 仍需用户手动重载后复看；服务端修复已经对现有 0.5.32 生效。
+
+### 2026-08-02 · 0.5.32 / 服务端 0.1.7 公网云端与首次全量同步收口
+
+- **DNS、TLS 与公开页面。** DNSPod 已新增 `sync A 43.161.230.52`（TTL 600）和 Google Search Console 根域 TXT 所有权记录，未修改其他 DNS；Caddy 已签发 Let's Encrypt 证书并强制 HTTP → HTTPS。`/`、`/privacy`、`/terms`、`/ready` 均公网 200，主页和政策页为无脚本自包含页面。
+- **真实 OAuth。** Google app 已从 Testing 切到 In production，Search Console 域名所有权通过，品牌申诉已提交并处于审核中。真实浏览器完成 Google consent → 一次性 ticket → account/bootstrap → logout → revoked token 401；临时设备行已精确删除，保留 1 个空账号、0 设备、0 资源。
+- **首次同步与保护修复。** 首次全量同步不再只看可跨账号遗留的本地 `syncStatus`，而是结合当前账号 bootstrap 返回的 revision 补种所有缺失资源。受保护资源会清理本机陈旧 Outbox；文件夹保护新增 `protection_rule_resources` 映射，服务端拒绝资源 JSON、bookmark-item 和 asset 复传，并清理已有资源、收藏位置、冲突和 COS 全版本。
+- **生产发布与恢复。** v22 首次发布触发 PostgreSQL `08P01 invalid message format`，健康门拒绝上线并立即回滚 v21；后续只读对比确认 macOS tar 生成的 `._001_initial.sql` 等 AppleDouble 二进制伪文件被误当成迁移。v23 使用 `COPYFILE_DISABLE=1` 后成功上线；v24 在未带该环境变量的复核发布中精确复现并再次回滚。最终 0.1.7 同时加入 `.dockerignore`、迁移文件名过滤和逐条 SQL 解析，发布目录预检 0 个 AppleDouble 后以 v25 上线；容器健康，8 个迁移登记完整。手动日备成功（PG 16，55,376 B），容量探针通过，加密恢复包重新导出并通过 SHA-256，包与离线口令均为 mode 600。
+- **验证。** 根 `npm run check`：59 个测试文件 / 323 项、设计 token、TypeScript、生产构建和 JavaScript 语法全部通过；服务端最终 21/21（含真实 PostgreSQL 文件夹保护、全新空库执行全部 8 个迁移和 AppleDouble 拦截）通过，根与服务端 production audit 均为 0。最终 `dist/manifest.json` 为 0.5.32，cloud API 只出现在 `background.js`，严格 secret 扫描通过。仍需用户在 `chrome://extensions` 手动重载并执行真实首次同步/卸载重装恢复；Google 品牌审核、正式 Web Store ID 和 50 账号负载验收仍未完成。
+
+### 2026-08-02 · 0.5.31 站点标识通用 DOM 解码后备链路
+
+- **特例边界核对。** 内置品牌资源表只有 GitHub 一项，`pinBrandAsset` 也只有 GitHub；0.5.29 的旧资产拦截只会让 GitHub / www.github.com / gist.github.com 在迁移失败时突然显示兜底，不会把其他站点的既有 icon 批量改成兜底。其他站点仍按规则表 → Apple Touch → 约定路径 → manifest → SVG / 大图 / Tile → 注册域回退的统一管线处理。
+- **真实覆盖现状。** 最近一份严格同源 300 条真实书签基线中，160 条命中真实站点标识或页面图，140 条（46.67%）使用分类兜底；其中 28 条有候选但被质量闸门拒绝，112 条没有合格静态候选。该数字不是 0.5.31 的安装态重测，且未达到 PRD ≤12% 门，不能把通用覆盖率宣称为已达标。当前安装态失败记录还出现 `unsupported-ico-frame` 与浏览器后台无法解码图片，属于可修复的技术性假兜底。
+- **通用修复。** 新增 Chrome 官方 Offscreen API 隐藏处理页。普通图片继续走原 Service Worker `createImageBitmap`；只有已下载、限长并完成静态 SVG 安全处理的资源在后台解码失败，或 ICO 最大帧不是现有解析器支持的 PNG 时，才交给 DOM 图像解码器。隐藏页不打开标签、不读取网页、不新增第三方请求；输出仍通过同一套 128px、1.2 方形比例、0.15 墨迹、透明 Alpha 和 192×192 WebP 门槛，不能用它绕过质量标准。
+- **版本与验证。** Manifest 新增最小范围 `offscreen` 权限并打包 `icon-processor.html`；通用后备、消息目标隔离和响应配对有专项测试。`npm run check` 全通过：59 个测试文件 / 322 项测试、TypeScript、设计 token、0.5.31 生产构建和全部 JavaScript 产物语法检查成功。真实 Chrome 重载后的 Offscreen 解码与当前 261 条目录兜底分布仍是独立安装态验收门；已有失败站点需要重新运行一次“增强书签”才会按新管线重试。
+
+### 2026-08-02 · 0.5.30 修复 GitHub 标识迁移后只显示兜底封面
+
+- **安装态只读证据。** Chrome `Secure Preferences` 确认实际加载路径为本仓库 `dist/`，Service Worker 登记版本为 0.5.29 且具备 `<all_urls>`；对应扩展 IndexedDB 中的 GitHub 记录仍是旧 `https://github.com/apple-touch-icon-180x180.png`。因此不是用户漏重载或路径错误，而是 0.5.29 已拒绝旧图、却没有成功写入新图。
+- **代码根因。** 自动迁移依赖 Manifest V3 Service Worker 现场抓取并解码远程 GitHub SVG；生成失败时 `refreshPinnedSiteBrandIcons()` 直接 `continue`，既不更新图标，也不保存失败原因，界面只能持续显示分类兜底封面。
+- **正式修复。** 将同一 GitHub 官方 mark 预栅格化为 192×192 无损透明 WebP 并随扩展内置；GitHub 固定规则在启动、读取站点标识和全库扫描时直接使用该可信资源，不再依赖远程 SVG 临时解码。缓存身份仍登记为官方 SVG URL，既有迁移和云端防回灌规则保持有效；非 GitHub 站点的候选策略不变。以后固定品牌迁移失败会写入 `iconRejectReason`，不再静默丢失现场。
+- **像素与构建验证。** 内置 WebP 为 192×192 RGBA，四角透明、深色圆环不透明、Octocat 负形透明；放在固定白色承载层上即为深色圆形 + 白色 Octocat。`npm run check` 全通过：57 个测试文件 / 318 项测试、TypeScript、设计 token、0.5.30 生产构建和全部 JavaScript 产物语法检查成功。真实 Chrome 仍需重载 0.5.30 后完成最后安装态复看。
+
+### 2026-08-02 · F14 腾讯云生产底座部署、真实灾备与容量收口
+
+- **腾讯资源已创建。** 正式主桶 `aarre-private-1251806841`（香港）与灾备桶 `aarre-backup-1251806841`（新加坡）均为私有、版本控制、SSE-COS AES-256；主桶仅允许当前固定扩展 origin，灾备桶无浏览器 CORS。主桶 `users/` 跨地域复制已启用。`aarre-production-api` 与 `aarre-production-backup` 两个无控制台 CAM 子账号使用独立密钥和最小权限策略，API 身份实测不能调用 CAM 管理接口。
+- **全版本权限修复。** 真实容量探针暴露 `GetBucketObjectVersions` 不能授权到对象路径。按腾讯云官方六段式资源改为专用桶 `/*`，并用 `cos:prefix` 限制 `users/` 与 `backups/database/`；重新实测写入、AES-256、香港→新加坡复制、历史版本列举和 `DeleteMultipleObjects` 永久清除全部通过。两轮失败探针留下的 6 个临时对象版本已精确删除并确认剩余 0。
+- **生产服务。** 独立 API、`aarre_sync` database/role、8 个 migration、Caddy site block 和 systemd timers 已部署；API 健康并仅监听 `127.0.0.1:8788`。root-only `/etc/aarre` 为 mode 700，`aarre.env`、`api-cam.env`、`backup.env` 与 provision state 均为 mode 600；长期 API 不加载 backup CAM。
+- **加密决策。** KMS 基础/标准版已停止新购、专业版固定成本不适合 Alpha，当前账号 SSM 也需额外购买；没有勾选、购买或开通 KMS/SSM。COS 使用 SSE-COS AES-256，数据库仍逐用户 DEK + AES-256-GCM；DEK 由服务器 root-only 的版本化 KEK keyring 包装。服务器 secrets 已导出为 `/ops/encrypted-secrets/aarre-production-secrets.tar.gz.enc`，AES-256/PBKDF2 加密、SHA-256 与解密目录验证通过；恢复口令在 macOS Keychain 和 `~/Documents/Aarre-Recovery/` mode 600 文件中。
+- **灾备缺陷与修复。** 首次备份使用 PostgreSQL 17 client 对 PostgreSQL 16 服务端生成 dump，隔离恢复因 `transaction_timeout` 不兼容失败。镜像现固定 PGDG PostgreSQL 16 client，并在备份/恢复两端强制校验 dump/source/restore/target major。新日备 SHA-256 校验后已完整恢复：6 个 migration、25 张表、0 用户，临时库随后删除并确认不存在；新月备同样成功。旧不兼容备份在台账标记 failed 后从 COS 全版本永久删除，剩余有效日备/月备合计 103,092 B。
+- **容量实测。** 当前 Mac 有效云端投影仍为 5.17 MiB。生产公开登录尚未完成，云端账号数为 0；Aarre database 8.39 MiB、主桶 0 B、灾备桶两版本约 100.7 KiB、API 41.75 MiB。服务器约 2.35 GiB 可用内存、42.42 GiB 可用磁盘，不需要扩容或新购存储；Docker 约 1.63 GiB 可回收构建缓存不属于用户持久数据。
+- **Google OAuth。** 已创建 `Aarre Production` Google Cloud project、外部 Testing consent app 和 Web client；只登记 `https://sync.nexvoice.cc/v1/auth/google/callback`，没有 JavaScript origin；当前 Google 账号是唯一 test user。按用户明确授权只勾选了 `I agree to the Google API Services: User Data Policy.`，未勾营销或其他可选项。client secret 通过 mode 600 临时文件写入服务器后，临时文件已删除且未输出。
+- **健康巡检与错误监控（该阶段基线）。** 当时不可变发布为 `20260802-f14-v18`，现已由本页顶部记录的 v25 取代。systemd 每两分钟检查一次 Aarre readiness，失败时只重启独立 Aarre API；正向巡检成功。Fastify 日志删除 OAuth query 和 Authorization，错误 SDK 禁止默认 PII、trace、breadcrumb 与 HTTP/Fastify request integration。GlitchTip 已创建独立 `aarre` team、`Aarre Sync API` project 和 5 分钟内 1 个事件邮件告警；受控生产事件真实入库并标记 Resolved。DSN 只进入 `/etc/aarre/aarre.env` mode 600 与重新导出的加密恢复包。
+- **最终自动化。** 根 `npm run check` 为 57 个文件 / 317 项测试，0.5.29 构建与全部 JavaScript 语法检查通过；根和服务端依赖审计均为 0。服务端类型检查/构建通过，并在生产 PostgreSQL 实例的隔离临时库完成 15/15 测试，测试库随后删除并确认不存在。无效 OAuth state 返回 400，探针 secret 不进入日志。
+- **历史阻塞（已解决）。** 当时无法访问管理 `nexvoice.cc` 的 DNSPod 账号；本轮用户登录正确账号后已完成 A 记录、TLS、Search Console 所有权和公开 OAuth。当前剩余门以本页顶部 0.5.33 记录为准。
+
+### 2026-08-02 · F14 腾讯云生产开通：身份核验与首个外部阻塞
+
+- **身份与安全。** 已从 NexVoice 正式恢复材料确认生产 SSH key 可用；加密包本身不包含腾讯云 CAM/DNSPod 密钥。进一步在生产容器只读核验发现现有 ASR 身份实际是腾讯云 Root，能够调用 STS/CAM，但这是 NexVoice 的高风险遗留：Aarre 不复用该长期身份，只用它一次性创建独立最小权限用户；本轮不擅自轮换 NexVoice Root key，避免中断现有语音服务。
+- **正式资源脚本。** 新增 `server/src/cli/provision-tencent.ts`：显式确认后幂等创建香港主 COS、新加坡灾备 COS、版本控制、SSE-KMS、CORS、生命周期、跨地域复制、SSM KEK、API/backup 两套无控制台 CAM 身份与策略，以及 DNSPod A 记录；Secret 只写服务器 `/etc/aarre` mode 600 文件，不在 stdout、日志或仓库出现。SSM 策略资源 ARN 已修正为包含 `creatorUin`，COS 策略补齐 multipart 操作。
+- **验证。** 新脚本类型检查和 Docker build 通过；服务端 11/11 测试在临时 PostgreSQL 数据库通过，随后测试库已删除；生产主机已构建 `aarre-sync:20260802-f14-v2`，源码位于 `/opt/aarre/releases/20260802-f14-v2`，但 API 容器尚未启动。
+- **真实腾讯状态。** 当前账号 STS 身份为 Root，CAM 之前为 0 子用户/0 自定义策略。第一次运行只创建了空的私有桶 `aarre-private-1251806841`（香港）并开启版本控制；默认 SSE-KMS 的 PUT 返回 COS `InternalError`，读取确认加密配置并未落地，灾备桶、CAM、SSM、DNS 也尚未创建。KMS `GetServiceStatus` 在香港/新加坡均为未开通；SSM 创建真实凭据返回 `ResourceUnavailable.NotPurchased`。Chrome 的腾讯云控制台仍停在登录页，必须由用户先完成扫码/验证码登录，再购买按量 SSM 并确认 COS 云产品密钥路径；绝不能为绕过阻塞把对象或数据库降级成明文。
+- **成本边界。** 公开资料显示 KMS 基础版已停止新购，不能为 Alpha 误购高价专业版。目标仍是 SSM 按量单凭据 + COS 云产品默认密钥；若控制台表明必须购买 KMS 专业版，则必须停下重新评审，不能直接下单。
+
+### 2026-08-02 · F14 腾讯云完整同步代码与容量计划落地
+
+- **扩展侧。** 新建真实 OAuth/Token、REST 同步、持久 Outbox、完整 bootstrap + sequence 增量、文字/完整备份范围、COS 直传/懒恢复、账号切换隔离、稳定收藏位置与保护规则重绑定、主题/设置/会话/报告/用量/操作历史同步。云端默认关闭；没有显式生产 API 构建变量时账号入口显示未配置。
+- **冲突与保护。** 资源写入携带 `baseRevision`。两台设备并发修改备注/用户标签时，服务端将两份内容作为 AES-GCM 密文写入 `conflict_versions`，标签先合并集合，备注不静默覆盖；侧边栏和网页端编辑器提供三种真实解决动作。受保护资源客户端停止读取/AI/截图/上传，服务端同时拒绝旧设备写入并排队清理主/灾备 COS 全版本。
+- **服务端与灾备。** `server/` 为独立 Node 22/Fastify 5 服务，含五组 SQL migration、Google OAuth broker、随机 Token rotation/replay revoke、逐用户 DEK + 腾讯云 SSM KEK、严格 payload 白名单、配额、COS 两阶段资产、账户导出/删除、备份/隔离恢复、短命高权限 deletion worker、独立 Compose/Caddy/systemd/CAM 模板。长期 API 不加载备份 CAM。
+- **容量实测。** 当前 Chrome Default 账号为 262 条 URL、16 个文件夹、261 条有效 Aarre 资源；当前有效云端投影 5,422,378 B（5.17 MiB），主数据预算 7–9 MiB，含香港主桶、新加坡副本、版本和 DB 备份为 15–25 MiB。当前无需新购存储服务器；扩容只使用腾讯云，阶段与触发器见 `docs/CLOUD_CAPACITY_PLAN.md`。
+- **验证。** 根 `npm run check` 全通过：设计 token、TypeScript、57 个测试文件 / 310 项测试、0.5.25 生产构建和 JavaScript 产物语法检查成功；商店素材验证通过，根/服务端依赖审计均为 0。服务端 11 项测试通过，其中 9 项使用真实 PostgreSQL覆盖跨用户隔离、幂等、Token 重放、字段时钟、冲突、保护、配额、资产和删号，另 2 项结构测试强制在线用户 SQL 带 `user_id` 且 HTTP 用户数据路由先鉴权。目标腾讯云香港服务器隔离 Docker 构建成功，镜像约 313MB、运行用户为 `node`，随后已删除验证镜像和临时目录；本机 40MB Chrome 审计临时副本与 `aarre_sync_test` 测试库也已删除。`dist/manifest.json` 为 0.5.25，未包含生产 API 域名或 secret-like 内容；云端发行缺 API URL 时构建门会按预期拒绝。
+- **仍未上线。** 缺正式 Extension ID、Google OAuth Web Client、`sync.nexvoice.cc` DNS/TLS、Aarre 独立 API/backup CAM、香港主 COS、新加坡灾备 COS、SSM 凭据和真实 COS/重装/联合恢复演练。未获这些外部资产与计费授权前，不创建资源、不启动生产容器，也不把本地测试说成线上可用。
+
+### 2026-08-02 · 0.5.26 修复缓存图片内部被改黑并隔离夜间主题
+
+- **安装态截图证据。** DevTools 中选中 `img.site-thumbnail-image` 后，计算样式已经明确是 `background-color: rgb(255, 255, 255)`；用户标出的黑色色块属于 `color: rgb(23, 25, 28)`，不会绘制图片背景。当前黑块因此不来自列表、CSS 承载层或夜间主题，而是在 `src="data:image/webp;base64,..."` 的缓存图片内部。
+- **直接根因。** 用当前真实 GitHub manifest 512×512 图标跑同一 `normalizeSiteIconPixels()` 后精确复现截图：旧逻辑把每一个与白色承载层对比不足的像素单独改为 RGB 24，导致图标内部的白色圆形负空间也被改黑，输出 36,864 个像素全部不透明、`inkCoverage = 1`，最终成为带微弱轮廓的黑方块。这和候选选择无关，也不是 `color-scheme` 把 CSS 底色切黑。
+- **通用修复。** 候选来源和顺序完全不变。像素处理改为保留原始颜色与 Alpha；遇到覆盖整个方形资产的中性深色展示底时，仅剥离外围托底并保留被浅色/彩色图形包围的深色 Logo；只有整张可见图形确实几乎都是浅色单色时才整体转深，禁止再逐像素改黑内部白色区域。`.site-thumbnail` 增加 `color-scheme: only light`，`--site-icon-canvas` 仍只定义一次且固定为 `#FFFFFF`。
+- **缓存与云端防回灌。** `SITE_ICON_RENDER_VERSION` 提升到 6，使已生成的版本 5 黑底 WebP 自动失效并进入正常站点标识扫描；云端站点 icon 上传绑定当前渲染版本，恢复时拒绝把缺版本或旧版本资产重新标成最新版。
+- **验证。** 真实 GitHub 资产修复后 36,864 个像素中 21,125 个恢复透明，WebP 编码工具确认 `Features present: transparency`；内部白色区域和黑色 Logo 均保留。针对性 3 个测试文件 / 37 项、完整 57 个 Vitest 文件 / 312 项、设计 token、扩展与服务端 TypeScript、服务端 2 项无数据库结构测试、生产构建和 JavaScript 产物语法检查通过；暗色预览构建中承载层仍为白色，`dist/manifest.json` 为 0.5.26。服务端其余 9 项集成测试因本机按前序收口已删除 `aarre_sync_test` 而未运行，不涉及 icon 修复。真实 Chrome 安装态仍需重载最新 `dist/` 并执行一次“更新站点标识”。
+
+### 2026-08-02 · 0.5.25 恢复透明 icon 与固定白色承载层
+
+> 本节的固定白色 CSS 承载层继续保留，但其中“逐像素浅色对比度补偿”会把图标内部白色区域改黑，已由 0.5.26 的整体图形判断取代；后续不得恢复该逐像素逻辑。
+
+- **历史根因。** Git 历史确认：统一 UI 重构提交 `7e58563` 把旧版 `.site-thumbnail { background: #fff; }` 改成了主题化 `var(--surface-sunken)`；提交 `6c4cad8` 又新增浅/深两份预合成缓存和按深色偏好选择的 `<picture><source>`。因此黑色托底来自样式/渲染迭代，而不是站点 icon 候选选择。
+- **按产品语义恢复。** 保持 `scanSiteBrand` 原有候选顺序不变；撤回 0.5.24 的候选重排与深色边缘拒绝逻辑。站点 icon 缓存重新保留 Alpha，只有浅色前景的对比度补偿会修改前景 RGB，透明像素的 Alpha 始终保持；`SiteThumbnail → picture → site img` 三层统一继承不随主题变化的白色承载层。
+- **缓存迁移。** `SITE_ICON_RENDER_VERSION` 提升到 5，淘汰此前所有已经烘焙过白底或黑底的缓存；0.5.23 的缺图扫描候选修复继续负责重新生成。
+- **验证。** 针对性 3 个测试文件 / 35 项通过；透明缓存单测确认空白像素仍为 `[0,0,0,0]`，黑色图标像素保持不透明。暗色侧边栏用真实透明 SVG 复核：页面背景为 `[15,17,19,255]`，图标承载层四角和透明区域均为 `[255,255,255,255]`。设计 token、TypeScript、排除工作区既有 Node 原生测试入口后的 57 个 Vitest 文件 / 310 项测试、生产构建和 JavaScript 产物语法检查全部通过；构建 CSS 明确为 `.site-thumbnail → picture → site img` 三层继承白色背景，`dist/manifest.json` 为 0.5.25。真实 Chrome 安装态仍需重载最新 `dist/` 并执行一次“更新站点标识”。
+
+### 2026-08-02 · 0.5.24 不透明深色 icon 托底根因与通用修复
+
+> 本节记录的候选排序与深色边缘质量闸门已在 0.5.25 完整撤回；用户确认选择策略原本正常，当前实现不得沿用本节方案。
+
+- **真实根因。** 用户截图中的黑块严格位于缩略图图片区域。源码和构建 CSS 的 `.site-thumbnail` / `img[data-cover-kind="site"]` 均已是 `#FFFFFF`；对实际被选中的 180×180 图标取样后，四角为 `[34, 30, 32, 255]`，说明图片文件虽带 Alpha 通道，边缘却是 100% 不透明深色像素，下面的白色托底不可能透出。反复清缓存和扫描只会重新写回同一类黑底候选。
+- **通用修复。** 候选排序改为站点声明的透明/矢量 SVG优先，其次是站点声明的大尺寸位图，再到 manifest、Apple Touch 和猜测路径；新增不透明深色边缘质量闸门，颜色平坦、深色且边缘 90% 以上不透明的候选会被拒绝并继续尝试下一候选，找不到安全候选则使用 Aarre 兜底图。没有修改 GitHub 专属来源规则。
+- **缓存迁移。** `SITE_ICON_RENDER_VERSION` 从 3 提升到 4，旧的黑底生成缓存会在加载站点标识时被清除；0.5.23 的缺图扫描候选修复继续生效，随后“更新站点标识”可重新生成。
+- **验证。** 针对性 3 个测试文件 / 37 项通过；真实页面探针确认旧 180px 候选命中 `opaque-dark-edge-mat`，页面声明候选为 SVG/大图，新排序为 `svg-icon → large-icon → conventional-apple-touch-icon`；透明 SVG 合成后的四角为 `[255,255,255,255]`、墨迹覆盖 0.4387。设计 token、TypeScript、排除工作区既有 Node 原生测试入口后的 57 个 Vitest 文件 / 312 项测试、生产构建和 JavaScript 产物语法检查全部通过，`dist/manifest.json` 为 0.5.24。真实 Chrome 安装态仍需重载最新 `dist/` 并重新执行一次“更新站点标识”。
+
+### 2026-08-02 · 0.5.23 旧 icon 缓存清理后的自动恢复
+
+- **根因。** 0.5.22 的通用缓存迁移会清除旧的站点 icon 字节，让界面安全地显示兜底图；但全目录扫描候选过去只检查摘要、封面和链接健康，没有检查站点 icon 是否缺失。因此“更新站点标识”可能估算为 0 条，刷新后仍会一直显示兜底图。
+- **修复。** `thumbnail.ts` 新增统一的当前 icon 缓存新鲜度判断；`libraryScanCandidates` 将没有当前 `iconRenderVersion`、没有白底 icon 或已超过 30 天的站点加入扫描；`scanSiteBrand` 与候选判断共用同一门槛。没有加入任何 GitHub 专属设置。
+- **恢复方式。** 重新加载 0.5.23 的 `dist/` 后，在设置中点击“更新站点标识”；若第一次只显示待处理数量，按界面继续确认并开始，按提示允许网页读取权限，等待任务完成。不要删除扩展数据。
+- **验证。** 针对性测试 3 个文件 / 35 项通过；`npm run typecheck` 通过；排除工作区既有 Node 原生测试入口 `server/test/integration.test.ts` 后，55 个 Vitest 文件 / 306 项测试、生产构建和 JavaScript 产物语法检查通过。直接运行 `npm run check` 只因 Vitest 误收这个无 Vitest suite 的 Node 测试文件失败，未涉及本次 icon 逻辑。真实 Chrome 安装态仍需用户重载最新 `dist/` 后复看。
+
+### 2026-08-02 · 0.5.22 站点 icon 黑色背景通用链路修复
+
+- **调查边界。** 用户已明确这不是 GitHub 单站点问题；源码中的 GitHub 专属来源改动已撤回，不把任何站点规则作为解决方案。
+- **通用修复。** [base.css](src/ui/base.css) 将 `.site-thumbnail` 的基础底色从主题 `surface-sunken` 改为固定白色 `--site-icon-canvas`；透明 SVG/PNG 即使没有命中图片分类，也不会再透出暗色主题。 [thumbnail.ts](src/lib/thumbnail.ts) 的页面代表图在 WebP 编码前使用 `destination-over` 铺白底，避免透明画布携带黑色 RGB 通道。
+- **验证。** `npm run check` 全通过：55 个测试文件 / 305 项测试、设计 token、TypeScript、生产构建和全部 JavaScript 产物语法检查；修复后的 `dist/` 已同步到 0.5.22。源码和构建产物均未加入 GitHub 专属来源设置。
+- **待完成门。** 真实 Chrome 安装态仍需重新加载最新 `dist/` 复看；自动化本地运行态与构建检查不能替代真人安装态确认。
+
+### 2026-08-02 · 云端 PRD v1.3 与 NexVoice 共机评估
+
+- **完整恢复边界。** F14 从“只同步派生元数据”升级为同步全部有用户价值的持久信息，并通过私有 COS 保存用户封面、页面快照、页面代表图和站点标识；图片范围必须由用户明确选择，受保护资源始终禁止上传。
+- **真实共机基线。** 已只读核对 NexVoice 源码、生产 compose/Caddy/PostgreSQL 和腾讯云主机资源；确认目标为香港 `ap-hongkong-2`、Docker 网络 `production_default`，当前余量支持独立 256MiB `aarre-api`。不允许把 Aarre 路由塞入 NexVoice `control-api` 作为退化方案。
+- **隔离与恢复。** Aarre 使用独立 database/user、secrets、CAM、KMS、对象桶和错误上报 project；新增 sequence change feed、字段级冲突、两阶段对象上传、重装恢复、导入器、账户删除、联合备份恢复与 RPO/RTO 验收。Google 登录经官方流程复核后改为服务端 Web OAuth callback + 扩展一次性 PKCE ticket，避免把 Google callback、code 或 Token 直接交给扩展。
+- **仍未完成。** 本轮只调整需求和架构边界，没有创建 `server/`、数据库、COS 桶、OAuth 客户端、DNS 或生产部署。`docs/ARCHITECTURE.md` 已加历史架构警示，F14 实施时再整体改写其云端章节。
+- **验证。** `git diff --check` 通过；`npm run check` 全通过：设计 token、TypeScript、55 个测试文件 / 303 项测试、生产构建和全部 JavaScript 产物语法检查均成功。
+
+### 2026-08-02 · 0.5.20 旧站点 icon 缓存不再进入显示层
+
+- **显示门禁。** 侧边栏和网页端不再直接使用 `iconDataUrl` 兼容字段；只有 `iconRenderVersion === 3` 且存在当前白色画布 `iconDataUrlLight` 的记录才允许进入 `<img>`。
+- **缓存清理。** `GET_SITE_BRANDS` 返回前清除旧版本已经生成的 `iconDataUrl`、`iconDataUrlLight`、`iconDataUrlDark` 字节，但保留 host、来源、尺寸、分类和页面图规则等诊断字段；下一次站点扫描会重新生成白底图。
+- **验证。** `npm run check` 全通过：55 个测试文件 / 303 项测试、设计 token、TypeScript、生产构建和全部 JavaScript 产物语法检查；`dist/manifest.json` 已同步到 `0.5.20`。真实 Chrome 安装态仍需重新加载 `dist/` 复看。
+
+### 2026-08-02 · 0.5.19 站点 icon 固定纯白画布
+
+- **产品规则。** Aarre 页面与侧边栏仍支持日间/夜间主题；站点 icon 不参与主题切换，透明图标始终合成到 `#FFFFFF` 纯白画布，夜间界面也保持白底。
+- **显示层。** 删除 `brandImageUrlDark`、系统/应用主题观察器及全部深色图标传参；`SiteThumbnail` 只读取白色画布版本。CSS 增加固定 `--site-icon-canvas`，不会在暗色 token 中覆盖。
+- **生成与缓存。** `cacheSiteBrandIcon` 从浅/深双份 WebP 收敛为单一白底 WebP；新增 `SITE_ICON_RENDER_VERSION = 2` / `iconRenderVersion`，旧缓存下一次站点扫描时自动重建。旧 `iconDataUrlDark` 字段仅供 IndexedDB 兼容读取，不再写入新缓存或参与显示。
+- **真实 GitHub 像素验证。** 读取 GitHub 官方透明 Octocat SVG，栅格化后走正式缓存生成函数；输出 192×192、render version 2，四角像素均为 `[255,255,255,255]`，且墨迹覆盖闸门通过。暗色 Aarre 运行态确认白色 icon 命中、深色画布命中 0、`source` 节点 0、CSS 画布值为 `#ffffff`。
+- **验证。** `npm run check` 全通过：55 个测试文件 / 301 项测试、TypeScript、设计 token、生产构建与 JavaScript 产物语法检查；版本与最新 `dist/` 均为 `0.5.19`。`docs/PRD.md` 的透明图标规则、数据字段和验收标准已同步改为固定纯白画布。
+
+### 2026-08-02 · 0.5.18 双端允许共存与站点图标主题修复
+
+> 本节的双端共存行为继续有效；其中“图标跟随 Aarre 主题”的方案已在 0.5.19 改为固定纯白画布。
+
+- **撤销全部互斥。** 删除关闭全部侧边栏、关闭网页端标签、网页端标签级禁用、标签激活协调和后台工具栏点击接管；侧边栏打开网页端只负责新建或聚焦管理页，网页端与侧边栏可以同时存在。
+- **恢复 Chrome 原生打开。** `openPanelOnActionClick` 改回 `true`，点击扩展图标由 Chrome 原生行为打开侧边栏；右键收藏和显式 `OPEN_SIDE_PANEL` 仍只负责打开侧边栏，不再关闭网页端。移除 `sidePanel.close()` 后不再需要 Chrome 141，最低版本恢复为 134。
+- **黑色图标根因。** `SiteThumbnail` 过去用系统 `prefers-color-scheme` 选择图标版本；当系统偏好深色、Aarre 手动设为浅色时，会把预合成在 `#242426` 深色画布上的 GitHub 等透明图标放进白色列表。现在改为跟随 Aarre 根节点的 `data-theme`，现有浅色缓存可直接恢复，无需重新扫描。
+- **主题性能。** 新增共享 `useDocumentTheme` 外部存储，整页所有缩略图共用一个 `MutationObserver`；切换 Aarre 主题会更新图标，但不会为数百个列表项创建数百个观察器。
+- **验证。** `npm run check` 全通过：55 个测试文件 / 301 项测试、TypeScript、设计 token、生产构建与 JavaScript 产物语法检查；模拟“系统深色 + Aarre 浅色”时运行态确认根主题为 light、浅色图标命中、深色 `<source>` 为 0；`npm run ui:audit -- 列表` 为 0 项。源码、Manifest 与 `dist/manifest.json` 均为 `0.5.18`。
+
+### 2026-08-02 · 0.5.17 扩展图标始终打开侧边栏
+
+> 本节记录的是历史实现；其中“打开侧边栏后关闭网页端”的互斥行为已在 0.5.18 按产品决定完整撤销。
+
+- **点击行为。** 删除网页端点击扩展图标时的直接返回；无论当前是普通网页还是 Aarre 网页端，工具栏图标都会触发真实 `sidePanel.open()`。
+- **网页端切换。** 当前标签是网页端时使用窗口级侧边栏打开，成功后关闭网页端标签；这样不会因移除作为打开目标的标签而连带关闭侧边栏，同时继续保证网页端与侧边栏不并存。
+- **旧状态修复。** 网页端标签不再设为 `enabled: false`，并在协调时显式恢复 `enabled: true`，清理旧版本可能遗留的标签级禁用状态。
+- **验证。** `npm run check` 全通过：55 个测试文件 / 301 项测试、TypeScript、设计 token、生产构建与 JavaScript 产物语法检查；`package.json`、源码 Manifest 和 `dist/manifest.json` 均为 `0.5.17`。真实 Chrome 安装态仍需重载扩展复看。
+
+### 2026-08-02 · 0.5.16 受保护网页/文件夹与侧边栏互斥
+
+> 本节记录的是历史实现；其中所有网页端/侧边栏互斥代码已在 0.5.18 撤销，受保护规则本身保留。
+
+- **保护数据模型。** 新增本地 `aarre:protection-settings:v1`：网页按资源身份显式保护，文件夹按 Chrome 文件夹 ID 保护；实际操作前基于当前 Chrome 树动态计算后代，不会漏掉以后新增或移动进文件夹的收藏。同一网页有多个 Chrome 位置时采用最严格规则，任一受保护位置都会保护共享资源。
+- **统一执行边界。** 正文读取、自动增强、页面截图、批量补拍、链接健康/全目录扫描和 AI 对话 provider 目录都复用同一保护策略。开启保护会取消相关持久增强任务和即时截图目标，并停止正在运行的 AI 收藏对话；批量扫描、重定向和截图在网络/截图提交前后继续复核，避免规则切换后的旧任务落库。关闭保护后，仍缺内容的收藏只恢复为“首次正常访问后继续”，不会立即后台开页扫描。
+- **两端共用 UI。** 侧边栏与网页端编辑收藏共用 `ProtectionControl`；侧边栏编辑文件夹也使用同一控件。上级文件夹继承状态不可在子项绕过，文案明确说明关闭位置；开关尺寸、间距、色彩均使用共享 token，明暗主题编辑场景控件审计均为 0 项。
+- **网页端/侧边栏互斥。** 关闭 Chrome 自动处理的 `openPanelOnActionClick`，改由后台接管工具栏点击；当前是 `manager.html` 时直接不打开侧边栏。侧边栏打开网页端会新建或聚焦已有管理页标签，并调用 `sidePanel.close()` 关闭所有窗口的侧边栏；管理页标签同时通过 `sidePanel.setOptions(... enabled: false)` 禁用侧边栏。反向打开侧边栏后会关闭后台管理页标签，保证两套主界面不同时存在。
+- **兼容性与验证。** 因 `sidePanel.close()` 从 Chrome 141 开始提供，`minimum_chrome_version` 已从 134 提高到 141。`npm run check` 全通过：55 个测试文件 / 301 项测试、TypeScript、设计 token、生产构建和 JavaScript 产物语法检查；新增保护继承、并发持久化、AI 目录过滤、补拍过滤和双端互斥防回归测试。localhost 实测开关可从关闭切到开启并显示完整保护说明，浅色/深色编辑场景 `ui:audit` 均为 0 项。真实 Chrome 安装态仍需重载最新 `dist/` 验证 Side Panel API 行为。
+
+### 2026-08-02 · 网页端瀑布流卡片淡描边与投影收口
+
+- `.library-card` 保持无投影，`.library-card-cover-frame` 使用主题化透明度描边（浅色黑色 6%、深色白色 6%）并移除投影；封面内层仍保留独立裁切，不影响悬停详情和圆角封面。
+- 删除不再使用的 `--shadow-cover` token，并同步更新布局回归测试。
+- 验证：`npx vitest run tests/manager-layout-stability.test.ts tests/control-system-guardrails.test.ts` 通过（2 个文件 / 31 项）；`npm run typecheck` 和 `npm run build` 通过，最新样式已写入 `dist/`。真实 Chrome 安装态仍需用户重载最新 `dist/` 复看。
+
+### 2026-08-02 · 0.5.15 真实 Provider 验证与 localhost AI 去伪
+
+- **发现并移除假链路。** localhost 的 `SAVE_AI_SETTINGS` 过去只检查 Key 字符长度，`ASK_BOOKMARK_AGENT` 则固定返回“设计赏析与前端代码”及 269/269，导致看似验证成功、实际完全没有调用 Provider。现在预览设置会真实访问服务商模型接口，Key 只保留在当前预览内存；对话直接复用生产 `askBookmarkAgent`，并把真实阶段事件送回 UI。取消会终止对应的真实 `AbortController`。
+- **真实 DeepSeek 基线。** 新增 `npm run verify:ai-live`，只从临时环境变量读取 Key，不把凭据写入仓库或报告。真实 `deepseek-v4-flash` 实测：Key 校验 235ms；单条增强 10.552s，八类元数据完整且 schema=2；40 条普通问答 2.620s，正确召回 GitHub；125 条全量检索 4.560s，3 批全部检查并 4/4 召回预埋组件库；取消 1.739s 内返回“AI 请求已停止”。成功调用累计记录 26,104 tokens。
+- **真实 UI 证据。** 修复后的 localhost UI Key 校验约 1.0s；普通查询只显示“准备 → 筛选 → 生成”，DeepSeek 网络请求约 2.3s并正确显示 GitHub 来源；全量查询显示“正在检查收藏 0/309”，最终为“已检查 309/309”，命中 National Geographic，7 个 Provider 请求全部 HTTP 200，完成状态在 12.55s 内观测到；运行中停止按钮在 637ms 内恢复为可继续输入状态。
+- **防回归。** 新增预览 AI 集成测试，断言设置必须调用真实模型校验接口、对话必须经过真实 Provider 代码路径、来源映射与阶段序列真实；不再允许写死答案回归。`npm run check` 全通过：53 个测试文件 / 294 项测试、TypeScript、设计 token、生产构建和 JavaScript 产物语法检查均通过；`npm run ui:audit -- AI` 为 0 项，版本和 `dist` 已同步到 `0.5.15`。
+- **边界。** 本轮真实 Provider、真实网络和真实 UI 预览均已验证，但 localhost 使用评审数据，不等于用户真实 Chrome 收藏；浏览器控制策略拒绝接管扩展内部页，因此安装态 Service Worker、真实目录和 Gemini/OpenAI 仍是独立验收门。测试 Key 曾进入聊天上下文，必须在服务商控制台轮换。
+
+### 2026-08-02 · 0.5.14 AI 能力全面审计与可用性修复
+
+- **召回根因。** 新增的使用场景、内容类型、可能提问、实体和 schema 版本过去会在 IndexedDB 读取、Chrome 原生书签重建、Aarre 保存和 URL 迁移时丢失或错误沿用；现在统一通过一个检索字段复制契约持久化，新 URL 会明确清空旧页面的 AI 字段，旧 schema 记录进入一次增量补全而不会无限重复计费。
+- **全量与快速查询。** “所有/全部/整个/全量”等请求按 60 条分批、3 批并发检查全部可用收藏，任何批次失败都不合成半截回答；全量筛选为空时不再用普通模糊匹配把无关收藏填回来。快速查询不再显示“分批检查收藏”，前端只渲染后台声明的真实阶段与真实完成事件。
+- **稳定性。** Agent 与增强结构化输出分别提高到合适上限并在格式不完整时只重试一次；OpenAI 改用当前 `max_completion_tokens` 参数，provider 的 429/5xx 只做一次短重试；API Key 验证增加 15 秒网络边界和可见错误。增强失败会落为 `failed`，无 Key 保持“等待增强”，全目录扫描遇到整批 Key/额度错误会停止而不是继续打完整个目录。
+- **隐私与安全。** 对话检索复用截图/增强的敏感网址规则，受保护资源和对应操作目标在 provider prompt 构造前删除；UI 显示排除数量，隐私页补齐实际发送字段说明。AI 修改仍只生成待确认 proposal，真实写入前继续做目标校验、撤销快照和逐项结果记录。
+- **状态与界面。** 相关收藏按钮去掉默认固定高度并使用自动高度，标题/域名恢复显示；设置页的 Key 保存和扫描错误改为模块内联反馈，AI Key 字段进入真实 form，可回车提交；编辑收藏能区分分析中、等待增强、失败、暂不可用和受隐私保护。
+- **数据与历史。** 并发 provider 调用的用量写入改为串行合并，有限配额会在调用前串行复核；历史会话过滤损坏记录、限制持久化长度，失败/取消消息不再回灌给下一轮模型。
+- **验证。** `npm run check` 全通过：Node/设计 token、TypeScript、52 个测试文件 / 293 项测试、生产构建和全部 JavaScript 产物语法检查均通过；`npm run ui:audit -- AI` 为 0 项。本地 Playwright 在 565×1055 复核来源卡片文字与高度、输入后黑底白图标发送按钮和设置成功反馈；`package.json`、源码 Manifest 与 `dist/manifest.json` 均为 `0.5.14`。真实 Chrome 安装态和真实 provider Key 端到端仍需用户重载最新 `dist/` 后验收。
+
+### 2026-08-02 · 0.5.13 AI 状态控件中性色收口
+
+- 停止按钮改为 `--ink` 黑色背景，停止方块使用实心 `currentColor` SVG 图形。
+- 已完成的 AI 状态图标移除青绿色，改为中性色；状态行间距从 `--sp-1` 拉开到 `--sp-2`，提高读取舒适度。
+- 验证：针对性侧边栏布局测试、类型检查和设计 token 检查通过；版本与 manifest 同步到 `0.5.13`。
+
+### 2026-08-02 · 0.5.12 首屏骨架、瀑布流阴影与 AI Agent 状态链路
+
+- **侧边栏首屏。** 原因是 React 首次挂载前 `sidepanel.html` 没有可见内容，同时 React 还要等待持久状态与初始化请求；现在 HTML 先绘制静态品牌骨架，React 初始化期间继续显示同一套骨架，避免 2–3 秒纯白窗口。原生 Chrome 书签读取仍先于本地索引和增强信息，不把慢索引挡在首屏前。
+- **瀑布流投影。** `.library-card` 与新的 `.library-card-cover-frame` 允许阴影向外绘制；内层 `.library-card-cover` 单独负责封面和 hover 内容裁切，避免外层卡片和封面同时裁掉投影。
+- **AI 对话。** 每次请求有独立 request id；后台按「准备收藏库 → 分批检查收藏 → 筛选相关内容 → 整理并生成回答」发送真实进度事件。输入框在运行中变为停止按钮，停止会 AbortController 贯穿到 provider fetch；重载后遗留的 sending 会话会恢复为可重试的已停止状态。
+- **全量查询可靠性。** 全量查询仍会检查完整目录，任意批次失败不会合成半截答案。模型返回被代码围栏/简短说明包裹的 JSON 可自动提取；只有 JSON 格式或字段不完整时最多重试一次，API、额度和网络错误不重复消耗请求。
+- **验证。** `npm run typecheck`、`npm run check:design`、51 个测试文件（当前新增到 279 项）、`npm run build` 和 `dist` JavaScript 语法检查通过；本地 Playwright 确认提交后 50ms 仍有侧边栏骨架、约 300ms 进入书签列表，且瀑布流外框 `overflow: visible`、内层封面 `overflow: hidden`。真实 Chrome 安装态仍需用户重载最新 `dist/` 后复看；本地运行态不能替代 Service Worker/Performance 现场日志。
+
+### 2026-08-02 · 0.5.11 AI 对话 UI 与收藏库全量检索
+
+- **网页端卡片。** 日间管理页背景恢复为 `#FFFFFF`；每个瀑布流封面使用共享 `--shadow-cover`，以 4% 墨色、较大模糊范围提供非常淡的悬浮感。
+- **AI 对话 UI。** 历史会话标题和预览允许多行并截断，改名/删除动作回到同行布局；用户气泡不再被默认段落 margin 撑高；相关收藏卡片左对齐且长标题省略；输入后发送按钮图标仍保持亮色。重复形状和间距使用 `--agent-*` token。
+- **全量检索。** 对“找/搜/查询/相关”以及批量修改类请求，目录按每批 60 条、最多 3 批并发逐条检查；所有批次成功后才进行最终回答合成，返回的 `examinedCount` 为真实全量数量，UI 显示为“已检查 N/N”。任何批次失败都会终止本次回答，不返回半截结果；普通非全量请求会明确显示“已召回”。
+- **验证。** `npm run typecheck`、`npm run check:design`、`npx vitest run tests/local-ai.test.ts`（13 项）和 `npm run check` 已通过；完整回归为 51 个测试文件、276 项测试，生产构建和 `dist` JavaScript 语法检查均通过，版本文件与 `dist/manifest.json` 为 `0.5.11`。侧边栏浅色/深色控件审计均为 0 项问题；真实 Chrome 安装态仍需用户重载最新 `dist/` 复看。
+
+### 2026-08-02 · 0.5.10 瀑布流 hover 信息收口与网页端浅色底色
+
+- **信息收口。** 收藏库卡片 hover 遮罩删除标签/匹配原因与更新时间，只渲染收藏描述；没有描述时仍使用既有的真实状态提示，不伪造内容。
+- **样式清理。** 删除标签与日期元信息对应的布局规则，保留遮罩的整面覆盖、内部滚动和不改变瀑布流卡片高度的行为。
+- **背景 token。** 网页端日间整体背景由 `#FCFCFC` 调整为 `#FAFAFA`，只作用于管理页的 `--page-bg-light`，卡片表面、侧边栏和夜间模式保持原样；后续 0.5.11 已恢复为白色。
+- **验证。** 运行态确认遮罩只有一个描述段落，`time` 和标签元信息节点均不存在，网页端浅色背景为 `rgb(250, 250, 250)`；`npm run check` 通过（51 个测试文件、275 项测试、类型检查、设计 token、生产构建和全部 JS 产物语法检查），`dist` 已刷新为 `0.5.10`。
+
+### 2026-08-01 · 0.5.8 网页端无轨悬浮滚动手柄与浅色底色
+
+- **滚动条替换。** 管理页隐藏 document 的系统滚动条，新增不占布局宽度的 fixed 悬浮手柄；手柄无滑轨，滚动/悬停时出现，停止操作后渐隐，并支持鼠标/触控拖拽、键盘方向键、PageUp/PageDown、Home 和 End。
+- **主题范围。** 仅网页端日间模式的页面底色改为 `#FCFCFC`；侧边栏和网页端夜间模式继续使用原主题底色。滚动手柄颜色从现有墨色 token 派生，明暗主题均保持可见对比度。
+- **防回归与验证。** 新增网页端滚动手柄结构回归测试；本地运行态确认系统滚动条为 `none`、页面宽度不因手柄变化、实际拖拽能改变滚动位置、闲置后透明度归零；浅色/深色网页截图已复核。`npm run check` 通过（51 个测试文件、275 项测试、类型检查、设计 token、生产构建和全部 JS 产物语法检查）；明暗两套 `npm run ui:audit` 均为 0 项问题；`package.json` 与 `dist/manifest.json` 已同步为 `0.5.8`。真实 Chrome 安装态仍需用户重载最新 `dist/` 后复看。
+
+### 2026-08-01 · 0.5.7 compact button 高度 token
+
+- **高度 token。** 新增 `--control-h-button: 30px`，所有 `.button-small` 统一使用 30px 高度；没有直接把 `--control-h-md` 从 36px 改掉，因此输入框、Select 和其它中等控件继续保持原有尺寸。
+- **层叠修正。** 将 compact button 规则放在按钮变体之后，覆盖 `.button-quiet` 等变体原本的 40px 最小高度；“暂不”和“去处理”运行时实测均为 30px。
+- **验证与构建。** `npm run check` 通过（51 个测试文件、274 项测试、类型检查、设计 token、生产构建和全部 JS 产物语法检查）；浅色/深色 `npm run ui:audit` 均为 0 项问题；最新 `dist/manifest.json` 与源码版本为 `0.5.7`。
+
+### 2026-08-01 · 0.5.6 圆角阶梯系统与编辑操作布局
+
+- **圆角 token 化。** 在 `tokens.css` 增加 `--radius-shell`、`--radius-module`、`--radius-control`、`--radius-inset-module`、`--radius-compact` 和 `--radius-chip`；共享 Button、Select/菜单形状和主要外层模块改用语义 token，避免同一层级直接复用外层圆角。
+- **嵌套场景收口。** 整理提示卡片内的“暂不/去处理”、设置“最近的更改”条目内的“撤销”按钮统一降到控件档；“这会儿值得重看”既有外层/内层阶梯关系保留；运行时扫描其它主要页面，仅保留搜索框内胶囊按钮这一有意例外。
+- **编辑操作。** 侧边栏编辑弹层的“取消/保存修改”按钮补齐间距；侧边栏与网页端关闭按钮从 44px 触控容器收回到 32px 透明容器，图标继续居中，位置更靠右上角。
+- **验证。** `npm run check` 通过（51 个测试文件、274 项测试、类型检查、设计 token、生产构建和全部 JS 产物语法检查）；浅色/深色 `npm run ui:audit` 均为 0 项问题；浅色/深色关键截图已复核；本地 `sidepanel.html` 与 `manager.html` 继续返回 200。版本文件与 `dist/manifest.json` 同步到 `0.5.6`。
+
+### 2026-08-01 · 0.5.5 编辑弹层分隔线/关闭按钮与 Chrome 星标自动增强核查
+
+- **编辑弹层线条。** 去掉网页端编辑弹层标题下、AI 分析模块顶部和底部操作区顶部的分隔线；侧边栏共用的 AI/操作区同步生效。
+- **关闭按钮。** 网页端和侧边栏关闭按钮统一扩大到触控尺寸，取消背景和描边，保留透明点击区域与无障碍标签。
+- **整理提案对齐。** “仅提示 · 不自动执行”的信息图标增加与标题文字一致的上内边距，和复选框的视觉对齐方式统一。
+- **Chrome 星标行为核查。** `chrome.bookmarks.onCreated` 会为当前新建的网页收藏登记本地资源并排入 AI/封面任务；若当前活动页仍是该网址且已配置 API Key，会读取真实渲染页面并异步生成摘要/标签，首张封面截图静默执行。无 Key、页面不可读取、隐私保护页面、批量导入/Chrome Sync 或书签创建时不在当前页时，不会后台猜测或批量开页，而是等待配置或用户首次正常访问；全目录 AI 仍需用户显式启动扫描。
+- **验证。** `npm run check` 通过（51 个测试文件、273 项测试、类型检查、设计 token、生产构建和全部 JS 产物语法检查）；编辑弹层浅色/深色 `npm run ui:audit -- 编辑` 均为 0 项问题；`sidepanel.html` 与 `manager.html` 本地返回 200，`dist/manifest.json` 与源码版本均为 `0.5.5`。版本文件递增到 `0.5.5`。
+
+### 2026-08-01 · 0.5.4 编辑收藏字段层级收口
+
+- **去掉重复位置信息。** 单个 Chrome 收藏不再显示“收藏位置 / 根目录”静态信息；文件夹选择保留为唯一的原生位置编辑入口。重复收藏仍保留必要的副本选择器，但不再额外显示位置标题。
+- **隐藏主题。** 编辑弹层不再显示 AI 主题。主题是 AI 独立生成的语义字段，继续供报告、主题图谱和重新发现使用，不会因用户删除自定义标签而被错误改写。
+- **标签去标题。** 自定义标签区域去掉可视标题，仅保留标签芯片、删除操作和添加输入；两端继续共享同一个编辑字段组件。
+- **验证。** 暗色主题重新拍摄侧边栏和网页端编辑弹层，字段结构一致；单个收藏不再渲染重复位置、主题或标签标题，重复收藏仍保留副本选择器；`npm run check` 通过（51 个测试文件、272 项测试、类型检查、设计 token、生产构建和全部 JS 产物语法检查）。版本文件和 `dist/manifest.json` 已同步到 `0.5.4`。
+
+### 2026-08-01 · 0.5.3 编辑弹层统一与侧边栏层级/状态样式修复
+
+- **文件夹缩进根因。** 上一轮只把 `--tree-depth` 应用到文件夹行，普通书签行仍使用 `padding-left: 0`；现将层级变量接到普通书签行的左内边距，子项实际增加 24px。
+- **编辑弹层统一。** 新增共享 `BookmarkEditorFields` 与共享 `buildBookmarkEditorModel`。侧边栏和网页端现在都显示收藏位置、名称、网址、文件夹、AI 分析、主题、自定义标签和备注，并统一使用 `UPDATE_BOOKMARK_DETAILS` 保存原生字段与 Aarre 元数据；重复 Chrome 收藏位置也可在两端选择。
+- **夜间编辑按钮。** 新增 `--cover-action-bg/ink` 主题 token，网页端卡片右上角编辑按钮在暗色模式使用亮色背景和深色图标，不再被封面遮罩压成黑块。
+- **网页端兜底封面。** 40 张本地 Aarre 兜底图现在在 4:3 瀑布流封面中使用 `object-fit: contain`，完整保持封面高度；左右留白使用当前封面自己的强调底色（来自封面资产基准色），不再露出管理页中性色。真实页面截图仍保持原来的铺满裁切和 hover 放大。
+- **状态与重新发现。** 所有设置状态胶囊左右内边距收敛为 12px；编辑弹层状态和封面补拍状态同步采用 12px；「这会儿值得重看」条目默认使用 `--surface`，与外层 `--surface-sunken` 保持相近但可辨识的底色。
+- **验证。** 侧边栏运行态确认子项 `padding-left: 24px`、编辑保存可回读备注；暗色主题确认编辑按钮背景为亮色；运行态确认兜底图为 `contain`、384×384 资产在 4:3 容器中保持高度、底色分别落为资产对应的 RGB 值；`npm run check` 通过（51 个测试文件、272 项测试、类型检查、设计 token、生产构建和全部 JS 产物语法检查）；`npm run ui:audit` 浅色列表与深色收藏库相关场景均为 0 项问题。版本文件递增到 `0.5.3`。
+
+### 2026-08-01 · 0.5.2 侧边栏样式走查收口
+
+- **目录层级。** 文件夹内书签的缩进刻度从 20px 调整为 24px，文件夹与子项的层级关系更清楚。
+- **普通搜索。** 无结果时只保留「没有找到相关收藏」，去掉排序/AI 解释文案和 AI 配置按钮；普通搜索不再把 AI 配置当成前置条件。
+- **历史会话。** 去掉底部「最多保留 50 个会话」的内部实现说明，保留用户真正需要的空状态说明。
+- **图标密度。** 侧边栏普通列表和搜索结果的书签缩略图统一为 42×42px。
+- **主题与标签。** 本轮不改数据模型：主题用于较高层的报告、趋势、图谱和重新发现；标签用于具体检索和用户编辑。截图里主题与标签出现同名属于生成/展示去重问题，后续可单独做去重策略。
+- **本地走查。** `npm run dev` 持续提供 `http://localhost:5173/sidepanel.html` 与 `http://localhost:5173/manager.html`；`npm run ui:audit -- 列表` 为 0 项问题，`npm run ui:shots -- panel library` 已重拍两端关键状态。
+- **验证。** `npm run check` 通过（51 个测试文件、271 项测试、设计 token、TypeScript、生产构建和全部 JS 产物语法检查）；版本文件同步到 `0.5.2`。
+
+### 2026-08-01 · 0.5.1 侧边栏首屏 loading 与 AI 引导卡片修复
+
+- **首屏顺序。** 侧边栏直接读取并渲染 Chrome 原生书签树；`GET_LOCAL_RESOURCES` 只在后台 fire-and-update 完成本地 IndexedDB 全量索引同步。此前后者逐条处理书签时会让 `snapshot` 一直为空，用户只能看到长期 loading。设计预览仍回退到消息 mock，生产侧首屏不再依赖 Service Worker 的索引响应。
+- **AI 引导卡片。** 未配置 API Key 时不再在收藏列表底部挂载「配置 AI 后可以直接问你的收藏」卡片；设置页仍是配置入口，已配置 AI 的输入框不受影响。
+- **回归保护。** `tests/sidepanel-layout-stability.test.ts` 新增启动顺序与 footer 渲染断言，`tests/bookmark-tree.test.ts` 覆盖根目录排序和计数；版本文件递增到 `0.5.1`。
+- **验证。** `npm run check` 通过（51 个测试文件、270 项测试、类型检查、设计 token 检查、生产构建和全部 JS 产物语法检查）；本地 `sidepanel.html` 运行态确认 setup card/loading 均为 0，侧边栏列表审计为 0 项问题。Chrome 安装态重载仍需真人复看。
+
+### 2026-08-01 晚 · UI 收口（已构建 dist）
+
+产品在预览里连续点名后完成，变更按 token / 控件系统落地，避免页面特例：
+
+| 项 | 处理 |
+| --- | --- |
+| 设置页顶部提示条 | 主设置页不再渲染 `settings-notice`；扫描确认只留弹窗 |
+| 设置「更多」 | 与分区同宽；`padding: var(--sp-3)`；`size="unstyled"` |
+| 卡片 hover 遮罩 | `--scrim-cover` 冷暗色整面；去掉截断；遮罩内无滚动条滚动 |
+| Select 焦点/菜单 | `--focus-ring` 脱离 accent；菜单 `radius-md` + `nested-md`；无黑色描边；高亮不从 0×0 飞入 |
+| Elevated 浮层 | 默认 `border-border/60` 淡描边 |
+| 网页端顶栏 | 去掉 `.manager-header` 底部分隔线 |
+
+**验证：** 相关 layout / guardrail 单测通过；设计 token 检查通过；本轮结束时执行 `npm run build` 刷新 `dist/`。真机重载扩展后请重点看：文件夹下拉圆角与淡描边、卡片 hover 文案是否滚得完、设置页是否还有顶部提示、顶栏是否还有细线。
+
+**暂勿并行修改：** `src/ui/tokens.css`、`src/lib/shape-context.tsx`、`src/lib/elevated.tsx`、`src/components/ui/select.tsx`、`src/ui/manager.css`、`src/ui/sidepanel/SidePanelApp.tsx`（设置页段落）——除非用户又提新需求。
+
+### 2026-08-01 · 0.5.0 控件回归修复 + 本地对照环境
+
+用户在真机上发现批次 0 之后仍有大量控件问题。本轮先修掉点名的五条，再用截图和运行时审计做了一遍系统性排查。`npm run check` 通过（51 个测试文件、263 项测试、类型检查、生产构建）。
+
+**本地对照环境（用户明确要求）**
+
+- `npm run dev` 已经能同时提供 `http://localhost:5173/sidepanel.html` 和 `http://localhost:5173/manager.html`，DEV 下自动装载 `preview.ts` 的 chrome mock，无需安装扩展。主题存在 `localStorage` 的 `aarre:theme`（`light` / `dark`）。
+- 新增 `npm run ui:shots [场景…]`：用 Playwright 把两端驱动到难以手动复现的状态（行 hover、设置二级页、编辑弹窗、下拉展开、删除确认、键盘焦点、六个视图），逐张写到 `.shots/`（已 gitignore）。`SHOOT_THEME=dark` 切夜间。
+- 新增 `npm run ui:audit [场景关键词]`：在 10 个场景 × 明暗两套主题下遍历所有控件，报告六类问题——高度不足 24px、文字被裁切、图标偏离中线、超出视口、整行按钮未撑满，以及 **hover 反色**。当前两套主题均为 0 项。
+- hover 检测用 CDP 的 `CSS.forcePseudoState` 一次性给所有控件加上 `:hover`，再比较悬停前后的实际背景亮度：静止浅色而悬停近黑（夜间反之）判为反色，另外还看悬停后文字对比度是否掉到 3:1 以下。**这条规则做过反向验证**：把 `.bookmark-main` 的 `variant="unstyled"` 去掉后立刻报出 315 项，加回去归零，所以 0 项不是规则写空了。
+- 写这个检测器时踩过一个坑：`getComputedStyle` 返回的颜色语法取决于作者怎么写，`color(srgb 1 1 1 / 0.78)` 的通道是 0–1 而 `rgb()` 是 0–255，正则抓数字会把白色读成黑色。最终改成把颜色画到 canvas 再读像素，这是唯一能覆盖全部语法的解析方式。
+
+**hover 变黑的真正根因（点名问题 1）**
+
+批次 0 把变体背景从内层挪到按钮元素上时，只考虑了静止态的层叠顺序。静止态确实是项目 CSS 胜出（旧类 unlayered、Tailwind 在 `@layer utilities`），但 `hover:bg-foreground/90` 编译出的是 `.hover\:bg-foreground\/90:hover`——**伪类选择器的特异性比同元素上的普通类高一级，跟层和源码顺序都无关**。于是所有没写 `variant` 的 `<Button>`（默认 `primary`）在鼠标移上去的一瞬间被刷成近黑，`.bookmark-main` 首当其冲。
+
+- `Button` 新增 `variant="unstyled"` 与 `size="unstyled"`（两者都是空类名），用于外观由项目 CSS 负责的按钮。
+- `src/ui/**` 里 71 个带项目类名的 `Button` 全部改用 `variant="unstyled"`（53 个原本没有 variant，18 个原本是 `ghost`）。原先靠 `ghost` 白蹭 hover 的四处（收藏库 tab、两个弹窗关闭键、`agent-action-drop`）在 CSS 里补了自己的 hover。
+- 设计检查脚本的规则同步反转：从「禁止 variant 与旧类叠加」改为「带项目类名的 Button 必须是 `variant="unstyled"`」，判据是实际扫描 5 个 CSS 文件得到的类名集合，不是关键词猜测。`tests/control-system-guardrails.test.ts` 里有同一条断言。
+
+**其余四条点名问题**
+
+- **文件夹下拉（问题 2）**：卡片编辑弹窗里的两个 `FluidSelect`（原生 `<select>`）换成收藏库工具栏同款 `Select`，蓝绿描边、贴边箭头和系统菜单一起消失。同时 `FluidControls` 的焦点态从「accent 边框 + 2px accent 环」改成「`--line-strong` 边框 + 仅键盘焦点的 1px `--focus-ring` 环」——点一下输入框就镶一圈蓝绿是这一族控件共同的问题，不只是下拉。
+- **设置「更多」排版（问题 3）**：`Button` 会把 children 包进带 `text-box: trim-both` 的 label span，那是个普通行内盒，于是「标题块 + 右侧箭头」被竖着堆起来。改成**只有字符串 children 才包 label span**，组合 children 直接放进 flex 行；同时把该行的负外边距调好，让标题与其他分区标题左对齐。
+- **AI 分析多余说明（问题 4）**：删掉侧边栏编辑弹窗里那段「主题是 AI 归纳的…」，连同只为它存在的 CSS。
+- **删除按钮图标未对齐（问题 5）**：同一处 label span 修复顺带解决——图标和文字过去被塞进同一个被 trim 过的行内盒里，基线自然对不上。
+
+**顺带排查出来并修掉的问题**
+
+- **夜间模式的遮罩和阴影是反的**：三处模态遮罩和全部阴影都写成 `color-mix(var(--ink) N%)`，而 `--ink` 在夜间是近白色，于是遮罩把页面照亮、阴影变成白色光晕。新增 `--shade`（固定深色）和 `--scrim-modal`，遮罩和 `--shadow-*` 全部改用它。
+- **焦点环有两套**：`base.css` 里 `button:focus-visible` 画 2px `--ink 42%` 外框，共享 `Button` 又画 1px `--focus-ring` 内环。统一为 `--focus-ring`，并让 `[data-slot="button"]` 只保留组件自己那一个。
+- **同一个标签芯片在两端是两套尺寸**：侧边栏 28px 芯片配 22px 圆形删除键、11px 图标；网页端 32px 芯片配 26px 圆角删除键、13px 图标。收敛成 `base.css` 里共享的 `.tag-chip` / `.tag-chip-remove`（新增 `--control-h-2xs: 22px`），两端各自的重复规则删除。
+- **设置账号行的姓名和状态挤在一行**，且未登录时头像会拿「尚未连接」的首字「尚」当字母头像。改为姓名在上状态在下，没有真实账号就不渲染头像。修这条时误删了 `.settings-onboarding-section` 共享的 `space-between`，已在截图复查中发现并补回——这类共享规则改动必须复查所有共用它的选择器。
+- **整理提案的恢复链接**只有 20px 行高，作为独立操作行给到 `--control-h-xs` 的点击高度。
+- 编辑弹窗页脚三个按钮从「删除用 small、保存用默认」统一为同一档高度。
+- **设置「更多」的箭头没有推到最右边**，是修完排版后复看截图才发现的：`.settings-more-button` 写了 `justify-content: space-between`，但 button 元素的 auto 宽度即使在 `display: flex` 下也仍然收缩到内容宽度，于是没有空间可分配。补 `width: 100%`，并把「整行按钮未撑满」加进运行时审计——这类「规则写了但不生效」的问题看代码是看不出来的。
+- **编辑书签的「添加标签」按钮仍有错误 hover**：它没有自己的类名，却被祖先选择器 `.tag-entry button` 画成主按钮，同时 React 上仍写着 `variant="ghost"`；静止态与 hover 态分别由两套系统控制，实测甚至出现黑底黑字。改为具名的 `tag-entry-submit` + `variant="unstyled"`，明确补齐 enabled / hover / disabled 三态；网页端相同结构同步改为 `library-card-editor-tag-submit`。此前 guardrail 只识别按钮自身的项目类名，无法识别祖先选择器，现已为这两个提交按钮补专门回归测试。
+- **点击位移**：共享 `Button` 曾对所有变体加 `active:scale-[0.98]`。宽列表行会明显往里缩，用户要求所有点击都不要位移。已从全部变体移除按压缩放，点击反馈只保留颜色变化。「这会儿值得重看」条目原先用 `ghost`，被锁成 36px 高，hover 白底把两行文字紧紧包住；改为 `unstyled` + 明确内边距与最小高度。
+- **表单焦点绿框**：`FluidControls` 与 `Select` 触发器曾用 `--focus-ring`（accent 青绿）画一圈外环。已统一改为只加深自身描边；绿色焦点环只留给按钮等非表单控件的键盘焦点。
+- **状态提示与列表融在一起**：侧边栏 `.native-notice` / `.native-error-layout`（含预览写入失败「设计预览不执行数据写入操作」）原先是面板网格里的平铺条，背景与列表同色。已移入内容框并绝对定位浮在列表上方，白底 + 描边 + `--shadow-float`，与网页端 toast 同角色。设置页内的 `settings-notice` 与整理建议横幅仍是各自场景的内联块，不改。
+- **费用展示全面改为 token 用量**：扫描确认弹窗、首次引导粗估、设置「AI 用量」都不再出现 ¥ / 费用 / 人民币；统一为输入/输出 token。后台不再按费用上限拦截启动。内部仍可累计 `estimatedCostCny` 供以后需要，但界面不再展示。
+- **预览点「更新站点标识」报 `chrome.permissions.contains is not a function`**：设计预览的 permissions stub 原先只有 `request`。已补 `contains`，并让 `requestPageSnapshotPermission` 在缺少 `contains` 时不再同步抛 TypeError。
+- **设置页顶部提示条全部拿掉**：点「更新站点标识」、打开扫描确认、保存 API、导出等，都不再在设置内容区顶部刷一条 `settings-notice`（原先会压在弹窗背后当“背景字”）。确认信息只留在「开始前确认」弹窗里；引导页的错误提示保留。
+- **设置「更多」条目布局**：去掉负外边距（避免往左偏、右边缺一块），补 `size="unstyled"`，并恢复与同类 title+chevron 行一致的 `padding: var(--sp-3)`；外框与分区同宽，文字/箭头不再贴边。已加 `sidepanel-layout-stability` 防回归。
+- **收藏库卡片 hover 遮罩**：整面冷暗色 `--scrim-cover`（不要棕色/彩色）；去掉摘要截断，内容过多时在遮罩内无滚动条滚动；点击仍打开书签。
+- **焦点环与下拉菜单（token 层）**：`--focus-ring` 不再绑 `--accent` 青绿，改为冷中性色；`--color-ring` 同步。Select 菜单壳用同心圆角 `radius-md`（14）+ `nested-md`（10）；高亮层仅在已知行矩形后挂载。菜单项 hover/键盘只走浅底高亮，不再画黑色 focus 描边。
+- **网页端顶栏**：去掉 `.manager-header` 底部分隔细线。
+- **下拉浮层描边**：`Elevated` 默认加与 Card 相同的淡描边 `border-border/60`，不再只靠阴影。
+
+### 2026-08-01 · 0.5.0 系统性优化（七个批次已全部完成，待真机验证）
+
+按 `Aarre 系统性优化` 方案分七个批次执行，本地检查为 51 个测试文件、251 项测试全部通过，构建成功。版本号已提升到 0.5.0。
+
+**批次进度**
+
+- [x] 批次 0 控件系统归一
+- [x] 批次 1a 侧边栏删除书签
+- [x] 批次 1b 网页端卡片修复
+- [x] 批次 2 卡片重设计
+- [x] 批次 3 设置页信息架构
+- [x] 批次 4 性能
+- [x] 批次 5a/5b/5c/5d AI 能力
+- [x] 批次 6 防回归
+
+**批次 1a 已完成内容。** 确认按钮改用 `.button-danger`（现在是红色），入口按钮改 `.button-danger-quiet`，实心红只留给真正执行删除的那一下。确认态与常态都收敛为同一行控件布局并锁 `min-height: var(--control-h-lg)`，切换确认不再改变弹窗高度。删除改为乐观更新：新增 `removedNodeIds`，`bookmarkRoots` 在派生时剪掉这些节点（搜索结果同源派生，一并消失），请求失败再回滚并报错。`startEdit` / `startCreateFolder` 补上 `setBusy("")`，消除「已删除的条目再次打开编辑时整片变灰」。
+
+**批次 1b 已完成内容。** 去掉 `.library-card-cover` 的 `border`（描边只在直边可见，圆角处被放大 5% 的图片盖住，本来就是半截效果）。整卡改为单一点击目标：标题链接通过 `::after` 铺满卡片，编辑按钮 `z-index` 提到其上。批次 0 删掉背景层后，卡片编辑弹窗的黑块自动消失；另外把 16 处既没有 `variant` 也没有类名的 `Button` 显式标成 `variant="ghost"`，纯图标的补上 `size="icon-sm"`，避免它们默认落到实心深色 primary。
+
+**批次 2 已完成内容。** 摘要与标签从「展开撑高卡片」改为「盖在封面上的遮罩」，用 `--scrim` 系列 token 保证在明暗主题下都是深底白字。hover 状态只过渡 `opacity`，卡片高度恒定，同列后续卡片不再位移。hover 反馈改为封面放大 1.05→1.09 加标题墨色加深，不再有描边变化；`.library-card-link:focus-visible::after` 提供键盘焦点环。
+
+**批次 3 已完成内容。** 一级页从 7 个分区收敛到 3 个（AI 服务 / 显示 / 书签增强）加一个「更多」入口；最近的更改、重看引导、隐私与导出、Google 账号、AI 用量移入二级页，返回键在二级页先回一级。全目录扫描默认只剩「N/M 已具备 AI 元数据 + 状态标签 + 一个按钮」，进度条只在扫描进行中出现；预计时间、并发、估算费用和费用上限全部移进点击后的确认弹窗。
+
+**批次 4 已完成内容。** 从四个入口做可达性分析，删除 21 个零引用组件与 hook（约 12,000 行）。framer-motion 的四处用法（tab 滑块、下拉展开、卡片 proximity 高亮、tooltip 淡入）全部改为纯 CSS 过渡，依赖已卸载，`src/lib/springs.ts` 随之删除。Supabase 客户端路径清理：删除 `supabase/` 目录、`src/lib/supabase.ts` 与 SDK 依赖，`auth.ts` / `cloud.ts` 保留原有导出签名但改为本地实现（后台的云端调用点本来就全部由 `AuthState.configured` 把守，行为不变），`scripts/build.mjs` 去掉 Supabase 域名注入分支。
+
+首屏体积（未压缩）：`styles` chunk 193.53 → 67.85 KB，样式表 132.04 → 123.33 KB，`background.js` 150.58 → 146.85 KB。
+
+**批次 5a 已完成内容。** `ResourceRecord` 新增 `useCases` / `contentType` / `questions` / `entities` 四类字段，两条增强路径（完整正文、批量扫描）共用同一份字段契约，`contentType` 必须落在 `src/lib/ai-fields.ts` 的白名单里，编造的类型会被丢弃而不是原样落库。新字段是增量的：模型漏答只是少几个字段，不会让整条增强失败。完整正文路径补上了此前只有批量路径才有的 H1/H2（`extract.ts` 新采集 `headings`，Readability 会把标题层级压平）和 URL 路径词。Gemini 路径补上 `systemInstruction`，与 OpenAI/DeepSeek 路径共用同一条注入隔离指令。
+
+**批次 5b 已完成内容。** 四个新字段接入本地搜索索引，`questions` 权重 34 排在标题（30）之上——它保存的是「你以后会怎么问」的原句，标题往往对不上。召回从 Top-50 提到 Top-80，并改为两级上下文：前 20 条给完整字段（含场景、提问、实体），其余只给一行摘要，提示词上限相应从 12k 提到 16k，候选翻倍而 token 只小幅上升。
+
+**批次 5c 已完成内容。** 新增 `update_metadata` 操作，可改标签、备注、摘要，只写 Aarre 本地存储、不碰 Chrome；撤销侧新增 `restore_metadata` 快照，`bookmark-undo.ts` 通过注入的写入函数完成恢复，自身仍不依赖存储层。语义批量操作通过 `group_label` 实现：模型为每个命中对象各生成一项操作并标注同一条筛选条件，确认卡按条件分组显示「命中 N 条」，每行可单独移除，整批仍是一个撤销单元。操作上限从 8 提到 40。
+
+**批次 5d 已完成内容。** 「这条书签还欠一次 AI 调用」收敛为 `needsAiEnrichment()` 一处定义，保存路径、全目录扫描和存量补齐共用，避免三方对「算不算完成」有分歧而重复计费。存量补齐直接复用现有扫描任务：它本来就是分批（alarm 分块）、可中断（暂停/继续/取消）的；增量部分是扫描时传 `keepExisting`，只写入缺失字段，用户手改过的摘要不被覆盖，字段齐全的收藏根本不会进候选。设置页的「N/M 已具备 AI 元数据」也改用同一判定，所以升级后计数会明显下降——这是如实反映存量缺口，不是故障。
+
+**批次 6 已完成内容。** 设计检查脚本从「只扫 5 个 CSS 文件」扩展到同时扫描全部 tsx：新增共享按钮类的 min-height 契约（必须用 `--control-h-*`，且不得写死 height）、同心圆角配对（嵌套元素不得与外层共用同一个 `--radius-*`，胶囊除外）、禁止 Button variant 与会上色的旧 CSS 按钮类叠加、旧修饰类必须挂基类、tsx 里的硬编码圆角/高度/色值和内联样式。脚本一次跑出的存量问题已全部修掉。新增 `tests/control-system-guardrails.test.ts` 覆盖三条方案点名的回归：删除确认两态同高、整卡单一点击目标（含焦点环与编辑按钮层级）、危险按钮用 `--negative` 而不是 `--ink`。
+
+**需要你在真实 Chrome 里确认的**：重新加载扩展后，侧边栏删除书签是否即时消失、编辑弹窗没有黑块、设置页分段控件圆角正常；以及首次进入设置页时「已具备 AI 元数据」的计数下降属于预期，点一次全目录扫描即可增量补齐。工具环境无法访问扩展管理页，这一步只能由你完成。
+
+**批次 0 已完成内容。** 根因是项目里有两套按钮系统叠在同一个元素上：React `Button` 会渲染一个绝对定位铺满的内层背景层（默认近黑），旧 CSS 类 `.button*` 又在同一元素上设背景，于是 `<Button className="button button-quiet">` 渲染成黑块。侧边栏靠一条 `[data-slot="button-background"] { background: transparent }` 兜底掩盖了它，网页端没有对应兜底所以露馅。
+
+- **删除内层背景层**，变体背景直接画在 button 元素上；两处兜底规则（`sidepanel.css`、`manager.css`）随之删除。旧 CSS 类是 unlayered、Tailwind utilities 在 `@layer utilities`，因此旧类稳定胜出，两套系统不再互相覆盖。
+- **新增危险色控件**：`Button` 增加 `danger` / `danger-quiet` 变体，`.button-danger` 背景从 `var(--ink)` 改为 `var(--negative)`，新增 `.button-danger-quiet`、`.text-button-danger`；`.agent-action-confirm-danger` 同步改红。`--negative` 此前从未被任何按钮使用过。
+- **控件高度收敛为闭合刻度**：新增 `--control-h-xs/sm/md/lg/touch`（28/32/36/40/44），把散落的 30/34/38/42 全部并入最近档位。`.button`、`.button-quiet`、`.button-danger`、`.text-button`、`.icon-button` 均获得 `min-height`，杜绝塌陷成一条文字。
+- **圆角建立嵌套关系**：新增 `--radius-nested-md/lg = 外层 − --sp-1`。分段控件（设置页 provider/cover tabs、管理页 report tabs）内层改用嵌套圆角，与 `--radius-md` 外壳同心。`shape-context` 的硬编码 `rounded-[20px]` 等全部改读 `--radius-*`。
+- **修掉分段控件的双重指示器**：选中态此前同时由 CSS 背景和 `TabsSubtle` 的动效滑块绘制，两个圆角不同才出现 hover 变胶囊。现在滑块是唯一指示器，其圆角与底色由 `--tabs-pill-radius` / `--tabs-pill-bg` 控制，调用方在 CSS 里设定。
+- 修复 `SidePanelApp.tsx` 中漏写 `button` 前缀的取消按钮。
+- 验证：`npm run check` 通过（49 个测试文件、233 项测试）。`tests/sidepanel-layout-stability.test.ts` 的像素断言改为断言 token。
+
+### 2026-08-01 · 0.4.9 三并发后台补拍与卡片编辑按钮交互收口
+
+- **三并发补拍。** 批量补拍改为固定 3 个 worker，每个 worker 使用独立的后台静音标签页、资源游标、尝试次数和 lease；任务状态持久保存 workers，0.4.8 的单 worker 状态会在读取时兼容迁移。单个 worker 的截图、调试协议、页面超时或标签页关闭只影响该项，其他 worker 继续执行。
+- **限流与资源边界。** 同一注册域名的导航启动使用 1 秒 DomainRateLimiter；最多同时保留 3 个补拍标签页和 3 个调试连接，不把全量收藏一次性并发化。暂停、取消、完成、Service Worker 重启和旧 lease 均按 worker 清理/恢复，避免旧截图写入新任务。
+- **管理页体验。** 补拍状态会显示当前并发 worker 数；卡片右上角编辑按钮默认隐藏，hover、键盘 focus 或窄屏触控设备显示，保留无障碍和移动端可用性。
+- **版本与验证。** 版本文件递增到 `0.4.9`；需完成本轮 `npm run check` 和真实 Chrome 安装态三 worker 体验验证。
+
+### 2026-08-01 · 0.4.11 手动封面截图与网页端直接导航优化
+
+- **右键入口。** 新增“更新封面”菜单项，仅对当前 URL 已确认存在 Chrome 收藏的普通网页显示；未收藏、无法确认、受保护或不支持的页面不会显示或执行。
+- **截图流程。** 点击后重新校验收藏、本地资源、隐私设置和当前前台标签页，清理同页普通自动截图目标，等待页面稳定后用现有前台截图路径截取当前视图，并覆盖 `pageSnapshots` 与资源 `snapshotAt`。
+- **交互与边界。** 手动刷新使用独立 `manual_refresh` 触发状态，明确绕过“7 天内不自动重复刷新”策略，但不会顺带触发 AI 富化；成功复用网页内“封面截图已更新”提示，失败通过扩展徽标给出原因。批量补拍专用标签页不会被手动菜单打断。
+- **打开与截图优化。** 手动更新封面不再执行 900ms–4s 的页面稳定等待，只保留页面身份和前台状态核对后立即截图；从网页端打开收藏改为 `chrome.tabs.create({ url, active: true })`，再补登记截图目标，避免默认首页闪现。
+- **版本与验证。** 版本文件递增到 `0.4.11`；`npm run check` 通过（49 个测试文件、233 项测试、类型检查、生产构建），待真实 Chrome 安装态验证右键显示、当前视图覆盖、直接导航和失败提示。
+
+### 2026-08-01 · 0.4.12 构建产物语法错误防回归与 AI 链路核查
+
+- **报错调查。** 用户提供的 Chrome 扩展错误为 `background.js:91 Uncaught SyntaxError: Unexpected end of input`。当前源码、Vite 产物和所有已生成 JS 文件均通过 Node 语法解析，未复现源码语法错误；该现象符合 Chrome 曾加载旧版或不完整背景脚本后的安装态错误记录。
+- **防回归修复。** 新增 `scripts/check-built-javascript.mjs`，构建结束后递归对 `dist/` 内所有 JavaScript 执行 `node --check`；任何截断或未闭合语法都阻断构建，不再让无效 `background.js` 进入可加载产物。
+- **AI 链路结论。** Aarre 保存当前已打开网页时，会注入 `content-capture.js`，在真实网页 DOM 上用 Readability 提取正文、标题、描述、作者、站点名、语言、选中文本和代表图，再把最多 50,000 字正文与网页元数据发送到用户配置的 AI 提供商生成摘要、标签、主题和别名；AI 不直接读取截图。Chrome 原生书签或没有可信前台正文时，任务会等待用户正常打开网页后再读取真实渲染 DOM；显式“全库扫描”才会使用公开 HTML 的元数据/首段正文作为降级输入。
+- **版本与验证。** 版本文件递增到 `0.4.12`；待完成本轮 `npm run check`、产物语法校验和真实 Chrome 重新加载验证。
+
+### 2026-08-01 · 0.4.8 封面比例与侧边栏通知浮层 UI 收口；并发补拍可行性结论
+
+- **网页端封面。** 收藏卡片封面从 16:9 调整为 4:3，容器继续隐藏边缘溢出；封面内容默认以 `scale(1.05)` 轻微放大，悬停/键盘聚焦时平滑到 `1.065`，避免页面边缘出现细滚动条或未填满的视觉缝隙。
+- **侧边栏提示。** 收藏保存后的成功提示和错误提示统一增加明确最小高度、行高、长文案换行与关闭按钮不收缩规则；设置页通知同步有最小高度并垂直居中。网页端 `manager-toast` 也补齐固定最小高度和居中布局，避免相同问题在不同入口复现。
+- **并发研究结论。** 当前批量补拍状态按单 worker 实现：任务只有一个 `currentResourceKey/currentLease/tabId`，只创建一个后台专用标签页，超时 Alarm 按单 job 清理，`SnapshotBackfillStatus.concurrency` 还是字面量 `1`。3–5 并发技术上可行，但需要多 worker、每 worker 独立标签页/lease/超时/取消恢复和结果结算的状态机重构；本轮没有改并发逻辑，也不能承诺线性 3–5 倍加速。建议后续先设计 3 worker、按 host 限流和资源上限，再做真实 Chrome 安装态基准。
+- **验证。** `manager-layout-stability` 与新增的 `sidepanel-layout-stability` 专项测试通过；`npm run check` 已通过（49 个测试文件、232 项测试、类型检查、生产构建）。真实 Chrome 安装态仍需用户重新加载/安装 0.4.8 后体验确认。版本文件已递增到 `0.4.8`。
+
+### 2026-08-01 · 0.4.7 首屏速度与批量补拍队列修复
+
+- **首屏速度。** 管理页先加载真实书签库，整理洞察、知识仪表盘等非首屏计算改为后台准备；管理页基础请求并行执行。后台原生书签导入增加并发合并、变更版本缓存，未发生变化的资源不再重复写入 IndexedDB，避免同一次打开反复全量导入。
+- **批量补拍。** 后台图片准备与稳定等待函数改为真正自包含，注入网页时不再引用外部模块辅助函数；截图重试异常统一进入单页失败结算并继续下一项，避免 rejected Promise 将队列悬在第一张。
+- **版本。** `package.json`、`package-lock.json`、`public/manifest.json` 和最新 `dist/` 均为 `0.4.7`。
+- **验证。** `npm run check` 通过：48 个测试文件、231 项测试、类型检查、生产构建全部通过；尚未在真实 Chrome 安装态复测，需用户重新加载/安装 0.4.7 后体验首屏速度和批量补拍。
 
 ### 2026-07-31 · 0.4.6 后台补拍封面未加载完成修复
 
@@ -740,7 +1171,7 @@
 **明确未通过 / 外部门**
 
 - 尝试在 Chrome 内部扩展管理页加载最新 `dist/` 时，浏览器控制工具以安全策略拒绝 `chrome://extensions`，并明确禁止换通道或间接绕过。因此本轮不能声称完成 PRD 0.2 第 3 条“真实安装扩展”门；开发预览证据与安装态证据保持分开。
-- 正式 Extension ID 只能由 Chrome Web Store 开发者后台生成；公开 HTTPS 隐私政策地址也需要实际发布。仓库没有伪造二者。
+- 正式 Extension ID 只能由 Chrome Web Store 开发者后台生成，仓库不能伪造；公开 HTTPS 隐私政策和服务条款已经发布。
 - F2 真实 20 条子树撤销、F3 真实 300 条来源分布、F7 人工合理率、F9 300 条/5 分钟、F11 相比串行与账单偏差、F1 1,000 条首帧和 F8 2,000 条真人体验仍需安装态真实数据。
 - 语音制作 Skill 要求正式 TTS 使用 `OPENAI_API_KEY`；当前环境未配置，所以交付的是无需音频也能理解的中文字幕视频，不用临时系统音冒充正式旁白。
 - F8 第二/三层受尚未拍板的 D7 约束，且 PRD 第 12 章明确本轮只做第一层；F14 与 F21 按用户要求排除。
@@ -830,6 +1261,8 @@
 ### 2026-07-30 · PRD 定稿到可开工状态：确认与 NexVoice 同栈，新增第 12 章开工指引（仅文档，未改动代码）
 
 第五轮修订。本轮仍只改文档，`docs/PRD.md` 升到 v1.2。**这一轮的目标是让 PRD 可以直接交给 Agent 执行，所以补的全是「怎么做」而不是「做什么」。**
+
+> 历史说明：本节的 OAuth、三表 schema、`updatedAt` 游标、只同步元数据和不上传快照方案已在 2026-08-02 的 PRD v1.3 中整体替换；实施只看当前 F14，不得照本节旧规格开发。
 
 **1. 服务端技术栈已确认同栈，并实地核对了 NexVoice 的实现（`docs/PRD.md` F14）**
 
@@ -1245,42 +1678,46 @@ F2 的撤销快照和 F22 的页面快照原来都叫 `snapshots`，但前者是
 
 ## 下一步计划
 
-统一增强协调器、所有正常打开方式补缺、7 天截图新鲜度、存量前台补拍、瀑布流稳定性和收藏库筛选排序均已实现。下一步重点是**真人安装态验收与商业化规模验证**，不是继续改交互规则：
+**最优先：重载今晚构建的 `dist/` 做真机复看。** 除原有控件回归项外，额外确认：设置无顶部提示条、「更多」不贴边、卡片冷暗遮罩可滚完文案、文件夹/排序下拉圆角与淡描边且无绿框/黑描边、顶栏无底线。仍有问题先截图/`ui:shots` 再改，不要凭记忆猜。
+
+统一增强协调器、所有正常打开方式补缺、7 天截图新鲜度、存量前台补拍、瀑布流稳定性和收藏库筛选排序均已实现。此外的重点是**真人安装态验收与商业化规模验证**，不是继续改交互规则：
 
 1. 在真实 Chrome 重载最新 `dist/`，逐项验证 Chrome 星标、Aarre 新增、Aarre/地址栏/普通链接打开缺图旧收藏、新收藏静默首拍、旧收藏 toast、7 天静默刷新、多个后台标签逐个切回，以及批量补拍的失焦、快速暂停/继续、关闭专用标签页、超时、重定向和 Service Worker 休眠恢复；保留实际版本、权限与后台错误证据。
 2. 对收藏库第二列长时间悬停、文件夹筛选、六种排序、状态组合、搜索相关度、URL 恢复、已删除文件夹回退、移动端布局和空状态做真人管理页验收。
 3. 用不少于 300 条真实中英文书签完成封面来源分布、死链耗时、整理建议合理率、扫描并发和实际费用偏差报告。
-4. 在 Chrome Web Store 后台创建正式 Extension ID，把 `privacy.html` 同内容部署到公开 HTTPS 地址，再核对 Google OAuth 重定向 URI 与最终 Manifest。
+4. 在 Chrome Web Store 后台创建正式 Extension ID，把 `privacy.html` 同内容部署到公开 HTTPS 地址；核对 Google Cloud callback 为 `https://sync.nexvoice.cc/v1/auth/google/callback`，Aarre API allowlist 为该 Extension ID 的 `chromiumapp.org/auth`，并与最终 Manifest 保持一致。
 5. 若决定制作有声宣传片，配置正式 TTS 凭据后生成旁白并披露 AI 配音；当前中文字幕版可直接审阅。
-6. F14 云端迁移与 F21 Web/PWA 继续保持排除，除非产品负责人另开任务；F8 第二/三层须先拍板 D7。
+6. F14 代码与本地集成已完成；下一门是准备正式 Extension ID / Google OAuth、`sync.nexvoice.cc` DNS/TLS、香港/新加坡 COS、SSM、两套独立 CAM 和生产 secrets，然后执行真实 COS、重装恢复、联合灾备与共机压测。F21 继续依赖 F14 的生产门；F8 第二/三层须先拍板 D7。
 
-**第 5 批：F14 云端迁移**
+**第 5 批：F14 生产外部资源与上线验收**
 
-开工前必须先查清这四件事，每一件都可能推翻方案：
+2026-08-02 已完成服务器只读核对与隔离镜像构建：NexVoice 运行在腾讯云香港 `ap-hongkong-2`；观测时资源允许新增独立 320MiB `aarre-api`；实际 Docker 网络为 `production_default`；PostgreSQL 16、Caddy 与 GlitchTip 均健康。服务器在香港，因此旧方案里的“中国大陆节点 ICP 备案是当前阻塞”不成立；每次部署前仍要重新核对内存、磁盘、load 和容器状态。
 
-- **域名与备案** — 确认能否直接用 `nexvoice.cc` 的子域名（如 `sync.nexvoice.cc`）。要独立域名的话备案周期得提前算进排期。
-- **内存余量** — 在机器上跑 `free -h` 和 `docker stats`。现有占用是 `control-db` 640M + `control-api` 384M + GlitchTip 整套（通常 1.5GB 以上），要确认还能塞进 256M。不足则走退化方案，**但这个决定必须先报产品负责人**。
-- **Compose 网络名** — `docker network ls` 查 NexVoice compose 的实际网络名，不要猜。
-- **Google Cloud 重定向 URI** — 需要正式 Extension ID 才能注册，确认 F16 的进度。
+上线前剩余外部资产：
 
-然后按 F14 的规格实现 `server/`，并按清单改造扩展侧的 `auth.ts` / `cloud.ts` / `build.mjs`，删除 `supabase/` 整个目录。
+- **正式身份** — 在 Chrome Web Store 固定 Extension ID；Google Cloud Web client 只登记 `https://sync.nexvoice.cc/v1/auth/google/callback`，Aarre API 另行 allowlist 该 Extension ID 的 `chromiumapp.org/auth` 回跳。
+- **API 入口** — 为 `sync.nexvoice.cc` 配置 DNS/TLS；未来取得 Aarre 独立域名时按双域名迁移，不改变客户端数据模型。
+- **对象存储** — 创建 Aarre 独立的香港私有主 COS、新加坡私有灾备 COS、默认 SSE-KMS、版本/生命周期/跨地域复制，以及 API CAM 与 backup/deletion CAM。
+- **生产密钥与恢复** — 在腾讯云 SSM 建立 Aarre envelope KEK，配置独立数据库密码、Token pepper、OAuth secret 和 root-only 环境文件，严禁复用 NexVoice 的业务密钥。
+
+代码四门已经完成；外部资产齐备后按同一顺序做真实环境验收：认证与 metadata → COS PUT/HEAD/GET 与图片恢复 → 卸载重装/新设备 → 联合灾备与共机压测。任一门失败都不开放生产构建。旧 `supabase/` 已经删除，不要重新创建。
 
 **待产品负责人拍板的决策**
 
-`docs/PRD.md` 第 9 章里 D1、D3、D5、D6、D7、D11 尚未定，Agent 遇到要停下来问，不要自行决定。
+`docs/PRD.md` 第 9 章里 D1、D3、D5、D6、D7 尚未定，Agent 遇到要停下来问，不要自行决定。D2、D9–D13 已完成产品与架构决策。
 
 ## 遇到的问题
 
 - Chrome 原生书签只能保存标题、URL 和文件夹，不能承载摘要和标签。
 - Chrome 扩展同步空间不足以存放正文和 AI 索引。
-- Google OAuth 和生产扩展 ID 必须由真实 Google Cloud、Supabase 和 Chrome Web Store 配置共同完成。
+- Google OAuth 和生产扩展 ID 必须由真实 Google Cloud 与 Chrome Web Store 配置共同完成，开发期 unpacked ID 不能代替生产配置。
 - Chrome 扩展不能复制地址栏未公开的计算器、站点搜索快捷词等内部逻辑。
 
 ## 已解决问题
 
 - 使用 Chrome Sync 与自建云端的双层同步模型（原生层交给 Chrome，智能层自己同步）。
 - 使用 Google 账号和 Chrome 配置文件邮箱一致性检查避免账号串库。
-- ~~使用 Supabase RLS 隔离每个用户的数据。~~ **已随迁移作废。** 自建服务器没有 RLS 兜底，改为应用层强制：唯一 repository 层 + 结构测试 + 越权集成测试。见 `docs/PRD.md` F14。
+- ~~使用 Supabase RLS 隔离每个用户的数据。~~ **已随迁移作废。** 当前自建服务以 Auth/Sync/Asset/Account domain service 作为 repository 边界，所有在线用户数据 SQL 都从已认证账号取得 `userId`；结构测试会扫描并拒绝缺少 `user_id` 的语句，路由鉴权与跨用户资源/资产/冲突集成测试均已通过。
 - 使用本地队列保证云端失败时原生书签仍能成功保存。
 - 使用规范化 URL 资源键解决跨设备 Chrome bookmark ID 不可靠问题。
 - Chrome 作为基础字段的唯一事实来源；智能索引自动关联，不再要求用户导入。
@@ -1288,15 +1725,19 @@ F2 的撤销快照和 F22 的页面快照原来都叫 `snapshots`，但前者是
 
 ## 未解决问题
 
-**云端（F14，尚未开工）**
+**云端（F14，生产底座运行中、公开入口未开通）**
 
-- 自建服务端代码尚未编写，`server/` 目录不存在。
-- 上面「下一步计划」里的四项前置确认（域名备案、内存余量、compose 网络名、Google 重定向 URI）全部未查。
-- 现有 `src/lib/cloud.ts` 和 `auth.ts` 仍是 Supabase 实现，**从未真实跑通过一次**，而 README 和界面已经在向用户承诺跨设备同步。这是当前最需要收口的落差。
-- Google OAuth 需要正式 Extension ID 才能注册重定向 URI，依赖 F16。
+- 自建服务端、扩展客户端、数据库迁移、COS 协议、部署/备份脚本、香港/新加坡 COS、API 与 backup/deletion CAM、Google Web OAuth、生产 secrets、健康巡检和 GlitchTip project 均已建立并验证；公开端到端尚未完成，因此仍不能宣称云端生产可用。
+- 正式 `sync.nexvoice.cc` DNS/TLS 仍待实际管理 `nexvoice.cc` 的 DNSPod 账号配置；正式 Web Store Extension ID、公开 Google OAuth、真实扩展同步、卸载重装/联合恢复和 50 用户压测仍待完成。KMS/SSM 是经成本评估后明确不购买的当前方案，不再列作“缺少配置”。
+- 普通 `dist` 未注入生产 API，账号入口安全显示未配置；只有真实外部门通过后才允许用 `AARRE_CLOUD_RELEASE=1` 构建生产包。
+- 生产 Google 登录需要正式 Extension ID 才能固定 Aarre API 的 `chromiumapp.org/auth` 回跳 allowlist，依赖 F17；Google Cloud 的 Web callback 则固定为 `https://sync.nexvoice.cc/v1/auth/google/callback`，两者不能混写。
+- 图片资产、sequence change feed、加密冲突、重装恢复客户端、账户删除和离机备份/恢复工具已经实现；真实 COS、数据库隔离恢复和日志脱敏演练已执行，卸载重装、联合资产恢复及 50 用户压测尚未执行。
+- F15 的版本化 archive 导入器尚未实现；当前只有本地/云端导出与云端登录恢复，不能把导出说成完整的离线导入闭环。
 
 **产品与功能**
 
+- 0.5.15 已用真实 DeepSeek Key 跑通校验、增强、普通问答、全量分批召回、进度与取消，并修复 localhost 假 AI；但 localhost 仍是评审数据，不能替代安装态 Service Worker 和用户真实收藏。Gemini/OpenAI、DeepSeek 额度错误后的 UI 恢复、以及重载 `dist/` 后的真实目录查询仍需单独验收。
+- 旧版本已经丢失的 `useCases/contentType/questions/entities` 无法凭空恢复。它们会被 schema 版本识别为待补全，但为了避免未经确认消耗 BYOK，用量较大的全库补全仍由用户在设置中显式启动；日常新收藏和正常打开页面会按既有策略自动补齐。
 - 删除原生书签目前不会立即永久删除云端资源。F14 的墓碑机制加 F2 的回收站会一起解决。
 - 同一个 Canonical URL 的多位置、多备注模型目前合并为一个资源。
 - F3 真实 300 条中英文书签样本的来源分布和质量地板指标尚未统一验收。
@@ -1325,6 +1766,13 @@ F2 的撤销快照和 F22 的页面快照原来都叫 `snapshots`，但前者是
 
 ## 验证情况
 
+- **2026-08-01 · 0.5.3 编辑弹层统一与样式修复：** 类型检查通过；编辑器/侧边栏/模型专项测试通过（13 项）；设计 token 检查通过；暗色侧边栏列表与网页端收藏库编辑场景 UI 审计为 0 项问题。localhost 运行态验证：子书签 24px 内缩、状态胶囊左右 12px、重新发现条目底色分层、夜间编辑按钮亮色、侧边栏编辑保存备注后可重新读回。
+- **2026-08-01 · 0.5.2 侧边栏样式走查：** `npm run check` 通过（51 个测试文件、271 项测试）；`npm run ui:audit -- 列表` 通过（0 项问题）；`npm run ui:shots -- panel library` 通过并生成侧边栏/网页端对照截图。localhost 两个页面均返回 200，开发服务器继续保留供集中走查。
+- **2026-08-01 晚 UI 收口：** `manager-layout-stability` / `control-system-guardrails` / `sidepanel-layout-stability` 相关断言已更新并通过；设计 token 检查通过；`npm run build` 成功（Vite 生产构建 + `background.js` / `content-capture.js` + 全部 JS 产物语法检查）。请在 Chrome 用「加载已解压的扩展程序」指向本仓库 `dist/`。完整 `npm run check` 未在本轮末尾重跑全量。
+- 当前 0.5.0 工作区此前 `npm run check`：通过；Node.js 22.22.2，包含设计 Token、TypeScript、51 个测试文件 / 263 项测试和生产构建。设计检查新增五条规则：控件高度必须走 `--control-h-*`、嵌套圆角必须成对、TSX 里禁止硬编码颜色/高度/圆角、带项目 CSS 类名的 `Button` 必须是 `variant="unstyled"`、禁止同时用变体和旧按钮类。
+- 当前 0.5.0 `npm run ui:audit`：明暗两套主题 × 10 个场景共 0 项问题（检查项为高度 ≥ 24px、文字未被裁切、图标居中、无横向溢出、整行按钮撑满、hover 不反色；复选框、单选、标签删除键和正文内联链接按设计豁免高度）。hover 一项经过反向验证：故意去掉一个 `variant="unstyled"` 会报出 315 项。
+- 当前 0.5.0 `npm run ui:shots`：14 个场景截图已人工逐张比对，包含行 hover、设置主页与「更多」二级页、侧边栏编辑弹窗与删除确认、网页端卡片编辑弹窗与下拉展开态、筛选下拉、键盘焦点环，以及收藏库/整理/阅读/报告/图谱/回顾六个视图。夜间模式另跑一轮，确认弹窗遮罩是变暗而不是变亮。
+- **控件系统仍待真机验收。** 上述截图与审计都在 `npm run dev` 的 chrome mock 环境下完成，数据规模、真实封面和 Chrome 侧边栏的实际视口宽度都与安装态不同；用户在真机上发现的问题本轮已逐条修复，但需要重载 `dist/` 后再确认一次。
 - 当前 0.4.4 工作区 `npm run check`：通过；Node.js 22.22.2，包含设计 Token、TypeScript、48 个测试文件 / 225 项测试和生产构建；`package.json` 与 `dist/manifest.json` 均为 0.4.4，产物必需 `host_permissions` 为 `"<all_urls>"`，40 / 40 张本地兜底 WebP 已进入 `dist/assets/`，共 62 个文件，无 source map 或测试文件。
 - 当前 0.4.4 `npm audit --audit-level=high`：0 漏洞；`npm run verify:store-assets` 与 `git diff --check` 通过；`npm run verify:artifacts` 检测到当前没有 `outputs/` 交付包并安全跳过历史包校验。开发预览完成 1920px 第二列 24 帧悬停稳定采样、批量确认焦点闭环，以及 640px / 360px 弹窗与横向溢出检查，控制台 0 error；不替代安装态扩展验收。
 - 0.4.4 批量补拍专项覆盖：真实候选筛选、主机交错、单并发、成功/失败/跳过计数、job/lease 精确提交、失焦和暂停吊销、旧 lease 不复活、前台确认文案、真实进度、暂停/继续/取消、完成关闭和实存候选数覆盖陈旧 `snapshotAt`。
@@ -1361,10 +1809,11 @@ F2 的撤销快照和 F22 的页面快照原来都叫 `snapshots`，但前者是
 
 ## 暂不应并行修改
 
-**当前无人占用。领取需求前在下表登记自己独占的文件，完成后移除。**
+**当前无人占用。** 今晚收口刚落地；若继续改 UI，优先独占下表，做完再清。
 
 | 文件 | 占用者 | 需求 |
 | --- | --- | --- |
+| （空） | — | 上一轮涉及 tokens / shape / Elevated / Select / manager.css / SidePanelApp 设置页，有冲突先读「晚 · UI 收口」 |
 
 **长期规则**
 

@@ -80,6 +80,19 @@ export function costCnyForUsage(
   return Number((costUsd * ESTIMATED_USD_TO_CNY).toFixed(4));
 }
 
+export function estimateScanTokens(count: number): {
+  estimatedInputTokens: number;
+  estimatedOutputTokens: number;
+} {
+  const safeCount = Math.max(0, Math.floor(count));
+  return {
+    estimatedInputTokens:
+      DEFAULT_USAGE_PER_RESOURCE.inputTokens * safeCount,
+    estimatedOutputTokens:
+      DEFAULT_USAGE_PER_RESOURCE.outputTokens * safeCount
+  };
+}
+
 export function estimateScanCost(
   count: number,
   provider: AiProviderId,
@@ -87,19 +100,23 @@ export function estimateScanCost(
   concurrency = 4
 ): {
   estimatedMinutes: number;
+  estimatedInputTokens: number;
+  estimatedOutputTokens: number;
   estimatedCostCny: number | null;
   pricingUpdatedAt: string;
 } {
   const safeCount = Math.max(0, Math.floor(count));
+  const tokens = estimateScanTokens(safeCount);
   const usage: AiTokenUsage = {
     ...DEFAULT_USAGE_PER_RESOURCE,
-    inputTokens: DEFAULT_USAGE_PER_RESOURCE.inputTokens * safeCount,
-    outputTokens: DEFAULT_USAGE_PER_RESOURCE.outputTokens * safeCount
+    inputTokens: tokens.estimatedInputTokens,
+    outputTokens: tokens.estimatedOutputTokens
   };
   return {
     estimatedMinutes: safeCount
       ? Math.max(1, Math.ceil((safeCount * 18) / (60 * concurrency)))
       : 0,
+    ...tokens,
     estimatedCostCny: costCnyForUsage(provider, model, usage),
     pricingUpdatedAt: AI_PRICE_UPDATED_AT
   };

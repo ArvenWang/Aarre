@@ -6,6 +6,8 @@ const SOURCE_DIRECTORY = new URL("../src/", import.meta.url);
 const TOKEN_FILE = "tokens.css";
 const ALLOWED_TOKEN_COLORS = new Set([
   "#ffffff",
+  "#fcfcfc",
+  "#fafafa",
   "#f5f6f7",
   "#17191c",
   "#6c7278",
@@ -19,6 +21,10 @@ const ALLOWED_TOKEN_COLORS = new Set([
   "#7b6bc4",
   "#4d9c5a",
   "#0f1113",
+  "#12161c",
+  "#1c2430",
+  "#0a0d12",
+  "#c5ceda",
   "#16181b",
   "#1d2023",
   "#eef0f2",
@@ -34,6 +40,26 @@ const ALLOWED_TOKEN_COLORS = new Set([
   "#6fbf7c"
 ]);
 
+// 旧 CSS 按钮体系的全部类名。修饰类必须挂在基类上，且不能和 React Button 的
+// variant 混用——两套系统叠在同一个元素上正是「黑块」和「高度塌陷」的根因。
+const LEGACY_BUTTON_BASES = new Set([
+  "button",
+  "icon-button",
+  "text-button"
+]);
+const LEGACY_BUTTON_MODIFIERS = new Set([
+  "button-dark",
+  "button-quiet",
+  "button-small",
+  "button-danger",
+  "button-danger-quiet",
+  "text-button-danger"
+]);
+// 上色的 variant 用 hover:/active: 这类伪类选择器写背景，伪类的特异性天然高过
+// 同元素上的普通类选择器——所以只要项目 CSS 负责这个按钮的外观，variant 必须是
+// unstyled，否则鼠标一挪上去就会被 Tailwind 的背景盖掉。
+const projectClasses = new Set<string>();
+
 const errors: string[] = [];
 const entries = (await readdir(UI_DIRECTORY))
   .filter((file) => file.endsWith(".css"))
@@ -42,6 +68,9 @@ const entries = (await readdir(UI_DIRECTORY))
 for (const file of entries) {
   const source = await readFile(join(UI_DIRECTORY.pathname, file), "utf8");
   const lines = source.split(/\r?\n/);
+  for (const match of source.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)) {
+    projectClasses.add(match[1]);
+  }
 
   for (const [index, line] of lines.entries()) {
     const lineNumber = index + 1;
@@ -113,6 +142,7 @@ for (const file of entries) {
       errors.push(`${file}:${lineNumber} 不允许使用 !important`);
     }
 
+
     if (
       />\s*span\.relative\b|span\[aria-hidden=(?:"true"|'true')\]/.test(
         line
@@ -123,6 +153,86 @@ for (const file of entries) {
       );
     }
   }
+}
+
+/**
+ * 共享按钮类必须靠 min-height token 撑开。写死 height 正是「按钮塌成一条」
+ * 和「两套按钮系统高度对不上」的来源，所以这里只盯 .button* / .icon-button
+ * / .text-button* 这一组共享类，组件内部自己的 button 元素不在管辖范围。
+ */
+function checkControlHeights(file: string, source: string) {
+  const sharedButtonClass =
+    /\.(?:button(?:-[\w-]+)?|icon-button|text-button(?:-[\w-]+)?)$/;
+  for (const block of source.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const selector = block[1].trim();
+    const body = block[2];
+    if (selector.startsWith("@")) continue;
+    const targetsSharedButton = selector
+      .split(",")
+      .map((part) => part.trim().split(/[\s>]+/).pop() || "")
+      .some((last) => sharedButtonClass.test(last.replace(/:[\w-]+.*$/, "")));
+    if (!targetsSharedButton) continue;
+
+    const lineNumber = source.slice(0, block.index).split(/\r?\n/).length;
+    const height = body.match(/(?:^|[\s;])height:\s*([^;]+)/);
+    if (height && /\d/.test(height[1])) {
+      errors.push(
+        `${file}:${lineNumber} 共享按钮类不得写死 height，请改用 min-height token：${selector}`
+      );
+    }
+    const minHeight = body.match(/min-height:\s*([^;]+)/);
+    if (minHeight && !minHeight[1].includes("var(--control-h-")) {
+      errors.push(
+        `${file}:${lineNumber} 按钮最小高度必须使用 --control-h-* token：${minHeight[1].trim()}`
+      );
+    }
+  }
+}
+
+/**
+ * 同心圆角必须成对：外层用 --radius-lg，嵌在它里面的元素就得用
+ * --radius-nested-lg。设置页那个「外 14px、内 8px、滑块 20px」的分段控件
+ * 就是因为三层各写各的。
+ */
+function checkNestedRadiusPairs(file: string, source: string) {
+  const radiusBySelector = new Map<string, { token: string; line: number }>();
+  for (const block of source.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const selector = block[1].trim();
+    if (selector.startsWith("@")) continue;
+    const radius = block[2].match(/border-radius:\s*var\((--radius-[\w-]+)\)/);
+    // 胶囊嵌胶囊是对的：--radius-pill 的视觉半径跟着高度走，本来就该内外一致。
+    if (!radius || radius[1] === "--radius-pill") continue;
+    const lineNumber = source.slice(0, block.index).split(/\r?\n/).length;
+    for (const part of selector.split(",")) {
+      radiusBySelector.set(part.trim(), {
+        token: radius[1],
+        line: lineNumber
+      });
+    }
+  }
+
+  for (const [selector, radius] of radiusBySelector) {
+    const segments = selector.split(/\s+/).filter(Boolean);
+    if (segments.length < 2) continue;
+    for (let end = 1; end < segments.length; end += 1) {
+      const ancestor = radiusBySelector.get(
+        segments.slice(0, end).join(" ")
+      );
+      if (ancestor?.token === radius.token) {
+        errors.push(
+          `${file}:${radius.line} 嵌套元素与外层共用 ${radius.token}，应改用配对的 nested 圆角：${selector}`
+        );
+        break;
+      }
+    }
+  }
+}
+
+for (const file of entries) {
+  const source = await readFile(join(UI_DIRECTORY.pathname, file), "utf8");
+  if (file === TOKEN_FILE) continue;
+  checkControlHeights(file, source);
+  checkNestedRadiusPairs(file, source);
 }
 
 async function collectTsxFiles(directory: string): Promise<string[]> {
@@ -155,6 +265,59 @@ for (const file of await collectTsxFiles(SOURCE_DIRECTORY.pathname)) {
         `${file}:${lineNumber} 纯图标 Button 必须显式使用 icon 尺寸`
       );
     }
+
+    const className =
+      attributes
+        .match(/className=(?:"([^"]*)"|\{"([^"]*)"\})/)
+        ?.slice(1)
+        .find(Boolean) || "";
+    const classes = className.split(/\s+/).filter(Boolean);
+    const usesLegacyBase = classes.some((name) =>
+      LEGACY_BUTTON_BASES.has(name)
+    );
+    const legacyModifiers = classes.filter((name) =>
+      LEGACY_BUTTON_MODIFIERS.has(name)
+    );
+    const lineNumber = source.slice(0, match.index).split(/\r?\n/).length;
+    const cssDriven = classes.filter((name) => projectClasses.has(name));
+    if (cssDriven.length && !/\bvariant="unstyled"/.test(attributes)) {
+      errors.push(
+        `${file}:${lineNumber} 外观由项目 CSS 决定的 Button 必须用 variant="unstyled"：${cssDriven.join(" ")}`
+      );
+    }
+    if (legacyModifiers.length && !usesLegacyBase) {
+      errors.push(
+        `${file}:${lineNumber} 旧 CSS 按钮修饰类必须与基类 button 同时出现：${className}`
+      );
+    }
+  }
+
+  // tsx 里的硬编码尺寸和色值绕过了 token，是「收敛成 token」做了却没做到的主因。
+  for (const [index, line] of source.split(/\r?\n/).entries()) {
+    // 圆角、高度和色值是这个项目真正建立了 token 体系的三类，也正是硬编码
+    // 造成过实际 bug 的三类。允许 calc()/min() 里引用 var() 的派生值。
+    const arbitrary = (
+      line.match(/\b[\w-]+-\[[^\]]*\]/g) || []
+    ).filter((value) => {
+      if (value.includes("var(")) return false;
+      if (/#[\da-f]{3,8}\b/i.test(value)) return true;
+      return /^(?:min-h|h|rounded[\w-]*)-\[/.test(value) && /\dpx/.test(value);
+    });
+    if (arbitrary.length) {
+      errors.push(
+        `${file}:${index + 1} Tailwind 任意值绕过了 token：${arbitrary.join(", ")}`
+      );
+    }
+
+    const inlineStyle = line.match(/style=\{\{([^}]*)\}\}/);
+    if (
+      inlineStyle &&
+      /(?<!var\([^)]*)\b\d+px\b|#[\da-f]{3,8}\b/i.test(inlineStyle[1])
+    ) {
+      errors.push(
+        `${file}:${index + 1} 内联样式必须使用 token：${inlineStyle[1].trim()}`
+      );
+    }
   }
 }
 
@@ -165,5 +328,5 @@ if (errors.length) {
 }
 
 console.log(
-  `设计 token 检查通过：${entries.length} 个 CSS 文件无硬编码回归。`
+  `设计 token 检查通过：${entries.length} 个 CSS 文件与全部 tsx 无硬编码回归。`
 );

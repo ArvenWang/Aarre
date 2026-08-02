@@ -5,7 +5,7 @@ import { displayTimestamp } from "../utils";
 
 export function ReadingView({
   insights,
-  onOpenResource
+  onOpenResource,
 }: {
   insights: LibraryInsights | null;
   onOpenResource: (url: string) => void;
@@ -18,10 +18,7 @@ export function ReadingView({
           <span className="reading-index">{index + 1}</span>
           <div>
             <h3>
-              <ResourceLink
-                url={item.url}
-                onOpenResource={onOpenResource}
-              >
+              <ResourceLink url={item.url} onOpenResource={onOpenResource}>
                 {item.title}
               </ResourceLink>
             </h3>

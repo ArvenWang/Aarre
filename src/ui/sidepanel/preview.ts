@@ -3,6 +3,7 @@ import type {
   AiProviderId,
   AiSettingsStatus,
   AppState,
+  BookmarkAgentCatalog,
   BookmarkAgentActionExecutionResult,
   BookmarkAgentActionProposal,
   BookmarkBarSnapshot,
@@ -11,6 +12,8 @@ import type {
   ResourceRecord,
   SiteBrandRecord
 } from "../../lib/types";
+import { askBookmarkAgent } from "../../lib/local-ai";
+import { validateAiApiKey } from "../../lib/settings";
 import { categoryCoverForResource } from "../../lib/cover-registry";
 import { canonicalizeUrl } from "../../lib/url";
 import aiAutomationCover from "../../../design-assets/bookmark-covers/taxonomy-pilot/ai-automation-v1.png";
@@ -58,6 +61,29 @@ const previewEvent = {
   addListener() {},
   removeListener() {}
 };
+
+type PreviewRuntimeListener = (message: unknown) => void;
+const previewRuntimeListeners = new Set<PreviewRuntimeListener>();
+const previewProtectedResourceKeys = new Set<string>();
+const previewProtectedFolderIds = new Set<string>();
+const previewRuntimeMessageEvent = {
+  addListener(listener: PreviewRuntimeListener) {
+    previewRuntimeListeners.add(listener);
+  },
+  removeListener(listener: PreviewRuntimeListener) {
+    previewRuntimeListeners.delete(listener);
+  }
+};
+
+function emitPreviewRuntimeMessage(message: unknown) {
+  for (const listener of previewRuntimeListeners) {
+    try {
+      listener(message);
+    } catch {
+      // A broken preview listener must not interrupt the provider request.
+    }
+  }
+}
 
 const previewFolders = [
   ["设计赏析", 40],
@@ -423,6 +449,8 @@ const previewState: AppState = {
   },
   localResourceCount: 309,
   aiReadyResourceCount: 48,
+  aiEligibleResourceCount: 297,
+  aiPrivacyProtectedCount: 12,
   pendingSyncCount: 0,
   libraryScan: {
     id: "",
@@ -451,6 +479,12 @@ const previewGeneratedCoverResources: ResourceRecord[] =
       tags: [sample.category, "缺省封面", "视觉评审"],
       tagsSource: "ai",
       topics: [sample.category],
+      aliases: [sample.category, sample.title],
+      useCases: [`查找${sample.category}参考资料时打开`],
+      contentType: "产品",
+      questions: [`有哪些${sample.category}参考资料`],
+      entities: [],
+      aiSchemaVersion: 2,
       contentExcerpt: "",
       contentHash: "",
       selectedText: "",
@@ -496,6 +530,16 @@ const previewResources: ResourceRecord[] = [
         tags: ready ? [folder.title, "参考资料", "待实践"] : [],
         tagsSource: ready ? "ai" : undefined,
         topics: ready ? ["知识管理"] : [],
+        ...(ready
+          ? {
+              aliases: [folder.title, node.title],
+              useCases: [`查找${folder.title}资料时打开`],
+              contentType: "文章",
+              questions: [`有哪些${folder.title}资料`],
+              entities: [],
+              aiSchemaVersion: 2,
+            }
+          : {}),
         contentExcerpt: "",
         contentHash: "",
         selectedText: "",
@@ -515,31 +559,37 @@ const previewResources: ResourceRecord[] = [
   )
 ];
 
-function previewBrandDataUrl(surface: string, foreground: string): string {
+function previewBrandDataUrl(foreground: string): string {
   const svg = [
     '<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">',
-    `<rect width="192" height="192" rx="42" fill="${surface}"/>`,
     `<path fill="${foreground}" d="M48 142 83 50h27l35 92h-27l-7-21H80l-7 21H48Zm40-44h16L96 73l-8 25Z"/>`,
     "</svg>"
   ].join("");
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
-const previewSiteBrands: SiteBrandRecord[] = [
-  {
-    host: "example.com",
-    iconDataUrl: previewBrandDataUrl("#f6f7fa", "#18191c"),
-    iconDataUrlLight: previewBrandDataUrl("#f6f7fa", "#18191c"),
-    iconDataUrlDark: previewBrandDataUrl("#242426", "#f2f2f3"),
+function previewSiteBrand(host: string): SiteBrandRecord {
+  return {
+    host,
+    iconDataUrl: previewBrandDataUrl("#18191c"),
+    iconDataUrlLight: previewBrandDataUrl("#18191c"),
+    iconRenderVersion: 6,
     iconSource: "registry",
     nativeWidth: 192,
     nativeHeight: 192,
     updatedAt: "2026-07-30T08:00:00.000Z"
-  }
+  };
+}
+
+const previewSiteBrands: SiteBrandRecord[] = [
+  previewSiteBrand("anthropic.com"),
+  previewSiteBrand("example.com")
 ];
 
 let previewConversations: AgentConversation[] = [];
 let previewOrganizationNoticeDismissed = false;
+const PREVIEW_AI_SETTINGS_KEY = "bookmark-layer:ai-settings";
+const previewAgentRuns = new Map<string, AbortController>();
 
 let previewAiSettings: AiSettingsStatus = {
   provider: "gemini",
@@ -590,6 +640,38 @@ function previewFolderOptions() {
   ];
 }
 
+function previewAgentCatalog(): BookmarkAgentCatalog {
+  const catalog: BookmarkAgentCatalog = { bookmarks: [], folders: [] };
+  const visit = (node: NativeBookmarkNode, parentPath: string[]) => {
+    const path = node.title ? [...parentPath, node.title] : parentPath;
+    if (!node.url) {
+      catalog.folders.push({
+        id: node.id,
+        parentId: node.parentId,
+        title: node.title,
+        path,
+        writable: true
+      });
+    }
+    for (const child of node.children || []) {
+      if (child.url) {
+        catalog.bookmarks.push({
+          id: child.id,
+          parentId: child.parentId || node.id,
+          title: child.title,
+          url: child.url,
+          path,
+          writable: true
+        });
+      } else {
+        visit(child, path);
+      }
+    }
+  };
+  visit(previewRoot, []);
+  return catalog;
+}
+
 const previewSuggestions: NavigationSuggestion[] = [
   {
     id: "preview-tab",
@@ -612,6 +694,34 @@ function findPreviewNode(
     if (nested) return nested;
   }
   return null;
+}
+
+function previewProtectionState(target: {
+  kind: "bookmark" | "folder";
+  id: string;
+}) {
+  const match = findPreviewNode(target.id);
+  if (!match) return { protected: false, explicit: false, inherited: false };
+  let parent: NativeBookmarkNode | undefined = match.parent;
+  let inherited = false;
+  while (parent) {
+    if (previewProtectedFolderIds.has(parent.id)) {
+      inherited = true;
+      break;
+    }
+    parent = parent.parentId ? findPreviewNode(parent.parentId)?.node : undefined;
+  }
+  if (target.kind === "folder") {
+    const explicit = previewProtectedFolderIds.has(target.id);
+    return { protected: explicit || inherited, explicit, inherited };
+  }
+  const resource = previewResources.find((item) =>
+    item.nativeBookmarkIds.includes(target.id)
+  );
+  const explicit = Boolean(
+    resource && previewProtectedResourceKeys.has(resource.resourceKey)
+  );
+  return { protected: explicit || inherited, explicit, inherited };
 }
 
 function movePreviewNode(
@@ -727,6 +837,11 @@ function executePreviewAgentAction(
       if (!moved) throw new Error("预览移动失败。");
       return success(`已移动「${moved.title}」。`);
     }
+    case "update_metadata": {
+      // Preview mode has no Aarre storage, so there is nothing to write; the
+      // point is only to show the confirmation flow.
+      return success("已更新预览数据中的标签与备注。");
+    }
   }
 }
 
@@ -750,11 +865,12 @@ export function installSidePanelPreview() {
       getURL(path: string) {
         return new URL(path, window.location.origin).toString();
       },
-      onMessage: previewEvent,
+      onMessage: previewRuntimeMessageEvent,
       async sendMessage(request: {
         type?: string;
         apiKey?: string;
         query?: string;
+        requestId?: string;
         history?: Array<{ role: "user" | "assistant"; content: string }>;
         force?: boolean;
         id?: string;
@@ -763,6 +879,8 @@ export function installSidePanelPreview() {
         canonicalUrl?: string;
         conversation?: AgentConversation;
         actions?: BookmarkAgentActionProposal[];
+        target?: { kind: "bookmark" | "folder"; id: string };
+        protected?: boolean;
         payload?: {
           id?: string;
           parentId?: string;
@@ -795,6 +913,35 @@ export function installSidePanelPreview() {
                 )
               )
             };
+          case "GET_ITEM_PROTECTION":
+            return {
+              ok: true,
+              data: previewProtectionState(
+                request.target || { kind: "bookmark", id: "" }
+              )
+            };
+          case "SET_ITEM_PROTECTION": {
+            const target = request.target || { kind: "bookmark" as const, id: "" };
+            const match = findPreviewNode(target.id);
+            if (!match) return { ok: false, error: "没有找到预览保护目标。" };
+            if (target.kind === "folder") {
+              if (request.protected) previewProtectedFolderIds.add(target.id);
+              else previewProtectedFolderIds.delete(target.id);
+            } else {
+              const resource = previewResources.find((item) =>
+                item.nativeBookmarkIds.includes(target.id)
+              );
+              if (!resource) {
+                return { ok: false, error: "没有找到预览网页资源。" };
+              }
+              if (request.protected) {
+                previewProtectedResourceKeys.add(resource.resourceKey);
+              } else {
+                previewProtectedResourceKeys.delete(resource.resourceKey);
+              }
+            }
+            return { ok: true, data: previewProtectionState(target) };
+          }
           case "GET_RESOURCES":
             return {
               ok: true,
@@ -1146,42 +1293,62 @@ export function installSidePanelPreview() {
               openai: "OpenAI",
               deepseek: "DeepSeek"
             }[provider];
-            const apiKey = request.payload?.apiKey?.trim() || "";
-            const alreadyConfigured =
-              previewAiSettings.configuredProviders.includes(provider);
-            if (!alreadyConfigured && apiKey.length < 12) {
+            const stored = (previewStorage[PREVIEW_AI_SETTINGS_KEY] || {}) as {
+              provider?: AiProviderId;
+              apiKeys?: Partial<Record<AiProviderId, string>>;
+              models?: Partial<Record<AiProviderId, string>>;
+            };
+            const model =
+              request.payload?.model ||
+              stored.models?.[provider] ||
+              previewAiSettings.providerModels[provider];
+            const providedKey = request.payload?.apiKey?.trim() || "";
+            const existingKey = stored.apiKeys?.[provider]?.trim() || "";
+            const apiKey = providedKey || existingKey;
+            if (apiKey.length < 12) {
               return {
                 ok: false,
                 error: `请输入完整的 ${providerName} API Key。`
               };
             }
+            try {
+              await validateAiApiKey(provider, apiKey, model);
+            } catch (error) {
+              return {
+                ok: false,
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : `无法验证 ${providerName} API Key。`
+              };
+            }
+            previewStorage[PREVIEW_AI_SETTINGS_KEY] = {
+              provider,
+              apiKeys: {
+                ...stored.apiKeys,
+                [provider]: apiKey
+              },
+              models: {
+                ...stored.models,
+                [provider]: model
+              }
+            };
             previewAiSettings = {
               ...previewAiSettings,
               provider,
               providerName,
-              model:
-                request.payload?.model ||
-                previewAiSettings.providerModels[provider],
-              apiKeyConfigured: Boolean(apiKey) || alreadyConfigured,
-              apiKeySuffix: apiKey
-                ? apiKey.slice(-4)
-                : alreadyConfigured &&
-                    previewAiSettings.provider === provider
-                  ? previewAiSettings.apiKeySuffix
-                  : undefined,
-              configuredProviders: apiKey || alreadyConfigured
-                ? [
-                    ...new Set([
-                      ...previewAiSettings.configuredProviders,
-                      provider
-                    ])
-                  ]
-                : previewAiSettings.configuredProviders,
+              model,
+              apiKeyConfigured: true,
+              apiKeySuffix: apiKey.slice(-4),
+              configuredProviders: [
+                ...new Set([
+                  ...previewAiSettings.configuredProviders,
+                  provider
+                ])
+              ],
               providerModels: {
                 ...previewAiSettings.providerModels,
-                [provider]:
-                  request.payload?.model ||
-                  previewAiSettings.providerModels[provider]
+                [provider]: model
               },
               usingBuiltInService: false
             };
@@ -1231,60 +1398,61 @@ export function installSidePanelPreview() {
           case "GET_NAVIGATION_SUGGESTIONS":
             return { ok: true, data: previewSuggestions };
           case "NAVIGATE":
-          case "OPEN_MANAGER":
           case "OPEN_SIDE_PANEL":
             return { ok: true, data: { opened: true } };
-          case "ASK_BOOKMARK_AGENT":
-            if (
-              /(删除|移除)/.test(request.query || "") &&
-              /(生活与娱乐|示例收藏)/.test(request.query || "")
-            ) {
-              return {
-                ok: true,
-                data: {
-                  query: request.query || "",
-                  answer:
-                    "我已准备 1 项书签操作，但尚未执行。请核对下方内容后确认。",
-                  providerName: "DeepSeek",
-                  sources: [],
-                  actions: [
-                    {
-                      id: "preview-delete-action",
-                      type: "delete_bookmark",
-                      label: "删除书签「生活与娱乐示例收藏」",
-                      description:
-                        "生活与娱乐 · https://example.com/3/0",
-                      destructive: true,
-                      status: "pending",
-                      targetId: "preview-folder-3-0"
-                    }
-                  ],
-                  catalogSize: 269,
-                  examinedCount: 269
-                }
-              };
-            }
+          case "OPEN_MANAGER":
+            return { ok: true, data: { opened: true, reused: false } };
+          case "CANCEL_BOOKMARK_AGENT": {
+            const requestId = request.requestId || "";
+            const controller = previewAgentRuns.get(requestId);
+            controller?.abort(
+              new DOMException("AI 请求已停止。", "AbortError")
+            );
             return {
               ok: true,
-              data: {
-                query: request.query || "",
-                answer:
-                  "你收藏的内容里，设计赏析与前端代码两个文件夹最接近这个问题。前者适合寻找视觉参考，后者更适合落地组件实现。",
-                providerName: "DeepSeek",
-                sources: [
-                  {
-                    resourceKey: "preview-agent-source",
-                    title: "设计赏析示例收藏",
-                    url: "https://example.com/0/0",
-                    siteName: "example.com",
-                    faviconUrl: ""
-                  }
-                ],
-                actions: [],
-                catalogSize: 269,
-                examinedCount: 269
-              }
+              data: { cancelled: Boolean(controller) }
             };
+          }
+          case "ASK_BOOKMARK_AGENT": {
+            const query = request.query?.trim() || "";
+            const requestId = request.requestId || crypto.randomUUID();
+            const controller = new AbortController();
+            previewAgentRuns.set(requestId, controller);
+            try {
+              const resources = previewResources.filter(
+                (resource) => resource.nativeBookmarkIds.length
+              );
+              const response = await askBookmarkAgent(
+                query,
+                resources,
+                request.history || [],
+                previewAgentCatalog(),
+                {
+                  signal: controller.signal,
+                  onProgress(progress) {
+                    emitPreviewRuntimeMessage({
+                      type: "BOOKMARK_AGENT_PROGRESS",
+                      requestId,
+                      ...progress
+                    });
+                  }
+                }
+              );
+              return { ok: true, data: response };
+            } catch (error) {
+              return {
+                ok: false,
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : "AI 暂时无法回答。"
+              };
+            } finally {
+              if (previewAgentRuns.get(requestId) === controller) {
+                previewAgentRuns.delete(requestId);
+              }
+            }
+          }
           case "EXECUTE_BOOKMARK_AGENT_ACTIONS": {
             const results = (request.actions || []).map((action) => {
               try {
@@ -1329,6 +1497,8 @@ export function installSidePanelPreview() {
                 aiResourceCount: 206,
                 concurrency: 4,
                 estimatedMinutes: 16,
+                estimatedInputTokens: 185_400,
+                estimatedOutputTokens: 37_080,
                 estimatedCostCny: 0.1946,
                 pricingUpdatedAt: "2026-07-30",
                 providerName: "DeepSeek",
@@ -1575,6 +1745,9 @@ export function installSidePanelPreview() {
       onChildrenReordered: previewEvent
     },
     permissions: {
+      async contains() {
+        return true;
+      },
       async request() {
         return true;
       }

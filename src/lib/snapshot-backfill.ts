@@ -1,4 +1,8 @@
 import { isSnapshotSensitiveUrl } from "./page-snapshot";
+import {
+  isResourceUserProtected,
+  type ProtectionPolicy
+} from "./protection";
 import { interleaveResourcesByHost } from "./scan-scheduler";
 import type {
   ResourceRecord,
@@ -13,7 +17,10 @@ export type SnapshotBackfillOutcome =
   | "failed"
   | "skipped";
 
+export const SNAPSHOT_BACKFILL_CONCURRENCY = 3;
+
 export interface SnapshotBackfillLease {
+  workerId: number;
   jobId: string;
   resourceKey: string;
   tabId: number;
@@ -38,6 +45,7 @@ export function snapshotBackfillLeaseAllowsCapture(
   input: {
     state: SnapshotBackfillState;
     jobId: string;
+    expectedWorkerId?: number;
     currentResourceKey?: string;
     expectedTabId?: number;
     currentLease?: string;
@@ -46,6 +54,8 @@ export function snapshotBackfillLeaseAllowsCapture(
 ): boolean {
   return (
     input.jobId === lease.jobId &&
+    (input.expectedWorkerId === undefined ||
+      input.expectedWorkerId === lease.workerId) &&
     input.currentLease === lease.token &&
     snapshotBackfillCaptureAllowed({
       state: input.state,
@@ -68,7 +78,8 @@ export function snapshotBackfillStateAfterFocusCheck(
 export function snapshotBackfillCandidates(
   resources: ResourceRecord[],
   snapshotCanonicalUrls: ReadonlySet<string>,
-  excludedHosts: string[]
+  excludedHosts: string[],
+  protectionPolicy?: ProtectionPolicy
 ): ResourceRecord[] {
   return interleaveResourcesByHost(
     resources.filter(
@@ -76,7 +87,9 @@ export function snapshotBackfillCandidates(
         resource.nativeBookmarkIds.length > 0 &&
         isSupportedPageUrl(resource.url) &&
         !snapshotCanonicalUrls.has(resource.canonicalUrl) &&
-        !isSnapshotSensitiveUrl(resource.url, excludedHosts)
+        !isSnapshotSensitiveUrl(resource.url, excludedHosts) &&
+        (!protectionPolicy ||
+          !isResourceUserProtected(resource, protectionPolicy))
     )
   );
 }
@@ -92,7 +105,7 @@ export function emptySnapshotBackfillStatus(): SnapshotBackfillStatus {
     skipped: 0,
     currentTitle: "",
     errors: [],
-    concurrency: 1,
+    concurrency: SNAPSHOT_BACKFILL_CONCURRENCY,
     requiresForeground: false
   };
 }
