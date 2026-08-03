@@ -8196,7 +8196,7 @@ async function handleContextMenuImageCover(
     throw new Error("此页面受隐私保护规则限制，不能修改封面。");
   }
 
-  flashActionBadge(tab.id, "…", "#205aef", "正在下载图片…", 6_000);
+  flashActionBadge(tab.id, "…", "#205aef", "正在下载图片…", 60_000);
   const response = await fetch(srcUrl, {
     credentials: "omit",
     // 部分图片服务会校验来源页（防盗链），带上当前页面地址提高成功率。
@@ -8210,6 +8210,7 @@ async function handleContextMenuImageCover(
   if (blob.size > 15 * 1024 * 1024) {
     throw new Error("图片超过 15 MB，无法作为封面。");
   }
+  flashActionBadge(tab.id, "…", "#205aef", "正在处理图片…", 60_000);
 
   // GIF 保留原始动图（不转码、不缩放），封面以动画形式展示；
   // 其余格式统一缩放到最长边 1600px 并转 WebP。
@@ -8289,9 +8290,19 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     return;
   }
   if (info.menuItemId === CONTEXT_MENU_IMAGE_COVER_ID) {
-    void handleContextMenuImageCover(info, tab).catch((error) => {
+    const tabId = tab?.id;
+    // 入口立即反馈：无论后面哪一步出问题，用户都能看到处理已开始。
+    flashActionBadge(tabId, "…", "#205aef", "正在处理…", 60_000);
+    const task = handleContextMenuImageCover(info, tab);
+    const timeout = new Promise<never>((_, reject) => {
+      globalThis.setTimeout(
+        () => reject(new Error("处理超时，请重试。")),
+        60_000
+      );
+    });
+    void Promise.race([task, timeout]).catch((error) => {
       flashActionBadge(
-        tab?.id,
+        tabId,
         "!",
         "#a33b34",
         errorMessage(error),
