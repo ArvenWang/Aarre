@@ -119,6 +119,27 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   line-height: 1;
 }
 
+/* 登录后标题变为账号入口：继承标题排版，超长用户名截断显示 */
+.native-title-account {
+  max-width: 200px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.native-title-account:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .native-actions {
   display: flex;
   align-items: center;
@@ -1229,6 +1250,14 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   border-color: color-mix(in srgb, var(--ink) 24%, transparent);
 }
 
+/* Button 会把内容包进一层 button-content span；不拆掉这层包装的话，
+   trigger 的 space-between 和 option 的三列 grid 都会失效（文字被压进
+   第一列 16px 里逐字竖排）。display: contents 让子项直接参与外层布局。 */
+.folder-select-trigger > [data-slot="button-content"],
+.folder-select-option > [data-slot="button-content"] {
+  display: contents;
+}
+
 .folder-select-trigger svg {
   width: 15px;
   height: 15px;
@@ -1291,6 +1320,9 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   color: var(--ink-muted);
 }
 
+/* 名称 span 在 Button 的 button-content 包装层内（该层 display: contents），
+   选择器要按 DOM 层级写，否则长文件夹名会换行而不是省略截断。 */
+.folder-select-option > [data-slot="button-content"] > span:nth-child(2),
 .folder-select-option > span:nth-child(2) {
   overflow: hidden;
   text-overflow: ellipsis;

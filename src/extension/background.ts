@@ -271,6 +271,7 @@ import {
 const CONTEXT_MENU_PAGE_ID = "bookmark-layer-save-page";
 const CONTEXT_MENU_LINK_ID = "bookmark-layer-save-link";
 const CONTEXT_MENU_UPDATE_SNAPSHOT_ID = "bookmark-layer-update-snapshot";
+const CONTEXT_MENU_IMAGE_COVER_ID = "bookmark-layer-image-cover";
 const PENDING_SAVE_PREFIX = "pending-save:";
 const LIBRARY_SCAN_KEY = "aarre:library-scan";
 const LIBRARY_SCAN_ALARM = "aarre-library-scan";
@@ -7941,6 +7942,11 @@ chrome.runtime.onInstalled.addListener(() => {
         contexts: ["page"],
         enabled: false,
         visible: false
+      }),
+      chrome.contextMenus.create({
+        id: CONTEXT_MENU_IMAGE_COVER_ID,
+        title: "用此图片设为封面",
+        contexts: ["image"]
       })
     ])
   ).then(() => refreshPageContextMenuState()).catch(() => undefined);
@@ -8128,9 +8134,115 @@ async function handleContextMenuUpdateSnapshot(
   flashActionBadge(tab.id, "✓", "#2c7a52", "封面已更新");
 }
 
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("图片转换失败。"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function handleContextMenuImageCover(
+  info: chrome.contextMenus.OnClickData,
+  tab?: chrome.tabs.Tab
+): Promise<void> {
+  const srcUrl = info.srcUrl;
+  if (!srcUrl || !/^https?:/i.test(srcUrl)) {
+    throw new Error("这张图片不是可访问的网页图片，无法设为封面。");
+  }
+  if (typeof tab?.id !== "number" || !tab.url) {
+    throw new Error("无法确认当前标签页。");
+  }
+
+  const bookmarkState = await getBookmarkSaveState(tab.url);
+  if (bookmarkState.status === "none") {
+    throw new Error("当前页面尚未收藏，无法设置封面。");
+  }
+  let resource = await bookmarkedResourceForLoadedUrl(tab.url);
+  if (!resource?.nativeBookmarkIds.length) {
+    // 本地索引可能在 Chrome 刚完成收藏时存在极短的时间差。
+    await importNativeBookmarks();
+    resource = await bookmarkedResourceForLoadedUrl(tab.url);
+  }
+  if (!resource?.nativeBookmarkIds.length) {
+    throw new Error("收藏信息还没有同步完成，请稍后再试。");
+  }
+
+  const context = await getPrivacyProtectionContext();
+  if (
+    !context.pageSnapshotsEnabled ||
+    resourceProtectionState(resource, context, tab.url).protected
+  ) {
+    throw new Error("此页面受隐私保护规则限制，不能修改封面。");
+  }
+
+  flashActionBadge(tab.id, "…", "#205aef", "正在下载图片…");
+  const response = await fetch(srcUrl, {
+    credentials: "omit",
+    signal: AbortSignal.timeout(30_000)
+  });
+  if (!response.ok) {
+    throw new Error(`图片下载失败（${response.status}）。`);
+  }
+  const blob = await response.blob();
+  if (blob.size > 15 * 1024 * 1024) {
+    throw new Error("图片超过 15 MB，无法作为封面。");
+  }
+
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(blob);
+  } catch {
+    throw new Error("无法解析这张图片，请换一张试试。");
+  }
+  try {
+    // 统一缩放到最长边 1600px，避免原图过大挤占本地与云端容量。
+    const maxEdge = 1600;
+    const scale = Math.min(
+      1,
+      maxEdge / Math.max(bitmap.width, bitmap.height)
+    );
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = new OffscreenCanvas(width, height);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      throw new Error("当前环境无法处理图片。");
+    }
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    const out = await canvas.convertToBlob({
+      type: "image/webp",
+      quality: 0.88
+    });
+    const dataUrl = await blobToDataUrl(out);
+    await upsertLocalResource({
+      ...resource,
+      thumbnailDataUrl: dataUrl,
+      coverUpdatedAt: new Date().toISOString()
+    });
+    flashActionBadge(tab.id, "✓", "#2c7a52", "封面已更新");
+    // 立即把新封面同步到云端，不等后台定时任务。
+    void syncNow().catch(() => undefined);
+  } finally {
+    bitmap.close();
+  }
+}
+
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === CONTEXT_MENU_UPDATE_SNAPSHOT_ID) {
     void handleContextMenuUpdateSnapshot(tab).catch((error) => {
+      flashActionBadge(
+        tab?.id,
+        "!",
+        "#a33b34",
+        errorMessage(error)
+      );
+    });
+    return;
+  }
+  if (info.menuItemId === CONTEXT_MENU_IMAGE_COVER_ID) {
+    void handleContextMenuImageCover(info, tab).catch((error) => {
       flashActionBadge(
         tab?.id,
         "!",

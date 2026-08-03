@@ -4472,7 +4472,20 @@ export function SidePanelApp() {
     <main className="native-panel">
       <header className="native-header">
         <div className="native-title-row">
-          <h1>我的书签</h1>
+          <h1>
+            {appState?.auth.signedIn && appState.auth.userName ? (
+              <button
+                type="button"
+                className="native-title-account"
+                title="打开账号与同步设置"
+                onClick={() => setPanelView("settings")}
+              >
+                {appState.auth.userName} 的书签
+              </button>
+            ) : (
+              "我的书签"
+            )}
+          </h1>
         </div>
         <div className="native-actions">
           <Button
