@@ -16,7 +16,7 @@
 | Google Cloud project | `aarre-production` | Web OAuth 回调仅为 `https://sync.nexvoice.cc/v1/auth/google/callback` |
 | 腾讯 DNS | `nexvoice.cc` DNSPod | `sync` A 记录指向生产主机；根 TXT 用于 Google 域名所有权 |
 | 错误监控 | `https://console.nexvoice.cc/admin/` | Aarre 使用独立 GlitchTip team/project |
-| 当前临时扩展 ID | `ohhmoipbedndbffmbpdkaoplojdefcak` | 仅受控 unpacked 测试；正式 Web Store ID 下发后必须整体替换 |
+| 扩展固定身份 ID | `ppjmhonejgpcdmjmcbbdjookgiagambm` | 0.5.35 起 manifest 固定公钥，所有电脑任意路径加载均为同一 ID；正式 Web Store ID 下发后必须整体替换。私钥在 `~/Documents/Aarre-Recovery/aarre-extension-identity.pem`（0600），不进 Git |
 
 生产 API 的内容字段使用逐用户 DEK + AES-256-GCM；图片使用私有 COS + SSE-COS AES-256。这不是端到端加密，受控服务器 root 与 KEK 持有人具备恢复能力。
 

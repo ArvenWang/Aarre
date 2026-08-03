@@ -1,10 +1,10 @@
 # Aarre 项目进展
 
-最后更新：2026-08-03（0.5.34 / 登录链路与完整本地体积统计已落地，等待用户重载扩展实测）
+最后更新：2026-08-03（0.5.35 / manifest 固定扩展身份，多机任意路径加载均为同一扩展 ID）
 
 > **并行说明：** 本轮账号交接包、同步契约和生产发布已完成代码与服务器写入；当前没有新增的独占编辑文件。0.5.34 及此前累积的 UI / AI / icon / 云端改动已作为同一套可构建状态纳入 Git，后续 Agent 不得 reset、回退或删除 `/opt/aarre` 发布目录。完整图片备份、真实卸载重装恢复和正式 Web Store ID 仍是外部验收门，不能写成已完成。云端接管先读 `ops/README.md`。
 
-**当前工作区最新状态：0.5.34。** 网页收藏与文件夹已有统一的本地/云端“受保护”规则；0.5.16–0.5.17 引入的网页端/侧边栏互斥已经完整撤销，两端允许同时存在。Aarre 整体仍支持日间与夜间主题；站点 icon 固定白色 CSS 承载层与主题隔离。当前 `dist/` 是显式连接 `https://sync.nexvoice.cc` 的 cloud-enabled 0.5.34 构建，Manifest 最低版本保持 134。真实账号的 metadata 首次同步已经写入生产；0.5.34 将同步范围立即保存、后台分批同步，并严格遵守 `Retry-After`。F14 生产 API、数据库、COS/CAM、Google Web OAuth、DNS/TLS、定时备份、两分钟健康巡检、独立 GlitchTip project 与含 SSH Key 的加密恢复包已经部署；Google 品牌审核、完整图片备份、卸载重装恢复和正式 Web Store ID 尚未完成。
+**当前工作区最新状态：0.5.35。** 0.5.35 在 manifest 固定 RSA 公钥，扩展 ID 由此派生为 `ppjmhonejgpcdmjmcbbdjookgiagambm`，不再随电脑/目录路径变化；生产服务器白名单需要同步登记该 ID（旧 `ohhmoipbedndbffmbpdkaoplojdefcak` 可保留到全部电脑升级完毕）。网页收藏与文件夹已有统一的本地/云端“受保护”规则；0.5.16–0.5.17 引入的网页端/侧边栏互斥已经完整撤销，两端允许同时存在。Aarre 整体仍支持日间与夜间主题；站点 icon 固定白色 CSS 承载层与主题隔离。当前 `dist/` 是显式连接 `https://sync.nexvoice.cc` 的 cloud-enabled 0.5.35 构建，Manifest 最低版本保持 134。真实账号的 metadata 首次同步已经写入生产；0.5.34 将同步范围立即保存、后台分批同步，并严格遵守 `Retry-After`。F14 生产 API、数据库、COS/CAM、Google Web OAuth、DNS/TLS、定时备份、两分钟健康巡检、独立 GlitchTip project 与含 SSH Key 的加密恢复包已经部署；Google 品牌审核、完整图片备份、卸载重装恢复和正式 Web Store ID 尚未完成。
 
 ## 当前进展
 
@@ -57,6 +57,13 @@
 当前统一项目目录：`/Users/nefish/Desktop/Coding/Aarre`。
 
 ## 最近更新
+
+### 2026-08-03 · 0.5.35 / manifest 固定扩展身份，解决多机登录白名单问题
+
+- **真实故障根因。** 用户在第二台电脑（本仓库 `WorkSpace/Coding/Aarre` 路径）点击登录出现 “Authorization page could not be loaded.”。已解压扩展的 ID 由目录绝对路径派生：本机路径 ID 为 `kplepcclbgdifiilkkbhammlmjijlkgi`，而生产服务器 `ALLOWED_EXTENSION_IDS` 登记的是旧路径 `/Users/nefish/Desktop/Coding/Aarre` 派生的 `ohhmoipbedndbffmbpdkaoplojdefcak`。`/v1/auth/google/start` 对未登记 ID 返回 403，Chrome 授权窗口收到错误页后即报 “Authorization page could not be loaded.”；用白名单 ID 走同一接口可正常 302 到 Google 登录页，排除网络与 OAuth 客户端问题。
+- **修复。** 生成 RSA-2048 身份密钥，公钥写入 `public/manifest.json` 的 `key` 字段，扩展 ID 固定为 `ppjmhonejgpcdmjmcbbdjookgiagambm`，任何电脑任意路径加载（0.5.35 构建）均为同一 ID；私钥仅存本机 `~/Documents/Aarre-Recovery/aarre-extension-identity.pem`（0600，不进 Git），未来如需轮换身份从该私钥重新导出公钥即可。
+- **兼容与回退。** 旧 ID 的 Chrome 本地数据（Local Extension Settings + IndexedDB，约 13 MB）已备份到 `~/Documents/Aarre-Recovery/aarre-legacy-extension-data-kplepc/`；换 ID 后旧实例数据仍留在磁盘，加载不带 key 的旧构建即可恢复视角。生产白名单计划保留 `ohhmoip...` 直到全部测试电脑升级到 0.5.35。
+- **验证。** 构建前先以 Chrome 已确认的路径-ID 对照（`kplepc...`）校准了 ID 推导算法，再从公钥 DER 计算新 ID 一致；cloud-enabled 0.5.35 构建、JS 语法检查与公网 start 端点验证通过（新 ID 登记后 302 到 Google）。各电脑 `git pull` 后重载扩展、重新登录与云端恢复仍待用户实测。
 
 ### 2026-08-03 · 0.5.33 / 服务端 0.1.9 同步契约、首次 metadata 与生产交接包
 
