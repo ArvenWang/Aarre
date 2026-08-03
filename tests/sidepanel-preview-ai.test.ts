@@ -9,7 +9,10 @@ afterEach(() => {
 
 describe("side panel preview AI", () => {
   it("validates the configured key and routes chat through the real provider path", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    let bodyRequest: RequestInit | undefined;
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+      bodyRequest = init;
       const url = String(input);
       if (url === "https://api.deepseek.com/models") {
         return new Response(
@@ -18,16 +21,25 @@ describe("side panel preview AI", () => {
         );
       }
       if (url === "https://api.deepseek.com/chat/completions") {
+        const request = bodyRequest as RequestInit;
+        const body = JSON.parse(String(request.body)) as {
+          messages?: Array<{ content?: string }>;
+        };
+        const prompt = body.messages?.[1]?.content || "";
         return new Response(
           JSON.stringify({
             choices: [
               {
                 message: {
-                  content: JSON.stringify({
-                    answer: "这是来自真实 Provider 路径的回答。",
-                    source_ids: ["r1"],
-                    actions: []
-                  })
+                  content: prompt.includes("- steps：")
+                    ? JSON.stringify({
+                        steps: ["先定位相关收藏", "再核对用途"]
+                      })
+                    : JSON.stringify({
+                        answer: "这是来自真实 Provider 路径的回答。",
+                        source_ids: ["r1"],
+                        actions: []
+                      })
                 }
               }
             ],
@@ -41,7 +53,8 @@ describe("side panel preview AI", () => {
         );
       }
       throw new Error(`Unexpected URL: ${url}`);
-    });
+      }
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     const { installSidePanelPreview } = await import(
@@ -60,10 +73,21 @@ describe("side panel preview AI", () => {
     expect(saveResponse).toEqual(expect.objectContaining({ ok: true }));
 
     const progress: string[] = [];
+    const thinkingEvents: string[][] = [];
     chrome.runtime.onMessage.addListener((message: unknown) => {
-      const event = message as { type?: string; stage?: string };
+      const event = message as {
+        type?: string;
+        stage?: string;
+        steps?: unknown;
+      };
       if (event.type === "BOOKMARK_AGENT_PROGRESS" && event.stage) {
         progress.push(event.stage);
+      }
+      if (
+        event.type === "BOOKMARK_AGENT_THINKING" &&
+        Array.isArray(event.steps)
+      ) {
+        thinkingEvents.push(event.steps.map(String));
       }
     });
     const agentResponse = (await chrome.runtime.sendMessage({
@@ -85,13 +109,21 @@ describe("side panel preview AI", () => {
         ok: true,
         data: expect.objectContaining({
           answer: "这是来自真实 Provider 路径的回答。",
+          thinking: ["先定位相关收藏", "再核对用途"],
           sources: [expect.objectContaining({ title: "GitHub — 代码仓库" })]
         })
       })
     );
-    expect(progress).toEqual(["preparing", "selecting", "synthesizing"]);
+    expect(progress).toEqual([
+      "preparing",
+      "selecting",
+      "thinking",
+      "synthesizing"
+    ]);
+    expect(thinkingEvents).toEqual([["先定位相关收藏", "再核对用途"]]);
     expect(fetchMock.mock.calls.map(([input]) => String(input))).toEqual([
       "https://api.deepseek.com/models",
+      "https://api.deepseek.com/chat/completions",
       "https://api.deepseek.com/chat/completions"
     ]);
   });

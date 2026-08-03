@@ -15,6 +15,8 @@ import {
   useRef,
   useState,
 } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   bookmarkMatchUrls,
   bookmarkNodesByUrl,
@@ -2256,13 +2258,16 @@ const AGENT_PROGRESS_STEPS: Array<{
   { stage: "preparing", label: "准备收藏库" },
   { stage: "scanning", label: "分批检查收藏" },
   { stage: "selecting", label: "筛选相关内容" },
+  { stage: "thinking", label: "思考回答路径" },
   { stage: "synthesizing", label: "整理并生成回答" },
 ];
 
 function AgentThinkingSteps({
   progress,
+  thinking,
 }: {
   progress?: BookmarkAgentProgress;
+  thinking?: string[];
 }) {
   const completedStages = new Set(progress?.completedStages || []);
   const visibleStages = new Set(progress?.stages || ["preparing"]);
@@ -2278,11 +2283,17 @@ function AgentThinkingSteps({
       aria-label={statusLabel}
     >
       {visibleSteps.map((step, index) => {
-        const state = completedStages.has(step.stage)
+        const thinkingSteps =
+          step.stage === "thinking" && thinking?.length
+            ? thinking
+            : null;
+        const state = thinkingSteps
           ? "done"
-          : step.stage === progress?.stage || (!progress && index === 0)
-            ? "current"
-            : "pending";
+          : completedStages.has(step.stage)
+            ? "done"
+            : step.stage === progress?.stage || (!progress && index === 0)
+              ? "current"
+              : "pending";
         return (
           <div
             className="agent-thinking-step"
@@ -2292,16 +2303,49 @@ function AgentThinkingSteps({
             <span className="agent-thinking-step-mark" aria-hidden="true">
               {state === "done" ? "✓" : state === "current" ? "•" : ""}
             </span>
-            <span>
-              {step.label}
-              {step.stage === "scanning" && progress?.stage === "scanning"
-                ? ` · ${progress.completed}/${progress.total}`
-                : null}
-            </span>
+            {thinkingSteps ? (
+              <ol className="agent-thinking-path">
+                {thinkingSteps.map((item, itemIndex) => (
+                  <li key={itemIndex}>{item}</li>
+                ))}
+              </ol>
+            ) : (
+              <span>
+                {step.label}
+                {step.stage === "scanning" && progress?.stage === "scanning"
+                  ? ` · ${progress.completed}/${progress.total}`
+                  : null}
+              </span>
+            )}
           </div>
         );
       })}
       <small>{statusLabel}</small>
+    </div>
+  );
+}
+
+function AgentMarkdown({ content }: { content: string }) {
+  return (
+    <div className="agent-markdown">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          a: ({
+            href,
+            children,
+          }: {
+            href?: string;
+            children?: React.ReactNode;
+          }) => (
+            <a href={href} target="_blank" rel="noreferrer noopener">
+              {children}
+            </a>
+          ),
+        }}
+      >
+        {content}
+      </ReactMarkdown>
     </div>
   );
 }
@@ -2425,9 +2469,28 @@ function AgentChatPage({
           >
             <div className="agent-message-copy">
               {message.status === "sending" ? (
-                <AgentThinkingSteps progress={message.progress} />
+                <AgentThinkingSteps
+                  progress={message.progress}
+                  thinking={message.thinking}
+                />
               ) : (
-                <p>{message.content}</p>
+                <Fragment>
+                  {message.thinking?.length ? (
+                    <details className="agent-thinking-recap">
+                      <summary>思考过程</summary>
+                      <ol>
+                        {message.thinking.map((step, index) => (
+                          <li key={index}>{step}</li>
+                        ))}
+                      </ol>
+                    </details>
+                  ) : null}
+                  {message.role === "assistant" ? (
+                    <AgentMarkdown content={message.content} />
+                  ) : (
+                    <p>{message.content}</p>
+                  )}
+                </Fragment>
               )}
               {message.providerName ? (
                 <small>{message.providerName}</small>
@@ -3139,7 +3202,32 @@ export function SidePanelApp() {
       if (!message || typeof message !== "object") return;
       const event = message as Partial<BookmarkAgentProgress> & {
         type?: string;
+        steps?: unknown;
       };
+      if (
+        event.type === "BOOKMARK_AGENT_THINKING" &&
+        event.requestId === activeAgentRequestRef.current &&
+        activeAgentMessageRef.current &&
+        Array.isArray(event.steps)
+      ) {
+        const thinking = (event.steps as unknown[])
+          .filter((step): step is string => typeof step === "string")
+          .map((step) => step.trim().slice(0, 140))
+          .filter(Boolean)
+          .slice(0, 8);
+        setActiveConversation((current) => {
+          if (!current) return current;
+          return {
+            ...current,
+            messages: current.messages.map((message) =>
+              message.id === activeAgentMessageRef.current
+                ? { ...message, thinking }
+                : message,
+            ),
+          };
+        });
+        return;
+      }
       if (
         event.type !== "BOOKMARK_AGENT_PROGRESS" ||
         event.requestId !== activeAgentRequestRef.current ||
@@ -3677,6 +3765,7 @@ export function SidePanelApp() {
             ? {
                 ...message,
                 content: response.answer,
+                thinking: response.thinking,
                 providerName: response.providerName
                   ? `${response.providerName} · ${
                       response.catalogScanComplete ? "已检查" : "已召回"

@@ -487,6 +487,8 @@ export interface UndoBatchResult {
 export interface BookmarkAgentResponse {
   query: string;
   answer: string;
+  /** 模型先思考生成的回答路径，最终回答必须按它展开；可能为空。 */
+  thinking: string[];
   providerName: string;
   sources: BookmarkAgentSource[];
   actions: BookmarkAgentActionProposal[];
@@ -507,6 +509,7 @@ export type BookmarkAgentProgressStage =
   | "preparing"
   | "scanning"
   | "selecting"
+  | "thinking"
   | "synthesizing";
 
 export interface BookmarkAgentProgress {
@@ -525,6 +528,7 @@ export interface AgentChatMessage {
   role: "user" | "assistant";
   content: string;
   createdAt: string;
+  thinking?: string[];
   providerName?: string;
   sources?: BookmarkAgentSource[];
   actions?: BookmarkAgentActionProposal[];

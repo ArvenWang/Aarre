@@ -64,6 +64,7 @@ export async function saveAgentConversation(
         ...message,
         id: message.id.slice(0, 160),
         content: message.content.slice(0, 12_000),
+        thinking: message.thinking?.slice(0, 8).map((step) => step.slice(0, 140)),
         providerName: message.providerName?.slice(0, 240),
         sources: message.sources?.slice(0, 20),
         actions: message.actions?.slice(0, 40)

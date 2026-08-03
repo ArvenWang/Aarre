@@ -7482,6 +7482,15 @@ async function askAgent(
               ...progress
             })
             .catch(() => undefined);
+        },
+        onThinking: (steps) => {
+          void chrome.runtime
+            .sendMessage({
+              type: "BOOKMARK_AGENT_THINKING",
+              requestId,
+              steps
+            })
+            .catch(() => undefined);
         }
       }
     );

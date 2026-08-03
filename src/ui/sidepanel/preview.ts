@@ -1358,6 +1358,9 @@ export function installSidePanelPreview() {
             return { ok: true, data: null };
           case "GET_FOLDERS":
             return { ok: true, data: previewFolderOptions() };
+          case "GET_BOOKMARK_SAVE_STATE":
+            // 预览里当前页面视为尚未收藏，让“添加到收藏”弹窗走新建流程。
+            return { ok: true, data: { status: "none", matches: [] } };
           case "CAPTURE_ACTIVE_PAGE":
             return { ok: true, data: previewCapture };
           case "GET_FOLDER_SUGGESTIONS":
@@ -1434,6 +1437,13 @@ export function installSidePanelPreview() {
                       type: "BOOKMARK_AGENT_PROGRESS",
                       requestId,
                       ...progress
+                    });
+                  },
+                  onThinking(steps) {
+                    emitPreviewRuntimeMessage({
+                      type: "BOOKMARK_AGENT_THINKING",
+                      requestId,
+                      steps
                     });
                   }
                 }

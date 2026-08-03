@@ -88,6 +88,37 @@ const actionCatalog: BookmarkAgentCatalog = {
   ]
 };
 
+/** 同时响应「思考路径」和「最终回答」两次调用的 mock：
+ * 思考提示词以 `- steps：` 开头约定结构，最终回答提示词走 answer JSON。 */
+function agentFetchMock(options: {
+  answer?: Record<string, unknown>;
+  thinkingSteps?: string[];
+} = {}) {
+  const answer = options.answer ?? {
+    answer: "这是回答。",
+    source_ids: []
+  };
+  const thinkingSteps = options.thinkingSteps ?? [
+    "先检查候选收藏的实际内容",
+    "按用途和主题组织回答"
+  ];
+  return vi.fn().mockImplementation(
+    async (_url: RequestInfo | URL, request?: RequestInit) => {
+      const body = JSON.parse(String((request as RequestInit)?.body)) as {
+        messages?: Array<{ content?: string }>;
+      };
+      const prompt = body.messages?.[1]?.content || "";
+      const content = prompt.includes("- steps：")
+        ? JSON.stringify({ steps: thinkingSteps })
+        : JSON.stringify(answer);
+      return new Response(
+        JSON.stringify({ choices: [{ message: { content } }] }),
+        { status: 200 }
+      );
+    }
+  );
+}
+
 beforeEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -270,32 +301,21 @@ describe("local AI enrichment", () => {
   it("proposes Aarre-only metadata edits that never touch Chrome", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            choices: [
-              {
-                message: {
-                  content: JSON.stringify({
-                    answer: "已准备好标签更新。",
-                    source_ids: [],
-                    actions: [
-                      {
-                        type: "update_metadata",
-                        target_id: "1",
-                        group_label: "产品设计类收藏",
-                        tags: ["产品设计", "# 信息架构"],
-                        note: "写方案时的参考"
-                      }
-                    ]
-                  })
-                }
-              }
-            ]
-          }),
-          { status: 200 }
-        )
-      )
+      agentFetchMock({
+        answer: {
+          answer: "已准备好标签更新。",
+          source_ids: [],
+          actions: [
+            {
+              type: "update_metadata",
+              target_id: "1",
+              group_label: "产品设计类收藏",
+              tags: ["产品设计", "# 信息架构"],
+              note: "写方案时的参考"
+            }
+          ]
+        }
+      })
     );
 
     const result = await askBookmarkAgent(
@@ -321,30 +341,19 @@ describe("local AI enrichment", () => {
   it("ignores a metadata edit aimed at a bookmark Aarre does not track", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            choices: [
-              {
-                message: {
-                  content: JSON.stringify({
-                    answer: "无法定位这条收藏。",
-                    source_ids: [],
-                    actions: [
-                      {
-                        type: "update_metadata",
-                        target_id: "999",
-                        tags: ["随便"]
-                      }
-                    ]
-                  })
-                }
-              }
-            ]
-          }),
-          { status: 200 }
-        )
-      )
+      agentFetchMock({
+        answer: {
+          answer: "无法定位这条收藏。",
+          source_ids: [],
+          actions: [
+            {
+              type: "update_metadata",
+              target_id: "999",
+              tags: ["随便"]
+            }
+          ]
+        }
+      })
     );
 
     const result = await askBookmarkAgent(
@@ -420,23 +429,12 @@ describe("local AI enrichment", () => {
   });
 
   it("answers from local bookmarks with DeepSeek and returns real sources", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          choices: [
-            {
-              message: {
-                content: JSON.stringify({
-                  answer: "可以先参考这篇书签的信息架构方法。",
-                  source_ids: ["r1"]
-                })
-              }
-            }
-          ]
-        }),
-        { status: 200 }
-      )
-    );
+    const fetchMock = agentFetchMock({
+      answer: {
+        answer: "可以先参考这篇书签的信息架构方法。",
+        source_ids: ["r1"]
+      }
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await askBookmarkAgent(
@@ -448,6 +446,7 @@ describe("local AI enrichment", () => {
       query: "我该怎么整理书签？",
       answer: "可以先参考这篇书签的信息架构方法。",
       providerName: "DeepSeek",
+      thinking: ["先检查候选收藏的实际内容", "按用途和主题组织回答"],
       sources: [
         {
           resourceKey: resource.resourceKey,
@@ -459,6 +458,11 @@ describe("local AI enrichment", () => {
     const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
     expect(String(request.body)).toContain("Aarre");
     expect(String(request.body)).toContain("信息架构");
+    const finalRequest = fetchMock.mock.calls[1]?.[1] as RequestInit;
+    expect(String(finalRequest.body)).toContain("使用 Markdown 组织");
+    expect(String(finalRequest.body)).toContain("不要使用表格");
+    expect(String(finalRequest.body)).toContain("我的思考路径");
+    expect(String(finalRequest.body)).toContain("1. 先检查候选收藏的实际内容");
   });
 
   it("reports only the stages a quick query really executes", async () => {
@@ -470,23 +474,9 @@ describe("local AI enrichment", () => {
     }));
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            choices: [
-              {
-                message: {
-                  content: JSON.stringify({
-                    answer: "这是一次快速回答。",
-                    source_ids: []
-                  })
-                }
-              }
-            ]
-          }),
-          { status: 200 }
-        )
-      )
+      agentFetchMock({
+        answer: { answer: "这是一次快速回答。", source_ids: [] }
+      })
     );
     const progress: Array<{
       stage: string;
@@ -505,6 +495,7 @@ describe("local AI enrichment", () => {
     expect(progress.map((item) => item.stage)).toEqual([
       "preparing",
       "selecting",
+      "thinking",
       "synthesizing"
     ]);
     expect(progress.every((item) => !item.stages.includes("scanning"))).toBe(
@@ -518,24 +509,13 @@ describe("local AI enrichment", () => {
   it("does not turn an informational delete question into a mutation", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            choices: [
-              {
-                message: {
-                  content: JSON.stringify({
-                    answer: "可以在收藏菜单中选择删除。",
-                    source_ids: [],
-                    actions: []
-                  })
-                }
-              }
-            ]
-          }),
-          { status: 200 }
-        )
-      )
+      agentFetchMock({
+        answer: {
+          answer: "可以在收藏菜单中选择删除。",
+          source_ids: [],
+          actions: []
+        }
+      })
     );
 
     const result = await askBookmarkAgent("怎么删除书签？", [resource]);
@@ -550,63 +530,56 @@ describe("local AI enrichment", () => {
       apiKeys: { openai: "openai-test-key-1234" },
       models: { openai: "gpt-5.6-luna" }
     };
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          choices: [
-            {
-              message: {
-                content: JSON.stringify({
-                  answer: "OpenAI 回答。",
-                  source_ids: []
-                })
-              }
-            }
-          ]
-        }),
-        { status: 200 }
-      )
-    );
+    const fetchMock = agentFetchMock({
+      answer: { answer: "OpenAI 回答。", source_ids: [] }
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     await askBookmarkAgent("概括一下", [resource]);
 
-    const body = JSON.parse(
-      String((fetchMock.mock.calls[0]?.[1] as RequestInit).body)
-    ) as Record<string, unknown>;
+    const bodies = fetchMock.mock.calls.map((call) => {
+      const request = call[1] as RequestInit;
+      return JSON.parse(String(request.body)) as Record<string, unknown>;
+    });
+    expect(bodies).toHaveLength(2);
+    // 思考调用用更小的输出预算，最终回答调用保持 4096 上限。
+    expect(bodies[0].max_completion_tokens).toBe(1_024);
+    expect(bodies[1].max_completion_tokens).toBe(4_096);
+    const body = bodies[1];
     expect(body.max_completion_tokens).toBe(4_096);
     expect(body).not.toHaveProperty("max_tokens");
     expect(body.reasoning_effort).toBe("minimal");
   });
 
   it("accepts a provider response wrapped in prose or a JSON code fence", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          choices: [
-            {
-              message: {
-                content:
-                  "下面是结果：\n```json\n" +
-                  JSON.stringify({
-                    answer: "可以先参考这篇书签。",
-                    source_ids: ["r1"]
-                  }) +
-                  "\n```"
-              }
-            }
-          ]
-        }),
+    const fetchMock = vi.fn().mockImplementation(async (_url, request) => {
+      const body = JSON.parse(String((request as RequestInit).body)) as {
+        messages?: Array<{ content?: string }>;
+      };
+      const prompt = body.messages?.[1]?.content || "";
+      const content = prompt.includes("- steps：")
+        ? JSON.stringify({
+            steps: ["先定位相关收藏"]
+          })
+        : "下面是结果：\n```json\n" +
+          JSON.stringify({
+            answer: "可以先参考这篇书签。",
+            source_ids: ["r1"]
+          }) +
+          "\n```";
+      return new Response(
+        JSON.stringify({ choices: [{ message: { content } }] }),
         { status: 200 }
-      )
-    );
+      );
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await askBookmarkAgent("怎么整理书签？", [resource]);
 
     expect(result.answer).toBe("可以先参考这篇书签。");
+    expect(result.thinking).toEqual(["先定位相关收藏"]);
     expect(result.sources[0]?.resourceKey).toBe(resource.resourceKey);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("retries only the agent response when its JSON shape is malformed", async () => {
@@ -627,6 +600,22 @@ describe("local AI enrichment", () => {
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    steps: ["先检查相关收藏"]
+                  })
+                }
+              }
+            ]
+          }),
+          { status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
             choices: [{ message: { content: "这不是 JSON" } }]
           }),
           { status: 200 }
@@ -638,7 +627,8 @@ describe("local AI enrichment", () => {
     const result = await askBookmarkAgent("怎么整理书签？", [resource]);
 
     expect(result.answer).toBe("重试后得到的回答。");
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.thinking).toEqual(["先检查相关收藏"]);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("checks a 2,000-item library in full batches before final synthesis", async () => {
@@ -661,10 +651,14 @@ describe("local AI enrichment", () => {
               `b${index + 1}`
             )
           })
-        : JSON.stringify({
-            answer: "已完成全量检查。",
-            source_ids: ["r80"]
-          });
+        : prompt.includes("- steps：")
+          ? JSON.stringify({
+              steps: ["先完成全量检查", "按主题分组候选收藏"]
+            })
+          : JSON.stringify({
+              answer: "已完成全量检查。",
+              source_ids: ["r80"]
+            });
       return new Response(
         JSON.stringify({
           choices: [{ message: { content } }]
@@ -689,9 +683,10 @@ describe("local AI enrichment", () => {
     expect(result.sources[0]?.resourceKey).toBe("catalog-80");
     expect(progress[0]).toBe("preparing");
     expect(progress.filter((stage) => stage === "scanning")).toHaveLength(35);
-    expect(progress.at(-2)).toBe("selecting");
+    expect(progress.at(-3)).toBe("selecting");
+    expect(progress.at(-2)).toBe("thinking");
     expect(progress.at(-1)).toBe("synthesizing");
-    expect(fetchMock).toHaveBeenCalledTimes(35);
+    expect(fetchMock).toHaveBeenCalledTimes(36);
     const prompts = fetchMock.mock.calls.map((call) => {
       const request = call[1] as RequestInit;
       const body = JSON.parse(String(request.body)) as {
@@ -710,6 +705,13 @@ describe("local AI enrichment", () => {
     expect(requestBody).toContain("收藏 80");
     expect(requestBody).not.toContain("收藏 81");
     expect(requestBody).toContain("全部 2000 条收藏");
+    expect(requestBody).toContain("我的思考路径");
+    expect(requestBody).toContain("1. 先完成全量检查");
+    const thinkingPrompt = prompts.find((prompt) =>
+      prompt.includes("- steps：")
+    );
+    expect(thinkingPrompt).toContain("收藏 80");
+    expect(thinkingPrompt).not.toContain("分批筛选器");
 
     // 前 20 条给完整字段，其余只给一行摘要，这样候选翻倍而提示词只小幅变长。
     expect(requestBody).toContain("[r20] | 名称=收藏 20");
@@ -738,10 +740,14 @@ describe("local AI enrichment", () => {
         prompts.push(prompt);
         const content = prompt.includes("分批筛选器")
           ? JSON.stringify({ relevant_ids: [] })
-          : JSON.stringify({
-              answer: "没有找到相关收藏。",
-              source_ids: []
-            });
+          : prompt.includes("- steps：")
+            ? JSON.stringify({
+                steps: ["确认全库都没有相关收藏"]
+              })
+            : JSON.stringify({
+                answer: "没有找到相关收藏。",
+                source_ids: []
+              });
         return new Response(
           JSON.stringify({ choices: [{ message: { content } }] }),
           { status: 200 }
@@ -754,6 +760,7 @@ describe("local AI enrichment", () => {
     expect(result.catalogScanComplete).toBe(true);
     expect(result.examinedCount).toBe(120);
     expect(result.sources).toEqual([]);
+    expect(result.thinking).toEqual(["确认全库都没有相关收藏"]);
     expect(prompts.at(-1)).toContain("收藏资料：\n（无）");
     expect(prompts.at(-1)).not.toContain("烹饪资料 1");
   });
@@ -781,29 +788,18 @@ describe("local AI enrichment", () => {
   it("prepares a real delete proposal without falsely claiming it already ran", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            choices: [
-              {
-                message: {
-                  content: JSON.stringify({
-                    answer: "已经帮你删掉了。",
-                    source_ids: [],
-                    actions: [
-                      {
-                        type: "delete_bookmark",
-                        target_id: "1"
-                      }
-                    ]
-                  })
-                }
-              }
-            ]
-          }),
-          { status: 200 }
-        )
-      )
+      agentFetchMock({
+        answer: {
+          answer: "已经帮你删掉了。",
+          source_ids: [],
+          actions: [
+            {
+              type: "delete_bookmark",
+              target_id: "1"
+            }
+          ]
+        }
+      })
     );
 
     const result = await askBookmarkAgent(
@@ -828,29 +824,18 @@ describe("local AI enrichment", () => {
   it("rejects hallucinated action ids and states that nothing changed", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            choices: [
-              {
-                message: {
-                  content: JSON.stringify({
-                    answer: "已完成删除。",
-                    source_ids: [],
-                    actions: [
-                      {
-                        type: "delete_bookmark",
-                        target_id: "missing-id"
-                      }
-                    ]
-                  })
-                }
-              }
-            ]
-          }),
-          { status: 200 }
-        )
-      )
+      agentFetchMock({
+        answer: {
+          answer: "已完成删除。",
+          source_ids: [],
+          actions: [
+            {
+              type: "delete_bookmark",
+              target_id: "missing-id"
+            }
+          ]
+        }
+      })
     );
 
     const result = await askBookmarkAgent(
@@ -863,6 +848,75 @@ describe("local AI enrichment", () => {
     expect(result.actions).toEqual([]);
     expect(result.answer).toContain("我没有执行任何更改");
     expect(result.answer).not.toContain("已完成删除");
+  });
+
+  it("delivers the real thinking path through onThinking before the answer", async () => {
+    vi.stubGlobal(
+      "fetch",
+      agentFetchMock({
+        thinkingSteps: ["先看每条收藏的用途", "再按主题归并分组"]
+      })
+    );
+    const received: string[][] = [];
+
+    const result = await askBookmarkAgent(
+      "我的收藏应该怎么分组",
+      [resource],
+      [],
+      { bookmarks: [], folders: [] },
+      { onThinking: (steps) => received.push(steps) }
+    );
+
+    expect(received).toEqual([["先看每条收藏的用途", "再按主题归并分组"]]);
+    expect(result.thinking).toEqual(["先看每条收藏的用途", "再按主题归并分组"]);
+  });
+
+  it("falls back to a direct answer when the thinking step cannot be parsed", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "这不是 JSON" } }]
+          }),
+          { status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "还是没有步骤" } }]
+          }),
+          { status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    answer: "直接回答。",
+                    source_ids: []
+                  })
+                }
+              }
+            ]
+          }),
+          { status: 200 }
+        )
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await askBookmarkAgent("概括一下", [resource]);
+
+    expect(result.answer).toBe("直接回答。");
+    expect(result.thinking).toEqual([]);
+    const finalPrompt = String(
+      (fetchMock.mock.calls[2]?.[1] as RequestInit).body
+    );
+    expect(finalPrompt).toContain("思考路径生成失败");
   });
 
   it("does not call an AI provider when no key is configured", async () => {
