@@ -1,10 +1,10 @@
 # Aarre 项目进展
 
-最后更新：2026-08-03（0.5.48 / 右键设封面同步写入页面快照，网页端封面生效）
+最后更新：2026-08-03（0.5.49 / 右键设封面后网页端自动刷新封面）
 
 > **并行说明：** 本轮账号交接包、同步契约和生产发布已完成代码与服务器写入；当前没有新增的独占编辑文件。0.5.34 及此前累积的 UI / AI / icon / 云端改动已作为同一套可构建状态纳入 Git，后续 Agent 不得 reset、回退或删除 `/opt/aarre` 发布目录。完整图片备份、真实卸载重装恢复和正式 Web Store ID 仍是外部验收门，不能写成已完成。云端接管先读 `ops/README.md`。
 
-**当前工作区最新状态：0.5.48。** 0.5.48 修复“Toast 出现但网页端封面不变”：网页端卡片封面（`LibraryCardCover`）只读取页面快照（`pageSnapshots`），从不读取 `thumbnailDataUrl`——右键图片设封面此前只写了 `thumbnailDataUrl`，网页端因此永远显示旧快照/兜底图。现在设置封面时同步写入 `pageSnapshots`（GIF 先解码取尺寸再写入，普通图用缩放后尺寸），网页端立即显示新封面；`restoreCloudAssets` 的快照分支同步增加本地优先保护（本地快照 `capturedAt` 不早于云端时跳过下载），防止定时同步回退。0.5.47 修复全量同步回退覆盖并新增页面 Toast；0.5.45/0.5.46 探针定位；0.5.44 入口反馈+超时；0.5.43 FileReader 修复；0.5.42 自动收藏+菜单双注册；0.5.41 标题头像化+GIF；0.5.40 右键图片设为封面；0.5.39 完整备份循环恢复；0.5.38 构建门强制云端；服务器 active 图片 391 张（原 409 的 95.6%）。0.5.37 上传前对账；0.5.36 只有完整备份；0.5.35 manifest 固定扩展 ID `ppjmhonejgpcdmjmcbbdjookgiagambm`。当前 `dist/` 为 cloud-enabled 0.5.48 正式构建（带 key）。F14 生产 API、数据库、COS/CAM、Google Web OAuth、DNS/TLS、定时备份、两分钟健康巡检、独立 GlitchTip project 与含 SSH Key 的加密恢复包已经部署；Google 品牌审核、卸载重装恢复和正式 Web Store ID 尚未完成。
+**当前工作区最新状态：0.5.49。** 0.5.49 在右键图片设封面保存快照后广播 `PAGE_SNAPSHOT_UPDATED`（网页端 manager 已有该消息监听，会按 canonicalUrl 刷新对应卡片封面）——设置封面后网页端无需手动刷新即可看到新封面。0.5.48 修复网页端封面数据源（同步写入 `pageSnapshots`）与快照防回退；0.5.47 修复全量同步回退覆盖并新增页面 Toast；0.5.45/0.5.46 探针定位；0.5.44 入口反馈+超时；0.5.43 FileReader 修复；0.5.42 自动收藏+菜单双注册；0.5.41 标题头像化+GIF；0.5.40 右键图片设为封面；0.5.39 完整备份循环恢复；0.5.38 构建门强制云端；服务器 active 图片 391 张（原 409 的 95.6%）。0.5.37 上传前对账；0.5.36 只有完整备份；0.5.35 manifest 固定扩展 ID `ppjmhonejgpcdmjmcbbdjookgiagambm`。当前 `dist/` 为 cloud-enabled 0.5.49 正式构建（带 key）。F14 生产 API、数据库、COS/CAM、Google Web OAuth、DNS/TLS、定时备份、两分钟健康巡检、独立 GlitchTip project 与含 SSH Key 的加密恢复包已经部署；Google 品牌审核、卸载重装恢复和正式 Web Store ID 尚未完成。
 
 ## 当前进展
 
@@ -57,6 +57,12 @@
 当前统一项目目录：`/Users/nefish/Desktop/Coding/Aarre`。
 
 ## 最近更新
+
+### 2026-08-03 · 0.5.49 / 右键设封面后网页端自动刷新
+
+- **用户实测。** 0.5.48 后大部分图片设置封面生效（tokenscope 等），但用户反馈 ECC 仓库的 hero.png 曾不生效——探针确认那是 0.5.46 时代（全量同步回退 bug 未修复时）的测试结果，0.5.48 链路已保存成功；同时发现 manager 页面打开时不会自动刷新卡片封面（`PAGE_SNAPSHOT_UPDATED` 监听已存在，但右键设封面路径未广播该消息）。
+- **修改。** GIF 与普通图两条保存路径在写入 `pageSnapshots` 后广播 `PAGE_SNAPSHOT_UPDATED`（canonicalUrl + capturedAt），manager 的 `LibraryView` 已有监听会更新对应卡片的 `snapshotRevision` 并重新拉取快照。
+- **验证。** typecheck 与 335 项测试通过；cloud-enabled 0.5.49 构建（带 key）通过。
 
 ### 2026-08-03 · 0.5.48 / 右键设封面同步写入页面快照，网页端封面生效
 

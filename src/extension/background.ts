@@ -8268,13 +8268,21 @@ async function handleContextMenuImageCover(
     });
     // 网页端卡片封面以页面快照为数据源，必须同步写入，
     // 否则网页端永远显示旧快照/兜底图。
+    const gifSnapshotAt = new Date().toISOString();
     await putPageSnapshot({
       canonicalUrl: resource.canonicalUrl,
       imageDataUrl: gifDataUrl,
-      capturedAt: new Date().toISOString(),
+      capturedAt: gifSnapshotAt,
       width: gifWidth,
       height: gifHeight
     });
+    void chrome.runtime
+      .sendMessage({
+        type: "PAGE_SNAPSHOT_UPDATED",
+        canonicalUrl: resource.canonicalUrl,
+        capturedAt: gifSnapshotAt
+      })
+      .catch(() => undefined);
     flashActionBadge(
       tab.id,
       "✓",
@@ -8319,13 +8327,21 @@ async function handleContextMenuImageCover(
       thumbnailDataUrl: dataUrl,
       coverUpdatedAt: new Date().toISOString()
     });
+    const snapshotAt = new Date().toISOString();
     await putPageSnapshot({
       canonicalUrl: resource.canonicalUrl,
       imageDataUrl: dataUrl,
-      capturedAt: new Date().toISOString(),
+      capturedAt: snapshotAt,
       width,
       height
     });
+    void chrome.runtime
+      .sendMessage({
+        type: "PAGE_SNAPSHOT_UPDATED",
+        canonicalUrl: resource.canonicalUrl,
+        capturedAt: snapshotAt
+      })
+      .catch(() => undefined);
     probe("saved");
     flashActionBadge(
       tab.id,
