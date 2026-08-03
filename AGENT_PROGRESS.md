@@ -1,10 +1,10 @@
 # Aarre 项目进展
 
-最后更新：2026-08-03（0.5.42 / 右键图片设封面：自动收藏未收藏页面，菜单注册双保险）
+最后更新：2026-08-03（0.5.43 / 右键图片设封面真实根因修复：FileReader 在 Service Worker 中不存在）
 
 > **并行说明：** 本轮账号交接包、同步契约和生产发布已完成代码与服务器写入；当前没有新增的独占编辑文件。0.5.34 及此前累积的 UI / AI / icon / 云端改动已作为同一套可构建状态纳入 Git，后续 Agent 不得 reset、回退或删除 `/opt/aarre` 发布目录。完整图片备份、真实卸载重装恢复和正式 Web Store ID 仍是外部验收门，不能写成已完成。云端接管先读 `ops/README.md`。
 
-**当前工作区最新状态：0.5.42。** 0.5.42 修复“右键图片设为封面没反应”：根因是未收藏页面被直接拒绝且错误只显示在工具栏徽标 2 秒（极易错过），以及菜单仅在 `onInstalled` 注册（Service Worker 提前结束时可能丢失）。现在未收藏页面右键图片会自动收藏到书签栏再设封面（提示“已收藏并设为封面”）；右键菜单在 `onInstalled` 与浏览器每次启动 `onStartup` 都重新注册（失败打印日志不再静默）；图片下载带当前页 referrer 提高防盗链站点成功率；封面相关徽标提示延长到 6 秒。0.5.41 标题头像化 + GIF 封面；0.5.40 右键图片设为封面；0.5.39 起完整备份循环恢复云端图片（391/391）；0.5.38 构建门强制云端；服务器 active 图片 391 张（原 409 的 95.6%）。0.5.37 上传前对账；0.5.36 只有完整备份；0.5.35 manifest 固定扩展 ID `ppjmhonejgpcdmjmcbbdjookgiagambm`。当前 `dist/` 为 cloud-enabled 0.5.42 正式构建（带 key）。F14 生产 API、数据库、COS/CAM、Google Web OAuth、DNS/TLS、定时备份、两分钟健康巡检、独立 GlitchTip project 与含 SSH Key 的加密恢复包已经部署；Google 品牌审核、卸载重装恢复和正式 Web Store ID 尚未完成。
+**当前工作区最新状态：0.5.43。** 0.5.43 修复“右键图片设为封面”的真实根因：图片 Blob 转 data URL 时使用了 `FileReader`，而它在 Manifest V3 Service Worker 中**不存在**（浏览器窗口专属 API），导致转换永远卡死——点击后既无成功反馈、封面也不变（与是否已收藏、是否防盗链无关）。改为 `ArrayBuffer + btoa` 分块转换（SW 可用 API），新增 `src/lib/image-cover.ts` 模块与 3 项单元测试（含多块大数据）。0.5.42 补充了自动收藏、菜单双注册与防盗链 referrer；0.5.41 标题头像化 + GIF 封面；0.5.40 右键图片设为封面；0.5.39 起完整备份循环恢复云端图片（391/391）；0.5.38 构建门强制云端；服务器 active 图片 391 张（原 409 的 95.6%）。0.5.37 上传前对账；0.5.36 只有完整备份；0.5.35 manifest 固定扩展 ID `ppjmhonejgpcdmjmcbbdjookgiagambm`。当前 `dist/` 为 cloud-enabled 0.5.43 正式构建（带 key）。F14 生产 API、数据库、COS/CAM、Google Web OAuth、DNS/TLS、定时备份、两分钟健康巡检、独立 GlitchTip project 与含 SSH Key 的加密恢复包已经部署；Google 品牌审核、卸载重装恢复和正式 Web Store ID 尚未完成。
 
 ## 当前进展
 
@@ -57,6 +57,13 @@
 当前统一项目目录：`/Users/nefish/Desktop/Coding/Aarre`。
 
 ## 最近更新
+
+### 2026-08-03 · 0.5.43 / 右键图片设封面：FileReader 不兼容 Service Worker 的根因修复
+
+- **用户实测反馈。** 已收藏、无防盗链的图片，点击“用此图片设为封面”后完全无反馈、封面不变——排除了 0.5.42 修复的未收藏/菜单注册/防盗链因素。
+- **根因。** `blobToDataUrl` 用 `FileReader.readAsDataURL` 转换图片；`FileReader` 是 Window 专属 API，Manifest V3 Service Worker 全局不存在，`new FileReader()` 直接抛错（或转换永不完成），handler 在图片转换步骤终止：成功徽标不出现、封面不写入。
+- **修复。** 新增 `src/lib/image-cover.ts`：`blobToDataUrl` 改用 `blob.arrayBuffer() + btoa` 分块拼接（SW 可用），GIF 与非 GIF 两条路径共用；background 导入该模块。新增 3 项单测（GIF 类型、无类型回退、200KB 多块数据）验证 base64 输出正确。
+- **验证。** typecheck 与 335 项测试通过（60 个文件）；cloud-enabled 0.5.43 构建（带 key）通过。真人浏览器右键流程待用户重载后最终验证。
 
 ### 2026-08-03 · 0.5.42 / 右键图片设封面“没反应”的修复
 

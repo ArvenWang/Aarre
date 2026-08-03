@@ -29,6 +29,7 @@ import {
 } from "../lib/cloud-progress";
 import { getCloudSyncEstimate } from "../lib/cloud-estimate";
 import { getLocalDataSize } from "../lib/local-size";
+import { blobToDataUrl } from "../lib/image-cover";
 import {
   clearDurableCloudStateTracking,
   restoreDurableCloudState,
@@ -8143,15 +8144,6 @@ async function handleContextMenuUpdateSnapshot(
     throw new Error("当前页面未能稳定完成截图，请保持页面打开后重试。");
   }
   flashActionBadge(tab.id, "✓", "#2c7a52", "封面已更新");
-}
-
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error("图片转换失败。"));
-    reader.readAsDataURL(blob);
-  });
 }
 
 async function handleContextMenuImageCover(
