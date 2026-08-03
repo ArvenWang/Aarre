@@ -7154,7 +7154,9 @@ async function syncNow() {
     });
     await syncDurableCloudState();
     if (cloudSettings.scope === "complete") {
-      await restoreCloudAssets();
+      // 完整备份必须把云端图片全部恢复到本机，而不是每轮只取 24 张。
+      let restored = await restoreCloudAssets();
+      while (restored.remaining) restored = await restoreCloudAssets();
       let assets = await syncCloudAssets();
       while (assets.remaining) assets = await syncCloudAssets();
     }
@@ -7207,7 +7209,10 @@ async function syncAfterExplicitCloudSettings(
       statusText: "正在恢复云端设置与会话…"
     });
     await restoreDurableCloudState({ skipCloudScope: true });
-    if (settings.scope === "complete") await restoreCloudAssets();
+    if (settings.scope === "complete") {
+      let restored = await restoreCloudAssets();
+      while (restored.remaining) restored = await restoreCloudAssets();
+    }
     const result = await syncPendingIfReady();
     await updateCloudSyncProgress({
       statusText: "正在同步设置、会话和报告…"
@@ -8692,7 +8697,10 @@ chrome.runtime.onStartup.addListener(() => {
       // 先恢复云端：重装后的本地资源壳不能用“刚导入”的时间戳覆盖旧设备的增强成果。
       await pullCloudResources();
       await restoreDurableCloudState();
-      if (cloudSettings.scope === "complete") await restoreCloudAssets();
+      if (cloudSettings.scope === "complete") {
+        let restored = await restoreCloudAssets();
+        while (restored.remaining) restored = await restoreCloudAssets();
+      }
       await syncPendingIfReady();
       await syncDurableCloudState();
       if (cloudSettings.scope === "complete") await syncCloudAssets();

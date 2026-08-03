@@ -339,6 +339,12 @@ export async function restoreCloudAssets(maxDownloads = 24): Promise<{ restored:
   if (!settings.enabled || settings.scope !== "complete") return { restored: 0, remaining: false };
   const response = await cloudRequest<{ assets: CloudAssetDescriptor[] }>("/v1/assets");
   const state = await readState();
+  // 下载进度与上传共用同一套计数：让“图片 X/Y”实时反映云端图片
+  // 恢复到本机的进度，避免下载期间进度条看起来没在动。
+  await updateCloudSyncProgress({
+    assetTotal: response.assets.length,
+    statusText: "正在恢复云端图片…"
+  });
   let restored = 0;
   let inspected = 0;
   for (const asset of response.assets) {
@@ -348,6 +354,9 @@ export async function restoreCloudAssets(maxDownloads = 24): Promise<{ restored:
       !cloudSiteIconBindingIsCurrent(asset.binding)
     ) {
       inspected += 1;
+      // 过期版本图标由本地上传阶段重新生成，恢复阶段按已处理计数，
+      // 避免进度条停在 99%。
+      await updateCloudSyncProgress({ assetProcessedDelta: 1 });
       continue;
     }
     const identity = asset.kind === "site-icon"
@@ -355,6 +364,8 @@ export async function restoreCloudAssets(maxDownloads = 24): Promise<{ restored:
       : `${asset.kind}:${asset.resourceKey}`;
     if (!identity || state[identity]?.sha256 === asset.sha256) {
       inspected += 1;
+      // 已在本地（或已恢复过）的图片也计入完成进度。
+      await updateCloudSyncProgress({ assetProcessedDelta: 1 });
       continue;
     }
     const bytes = await downloadAsset(asset);
@@ -393,6 +404,7 @@ export async function restoreCloudAssets(maxDownloads = 24): Promise<{ restored:
     state[identity] = { assetId: asset.assetId, sha256: asset.sha256, revision: asset.revision };
     restored += 1;
     inspected += 1;
+    await updateCloudSyncProgress({ assetProcessedDelta: 1 });
   }
   if (restored) await writeState(state);
   return { restored, remaining: inspected < response.assets.length };

@@ -1,10 +1,10 @@
 # Aarre 项目进展
 
-最后更新：2026-08-03（0.5.38 / 图片资产恢复至 391/409，构建强制云端版本）
+最后更新：2026-08-03（0.5.39 / 云端图片全量恢复下载，同步完成态按钮文案修正）
 
 > **并行说明：** 本轮账号交接包、同步契约和生产发布已完成代码与服务器写入；当前没有新增的独占编辑文件。0.5.34 及此前累积的 UI / AI / icon / 云端改动已作为同一套可构建状态纳入 Git，后续 Agent 不得 reset、回退或删除 `/opt/aarre` 发布目录。完整图片备份、真实卸载重装恢复和正式 Web Store ID 仍是外部验收门，不能写成已完成。云端接管先读 `ops/README.md`。
 
-**当前工作区最新状态：0.5.38。** 0.5.38 构建门强制云端：`scripts/build.mjs` 在缺少 `AARRE_CLOUD_RELEASE=1` 或 `VITE_AARRE_API_BASE_URL` 时直接拒绝构建；新增提交的 `.env.production` 提供默认云端配置，任何环境裸跑 `npm run build` 都产出 cloud-enabled 包，普通版本在机制上被杜绝。图片资产恢复：旧 ID 本地备份（10:16 前的 `aarre-legacy-extension-data-kplepc`）经字节级提取与 sha256/URL/resourceKey/host 多重配对，服务器 active 图片从 150 张恢复到 **391 张**（覆盖 409 个原资产中的 95.6%，含 202 快照/113 封面/76 站点标识，约 6.55 MB）；剩余 19 张快照因备份时未包含 Chrome 外部文件目录（`.blob`）而永久丢失。0.5.37 起上传前对账修复“图片 0/16 却显示完成”；0.5.36 起只有完整备份；0.5.35 起 manifest 固定扩展 ID `ppjmhonejgpcdmjmcbbdjookgiagambm`。当前 `dist/` 为 cloud-enabled 0.5.38 正式构建（带 key）。F14 生产 API、数据库、COS/CAM、Google Web OAuth、DNS/TLS、定时备份、两分钟健康巡检、独立 GlitchTip project 与含 SSH Key 的加密恢复包已经部署；Google 品牌审核、卸载重装恢复和正式 Web Store ID 尚未完成。
+**当前工作区最新状态：0.5.39。** 0.5.39 修复完整备份的图片恢复下载：`restoreCloudAssets` 每轮 24 张上限导致同步完成后本地只拿到部分图片（界面显示“图片 41/41”而云端实为 391 张），现在三处同步入口（手动同步、保存设置、登录恢复）都会循环下载直到云端图片全部落到本机；下载进度计入“图片 X/Y”计数（含已存在跳过项），进度条实时反映恢复进度。同步按钮文案按状态区分：同步进行中显示“暂停同步”，完成/空闲显示“关闭同步”。0.5.38 构建门强制云端（`build.mjs` 拒绝无云端配置的构建，`.env.production` 提供默认值）；服务器 active 图片已恢复到 **391 张**（覆盖原 409 资产的 95.6%，剩余 19 张快照因备份缺 Chrome `.blob` 外部文件永久丢失）。0.5.37 上传前对账；0.5.36 只有完整备份；0.5.35 manifest 固定扩展 ID `ppjmhonejgpcdmjmcbbdjookgiagambm`。当前 `dist/` 为 cloud-enabled 0.5.39 正式构建（带 key）。F14 生产 API、数据库、COS/CAM、Google Web OAuth、DNS/TLS、定时备份、两分钟健康巡检、独立 GlitchTip project 与含 SSH Key 的加密恢复包已经部署；Google 品牌审核、卸载重装恢复和正式 Web Store ID 尚未完成。
 
 ## 当前进展
 
@@ -57,6 +57,12 @@
 当前统一项目目录：`/Users/nefish/Desktop/Coding/Aarre`。
 
 ## 最近更新
+
+### 2026-08-03 · 0.5.39 / 云端图片全量恢复下载 + 同步按钮状态文案
+
+- **真实现象。** 用户重载 0.5.38 同步后界面显示“同步完成：图片 41/41”，与服务器 391 张不一致；且完成态按钮仍显示“暂停同步”。根因：`restoreCloudAssets(maxDownloads=24)` 每轮最多下载 24 张，而同步流程只调用一次（41 = 24 下载 + 17 本地上传），本地并未拿全云端图片。
+- **修复。** `syncNow`、`syncAfterExplicitCloudSettings`、登录恢复三处入口对 `restoreCloudAssets` 增加循环直至 `remaining=false`；恢复下载逐张计入 `assetProcessed`（含已存在跳过项与过期图标），进度文案“图片 X/Y”实时反映恢复进度。按钮文案改为：同步中“暂停同步”，完成/空闲“关闭同步”，关闭“开启同步”（“暂停”实际为关闭云端同步，云端数据保留）。
+- **验证。** typecheck 与 332 项测试通过；cloud-enabled 0.5.39 构建（带 key）通过。用户重载后再次同步应看到图片进度持续增长到 391/391，本地快照/封面补齐。
 
 ### 2026-08-03 · 0.5.38 / 409 张图片资产恢复 391 张，构建机制强制云端版本
 

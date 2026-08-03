@@ -1545,7 +1545,9 @@ function SettingsPage({
                       {action === "cloud-settings"
                         ? "正在处理…"
                         : cloudSettings.enabled
-                          ? "暂停同步"
+                          ? cloudSyncProgress?.phase === "syncing"
+                            ? "暂停同步"
+                            : "关闭同步"
                           : "开启同步"}
                     </Button>
                   </div>
