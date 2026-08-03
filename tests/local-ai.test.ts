@@ -7,7 +7,8 @@ import {
 } from "vitest";
 import {
   askBookmarkAgent,
-  enrichResourceLocally
+  enrichResourceLocally,
+  parseJsonObject
 } from "../src/lib/local-ai";
 import type {
   BookmarkAgentCatalog,
@@ -931,5 +932,36 @@ describe("local AI enrichment", () => {
       enrichResourceLocally(resource, capture)
     ).rejects.toThrow("请先在设置中填写 DeepSeek API Key");
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("parseJsonObject recovery", () => {
+  it("parses JSON with literal newlines inside string values", () => {
+    const content = '{"answer":"第一行\n第二行","source_ids":["a"]}';
+    expect(parseJsonObject(content)).toEqual({
+      answer: "第一行\n第二行",
+      source_ids: ["a"]
+    });
+  });
+
+  it("parses JSON with CRLF inside string values as a single newline", () => {
+    const content = '{"answer":"line1\r\nline2","ok":true}';
+    expect(parseJsonObject(content)).toEqual({
+      answer: "line1\nline2",
+      ok: true
+    });
+  });
+
+  it("keeps valid JSON untouched and still parses", () => {
+    const content = '{"answer":"a\\nb","steps":["x"]}';
+    expect(parseJsonObject(content)).toEqual({
+      answer: "a\nb",
+      steps: ["x"]
+    });
+  });
+
+  it("strips markdown code fences before parsing", () => {
+    const content = '```json\n{"answer":"ok"}\n```';
+    expect(parseJsonObject(content)).toEqual({ answer: "ok" });
   });
 });

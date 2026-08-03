@@ -68,7 +68,7 @@ describe("manager layout stability", () => {
     expect(cardRule).toContain("align-self: start");
     expect(cardRule).not.toContain("display: inline-block");
     expect(cardRule).toContain("overflow: visible");
-    expect(coverFrameRule).toContain("aspect-ratio: 4 / 3");
+    expect(coverFrameRule).toContain("aspect-ratio: 1 / 1");
     expect(coverFrameRule).toContain("height: auto");
     expect(coverFrameRule).toContain("overflow: visible");
     expect(cardRule).toContain("border: 0");
