@@ -303,8 +303,33 @@ async function currentBookmarkBindings(
   }
   const now = new Date().toISOString();
   const current: BookmarkItemBinding[] = [];
+  const deleted: BookmarkItemBinding[] = [];
+  // 同一规范化网址只保留一条收藏位置，其余标记删除。
+  // 换扩展 ID / 重装后本地绑定缓存清空曾导致同一网址反复生成新
+  // bookmarkItemId 上传，云端积累大量重复；这里按网址去重并让
+  // 多余记录随同步删除，之后不会继续增长。
+  const seenHintUrls = new Set<string>();
   for (const hint of nativeBookmarkHints(tree)) {
     if (!isSupportedPageUrl(hint.url)) continue;
+    const hintUrlKey = canonicalizeUrl(hint.url);
+    if (seenHintUrls.has(hintUrlKey)) {
+      const duplicate =
+        byNativeId.get(hint.id) ||
+        unbound.find(
+          (binding) =>
+            !usedBookmarkItemIds.has(binding.bookmarkItemId) &&
+            bookmarkHintMatches(binding, hint)
+        );
+      if (duplicate) {
+        deleted.push({
+          bookmarkItemId: duplicate.bookmarkItemId,
+          ...(hint.id ? { nativeBookmarkId: hint.id } : {}),
+          payload: duplicate.payload
+        });
+      }
+      continue;
+    }
+    seenHintUrls.add(hintUrlKey);
     const localResource = resourceByNativeId.get(hint.id);
     const resourceKey = localResource?.resourceKey || await resourceKeyForUrl(hint.url);
     if (protectedResourceKeys.has(resourceKey)) continue;
@@ -315,8 +340,12 @@ async function currentBookmarkBindings(
     const existing = byNativeId.get(hint.id) || exactUnbound;
     const createdAt = existing?.payload.createdAt ||
       (hint.dateAdded ? new Date(hint.dateAdded).toISOString() : now);
+    // 收藏位置 ID 由 Chrome 书签 ID 确定性派生：同一书签在重装、
+    // 换扩展 ID 后仍保持同一 ID，云端按 ID upsert 而不是新增。
     const payload: BookmarkItemPayload = {
-      bookmarkItemId: existing?.bookmarkItemId || crypto.randomUUID(),
+      bookmarkItemId:
+        existing?.bookmarkItemId ||
+        (await stableUuid(`bookmark:${hint.id}`)),
       resourceKey,
       userNote: resource?.userNote || existing?.payload.userNote || "",
       tags: resource?.tags || existing?.payload.tags || [],
@@ -340,18 +369,30 @@ async function currentBookmarkBindings(
       !usedBookmarkItemIds.has(binding.bookmarkItemId) &&
       !protectedResourceKeys.has(binding.payload.resourceKey)
     ) {
+      const unboundUrlKey = canonicalizeUrl(binding.payload.bindingHint.url);
+      if (seenHintUrls.has(unboundUrlKey)) {
+        deleted.push(binding);
+        continue;
+      }
+      seenHintUrls.add(unboundUrlKey);
       current.push(binding);
     }
   }
   const currentIds = new Set(current.map((binding) => binding.bookmarkItemId));
+  const deletedByUrl: BookmarkItemBinding[] = deleted;
+  const deletedIds = new Set(deletedByUrl.map((binding) => binding.bookmarkItemId));
   return {
     current,
-    deleted: previous.filter(
-      (binding) =>
-        !currentIds.has(binding.bookmarkItemId) &&
-        (Boolean(binding.nativeBookmarkId) ||
-          protectedResourceKeys.has(binding.payload.resourceKey))
-    )
+    deleted: [
+      ...deletedByUrl,
+      ...previous.filter(
+        (binding) =>
+          !currentIds.has(binding.bookmarkItemId) &&
+          !deletedIds.has(binding.bookmarkItemId) &&
+          (Boolean(binding.nativeBookmarkId) ||
+            protectedResourceKeys.has(binding.payload.resourceKey))
+      )
+    ]
   };
 }
 
@@ -677,9 +718,14 @@ export async function restoreDurableCloudState(
 
   const bookmarkHints = nativeBookmarkHints(tree).filter((hint) => isSupportedPageUrl(hint.url));
   const claimedNativeIds = new Set<string>();
+  // 云端同 URL 多条收藏位置时只恢复一条，避免重复灌回本地。
+  const seenRestoredUrls = new Set<string>();
   for (const entity of response.entities) {
     if (entity.deleted || entity.entityType !== "bookmark-item" || !entity.payload) continue;
     const payload = entity.payload as BookmarkItemPayload;
+    const payloadUrlKey = canonicalizeUrl(payload.bindingHint.url);
+    if (seenRestoredUrls.has(payloadUrlKey)) continue;
+    seenRestoredUrls.add(payloadUrlKey);
     const exactCandidates = bookmarkHints.filter(
       (hint) => !claimedNativeIds.has(hint.id) && bookmarkHintMatches({
         bookmarkItemId: payload.bookmarkItemId,

@@ -1,10 +1,10 @@
 # Aarre 项目进展
 
-最后更新：2026-08-03（0.5.49 / 右键设封面后网页端自动刷新封面）
+最后更新：2026-08-03（0.5.50 / 修复同一网址多条收藏位置：ID 确定性 + 同步去重）
 
 > **并行说明：** 本轮账号交接包、同步契约和生产发布已完成代码与服务器写入；当前没有新增的独占编辑文件。0.5.34 及此前累积的 UI / AI / icon / 云端改动已作为同一套可构建状态纳入 Git，后续 Agent 不得 reset、回退或删除 `/opt/aarre` 发布目录。完整图片备份、真实卸载重装恢复和正式 Web Store ID 仍是外部验收门，不能写成已完成。云端接管先读 `ops/README.md`。
 
-**当前工作区最新状态：0.5.49。** 0.5.49 在右键图片设封面保存快照后广播 `PAGE_SNAPSHOT_UPDATED`（网页端 manager 已有该消息监听，会按 canonicalUrl 刷新对应卡片封面）——设置封面后网页端无需手动刷新即可看到新封面。0.5.48 修复网页端封面数据源（同步写入 `pageSnapshots`）与快照防回退；0.5.47 修复全量同步回退覆盖并新增页面 Toast；0.5.45/0.5.46 探针定位；0.5.44 入口反馈+超时；0.5.43 FileReader 修复；0.5.42 自动收藏+菜单双注册；0.5.41 标题头像化+GIF；0.5.40 右键图片设为封面；0.5.39 完整备份循环恢复；0.5.38 构建门强制云端；服务器 active 图片 391 张（原 409 的 95.6%）。0.5.37 上传前对账；0.5.36 只有完整备份；0.5.35 manifest 固定扩展 ID `ppjmhonejgpcdmjmcbbdjookgiagambm`。当前 `dist/` 为 cloud-enabled 0.5.49 正式构建（带 key）。F14 生产 API、数据库、COS/CAM、Google Web OAuth、DNS/TLS、定时备份、两分钟健康巡检、独立 GlitchTip project 与含 SSH Key 的加密恢复包已经部署；Google 品牌审核、卸载重装恢复和正式 Web Store ID 尚未完成。
+**当前工作区最新状态：0.5.50。** 0.5.50 修复“同一网址多条收藏”根因：云端实测 740 条 bookmark-items / 267 资源（约 2.77 倍），本地 Chrome 书签树 265 条无重复——重复来自换扩展 ID/重装后本地绑定缓存清空，`bookmarkItemId` 用随机 UUID 重新生成并上传，服务端以 item id 为主键无法按 URL 去重，恢复逻辑又把重复灌回本地。修复：① 有 Chrome 书签 ID 的收藏位置改用确定性 UUID（`stableUuid("bookmark:"+id)`），同一书签跨重装稳定，云端按 ID upsert；② 同步构建绑定列表时按规范化网址去重（同一网址只保留一条，多余绑定标记删除并上传），云端重复自动清理；③ 云端恢复时按网址去重，不再重复灌回本地。0.5.49 网页端自动刷新封面；0.5.48 快照数据源+防回退；0.5.47 全量同步回退修复+Toast；0.5.46-0.5.44 探针与反馈；0.5.43 FileReader；0.5.42 自动收藏+菜单双注册；0.5.41 头像+GIF；0.5.40 右键图片设封面；0.5.39 完整备份循环恢复；0.5.38 构建门强制云端；服务器 active 图片 391 张。0.5.37 上传前对账；0.5.36 只有完整备份；0.5.35 manifest 固定扩展 ID。当前 `dist/` 为 cloud-enabled 0.5.50 正式构建（带 key）。F14 生产 API、数据库、COS/CAM、Google Web OAuth、DNS/TLS、定时备份、两分钟健康巡检、独立 GlitchTip project 与含 SSH Key 的加密恢复包已经部署；Google 品牌审核、卸载重装恢复和正式 Web Store ID 尚未完成。
 
 ## 当前进展
 
@@ -57,6 +57,13 @@
 当前统一项目目录：`/Users/nefish/Desktop/Coding/Aarre`。
 
 ## 最近更新
+
+### 2026-08-03 · 0.5.50 / 同一网址多条收藏位置的根因修复
+
+- **数据实测。** 服务器解密 bookmark_items：740 条 / 267 资源，同一 URL 关联 2-3 条收藏位置（238 个资源受影响）；本地 Chrome 书签树 265 条**无重复**；资源层面几乎不重复（仅 recent.design/?ref 一组 URL 变体）。重复形态是“同 URL 多条 bookmark-items”，不是资源重复。
+- **根因链。** `bookmarkItemId` 依赖本地绑定缓存（`CLOUD_BOOKMARK_BINDINGS`）中的 `existing?.bookmarkItemId`，缺失时 `crypto.randomUUID()`；用户换扩展 ID（kplepc→ppjmhone）/重装后缓存清空 → 全部书签重新生成新 ID 上传 → 服务端按 item id 主键插入 → 同 URL 积累；恢复逻辑把云端重复全部灌回本地（unbound 绑定），且 unbound 永不删除 → 云端重复永存。
+- **修复。** ① 有 `nativeBookmarkId` 的书签用 `stableUuid("bookmark:"+id)` 确定性 ID（跨重装/换 ID 稳定，云端 upsert）；② `currentBookmarkBindings` 按规范化网址去重：同一 URL 只保留一条收藏位置，其余进入 deleted 并随同步删除（云端从 740 自动清理回 ~265）；③ `restoreDurableCloudState` 恢复时按网址去重。
+- **验证。** typecheck 与 335 项测试通过；cloud-enabled 0.5.50 构建（带 key）通过。用户重载后触发一次同步即可看到云端重复自动清理。
 
 ### 2026-08-03 · 0.5.49 / 右键设封面后网页端自动刷新
 
