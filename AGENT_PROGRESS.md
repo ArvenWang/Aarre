@@ -1,10 +1,10 @@
 # Aarre 项目进展
 
-最后更新：2026-08-03（0.5.37 / 图片上传前与服务器对账，修复云端缺图却显示同步完成）
+最后更新：2026-08-03（0.5.38 / 图片资产恢复至 391/409，构建强制云端版本）
 
 > **并行说明：** 本轮账号交接包、同步契约和生产发布已完成代码与服务器写入；当前没有新增的独占编辑文件。0.5.34 及此前累积的 UI / AI / icon / 云端改动已作为同一套可构建状态纳入 Git，后续 Agent 不得 reset、回退或删除 `/opt/aarre` 发布目录。完整图片备份、真实卸载重装恢复和正式 Web Store ID 仍是外部验收门，不能写成已完成。云端接管先读 `ops/README.md`。
 
-**当前工作区最新状态：0.5.37。** 0.5.37 修复图片上传误跳过：`syncCloudAssets` 上传前先 `GET /v1/assets` 与服务器对账，本地“已上传”标记在服务器已删除的资产会失效并重新上传；对账后仍确认在云端的图片计入完成进度，不再出现“图片 0/16”式误导（真实背景：生产账号曾上传 409 个资产，随后因旧版范围切换到“文字与设置”触发整体删除，本地标记残留导致重传被跳过，服务器 active 资产为 0）。0.5.36 起产品只有“完整备份”一种同步方式，侧边栏只保留同步进度与配额。0.5.35 起 manifest 固定扩展 ID `ppjmhonejgpcdmjmcbbdjookgiagambm`。当前 `dist/` 是显式连接 `https://sync.nexvoice.cc` 的 cloud-enabled 0.5.37 构建，Manifest 最低版本保持 134。F14 生产 API、数据库、COS/CAM、Google Web OAuth、DNS/TLS、定时备份、两分钟健康巡检、独立 GlitchTip project 与含 SSH Key 的加密恢复包已经部署；Google 品牌审核、完整图片备份、卸载重装恢复和正式 Web Store ID 尚未完成。
+**当前工作区最新状态：0.5.38。** 0.5.38 构建门强制云端：`scripts/build.mjs` 在缺少 `AARRE_CLOUD_RELEASE=1` 或 `VITE_AARRE_API_BASE_URL` 时直接拒绝构建；新增提交的 `.env.production` 提供默认云端配置，任何环境裸跑 `npm run build` 都产出 cloud-enabled 包，普通版本在机制上被杜绝。图片资产恢复：旧 ID 本地备份（10:16 前的 `aarre-legacy-extension-data-kplepc`）经字节级提取与 sha256/URL/resourceKey/host 多重配对，服务器 active 图片从 150 张恢复到 **391 张**（覆盖 409 个原资产中的 95.6%，含 202 快照/113 封面/76 站点标识，约 6.55 MB）；剩余 19 张快照因备份时未包含 Chrome 外部文件目录（`.blob`）而永久丢失。0.5.37 起上传前对账修复“图片 0/16 却显示完成”；0.5.36 起只有完整备份；0.5.35 起 manifest 固定扩展 ID `ppjmhonejgpcdmjmcbbdjookgiagambm`。当前 `dist/` 为 cloud-enabled 0.5.38 正式构建（带 key）。F14 生产 API、数据库、COS/CAM、Google Web OAuth、DNS/TLS、定时备份、两分钟健康巡检、独立 GlitchTip project 与含 SSH Key 的加密恢复包已经部署；Google 品牌审核、卸载重装恢复和正式 Web Store ID 尚未完成。
 
 ## 当前进展
 
@@ -57,6 +57,13 @@
 当前统一项目目录：`/Users/nefish/Desktop/Coding/Aarre`。
 
 ## 最近更新
+
+### 2026-08-03 · 0.5.38 / 409 张图片资产恢复 391 张，构建机制强制云端版本
+
+- **恢复过程。** 409 个被删资产的主/灾备 COS 对象已物理删除；恢复源为 10:16 的旧 ID 本地备份（`~/Documents/Aarre-Recovery/aarre-legacy-extension-data-kplepc/`）。由于 Chrome IndexedDB 的 leveldb 使用自定义 comparator 且 64KB 日志块，标准库无法打开；改用手写解析器（log fragment 拼接、table 块结构、LevelDB crc32c + mask）与字节级提取，从备份中获得 391 张完整图片。
+- **配对恢复。** 先用 sha256 精确匹配恢复 133 张；其余采用多重锚点配对（value 内 `canonicalUrl`/`host` 字段 + `thumbnailDataUrl`/`imageDataUrl`/`iconDataUrl` 字段、resourceKey 定位、服务器解密 binding 取 host），共恢复 **241 张**（201 URL 法 + 28 resourceKey 法 + 19 host 法，含 4.92 MB），全部经 COS 上传 + 数据库记录更新（sha256/byte_size/object_key/cos_version_id）落库；配对算法用 150 张 ready 记录验证（149 命中）。最终 active 391 张、6.55 MB，deleted 仅剩 19 张（快照存于未备份的 Chrome `.blob` 外部文件，字节已丢失，Chrome 亦判定 irrecoverable）。
+- **构建门。** `scripts/build.mjs` 强制云端配置，缺失即拒绝构建；`.env.production` 提交为默认配置（`AARRE_CLOUD_RELEASE=1` + `VITE_AARRE_API_BASE_URL=https://sync.nexvoice.cc`），任何环境裸构建都是云端版。验证：无环境变量 `npm run build` 自动读 `.env.production` 产出 cloud-enabled 0.5.38；typecheck 与 332 项测试通过。
+- **收尾状态。** 用户 Chrome 当前仍加载无 key 的 0.5.37（旧 ID 恢复载体），正式 0.5.38 dist 已构建（带 key）；用户重载回正式版并重新登录后，`kplepc` 临时白名单可移除。恢复材料（服务器 `/tmp/aarre-restore`）待最终验证后清理。
 
 ### 2026-08-03 · 0.5.37 / 图片上传对账：云端缺图却显示“同步完成：图片 0/16”的根因修复
 

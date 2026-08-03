@@ -8,9 +8,13 @@ const buildEnvironment = {
 const cloudRelease = buildEnvironment.AARRE_CLOUD_RELEASE === "1";
 const configuredApiUrl = buildEnvironment.VITE_AARRE_API_BASE_URL || "";
 
-if (configuredApiUrl && !cloudRelease) {
+// Aarre 只发布云端版本：不允许构建未连接生产云端的普通包。
+// 默认配置见 .env.production（AARRE_CLOUD_RELEASE=1 +
+// VITE_AARRE_API_BASE_URL=https://sync.nexvoice.cc）。
+if (!cloudRelease || !configuredApiUrl) {
   throw new Error(
-    "VITE_AARRE_API_BASE_URL is only accepted when AARRE_CLOUD_RELEASE=1."
+    "Aarre 只发布云端版本：构建必须设置 AARRE_CLOUD_RELEASE=1 与 " +
+      "VITE_AARRE_API_BASE_URL（默认见 .env.production）。"
   );
 }
 
