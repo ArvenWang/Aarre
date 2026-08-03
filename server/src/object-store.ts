@@ -93,7 +93,10 @@ export class TencentCosObjectStore implements ObjectStore {
     const headers: Record<string, string> = {
       "content-type": input.mimeType,
       "x-cos-meta-sha256": input.sha256,
-      "x-cos-server-side-encryption": "AES256"
+      "x-cos-server-side-encryption": "AES256",
+      // 覆盖历史上传的旧对象时必须替换元数据：早期直接写入的 COS
+      // 对象缺少 x-cos-meta-sha256，若不替换，重传后服务端校验仍会失败。
+      "x-cos-metadata-directive": "Replace"
     };
     const url = this.client.getObjectUrl({
       Bucket: this.bucket,

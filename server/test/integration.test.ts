@@ -45,7 +45,8 @@ class FakeObjectStore implements ObjectStore {
         "content-type": input.mimeType,
         "content-length": String(input.byteSize),
         "x-cos-meta-sha256": input.sha256,
-        "x-cos-server-side-encryption": "AES256"
+        "x-cos-server-side-encryption": "AES256",
+        "x-cos-metadata-directive": "Replace"
       },
       expiresIn: input.expiresIn
     };
