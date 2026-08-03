@@ -83,7 +83,7 @@ export const assetCreateSchema = z.object({
   byteSize: z.number().int().min(1).max(20 * 1024 * 1024),
   width: z.number().int().min(1).max(16_384).optional(),
   height: z.number().int().min(1).max(16_384).optional(),
-  mimeType: z.enum(["image/webp", "image/png", "image/jpeg"]),
+  mimeType: z.enum(["image/webp", "image/png", "image/jpeg", "image/gif"]),
   capturedAt: timestamp.optional(),
   binding: z.object({
     canonicalUrl: z.string().url().max(8_192).optional(),

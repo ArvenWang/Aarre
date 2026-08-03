@@ -8,6 +8,7 @@ import type { EnvelopeEncryption } from "./encryption.js";
 function extensionForMime(mimeType: string): string {
   if (mimeType === "image/png") return "png";
   if (mimeType === "image/jpeg") return "jpg";
+  if (mimeType === "image/gif") return "gif";
   return "webp";
 }
 
