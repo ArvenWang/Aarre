@@ -371,6 +371,23 @@ export async function restoreCloudAssets(maxDownloads = 24): Promise<{ restored:
     const bytes = await downloadAsset(asset);
     const dataUrl = bytesDataUrl(bytes, asset.mimeType);
     if (asset.kind === "snapshot" && asset.binding?.canonicalUrl) {
+      // 本地已有更新的快照封面（手动设置）时不回退到云端旧图。
+      const existing = await getPageSnapshot(asset.binding.canonicalUrl);
+      const localTime = existing?.capturedAt
+        ? Date.parse(existing.capturedAt)
+        : 0;
+      const remoteTime = asset.capturedAt
+        ? Date.parse(asset.capturedAt)
+        : 0;
+      if (
+        existing?.imageDataUrl &&
+        localTime > 0 &&
+        localTime >= remoteTime
+      ) {
+        inspected += 1;
+        await updateCloudSyncProgress({ assetProcessedDelta: 1 });
+        continue;
+      }
       const snapshot: PageSnapshot = {
         canonicalUrl: asset.binding.canonicalUrl,
         imageDataUrl: dataUrl,

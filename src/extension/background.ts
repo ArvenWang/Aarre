@@ -8251,10 +8251,29 @@ async function handleContextMenuImageCover(
   if (blob.type.toLowerCase() === "image/gif") {
     const gifDataUrl = await blobToDataUrl(blob);
     probe("gif-converted");
+    let gifWidth = 1;
+    let gifHeight = 1;
+    try {
+      const gifBitmap = await createImageBitmap(blob);
+      gifWidth = gifBitmap.width;
+      gifHeight = gifBitmap.height;
+      gifBitmap.close();
+    } catch {
+      // 尺寸解码失败时用占位尺寸，不影响封面显示。
+    }
     await upsertLocalResource({
       ...resource,
       thumbnailDataUrl: gifDataUrl,
       coverUpdatedAt: new Date().toISOString()
+    });
+    // 网页端卡片封面以页面快照为数据源，必须同步写入，
+    // 否则网页端永远显示旧快照/兜底图。
+    await putPageSnapshot({
+      canonicalUrl: resource.canonicalUrl,
+      imageDataUrl: gifDataUrl,
+      capturedAt: new Date().toISOString(),
+      width: gifWidth,
+      height: gifHeight
     });
     flashActionBadge(
       tab.id,
@@ -8299,6 +8318,13 @@ async function handleContextMenuImageCover(
       ...resource,
       thumbnailDataUrl: dataUrl,
       coverUpdatedAt: new Date().toISOString()
+    });
+    await putPageSnapshot({
+      canonicalUrl: resource.canonicalUrl,
+      imageDataUrl: dataUrl,
+      capturedAt: new Date().toISOString(),
+      width,
+      height
     });
     probe("saved");
     flashActionBadge(
