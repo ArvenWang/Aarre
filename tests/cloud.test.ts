@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { defaultCloudSyncSettings, getCloudSyncSettings } from "../src/lib/cloud-settings";
+import {
+  CLOUD_SYNC_SETTINGS_KEY,
+  defaultCloudSyncSettings,
+  getCloudSyncSettings
+} from "../src/lib/cloud-settings";
 import { retryAfterMilliseconds } from "../src/lib/auth";
 import {
   resourceCloudPayload,
@@ -104,8 +108,26 @@ describe("cloud privacy contract", () => {
   });
 
   it("keeps cloud sync explicitly disabled until the user enables it", async () => {
-    expect(defaultCloudSyncSettings()).toEqual({ enabled: false, scope: "text", updatedAt: "" });
-    await expect(getCloudSyncSettings()).resolves.toEqual({ enabled: false, scope: "text", updatedAt: "" });
+    expect(defaultCloudSyncSettings()).toEqual({ enabled: false, scope: "complete", updatedAt: "" });
+    await expect(getCloudSyncSettings()).resolves.toEqual({ enabled: false, scope: "complete", updatedAt: "" });
+  });
+
+  it("migrates a legacy text-only setting to a complete backup", async () => {
+    values[CLOUD_SYNC_SETTINGS_KEY] = {
+      enabled: true,
+      scope: "text",
+      updatedAt: "2026-08-01T00:00:00.000Z"
+    };
+    await expect(getCloudSyncSettings()).resolves.toEqual({
+      enabled: true,
+      scope: "complete",
+      updatedAt: "2026-08-01T00:00:00.000Z"
+    });
+    expect(values[CLOUD_SYNC_SETTINGS_KEY]).toEqual({
+      enabled: true,
+      scope: "complete",
+      updatedAt: "2026-08-01T00:00:00.000Z"
+    });
   });
 
   it("honors Retry-After while bounding malformed or excessive delays", () => {
@@ -170,7 +192,7 @@ describe("cloud privacy contract", () => {
   });
 
   it("persists real sync progress instead of treating cloud capacity as progress", async () => {
-    await beginCloudSyncProgress({ scope: "text", resourceTotal: 4 });
+    await beginCloudSyncProgress({ scope: "complete", resourceTotal: 4 });
     await updateCloudSyncProgress({
       resourceProcessedDelta: 2,
       statusText: "正在同步收藏…"

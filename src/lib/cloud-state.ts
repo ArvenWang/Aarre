@@ -762,8 +762,8 @@ export async function restoreDurableCloudState(
       entity.entityType === "setting-cloud-scope" &&
       !options.skipCloudScope
     ) {
-      const setting = entity.payload as CloudSyncSettings;
-      await saveCloudSyncSettings({ enabled: true, scope: setting.scope });
+      // 产品只保留完整备份：恢复云端设置时只恢复开关，范围恒为 complete。
+      await saveCloudSyncSettings({ enabled: true });
       restored += 1;
     } else if (entity.entityType === "setting-theme") {
       const setting = entity.payload as { mode?: "light" | "dark" };

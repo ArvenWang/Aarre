@@ -152,7 +152,7 @@ export type ExtensionRequest =
   | { type: "GET_CLOUD_SETTINGS" }
   | {
       type: "SAVE_CLOUD_SETTINGS";
-      payload: Pick<CloudSyncSettings, "enabled" | "scope">;
+      payload: Pick<CloudSyncSettings, "enabled">;
     }
   | { type: "GET_CLOUD_USAGE" }
   | { type: "GET_CLOUD_SYNC_ESTIMATE" }

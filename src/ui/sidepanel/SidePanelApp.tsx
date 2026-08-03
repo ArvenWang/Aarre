@@ -68,7 +68,6 @@ import {
 import type {
   AiProviderId,
   AiSettingsStatus,
-  AiUsageStats,
   AgentChatMessage,
   AgentConversation,
   BookmarkAgentProgress,
@@ -115,12 +114,10 @@ import {
 import { SiteThumbnail } from "../components/SiteThumbnail";
 import { useDebouncedSearchQuery } from "../hooks/useDebouncedSearchQuery";
 import type {
-  CloudSyncEstimate,
   CloudStorageUsage,
   CloudSyncSettings,
 } from "../../lib/cloud-settings";
 import type { CloudSyncProgress } from "../../lib/cloud-progress";
-import type { LocalDataSize } from "../../lib/local-size";
 
 type EditorState =
   | {
@@ -140,52 +137,31 @@ function formatStorageBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
-function extensionPageStorageBytes(): number {
-  const encoder = new TextEncoder();
-  let bytes = 0;
-  for (let index = 0; index < window.localStorage.length; index += 1) {
-    const key = window.localStorage.key(index);
-    if (!key) continue;
-    bytes += encoder.encode(key).byteLength;
-    bytes += encoder.encode(window.localStorage.getItem(key) || "").byteLength;
-  }
-  for (let index = 0; index < window.sessionStorage.length; index += 1) {
-    const key = window.sessionStorage.key(index);
-    if (!key) continue;
-    bytes += encoder.encode(key).byteLength;
-    bytes += encoder.encode(window.sessionStorage.getItem(key) || "").byteLength;
-  }
-  return bytes;
-}
-
 function cloudSyncProgressLabel(progress: CloudSyncProgress): string {
+  const resourceTotal = progress.resourceTotal;
+  const assetTotal = progress.assetTotal;
+  const resourceDone =
+    progress.resourceProcessed + progress.resourceFailed;
+  const assetDone = progress.assetProcessed;
   if (progress.phase === "error") {
     return progress.error ? `同步未完成：${progress.error}` : "同步未完成。";
   }
   if (progress.phase === "completed") {
-    if (!progress.resourceTotal) return "同步完成：本地内容已经是最新。";
+    if (!resourceTotal && !assetTotal) return "同步完成：内容已是最新。";
+    const summary = `${resourceDone} / ${resourceTotal} 条收藏${
+      assetTotal ? `，图片 ${assetDone} / ${assetTotal}` : ""
+    }`;
     return progress.resourceFailed
-      ? `同步完成：已处理 ${progress.resourceProcessed} / ${progress.resourceTotal} 条收藏，${progress.resourceFailed} 条稍后重试。`
-      : `同步完成：已处理 ${progress.resourceProcessed} / ${progress.resourceTotal} 条收藏。`;
+      ? `同步完成：${summary}，${progress.resourceFailed} 条稍后重试。`
+      : `同步完成：${summary}。`;
   }
   if (progress.phase === "syncing") {
-    if (!progress.resourceTotal) return progress.statusText || "正在检查本地变更…";
-    return `正在同步：已处理 ${progress.resourceProcessed} / ${progress.resourceTotal} 条收藏${
-      progress.resourceFailed ? `，失败 ${progress.resourceFailed} 条` : ""
+    if (!resourceTotal && !assetTotal) return progress.statusText || "正在同步…";
+    return `正在同步：${resourceDone} / ${resourceTotal} 条收藏${
+      assetTotal ? `，图片 ${assetDone} / ${assetTotal}` : ""
     }`;
   }
-  return "尚未进行云端同步。";
-}
-
-function cloudUploadPercent(
-  usage: CloudStorageUsage,
-  estimate: CloudSyncEstimate,
-): number {
-  if (estimate.localTotalBytes <= 0) return usage.usedBytes > 0 ? 100 : 0;
-  return Math.min(
-    100,
-    Math.max(0, (usage.usedBytes / estimate.localTotalBytes) * 100),
-  );
+  return "尚未开始同步。";
 }
 
 /**
@@ -735,13 +711,9 @@ function SettingsPage({
   const [scanEstimate, setScanEstimate] = useState<LibraryScanEstimate | null>(
     null,
   );
-  const [usageStats, setUsageStats] = useState<AiUsageStats | null>(null);
   const [cloudSettings, setCloudSettings] =
     useState<CloudSyncSettings | null>(null);
   const [cloudUsage, setCloudUsage] = useState<CloudStorageUsage | null>(null);
-  const [cloudEstimate, setCloudEstimate] =
-    useState<CloudSyncEstimate | null>(null);
-  const [localDataSize, setLocalDataSize] = useState<LocalDataSize | null>(null);
   const [cloudSyncProgress, setCloudSyncProgress] =
     useState<CloudSyncProgress | null>(null);
   const [cloudFeedback, setCloudFeedback] = useState<{
@@ -775,40 +747,12 @@ function SettingsPage({
       .catch(() => {
         /* 设置页不再展示顶部提示条 */
       });
-    void sendExtensionRequest({ type: "GET_AI_USAGE" })
-      .then(setUsageStats)
-      .catch(() => undefined);
-  }, []);
-
-  useEffect(() => {
-    let disposed = false;
-    const refreshLocalDataSize = () => {
-      void sendExtensionRequest({ type: "GET_LOCAL_DATA_SIZE" })
-        .then((next) => {
-          if (!disposed) {
-            const pageBytes = extensionPageStorageBytes();
-            setLocalDataSize({
-              ...next,
-              extensionPageStorageBytes: pageBytes,
-              totalBytes: next.totalBytes + pageBytes,
-            });
-          }
-        })
-        .catch(() => undefined);
-    };
-    refreshLocalDataSize();
-    const timer = window.setInterval(refreshLocalDataSize, 5_000);
-    return () => {
-      disposed = true;
-      window.clearInterval(timer);
-    };
   }, []);
 
   useEffect(() => {
     if (!appState?.auth.signedIn) {
       setCloudSettings(null);
       setCloudUsage(null);
-      setCloudEstimate(null);
       setCloudSyncProgress(null);
       return;
     }
@@ -846,32 +790,6 @@ function SettingsPage({
     cloudSettings?.enabled,
     cloudSyncProgress?.phase,
   ]);
-
-  useEffect(() => {
-    if (!appState?.auth.signedIn || !cloudSettings) {
-      setCloudEstimate(null);
-      return;
-    }
-    let disposed = false;
-    const refreshEstimate = () => {
-      void sendExtensionRequest({ type: "GET_CLOUD_SYNC_ESTIMATE" })
-        .then((next) => {
-          if (!disposed) setCloudEstimate(next);
-        })
-        .catch(() => undefined);
-    };
-    refreshEstimate();
-    if (!cloudSettings.enabled) {
-      return () => {
-        disposed = true;
-      };
-    }
-    const timer = window.setInterval(refreshEstimate, 5_000);
-    return () => {
-      disposed = true;
-      window.clearInterval(timer);
-    };
-  }, [appState?.auth.signedIn, cloudSettings?.enabled, cloudSettings?.scope]);
 
   useEffect(() => {
     if (appState?.libraryScan.state !== "running") return;
@@ -953,9 +871,7 @@ function SettingsPage({
     }
   }
 
-  async function handleCloudSettings(
-    next: Pick<CloudSyncSettings, "enabled" | "scope">,
-  ) {
+  async function handleCloudSettings(next: Pick<CloudSyncSettings, "enabled">) {
     if (action) return;
     setAction("cloud-settings");
     setCloudFeedback(null);
@@ -977,9 +893,7 @@ function SettingsPage({
       setCloudFeedback({
         tone: "success",
         message: saved.enabled
-          ? saved.scope === "complete"
-            ? "完整云端备份已开启，图片会在后台分批加密上传。"
-            : "文字与设置同步已开启。"
+          ? "完整备份已开启。"
           : "云端同步已暂停，云端现有数据仍然保留。",
       });
     } catch (caught) {
@@ -1031,7 +945,6 @@ function SettingsPage({
       }
       const state = await sendExtensionRequest({ type: "GET_APP_STATE" });
       onAppStateChange(state);
-      setUsageStats(await sendExtensionRequest({ type: "GET_AI_USAGE" }));
       setScanFeedback({
         tone: "success",
         message:
@@ -1540,10 +1453,7 @@ function SettingsPage({
               aria-labelledby="account-settings-title"
             >
               <div className="settings-section-heading">
-                <div>
-                  <h2 id="account-settings-title">Google 账号</h2>
-                  <p>换电脑或重装后，恢复摘要、标签、备注和封面。</p>
-                </div>
+                <h2 id="account-settings-title">Google 账号</h2>
               </div>
               <div className="settings-account-row">
                 {appState?.auth.userAvatarUrl ? (
@@ -1589,34 +1499,6 @@ function SettingsPage({
               </div>
               {appState?.auth.signedIn && cloudSettings ? (
                 <div className="settings-cloud-controls">
-                  <TabsSubtle
-                    selectedIndex={cloudSettings.scope === "complete" ? 1 : 0}
-                    onSelect={(index) =>
-                      void handleCloudSettings({
-                        enabled: cloudSettings.enabled,
-                        scope: index === 1 ? "complete" : "text",
-                      })
-                    }
-                    equalWidth
-                    className="settings-provider-tabs"
-                    aria-label="云端同步范围"
-                  >
-                    <TabsSubtleItem
-                      index={0}
-                      label="文字与设置"
-                      className="settings-provider-tab"
-                    />
-                    <TabsSubtleItem
-                      index={1}
-                      label="完整备份"
-                      className="settings-provider-tab"
-                    />
-                  </TabsSubtle>
-                  <p className="settings-provider-help">
-                    {cloudSettings.scope === "complete"
-                      ? "除文字外，还会加密上传页面快照、页面封面和站点标识；受保护网页与文件夹始终排除。"
-                      : "同步摘要、标签、备注、设置、会话和报告，不上传任何图片。"}
-                  </p>
                   <div className="settings-field-footer">
                     <div className="settings-cloud-status">
                       <p className="settings-sync-progress" role="status" aria-live="polite">
@@ -1624,78 +1506,24 @@ function SettingsPage({
                           ? cloudSyncProgressLabel(cloudSyncProgress)
                           : "同步进度读取中…"}
                       </p>
-                      {cloudSyncProgress?.resourceTotal ? (
+                      {(cloudSyncProgress?.resourceTotal ||
+                        cloudSyncProgress?.assetTotal) ? (
                         <progress
                           className="settings-sync-progress-bar"
                           value={
                             cloudSyncProgress.resourceProcessed +
-                            cloudSyncProgress.resourceFailed
+                            cloudSyncProgress.resourceFailed +
+                            cloudSyncProgress.assetProcessed
                           }
-                          max={cloudSyncProgress.resourceTotal}
+                          max={
+                            cloudSyncProgress.resourceTotal +
+                            cloudSyncProgress.assetTotal
+                          }
                         />
-                      ) : null}
-                      {localDataSize ? (
-                        <small>
-                          本地数据总量（逻辑体积）：{formatStorageBytes(localDataSize.totalBytes)}；
-                          IndexedDB {formatStorageBytes(localDataSize.indexedDbBytes)}，
-                          Chrome 书签树 {formatStorageBytes(localDataSize.nativeBookmarkTreeBytes)}，
-                          设置、会话与界面状态 {formatStorageBytes(
-                            localDataSize.chromeStorageLocalBytes +
-                              localDataSize.chromeStorageSessionBytes +
-                              localDataSize.extensionPageStorageBytes,
-                          )}
-                        </small>
-                      ) : (
-                        <small>本地数据体积计算中…</small>
-                      )}
-                      {cloudEstimate && cloudUsage ? (
-                        <div className="settings-cloud-upload-progress">
-                          <div className="settings-cloud-upload-progress-heading">
-                            <span>本地上传进度</span>
-                            <strong>
-                              {formatStorageBytes(
-                                Math.min(
-                                  cloudUsage.usedBytes,
-                                  cloudEstimate.localTotalBytes,
-                                ),
-                              )} / {formatStorageBytes(cloudEstimate.localTotalBytes)}
-                            </strong>
-                            <em>
-                              {cloudUploadPercent(cloudUsage, cloudEstimate).toFixed(0)}%
-                            </em>
-                          </div>
-                          <progress
-                            className="settings-cloud-upload-progress-bar"
-                            value={Math.min(
-                              cloudUsage.usedBytes,
-                              cloudEstimate.localTotalBytes,
-                            )}
-                            max={Math.max(1, cloudEstimate.localTotalBytes)}
-                          />
-                          <small>
-                            预计还需上传 {formatStorageBytes(
-                              Math.max(
-                                0,
-                                cloudEstimate.localTotalBytes - cloudUsage.usedBytes,
-                              ),
-                            )}
-                          </small>
-                          <small>
-                            按本地预计上传内容计算：{cloudEstimate.resourceCount} 条收藏，
-                            {cloudEstimate.assetCount} 个图片、快照或站点标识；受保护内容不计入。
-                          </small>
-                        </div>
-                      ) : (
-                        <small>本地上传量计算中…</small>
-                      )}
-                      {cloudSyncProgress?.assetProcessed ? (
-                        <small>
-                          本次新增上传 {cloudSyncProgress.assetProcessed} 个图片或快照
-                        </small>
                       ) : null}
                       <small>
                         {cloudUsage
-                          ? `云端容量（账户配额）：${formatStorageBytes(cloudUsage.usedBytes)} / ${formatStorageBytes(cloudUsage.quotaBytes)}`
+                          ? `云端容量：${formatStorageBytes(cloudUsage.usedBytes)} / ${formatStorageBytes(cloudUsage.quotaBytes)}`
                           : "云端容量读取中…"}
                       </small>
                     </div>
@@ -1711,7 +1539,6 @@ function SettingsPage({
                       onClick={() =>
                         void handleCloudSettings({
                           enabled: !cloudSettings.enabled,
-                          scope: cloudSettings.scope,
                         })
                       }
                     >
@@ -1735,32 +1562,6 @@ function SettingsPage({
               ) : null}
             </section>
 
-            {usageStats ? (
-              <section className="settings-section">
-                <div className="settings-section-heading">
-                  <div>
-                    <h2>全目录扫描用量</h2>
-                    <p>仅记录在本机，用于查看 token 消耗。</p>
-                  </div>
-                </div>
-                <div className="settings-usage-summary">
-                  <span>
-                    {usageStats.scanCount} 次扫描 · 输入{" "}
-                    {usageStats.inputTokens.toLocaleString()} · 输出{" "}
-                    {usageStats.outputTokens.toLocaleString()} · 合计{" "}
-                    {(
-                      usageStats.inputTokens + usageStats.outputTokens
-                    ).toLocaleString()}
-                  </span>
-                  {usageStats.estimatedTokens ? (
-                    <small>
-                      其中 {usageStats.estimatedTokens.toLocaleString()}{" "}
-                      个 token 为服务商未返回用量时的本地估算。
-                    </small>
-                  ) : null}
-                </div>
-              </section>
-            ) : null}
           </>
         )}
       </section>

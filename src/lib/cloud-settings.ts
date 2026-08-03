@@ -30,7 +30,7 @@ export interface CloudSyncEstimate {
 
 const DEFAULT_SETTINGS: CloudSyncSettings = {
   enabled: false,
-  scope: "text",
+  scope: "complete",
   updatedAt: ""
 };
 
@@ -38,19 +38,25 @@ export async function getCloudSyncSettings(): Promise<CloudSyncSettings> {
   const stored = (await chrome.storage.local.get(CLOUD_SYNC_SETTINGS_KEY))[
     CLOUD_SYNC_SETTINGS_KEY
   ] as Partial<CloudSyncSettings> | undefined;
-  return {
+  const next: CloudSyncSettings = {
     enabled: stored?.enabled === true,
-    scope: stored?.scope === "complete" ? "complete" : "text",
+    // 产品只保留完整备份：读取时一律按 complete 处理，并把旧的 text
+    // 存储迁移为 complete，避免旧账号继续停留在仅文字同步。
+    scope: "complete",
     updatedAt: typeof stored?.updatedAt === "string" ? stored.updatedAt : ""
   };
+  if (stored && (stored.scope !== "complete" || stored.enabled !== next.enabled)) {
+    await chrome.storage.local.set({ [CLOUD_SYNC_SETTINGS_KEY]: next });
+  }
+  return next;
 }
 
 export async function saveCloudSyncSettings(
-  input: Pick<CloudSyncSettings, "enabled" | "scope">
+  input: Pick<CloudSyncSettings, "enabled">
 ): Promise<CloudSyncSettings> {
   const next: CloudSyncSettings = {
     enabled: input.enabled,
-    scope: input.scope === "complete" ? "complete" : "text",
+    scope: "complete",
     updatedAt: new Date().toISOString()
   };
   await chrome.storage.local.set({ [CLOUD_SYNC_SETTINGS_KEY]: next });

@@ -1686,16 +1686,10 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   color: var(--ink);
 }
 
-.settings-provider-help,
 .settings-field-footer,
-.settings-usage-summary,
 .settings-empty-state {
   color: var(--ink-muted);
   font-size: var(--fs-caption);
-}
-
-.settings-provider-help {
-  margin: var(--sp-3) 0 0;
 }
 
 .settings-field-footer,
@@ -1740,15 +1734,6 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   white-space: nowrap;
   color: var(--ink-muted);
   font-size: var(--fs-caption);
-}
-
-.settings-usage-summary {
-  margin-top: var(--sp-3);
-  padding: var(--sp-3);
-  display: grid;
-  gap: var(--sp-1);
-  border-radius: var(--radius-md);
-  background: var(--surface-sunken);
 }
 
 /* Secondary page entry: one row, one destination. Same outer width as other
@@ -1991,43 +1976,6 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 .settings-sync-progress-bar {
   width: min(100%, 220px);
   height: 4px;
-  display: block;
-  overflow: hidden;
-  border: 0;
-  border-radius: var(--radius-pill);
-  accent-color: var(--ink);
-}
-
-.settings-cloud-upload-progress {
-  display: grid;
-  gap: 4px;
-  margin-top: var(--sp-1);
-}
-
-.settings-cloud-upload-progress-heading {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: baseline;
-  gap: var(--sp-1);
-  color: var(--ink-muted);
-  font-size: var(--fs-caption);
-}
-
-.settings-cloud-upload-progress-heading strong {
-  color: var(--ink);
-  font-weight: var(--fw-medium);
-}
-
-.settings-cloud-upload-progress-heading em {
-  min-width: 34px;
-  color: var(--ink);
-  font-style: normal;
-  text-align: right;
-}
-
-.settings-cloud-upload-progress-bar {
-  width: 100%;
-  height: 5px;
   display: block;
   overflow: hidden;
   border: 0;

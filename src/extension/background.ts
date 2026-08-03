@@ -7840,16 +7840,6 @@ async function handleRequest(
       return getCloudSyncSettings();
     case "SAVE_CLOUD_SETTINGS": {
       const previous = await getCloudSyncSettings();
-      if (
-        previous.scope === "complete" &&
-        request.payload.scope === "text"
-      ) {
-        await cloudRequest<{ queued: number }>("/v1/assets", {
-          method: "DELETE",
-          body: "{}"
-        });
-        await clearCloudAssetSyncState();
-      }
       const next = await saveCloudSyncSettings(request.payload);
       if (next.enabled) {
         // Return the saved choice immediately. The bookmark list is already

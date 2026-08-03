@@ -1,10 +1,10 @@
 # Aarre 项目进展
 
-最后更新：2026-08-03（0.5.35 / manifest 固定扩展身份，多机任意路径加载均为同一扩展 ID）
+最后更新：2026-08-03（0.5.36 / 同步设置精简为只有完整备份，界面只保留同步进度与配额）
 
 > **并行说明：** 本轮账号交接包、同步契约和生产发布已完成代码与服务器写入；当前没有新增的独占编辑文件。0.5.34 及此前累积的 UI / AI / icon / 云端改动已作为同一套可构建状态纳入 Git，后续 Agent 不得 reset、回退或删除 `/opt/aarre` 发布目录。完整图片备份、真实卸载重装恢复和正式 Web Store ID 仍是外部验收门，不能写成已完成。云端接管先读 `ops/README.md`。
 
-**当前工作区最新状态：0.5.35。** 0.5.35 在 manifest 固定 RSA 公钥，扩展 ID 由此派生为 `ppjmhonejgpcdmjmcbbdjookgiagambm`，不再随电脑/目录路径变化；生产服务器白名单需要同步登记该 ID（旧 `ohhmoipbedndbffmbpdkaoplojdefcak` 可保留到全部电脑升级完毕）。网页收藏与文件夹已有统一的本地/云端“受保护”规则；0.5.16–0.5.17 引入的网页端/侧边栏互斥已经完整撤销，两端允许同时存在。Aarre 整体仍支持日间与夜间主题；站点 icon 固定白色 CSS 承载层与主题隔离。当前 `dist/` 是显式连接 `https://sync.nexvoice.cc` 的 cloud-enabled 0.5.35 构建，Manifest 最低版本保持 134。真实账号的 metadata 首次同步已经写入生产；0.5.34 将同步范围立即保存、后台分批同步，并严格遵守 `Retry-After`。F14 生产 API、数据库、COS/CAM、Google Web OAuth、DNS/TLS、定时备份、两分钟健康巡检、独立 GlitchTip project 与含 SSH Key 的加密恢复包已经部署；Google 品牌审核、完整图片备份、卸载重装恢复和正式 Web Store ID 尚未完成。
+**当前工作区最新状态：0.5.36。** 0.5.36 起产品只有“完整备份”一种同步方式：`cloud-settings` 读取/保存均强制 `scope: "complete"`，旧的 `text` 存储读取时自动迁移，隐私页文案同步更新；侧边栏同步区精简为两套信息——同步进度（收藏 + 图片/快照合并计数与进度条，每秒刷新）和云端容量配额，账号区与暂停/继续按钮保留，说明文字、范围切换、本地数据总量、本地上传估算和全目录扫描用量全部移除。0.5.35 在 manifest 固定 RSA 公钥，扩展 ID 恒为 `ppjmhonejgpcdmjmcbbdjookgiagambm`，生产白名单已登记。当前 `dist/` 是显式连接 `https://sync.nexvoice.cc` 的 cloud-enabled 0.5.36 构建，Manifest 最低版本保持 134。F14 生产 API、数据库、COS/CAM、Google Web OAuth、DNS/TLS、定时备份、两分钟健康巡检、独立 GlitchTip project 与含 SSH Key 的加密恢复包已经部署；Google 品牌审核、完整图片备份、卸载重装恢复和正式 Web Store ID 尚未完成。
 
 ## 当前进展
 
@@ -57,6 +57,12 @@
 当前统一项目目录：`/Users/nefish/Desktop/Coding/Aarre`。
 
 ## 最近更新
+
+### 2026-08-03 · 0.5.36 / 同步设置精简：只有完整备份，界面只留同步进度与配额
+
+- **产品调整。** 取消“文字与设置 / 完整备份”两种范围，产品只保留完整备份：`getCloudSyncSettings()` 与 `saveCloudSyncSettings()` 一律返回/写入 `scope: "complete"`，读取时把旧的 `text` 存储迁移为 `complete`（新增迁移测试）；`SAVE_CLOUD_SETTINGS` 消息与后台 handler 收口为只传 `enabled`，云端旧 `text` 范围在恢复设置时也不再被采纳。
+- **界面精简。** 侧边栏同步区删除范围切换 Tab、所有说明文字、本地数据总量、本地上传进度/估算、扫描用量区块；只保留同步进度（收藏与图片合并计数 + 进度条，`resourceTotal + assetTotal` 为总数，失败计入进度，每秒刷新）和“云端容量：已用 / 配额”一行。账号区保留邮箱/状态/退出，暂停/继续按钮保留，错误与成功提示保留。隐私页“可选的跨设备同步”文案改为只有完整备份。相应 CSS（provider-help、usage-summary、cloud-upload-progress）已清理。
+- **验证。** `npm run typecheck` 与 330 项测试全部通过（含新增 text→complete 迁移用例）；cloud-enabled 0.5.36 构建与 JS 语法检查通过，产物中已无旧文案；manifest key 保留（扩展 ID 不变，无需再动服务器白名单）。真人 Chrome 重载后的界面复看待用户验收。
 
 ### 2026-08-03 · 0.5.35 / manifest 固定扩展身份，解决多机登录白名单问题
 
