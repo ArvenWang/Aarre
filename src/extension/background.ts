@@ -8229,26 +8229,43 @@ async function handleContextMenuImageCover(
   const bookmarkState = await getBookmarkSaveState(tab.url);
   probe("bookmark-state", bookmarkState.status);
   let autoBookmarked = false;
+  let appliedToExistingSite = false;
+  let resource: Awaited<ReturnType<typeof bookmarkedResourceForLoadedUrl>>;
   if (bookmarkState.status === "none") {
-    // 右键图片设封面即代表用户意图收藏该页面：自动收藏到书签栏，
-    // 避免“未收藏就拒绝”让用户以为功能失效。
-    const [bar] = await chrome.bookmarks
-      .get("1")
-      .catch(() => []);
-    if (!bar || bar.url || bar.unmodifiable === "managed") {
-      throw new Error("书签栏不可写入，无法自动收藏当前页面。");
+    // 当前页面 URL 与已收藏 URL 不一致（参数/路径变体）时会被判为
+    // “未收藏”。先看同主机是否已有收藏：有则直接应用到现有收藏，
+    // 避免自动收藏在根目录产生重复书签。
+    const sameHostBookmark = await findExistingBookmarkForHost(tab.url);
+    if (sameHostBookmark) {
+      appliedToExistingSite = true;
+      const existingResource = await bookmarkedResourceForLoadedUrl(
+        sameHostBookmark.url
+      );
+      if (existingResource?.nativeBookmarkIds.length) {
+        resource = existingResource;
+      }
     }
-    markNativeBookmarksDirty();
-    await chrome.bookmarks.create({
-      parentId: bar.id,
-      title: tab.title || tab.url,
-      url: tab.url
-    });
-    autoBookmarked = true;
-    await importNativeBookmarks();
-    probe("auto-bookmarked");
+    if (!resource) {
+      // 该网站完全没有任何收藏：自动收藏到书签栏，避免“未收藏就
+      // 拒绝”让用户以为功能失效。
+      const [bar] = await chrome.bookmarks
+        .get("1")
+        .catch(() => []);
+      if (!bar || bar.url || bar.unmodifiable === "managed") {
+        throw new Error("书签栏不可写入，无法自动收藏当前页面。");
+      }
+      markNativeBookmarksDirty();
+      await chrome.bookmarks.create({
+        parentId: bar.id,
+        title: tab.title || tab.url,
+        url: tab.url
+      });
+      autoBookmarked = true;
+      await importNativeBookmarks();
+      probe("auto-bookmarked");
+    }
   }
-  let resource = await bookmarkedResourceForLoadedUrl(tab.url);
+  resource = resource || (await bookmarkedResourceForLoadedUrl(tab.url));
   if (!resource?.nativeBookmarkIds.length) {
     // 本地索引可能在 Chrome 刚完成收藏时存在极短的时间差。
     await importNativeBookmarks();
@@ -8330,10 +8347,14 @@ async function handleContextMenuImageCover(
       tab.id,
       "✓",
       "#2c7a52",
-      autoBookmarked ? "已收藏并设为封面" : "封面已更新",
+      autoBookmarked
+        ? "已收藏并设为封面"
+        : appliedToExistingSite
+          ? "已应用到该网站现有收藏"
+          : "封面已更新",
       6_000
     );
-    void showCoverToastAndUpload(tab.id, autoBookmarked);
+    void showCoverToastAndUpload(tab.id, autoBookmarked, appliedToExistingSite);
     return;
   }
 
@@ -8390,20 +8411,67 @@ async function handleContextMenuImageCover(
       tab.id,
       "✓",
       "#2c7a52",
-      autoBookmarked ? "已收藏并设为封面" : "封面已更新",
+      autoBookmarked
+        ? "已收藏并设为封面"
+        : appliedToExistingSite
+          ? "已应用到该网站现有收藏"
+          : "封面已更新",
       6_000
     );
-    void showCoverToastAndUpload(tab.id, autoBookmarked);
+    void showCoverToastAndUpload(tab.id, autoBookmarked, appliedToExistingSite);
   } finally {
     bitmap.close();
   }
 }
 
+/** 在当前页面未命中收藏时，查找同一主机下已存在的书签（URL 变体，
+ * 如登录页/参数差异），避免自动收藏产生重复。 */
+async function findExistingBookmarkForHost(
+  pageUrl: string
+): Promise<{ url: string } | null> {
+  let pageHost = "";
+  try {
+    pageHost = new URL(pageUrl).hostname.toLocaleLowerCase().replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+  const tree = await chrome.bookmarks.getTree();
+  const matches: Array<{ url: string; dateAdded: number }> = [];
+  const visit = (node: chrome.bookmarks.BookmarkTreeNode) => {
+    if (node.url) {
+      try {
+        const host = new URL(node.url).hostname
+          .toLocaleLowerCase()
+          .replace(/^www\./, "");
+        if (host === pageHost) {
+          matches.push({
+            url: node.url,
+            dateAdded: node.dateAdded || 0
+          });
+        }
+      } catch {
+        // 忽略无法解析的旧书签。
+      }
+    }
+    for (const child of node.children || []) visit(child);
+  };
+  for (const root of tree) visit(root);
+  if (!matches.length) return null;
+  // 多个同站书签时优先最近添加的（通常更接近当前浏览意图）。
+  matches.sort((a, b) => b.dateAdded - a.dateAdded);
+  return { url: matches[0].url };
+}
+
 async function showCoverToastAndUpload(
   tabId: number,
-  autoBookmarked: boolean
+  autoBookmarked: boolean,
+  appliedToExistingSite = false
 ): Promise<void> {
-  const message = autoBookmarked ? "已收藏并设为封面" : "封面已更新";
+  const message = autoBookmarked
+    ? "已收藏并设为封面"
+    : appliedToExistingSite
+      ? "已应用到该网站现有收藏"
+      : "封面已更新";
   // 页面内 Toast：动态注入轻量提示，不常驻任何页面脚本。
   await chrome.scripting
     .executeScript({
