@@ -595,7 +595,11 @@ function dataUrlToBlob(dataUrl: string): { blob: Blob; mime: string } {
 // 返回：Record<string, { blob: Blob; mime: string; width: number; height: number }>
 ```
 
-**Blob 可以直接通过 `chrome.runtime.sendMessage` 传递**（结构化克隆支持 Blob），比 dataURL 字符串快得多。
+> ⚠️ **更正（2026-08-04）：Blob 不能通过 `chrome.runtime.sendMessage` 传递。** 本文档早前写"结构化克隆支持 Blob"是错的——扩展消息通道走的是 JSON 序列化，Blob 会被降级成空对象 `{}`，而且不会报错，只会在渲染时静默变成坏图。
+>
+> 正确做法：**扩展页面直接读同源 IndexedDB，不过消息通道。** `sidepanel.html` 和 `manager.html` 与 Service Worker 同源，可以自己开库把 `Blob` 读出来再 `URL.createObjectURL()`，既避开序列化限制，又省掉一次进程间往返，比经消息通道更快。
+>
+> 只有在确实需要经过 SW 的场景下，才退回传 dataURL 字符串。
 
 ### 验收标准
 
@@ -1224,24 +1228,34 @@ export async function executePlan(
 
 三家都支持 SSE 流式。在 `providers.ts` 里加 `stream: true`，用 `ReadableStream` 逐块读。
 
-从 SW 推到 UI 用 `chrome.runtime.connect` 长连接（不是 sendMessage）：
+从 SW 推到 UI 用 `chrome.runtime.connect` 长连接（不是 sendMessage）。
+
+> ⚠️ **更正（2026-08-04）：连接必须由 UI 侧发起，Service Worker 侧只能监听。** 本文档早前的示例让 background 也调用 `chrome.runtime.connect()`，那是错的——SW 无法主动向扩展页面建链，那样只会连到它自己。
 
 ```ts
-// background 侧
+// UI 侧：由这里发起连接
 const port = chrome.runtime.connect({ name: "agent-stream" });
-for await (const chunk of streamResponse) {
-  port.postMessage({ type: "delta", text: chunk });
-}
-port.postMessage({ type: "done", plan });
-```
-
-```ts
-// UI 侧
-const port = chrome.runtime.connect({ name: "agent-stream" });
+port.postMessage({ type: "start", query, history });
 port.onMessage.addListener((message) => {
   if (message.type === "delta") setAnswer((prev) => prev + message.text);
 });
 ```
+
+```ts
+// Service Worker 侧：顶层同步注册 onConnect，不要放进任何 async 初始化
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== "agent-stream") return;
+  port.onMessage.addListener(async (message) => {
+    if (message.type !== "start") return;
+    for await (const chunk of streamResponse(message)) {
+      port.postMessage({ type: "delta", text: chunk });
+    }
+    port.postMessage({ type: "done", plan });
+  });
+});
+```
+
+注册位置遵循与其他监听器一致的约束：`onConnect` 必须在 `initializeBackground()` 的同步路径上注册，否则 SW 唤醒后连接会丢失。
 
 **工具调用阶段不流式**（那是结构化数据），只有最终的自然语言回答流式。
 
