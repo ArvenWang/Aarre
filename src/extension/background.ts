@@ -7949,6 +7949,17 @@ async function registerContextMenus(): Promise<void> {
 
 void configureActionSidePanelBehavior().catch(() => undefined);
 void hardenCloudTokenStorage().catch(() => undefined);
+// 诊断探针：Service Worker 每次启动都会写入心跳，配合“菜单点击日志”
+// 可以判断右键菜单事件是否真正到达扩展后台（用于定位“点击无反应”）。
+void chrome.storage.local
+  .set({
+    "aarre:sw-heartbeat": {
+      version: "0.5.45",
+      time: new Date().toISOString(),
+      mode: "top-level"
+    }
+  })
+  .catch(() => undefined);
 
 chrome.runtime.onInstalled.addListener(() => {
   void cleanupExpiredUndoSnapshots();
@@ -8278,6 +8289,19 @@ async function handleContextMenuImageCover(
 }
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
+  // 诊断探针：任何菜单点击都会记录，用于判断事件是否到达后台。
+  void chrome.storage.local
+    .set({
+      "aarre:context-menu-debug": {
+        menuItemId: info.menuItemId,
+        time: new Date().toISOString(),
+        pageUrl: info.pageUrl || null,
+        srcUrl: info.srcUrl || null,
+        tabId: tab?.id ?? null,
+        tabUrl: tab?.url || null
+      }
+    })
+    .catch(() => undefined);
   if (info.menuItemId === CONTEXT_MENU_UPDATE_SNAPSHOT_ID) {
     void handleContextMenuUpdateSnapshot(tab).catch((error) => {
       flashActionBadge(
