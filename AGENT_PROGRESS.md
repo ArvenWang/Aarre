@@ -1,10 +1,10 @@
 # Aarre 项目进展
 
-最后更新：2026-08-03（0.5.41 / 书签标题头像化；右键图片设为封面支持 GIF 动图）
+最后更新：2026-08-03（0.5.42 / 右键图片设封面：自动收藏未收藏页面，菜单注册双保险）
 
 > **并行说明：** 本轮账号交接包、同步契约和生产发布已完成代码与服务器写入；当前没有新增的独占编辑文件。0.5.34 及此前累积的 UI / AI / icon / 云端改动已作为同一套可构建状态纳入 Git，后续 Agent 不得 reset、回退或删除 `/opt/aarre` 发布目录。完整图片备份、真实卸载重装恢复和正式 Web Store ID 仍是外部验收门，不能写成已完成。云端接管先读 `ops/README.md`。
 
-**当前工作区最新状态：0.5.41。** 0.5.41 两项调整：标题不再显示长用户名，改为“我的书签”前加圆形用户头像（Google 头像，无头像时邮箱首字母占位），整行可点击进入账号与同步设置；“用此图片设为封面”现在允许 GIF——GIF 保留原始动图（不转码不缩放，封面以动画展示），其余格式仍缩放 1600px 转 WebP；服务端 mime 无白名单限制（扩展名映射其余格式为 webp，mime_type 原样保存）。0.5.40 新增右键图片设为封面；0.5.39 起完整备份循环把云端图片全部恢复到本机（391/391）；0.5.38 构建门强制云端；服务器 active 图片 391 张（原 409 的 95.6%）。0.5.37 上传前对账；0.5.36 只有完整备份；0.5.35 manifest 固定扩展 ID `ppjmhonejgpcdmjmcbbdjookgiagambm`。当前 `dist/` 为 cloud-enabled 0.5.41 正式构建（带 key）。F14 生产 API、数据库、COS/CAM、Google Web OAuth、DNS/TLS、定时备份、两分钟健康巡检、独立 GlitchTip project 与含 SSH Key 的加密恢复包已经部署；Google 品牌审核、卸载重装恢复和正式 Web Store ID 尚未完成。
+**当前工作区最新状态：0.5.42。** 0.5.42 修复“右键图片设为封面没反应”：根因是未收藏页面被直接拒绝且错误只显示在工具栏徽标 2 秒（极易错过），以及菜单仅在 `onInstalled` 注册（Service Worker 提前结束时可能丢失）。现在未收藏页面右键图片会自动收藏到书签栏再设封面（提示“已收藏并设为封面”）；右键菜单在 `onInstalled` 与浏览器每次启动 `onStartup` 都重新注册（失败打印日志不再静默）；图片下载带当前页 referrer 提高防盗链站点成功率；封面相关徽标提示延长到 6 秒。0.5.41 标题头像化 + GIF 封面；0.5.40 右键图片设为封面；0.5.39 起完整备份循环恢复云端图片（391/391）；0.5.38 构建门强制云端；服务器 active 图片 391 张（原 409 的 95.6%）。0.5.37 上传前对账；0.5.36 只有完整备份；0.5.35 manifest 固定扩展 ID `ppjmhonejgpcdmjmcbbdjookgiagambm`。当前 `dist/` 为 cloud-enabled 0.5.42 正式构建（带 key）。F14 生产 API、数据库、COS/CAM、Google Web OAuth、DNS/TLS、定时备份、两分钟健康巡检、独立 GlitchTip project 与含 SSH Key 的加密恢复包已经部署；Google 品牌审核、卸载重装恢复和正式 Web Store ID 尚未完成。
 
 ## 当前进展
 
@@ -57,6 +57,12 @@
 当前统一项目目录：`/Users/nefish/Desktop/Coding/Aarre`。
 
 ## 最近更新
+
+### 2026-08-03 · 0.5.42 / 右键图片设封面“没反应”的修复
+
+- **根因。** 三个叠加因素：① 未收藏页面被 `handleContextMenuImageCover` 直接拒绝（“当前页面尚未收藏”），而错误只显示在工具栏徽标上 2 秒，用户几乎看不到；② 右键菜单只在 `onInstalled` 注册，MV3 Service Worker 若在异步注册链完成前结束，菜单会丢失且失败被静默吞掉；③ 部分图片站点防盗链（无 referrer 时返回 403）。
+- **修复。** 未收藏时自动收藏当前页到书签栏（`chrome.bookmarks.create` + `importNativeBookmarks`）再设置封面，徽标提示“已收藏并设为封面”；菜单注册抽为 `registerContextMenus()`，`onInstalled` 与 `onStartup` 双保险，失败写 `console.error`；`fetch` 携带 `referrer: tab.url`；封面相关徽标（进行中/成功/失败）延长到 6 秒。
+- **验证。** typecheck 与 332 项测试通过；cloud-enabled 0.5.42 构建（带 key）通过。真人浏览器右键流程待用户重载后实测。
 
 ### 2026-08-03 · 0.5.41 / 右键图片设为封面支持 GIF 动图
 

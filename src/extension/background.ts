@@ -5409,14 +5409,15 @@ function flashActionBadge(
   tabId: number | undefined,
   text: string,
   color: string,
-  title: string
+  title: string,
+  durationMs = 2_000
 ) {
   void chrome.action.setBadgeBackgroundColor({ color, tabId });
   void chrome.action.setBadgeText({ text, tabId });
   void chrome.action.setTitle({ title, tabId });
   setTimeout(() => {
     void syncOrganizationBadge(tabId);
-  }, 2_000);
+  }, durationMs);
 }
 
 function pendingSaveKey(tabId: number): string {
@@ -7910,22 +7911,12 @@ function configureActionSidePanelBehavior(): Promise<void> {
   });
 }
 
-void configureActionSidePanelBehavior().catch(() => undefined);
-void hardenCloudTokenStorage().catch(() => undefined);
-
-chrome.runtime.onInstalled.addListener(() => {
-  void cleanupExpiredUndoSnapshots();
-  void ensurePinnedSiteBrandIcons().catch(() => undefined);
-  void chrome.storage.local.setAccessLevel({
-    accessLevel: "TRUSTED_CONTEXTS"
+async function registerContextMenus(): Promise<void> {
+  await chrome.contextMenus.removeAll().catch((error) => {
+    console.error("清除右键菜单失败", error);
   });
-  void configureActionSidePanelBehavior();
-  void chrome.alarms.create("bookmark-layer-sync", {
-    delayInMinutes: 1,
-    periodInMinutes: 5
-  });
-  void chrome.contextMenus.removeAll().then(() =>
-    Promise.all([
+  try {
+    await Promise.all([
       chrome.contextMenus.create({
         id: CONTEXT_MENU_PAGE_ID,
         title: "添加到收藏…",
@@ -7948,8 +7939,28 @@ chrome.runtime.onInstalled.addListener(() => {
         title: "用此图片设为封面",
         contexts: ["image"]
       })
-    ])
-  ).then(() => refreshPageContextMenuState()).catch(() => undefined);
+    ]);
+    await refreshPageContextMenuState();
+  } catch (error) {
+    console.error("右键菜单注册失败", error);
+  }
+}
+
+void configureActionSidePanelBehavior().catch(() => undefined);
+void hardenCloudTokenStorage().catch(() => undefined);
+
+chrome.runtime.onInstalled.addListener(() => {
+  void cleanupExpiredUndoSnapshots();
+  void ensurePinnedSiteBrandIcons().catch(() => undefined);
+  void chrome.storage.local.setAccessLevel({
+    accessLevel: "TRUSTED_CONTEXTS"
+  });
+  void configureActionSidePanelBehavior();
+  void chrome.alarms.create("bookmark-layer-sync", {
+    delayInMinutes: 1,
+    periodInMinutes: 5
+  });
+  void registerContextMenus();
   void importNativeBookmarks()
     .then(async () => {
       await queueIndexedResourcesUntilVisit();
@@ -8156,8 +8167,24 @@ async function handleContextMenuImageCover(
   }
 
   const bookmarkState = await getBookmarkSaveState(tab.url);
+  let autoBookmarked = false;
   if (bookmarkState.status === "none") {
-    throw new Error("当前页面尚未收藏，无法设置封面。");
+    // 右键图片设封面即代表用户意图收藏该页面：自动收藏到书签栏，
+    // 避免“未收藏就拒绝”让用户以为功能失效。
+    const [bar] = await chrome.bookmarks
+      .get("1")
+      .catch(() => []);
+    if (!bar || bar.url || bar.unmodifiable === "managed") {
+      throw new Error("书签栏不可写入，无法自动收藏当前页面。");
+    }
+    markNativeBookmarksDirty();
+    await chrome.bookmarks.create({
+      parentId: bar.id,
+      title: tab.title || tab.url,
+      url: tab.url
+    });
+    autoBookmarked = true;
+    await importNativeBookmarks();
   }
   let resource = await bookmarkedResourceForLoadedUrl(tab.url);
   if (!resource?.nativeBookmarkIds.length) {
@@ -8177,9 +8204,11 @@ async function handleContextMenuImageCover(
     throw new Error("此页面受隐私保护规则限制，不能修改封面。");
   }
 
-  flashActionBadge(tab.id, "…", "#205aef", "正在下载图片…");
+  flashActionBadge(tab.id, "…", "#205aef", "正在下载图片…", 6_000);
   const response = await fetch(srcUrl, {
     credentials: "omit",
+    // 部分图片服务会校验来源页（防盗链），带上当前页面地址提高成功率。
+    referrer: tab.url,
     signal: AbortSignal.timeout(30_000)
   });
   if (!response.ok) {
@@ -8199,7 +8228,13 @@ async function handleContextMenuImageCover(
       thumbnailDataUrl: gifDataUrl,
       coverUpdatedAt: new Date().toISOString()
     });
-    flashActionBadge(tab.id, "✓", "#2c7a52", "封面已更新");
+    flashActionBadge(
+      tab.id,
+      "✓",
+      "#2c7a52",
+      autoBookmarked ? "已收藏并设为封面" : "封面已更新",
+      6_000
+    );
     void syncNow().catch(() => undefined);
     return;
   }
@@ -8235,7 +8270,13 @@ async function handleContextMenuImageCover(
       thumbnailDataUrl: dataUrl,
       coverUpdatedAt: new Date().toISOString()
     });
-    flashActionBadge(tab.id, "✓", "#2c7a52", "封面已更新");
+    flashActionBadge(
+      tab.id,
+      "✓",
+      "#2c7a52",
+      autoBookmarked ? "已收藏并设为封面" : "封面已更新",
+      6_000
+    );
     // 立即把新封面同步到云端，不等后台定时任务。
     void syncNow().catch(() => undefined);
   } finally {
@@ -8261,7 +8302,8 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
         tab?.id,
         "!",
         "#a33b34",
-        errorMessage(error)
+        errorMessage(error),
+        6_000
       );
     });
     return;
@@ -8799,6 +8841,9 @@ chrome.runtime.onStartup.addListener(() => {
   void (async () => {
     await cleanupExpiredUndoSnapshots();
     await importNativeBookmarks();
+    // 浏览器每次启动都重新注册右键菜单，避免仅靠 onInstalled
+    // 时 Service Worker 提前结束导致菜单丢失。
+    await registerContextMenus();
     // 浏览器启动时只恢复当前可见页面，不扫描或后台打开整个收藏库。
     // 这样安装扩展前已收藏、且当前已经打开的网页也能立即进入补拍/AI 流程。
     const current = await activeTab();
