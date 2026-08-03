@@ -441,11 +441,26 @@ export function ManagerApp() {
     window.history.replaceState(null, "", url);
   }
 
-  function handleLibraryResourceChanged(message: string) {
+  function handleLibraryResourceChanged(
+    message: string,
+    detail?: {
+      resourceKey: string;
+      kind: "updated" | "removed" | "location-removed";
+    },
+  ) {
     setNotice(message);
-    // 编辑/删除后只刷新本地视图，不触发全量云同步：全量同步会再次
-    // 重拉资源与派生数据，造成卡片多次变化；删除等变更由后台同步
-    // 定时任务推送到云端。
+    if (detail?.kind === "removed") {
+      // 最后一个收藏位置被删除：直接从当前列表移除该卡片，
+      // 不做整页刷新，避免瀑布流二次重排。
+      setLibraryResults((current) =>
+        current.filter(
+          (result) => result.resource.resourceKey !== detail.resourceKey,
+        ),
+      );
+      return;
+    }
+    // 其他编辑场景只刷新本地视图，不触发全量云同步：全量同步会再次
+    // 重拉资源与派生数据，造成卡片多次变化；变更由后台定时同步推送。
     void refresh(true, false, false);
   }
 

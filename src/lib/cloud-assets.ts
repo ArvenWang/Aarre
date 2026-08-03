@@ -352,7 +352,22 @@ export async function restoreCloudAssets(maxDownloads = 24): Promise<{ restored:
     const identity = asset.kind === "site-icon"
       ? `site-icon:${asset.binding?.host || ""}`
       : `${asset.kind}:${asset.resourceKey}`;
-    if (!identity || state[identity]?.sha256 === asset.sha256) {
+    // 站点图标特殊处理：本地品牌记录没有“当前渲染版本”的图标字节时
+    // 必须强制下载。此前版本升级清空了本地字节，而云端 state 仍记录
+    // 相同哈希，通用跳过逻辑会让图标永远无法从云端拉回。
+    if (asset.kind === "site-icon") {
+      const localBrand = asset.binding?.host
+        ? await getSiteBrand(asset.binding.host)
+        : null;
+      if (
+        localBrand?.iconDataUrl &&
+        localBrand.iconRenderVersion === SITE_ICON_RENDER_VERSION
+      ) {
+        inspected += 1;
+        await updateCloudSyncProgress({ assetProcessedDelta: 1 });
+        continue;
+      }
+    } else if (!identity || state[identity]?.sha256 === asset.sha256) {
       inspected += 1;
       // 已在本地（或已恢复过）的图片也计入完成进度。
       await updateCloudSyncProgress({ assetProcessedDelta: 1 });

@@ -22,7 +22,13 @@ import {
 interface LibraryCardEditorProps {
   resource: ResourceRecord;
   bookmarkSnapshot: BookmarkBarSnapshot;
-  onChanged: (message: string) => void;
+  onChanged: (
+    message: string,
+    detail?: {
+      resourceKey: string;
+      kind: "updated" | "removed" | "location-removed";
+    },
+  ) => void;
 }
 
 type EditorAction = "saving" | "deleting" | "";
@@ -201,6 +207,7 @@ export function LibraryCardEditor({
         result.urlChanged
           ? "收藏信息已更新；新网址将在下次打开时重新生成摘要和封面。"
           : "收藏信息已更新",
+        { resourceKey: resource.resourceKey, kind: "updated" },
       );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "收藏信息更新失败");
@@ -227,6 +234,10 @@ export function LibraryCardEditor({
         hasOtherLocations
           ? "已删除所选收藏位置，其余位置仍然保留。"
           : "收藏已删除，可在侧边栏设置的“最近的更改”中恢复。",
+        {
+          resourceKey: resource.resourceKey,
+          kind: hasOtherLocations ? "location-removed" : "removed",
+        },
       );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "删除失败");

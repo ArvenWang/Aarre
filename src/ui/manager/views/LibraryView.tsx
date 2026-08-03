@@ -66,7 +66,13 @@ interface LibraryViewProps {
   onQueryDraftChange: (value: string) => void;
   onSearch: () => void;
   onClearSearch: () => void;
-  onResourceChanged: (message: string) => void;
+  onResourceChanged: (
+    message: string,
+    detail?: {
+      resourceKey: string;
+      kind: "updated" | "removed" | "location-removed";
+    },
+  ) => void;
   onSnapshotBackfillChanged?: () => void;
   onOpenResource: (url: string) => void;
   /** Kept for compatibility with older test fixtures; no longer rendered. */

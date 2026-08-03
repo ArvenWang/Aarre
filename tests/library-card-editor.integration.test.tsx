@@ -208,7 +208,8 @@ describe("LibraryCardEditor", () => {
       }
     });
     expect(onChanged).toHaveBeenCalledWith(
-      "收藏信息已更新；新网址将在下次打开时重新生成摘要和封面。"
+      "收藏信息已更新；新网址将在下次打开时重新生成摘要和封面。",
+      { resourceKey: resource.resourceKey, kind: "updated" },
     );
   });
 
@@ -320,7 +321,8 @@ describe("LibraryCardEditor", () => {
       payload: { id: "bookmark-b", recursive: false }
     });
     expect(onChanged).toHaveBeenCalledWith(
-      "已删除所选收藏位置，其余位置仍然保留。"
+      "已删除所选收藏位置，其余位置仍然保留。",
+      { resourceKey: resource.resourceKey, kind: "location-removed" },
     );
   });
 
