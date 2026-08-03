@@ -349,16 +349,6 @@ export async function restoreCloudAssets(maxDownloads = 24): Promise<{ restored:
   let inspected = 0;
   for (const asset of response.assets) {
     if (restored >= maxDownloads) break;
-    if (
-      asset.kind === "site-icon" &&
-      !cloudSiteIconBindingIsCurrent(asset.binding)
-    ) {
-      inspected += 1;
-      // 过期版本图标由本地上传阶段重新生成，恢复阶段按已处理计数，
-      // 避免进度条停在 99%。
-      await updateCloudSyncProgress({ assetProcessedDelta: 1 });
-      continue;
-    }
     const identity = asset.kind === "site-icon"
       ? `site-icon:${asset.binding?.host || ""}`
       : `${asset.kind}:${asset.resourceKey}`;
@@ -403,6 +393,9 @@ export async function restoreCloudAssets(maxDownloads = 24): Promise<{ restored:
         host: asset.binding.host,
         iconDataUrl: dataUrl,
         iconDataUrlLight: dataUrl,
+        // 云端图标字节始终有效：恢复时直接使用当前渲染版本，
+        // 不因云端 binding 的旧版本号而拒绝恢复，避免版本升级后
+        // 本地图标被清空又无法从云端拉回。
         iconRenderVersion: SITE_ICON_RENDER_VERSION,
         iconAssetUrl: asset.binding.iconAssetUrl,
         updatedAt: new Date().toISOString()

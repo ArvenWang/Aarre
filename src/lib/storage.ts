@@ -433,14 +433,13 @@ export async function invalidateStaleSiteBrandIcons(
 
   const transaction = db.transaction("siteBrands", "readwrite");
   for (const brand of stale) {
-    const {
-      iconDataUrl: _iconDataUrl,
-      iconDataUrlLight: _iconDataUrlLight,
-      iconDataUrlDark: _iconDataUrlDark,
-      iconRenderVersion: _iconRenderVersion,
-      ...withoutRenderedIcon
-    } = brand;
-    await transaction.store.put(withoutRenderedIcon);
+    // 已接受的图标保留渲染字节，只升级版本号：质量门槛放宽（或未来
+    // 其他规则调整）不应该让已有真实图标消失回退到兜底图；需要按新
+    // 规则重试的只是那些没有图标的 reject 记录，它们本来就没有字节。
+    await transaction.store.put({
+      ...brand,
+      iconRenderVersion: currentRenderVersion
+    });
   }
   await transaction.done;
   return stale.length;

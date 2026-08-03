@@ -174,7 +174,7 @@ export function ManagerApp() {
   }, []);
 
   const refresh = useCallback(
-    async (silent = false, waitForDerived = false) => {
+    async (silent = false, waitForDerived = false, runSync = true) => {
       if (!silent) setLoading(true);
       setError("");
       try {
@@ -191,6 +191,7 @@ export function ManagerApp() {
         setPageSnapshotsEnabled(displaySettings.pageSnapshotsEnabled);
         setSnapshotExcludedHosts(displaySettings.snapshotExcludedHosts);
         if (
+          runSync &&
           state.auth.configured &&
           state.auth.signedIn &&
           state.auth.accountMatches === true
@@ -442,7 +443,10 @@ export function ManagerApp() {
 
   function handleLibraryResourceChanged(message: string) {
     setNotice(message);
-    void refresh(true);
+    // 编辑/删除后只刷新本地视图，不触发全量云同步：全量同步会再次
+    // 重拉资源与派生数据，造成卡片多次变化；删除等变更由后台同步
+    // 定时任务推送到云端。
+    void refresh(true, false, false);
   }
 
   async function openResource(url: string) {

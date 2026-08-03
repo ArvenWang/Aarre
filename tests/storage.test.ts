@@ -144,7 +144,7 @@ describe("IndexedDB storage", () => {
     ).toBe(true);
   });
 
-  it("clears rendered bytes from legacy site-brand caches without losing diagnostics", async () => {
+  it("keeps accepted icon bytes and only bumps the render version for legacy caches", async () => {
     await putSiteBrand({
       host: "legacy.example.com",
       iconDataUrl: "data:image/webp;base64,LEGACY",
@@ -165,13 +165,11 @@ describe("IndexedDB storage", () => {
       nativeWidth: 192,
       nativeHeight: 192,
       skipPageImage: true,
+      iconRenderVersion: 7,
+      iconDataUrl: "data:image/webp;base64,LEGACY",
+      iconDataUrlLight: "data:image/webp;base64,LEGACY_LIGHT",
+      iconDataUrlDark: "data:image/webp;base64,LEGACY_DARK",
     });
-    expect(await getSiteBrand("legacy.example.com")).not.toHaveProperty(
-      "iconDataUrlLight",
-    );
-    expect(await getSiteBrand("legacy.example.com")).not.toHaveProperty(
-      "iconDataUrlDark",
-    );
   });
 
   it("evicts the oldest page snapshot above the local capacity", async () => {

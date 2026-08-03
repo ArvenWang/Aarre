@@ -94,6 +94,10 @@ interface LibraryCardCoverProps {
   >;
 }
 
+// 会话级快照缓存：瀑布流删除/排序导致卡片重挂时，直接用上次取到的
+// 封面初始化，避免“先显示兜底图、再变回封面”的闪烁。
+const sessionSnapshotCache = new Map<string, string>();
+
 export function LibraryCardCover({
   canonicalUrl,
   label,
@@ -102,7 +106,9 @@ export function LibraryCardCover({
 }: LibraryCardCoverProps) {
   const containerRef = useRef<HTMLSpanElement>(null);
   const [nearViewport, setNearViewport] = useState(false);
-  const [snapshotImageUrl, setSnapshotImageUrl] = useState("");
+  const [snapshotImageUrl, setSnapshotImageUrl] = useState(
+    () => sessionSnapshotCache.get(canonicalUrl) || "",
+  );
   const fallbackCoverId = aarreFallbackCoverId(
     fallbackResource || {
       canonicalUrl,
@@ -136,6 +142,10 @@ export function LibraryCardCover({
       setSnapshotImageUrl("");
       return;
     }
+    const cached = sessionSnapshotCache.get(canonicalUrl);
+    if (cached) {
+      setSnapshotImageUrl(cached);
+    }
     let cancelled = false;
     void sendExtensionRequest({
       type: "GET_PAGE_SNAPSHOT",
@@ -144,6 +154,9 @@ export function LibraryCardCover({
       .then((snapshot) => {
         if (!cancelled) {
           setSnapshotImageUrl(snapshot?.imageDataUrl || "");
+          if (snapshot?.imageDataUrl) {
+            sessionSnapshotCache.set(canonicalUrl, snapshot.imageDataUrl);
+          }
         }
       })
       .catch(() => {
