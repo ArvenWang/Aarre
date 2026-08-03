@@ -92,7 +92,7 @@ describe("thumbnail safety", () => {
       currentSiteBrandImageUrl({
         iconDataUrl: "data:image/webp;base64,TRANSPARENT_CURRENT",
         iconDataUrlLight: "data:image/webp;base64,TRANSPARENT_CURRENT",
-        iconRenderVersion: 6,
+        iconRenderVersion: 7,
       }),
     ).toBe("data:image/webp;base64,TRANSPARENT_CURRENT");
     expect(
@@ -100,7 +100,7 @@ describe("thumbnail safety", () => {
         host: "github.com",
         iconDataUrl: "data:image/webp;base64,OLD_GITHUB",
         iconDataUrlLight: "data:image/webp;base64,OLD_GITHUB",
-        iconRenderVersion: 6,
+        iconRenderVersion: 7,
         iconAssetUrl: "https://github.com/apple-touch-icon-180x180.png",
       }),
     ).toBe("");
@@ -109,7 +109,7 @@ describe("thumbnail safety", () => {
         host: "github.com",
         iconDataUrl: "data:image/webp;base64,CURRENT_GITHUB",
         iconDataUrlLight: "data:image/webp;base64,CURRENT_GITHUB",
-        iconRenderVersion: 6,
+        iconRenderVersion: 7,
         iconAssetUrl:
           "https://github.githubassets.com/favicons/favicon.svg",
       }),
@@ -134,7 +134,7 @@ describe("thumbnail safety", () => {
       siteBrandIconCacheIsFresh(
         {
           iconDataUrlLight: "data:image/webp;base64,CURRENT",
-          iconRenderVersion: 6,
+          iconRenderVersion: 7,
           updatedAt: "2026-08-01T00:00:00.000Z"
         },
         now
@@ -169,7 +169,7 @@ describe("thumbnail safety", () => {
     const decodeFallback = vi.fn(async (_input: SiteIconDecodeFallbackInput) => ({
       iconDataUrl: "data:image/webp;base64,DOM_DECODED",
       iconDataUrlLight: "data:image/webp;base64,DOM_DECODED",
-      iconRenderVersion: 6,
+      iconRenderVersion: 7,
       nativeWidth: 32,
       nativeHeight: 32
     }));

@@ -117,7 +117,9 @@ export function LibraryCardEditor({
         .querySelector<HTMLInputElement>(
           '[role="search"][aria-label="搜索收藏库"] input',
         )
-        ?.focus();
+        // preventScroll：删除/更新卡片后保持瀑布流滚动位置，
+        // 不要被聚焦搜索框拉回页面顶部。
+        ?.focus({ preventScroll: true });
     });
   }
 

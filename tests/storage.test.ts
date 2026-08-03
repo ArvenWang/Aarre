@@ -121,7 +121,7 @@ describe("IndexedDB storage", () => {
       iconDataUrl: "data:image/webp;base64,BRAND",
       iconDataUrlLight: "data:image/webp;base64,LIGHT",
       iconDataUrlDark: "data:image/webp;base64,DARK",
-      iconRenderVersion: 6,
+      iconRenderVersion: 7,
       iconAssetUrl: "https://docs.example.com/manifest-icon.png",
       nativeWidth: 512,
       nativeHeight: 512,
@@ -133,7 +133,7 @@ describe("IndexedDB storage", () => {
       iconSource: "manifest",
       iconDataUrlLight: "data:image/webp;base64,LIGHT",
       iconDataUrlDark: "data:image/webp;base64,DARK",
-      iconRenderVersion: 6,
+      iconRenderVersion: 7,
       iconAssetUrl: "https://docs.example.com/manifest-icon.png",
       nativeWidth: 512
     });
@@ -158,7 +158,7 @@ describe("IndexedDB storage", () => {
       updatedAt: "2026-07-30T00:00:00.000Z",
     });
 
-    expect(await invalidateStaleSiteBrandIcons(6)).toBe(1);
+    expect(await invalidateStaleSiteBrandIcons(7)).toBe(1);
     expect(await getSiteBrand("legacy.example.com")).toMatchObject({
       host: "legacy.example.com",
       iconSource: "svg-icon",

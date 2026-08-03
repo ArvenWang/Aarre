@@ -22,7 +22,9 @@ export const SITE_ICON_SURFACE = {
   green: 255,
   blue: 255
 } as const satisfies SiteIconSurface;
-export const SITE_ICON_RENDER_VERSION = 6;
+// 7：放宽 favicon 质量门槛（16px 下限、3:1 比例、0.01 墨迹），
+// 让之前被 128px/1.2/0.15 门槛拒绝的站点按新规则重新生成。
+export const SITE_ICON_RENDER_VERSION = 7;
 
 export function siteBrandIconCacheIsFresh(
   brand:
@@ -838,9 +840,12 @@ async function cacheSiteIconCandidate(
       viewport?.intrinsicHeight || icoFrame?.height || bitmap.height;
     const renderWidth = bitmap.width;
     const renderHeight = bitmap.height;
-    if (!viewport && (nativeWidth < 128 || nativeHeight < 128)) {
+    // 质量门槛放宽：16px 是 favicon 的最小常见尺寸，只有连 16px 都
+    // 没有的候选才拒绝；此前 128px 门槛会把大量真实 favicon 挡在
+    // 门外导致误用兜底图。
+    if (nativeWidth < 16 || nativeHeight < 16) {
       return {
-        iconRejectReason: "below-128px",
+        iconRejectReason: "below-16px",
         nativeWidth,
         nativeHeight
       };
@@ -848,7 +853,9 @@ async function cacheSiteIconCandidate(
     const ratio =
       Math.max(nativeWidth, nativeHeight) /
       Math.min(nativeWidth, nativeHeight);
-    if (ratio > 1.2) {
+    // 比例上限放宽到 3:1：方形 favicon 之外，横幅/宽图标也允许进入，
+    // 只有明显不成比例的候选才拒绝。
+    if (ratio > 3) {
       return {
         iconRejectReason: "non-square",
         nativeWidth,
@@ -898,7 +905,9 @@ async function cacheSiteIconCandidate(
       SITE_ICON_SURFACE,
       contentRect
     );
-    if (normalized.inkCoverage < 0.15) {
+    // 墨迹下限降到 0.01：几乎全白/全透明的图才拒绝，正常低对比度
+    // favicon 也允许进入（用户要求“抓得到就用真实图标”）。
+    if (normalized.inkCoverage < 0.01) {
       return {
         iconRejectReason: "low-ink-or-contrast",
         nativeWidth,

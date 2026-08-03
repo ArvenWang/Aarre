@@ -1056,6 +1056,123 @@ function SettingsPage({
       <section className="settings-page-content">
         {settingsPage === "main" ? (
           <>
+
+            <section
+              className="settings-section"
+              aria-labelledby="account-settings-title"
+            >
+              <div className="settings-section-heading">
+                <h2 id="account-settings-title">Google 账号</h2>
+              </div>
+              <div className="settings-account-row">
+                {appState?.auth.userAvatarUrl ? (
+                  <img src={appState.auth.userAvatarUrl} alt="" />
+                ) : accountIdentity ? (
+                  <span className="settings-account-avatar">
+                    {accountIdentity.slice(0, 1).toUpperCase()}
+                  </span>
+                ) : null}
+                <div>
+                  <strong>{accountName}</strong>
+                  <small>
+                    {!appState?.auth.configured
+                      ? "云端登录尚未配置"
+                      : appState.auth.signedIn
+                        ? appState.auth.accountMatches === false
+                          ? "与当前 Chrome 账号不一致"
+                          : "已连接"
+                        : "未登录"}
+                  </small>
+                </div>
+                {appState?.auth.configured ? (
+                  <Button
+                    variant="unstyled"
+                    type="button"
+                    className="button button-quiet button-small"
+                    disabled={Boolean(action)}
+                    onClick={() =>
+                      void (appState.auth.signedIn
+                        ? handleSignOut()
+                        : handleLogin())
+                    }
+                  >
+                    {action === "login"
+                      ? "登录中…"
+                      : action === "logout"
+                        ? "退出中…"
+                        : appState.auth.signedIn
+                          ? "退出"
+                          : "登录"}
+                  </Button>
+                ) : null}
+              </div>
+              {appState?.auth.signedIn && cloudSettings ? (
+                <div className="settings-cloud-controls">
+                  <div className="settings-field-footer">
+                    <div className="settings-cloud-status">
+                      <p className="settings-sync-progress" role="status" aria-live="polite">
+                        {cloudSyncProgress
+                          ? cloudSyncProgressLabel(cloudSyncProgress)
+                          : "同步进度读取中…"}
+                      </p>
+                      {(cloudSyncProgress?.resourceTotal ||
+                        cloudSyncProgress?.assetTotal) ? (
+                        <progress
+                          className="settings-sync-progress-bar"
+                          value={
+                            cloudSyncProgress.resourceProcessed +
+                            cloudSyncProgress.resourceFailed +
+                            cloudSyncProgress.assetProcessed
+                          }
+                          max={
+                            cloudSyncProgress.resourceTotal +
+                            cloudSyncProgress.assetTotal
+                          }
+                        />
+                      ) : null}
+                      <small>
+                        {cloudUsage
+                          ? `云端容量：${formatStorageBytes(cloudUsage.usedBytes)} / ${formatStorageBytes(cloudUsage.quotaBytes)}`
+                          : "云端容量读取中…"}
+                      </small>
+                    </div>
+                    <Button
+                      variant="unstyled"
+                      type="button"
+                      className={
+                        cloudSettings.enabled
+                          ? "button button-quiet button-small"
+                          : "button button-dark button-small"
+                      }
+                      disabled={Boolean(action)}
+                      onClick={() =>
+                        void handleCloudSettings({
+                          enabled: !cloudSettings.enabled,
+                        })
+                      }
+                    >
+                      {action === "cloud-settings"
+                        ? "正在处理…"
+                        : cloudSettings.enabled
+                          ? cloudSyncProgress?.phase === "syncing"
+                            ? "暂停同步"
+                            : "关闭同步"
+                          : "开启同步"}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+              {cloudFeedback ? (
+                <div
+                  className="settings-notice settings-inline-feedback"
+                  data-tone={cloudFeedback.tone}
+                  role={cloudFeedback.tone === "error" ? "alert" : "status"}
+                >
+                  {cloudFeedback.message}
+                </div>
+              ) : null}
+            </section>
+
             <form
               className="settings-section"
               aria-labelledby="ai-settings-title"
@@ -1450,121 +1567,6 @@ function SettingsPage({
               </div>
             </section>
 
-            <section
-              className="settings-section"
-              aria-labelledby="account-settings-title"
-            >
-              <div className="settings-section-heading">
-                <h2 id="account-settings-title">Google 账号</h2>
-              </div>
-              <div className="settings-account-row">
-                {appState?.auth.userAvatarUrl ? (
-                  <img src={appState.auth.userAvatarUrl} alt="" />
-                ) : accountIdentity ? (
-                  <span className="settings-account-avatar">
-                    {accountIdentity.slice(0, 1).toUpperCase()}
-                  </span>
-                ) : null}
-                <div>
-                  <strong>{accountName}</strong>
-                  <small>
-                    {!appState?.auth.configured
-                      ? "云端登录尚未配置"
-                      : appState.auth.signedIn
-                        ? appState.auth.accountMatches === false
-                          ? "与当前 Chrome 账号不一致"
-                          : "已连接"
-                        : "未登录"}
-                  </small>
-                </div>
-                {appState?.auth.configured ? (
-                  <Button
-                    variant="unstyled"
-                    type="button"
-                    className="button button-quiet button-small"
-                    disabled={Boolean(action)}
-                    onClick={() =>
-                      void (appState.auth.signedIn
-                        ? handleSignOut()
-                        : handleLogin())
-                    }
-                  >
-                    {action === "login"
-                      ? "登录中…"
-                      : action === "logout"
-                        ? "退出中…"
-                        : appState.auth.signedIn
-                          ? "退出"
-                          : "登录"}
-                  </Button>
-                ) : null}
-              </div>
-              {appState?.auth.signedIn && cloudSettings ? (
-                <div className="settings-cloud-controls">
-                  <div className="settings-field-footer">
-                    <div className="settings-cloud-status">
-                      <p className="settings-sync-progress" role="status" aria-live="polite">
-                        {cloudSyncProgress
-                          ? cloudSyncProgressLabel(cloudSyncProgress)
-                          : "同步进度读取中…"}
-                      </p>
-                      {(cloudSyncProgress?.resourceTotal ||
-                        cloudSyncProgress?.assetTotal) ? (
-                        <progress
-                          className="settings-sync-progress-bar"
-                          value={
-                            cloudSyncProgress.resourceProcessed +
-                            cloudSyncProgress.resourceFailed +
-                            cloudSyncProgress.assetProcessed
-                          }
-                          max={
-                            cloudSyncProgress.resourceTotal +
-                            cloudSyncProgress.assetTotal
-                          }
-                        />
-                      ) : null}
-                      <small>
-                        {cloudUsage
-                          ? `云端容量：${formatStorageBytes(cloudUsage.usedBytes)} / ${formatStorageBytes(cloudUsage.quotaBytes)}`
-                          : "云端容量读取中…"}
-                      </small>
-                    </div>
-                    <Button
-                      variant="unstyled"
-                      type="button"
-                      className={
-                        cloudSettings.enabled
-                          ? "button button-quiet button-small"
-                          : "button button-dark button-small"
-                      }
-                      disabled={Boolean(action)}
-                      onClick={() =>
-                        void handleCloudSettings({
-                          enabled: !cloudSettings.enabled,
-                        })
-                      }
-                    >
-                      {action === "cloud-settings"
-                        ? "正在处理…"
-                        : cloudSettings.enabled
-                          ? cloudSyncProgress?.phase === "syncing"
-                            ? "暂停同步"
-                            : "关闭同步"
-                          : "开启同步"}
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
-              {cloudFeedback ? (
-                <div
-                  className="settings-notice settings-inline-feedback"
-                  data-tone={cloudFeedback.tone}
-                  role={cloudFeedback.tone === "error" ? "alert" : "status"}
-                >
-                  {cloudFeedback.message}
-                </div>
-              ) : null}
-            </section>
 
           </>
         )}
