@@ -8190,6 +8190,20 @@ async function handleContextMenuImageCover(
     throw new Error("图片超过 15 MB，无法作为封面。");
   }
 
+  // GIF 保留原始动图（不转码、不缩放），封面以动画形式展示；
+  // 其余格式统一缩放到最长边 1600px 并转 WebP。
+  if (blob.type.toLowerCase() === "image/gif") {
+    const gifDataUrl = await blobToDataUrl(blob);
+    await upsertLocalResource({
+      ...resource,
+      thumbnailDataUrl: gifDataUrl,
+      coverUpdatedAt: new Date().toISOString()
+    });
+    flashActionBadge(tab.id, "✓", "#2c7a52", "封面已更新");
+    void syncNow().catch(() => undefined);
+    return;
+  }
+
   let bitmap: ImageBitmap;
   try {
     bitmap = await createImageBitmap(blob);

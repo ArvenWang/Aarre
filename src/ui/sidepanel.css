@@ -119,9 +119,11 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   line-height: 1;
 }
 
-/* 登录后标题变为账号入口：继承标题排版，超长用户名截断显示 */
+/* 登录后标题变为账号入口：头像 + 固定标题，点击进入账号与同步设置 */
 .native-title-account {
-  max-width: 200px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -130,14 +132,27 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   color: inherit;
   cursor: pointer;
   text-align: left;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .native-title-account:hover {
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+.native-title-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
+}
+
+.native-title-avatar-fallback {
+  display: grid;
+  place-items: center;
+  background: var(--surface-sunken);
+  font-size: 12px;
+  font-weight: var(--fw-medium);
 }
 
 .native-actions {

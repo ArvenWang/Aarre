@@ -4480,7 +4480,25 @@ export function SidePanelApp() {
                 title="打开账号与同步设置"
                 onClick={() => setPanelView("settings")}
               >
-                {appState.auth.userName} 的书签
+                {appState.auth.userAvatarUrl ? (
+                  <img
+                    src={appState.auth.userAvatarUrl}
+                    alt=""
+                    className="native-title-avatar"
+                  />
+                ) : appState.auth.userEmail ||
+                  appState.auth.chromeProfileEmail ? (
+                  <span className="native-title-avatar native-title-avatar-fallback">
+                    {(
+                      appState.auth.userEmail ||
+                      appState.auth.chromeProfileEmail ||
+                      "A"
+                    )
+                      .slice(0, 1)
+                      .toUpperCase()}
+                  </span>
+                ) : null}
+                我的书签
               </button>
             ) : (
               "我的书签"
