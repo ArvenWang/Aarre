@@ -6,6 +6,7 @@ import {
   cleanupExpiredUndoSnapshots,
   deleteUndoSnapshot,
   deferOutboxItem,
+  duplicateSnapshotGroups,
   enqueueOutbox,
   getLocalResource,
   getLocalResources,
@@ -412,5 +413,36 @@ describe("IndexedDB storage", () => {
     expect(await getUndoSnapshot("undo-expired")).toBeUndefined();
 
     await deleteUndoSnapshot(activeBatch.batchId);
+  });
+});
+
+describe("duplicateSnapshotGroups", () => {
+  const snapshot = (canonicalUrl: string, image: string) => ({
+    canonicalUrl,
+    imageDataUrl: image,
+    capturedAt: "2026-08-03T00:00:00.000Z",
+    width: 1,
+    height: 1
+  });
+
+  it("returns all snapshots when one image is bound to several urls", () => {
+    const duplicated = duplicateSnapshotGroups([
+      snapshot("https://a.example/", "data:image/webp;base64,AAAA"),
+      snapshot("https://b.example/", "data:image/webp;base64,AAAA"),
+      snapshot("https://c.example/", "data:image/webp;base64,BBBB")
+    ]);
+    expect(duplicated.map((s) => s.canonicalUrl).sort()).toEqual([
+      "https://a.example/",
+      "https://b.example/"
+    ]);
+  });
+
+  it("returns nothing when every image belongs to one url", () => {
+    expect(
+      duplicateSnapshotGroups([
+        snapshot("https://a.example/", "data:image/webp;base64,AAAA"),
+        snapshot("https://b.example/", "data:image/webp;base64,BBBB")
+      ])
+    ).toEqual([]);
   });
 });

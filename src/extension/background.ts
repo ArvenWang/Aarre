@@ -189,6 +189,7 @@ import {
   completeOutboxItem,
   cleanupExpiredUndoSnapshots,
   deferOutboxItem,
+  duplicateSnapshotGroups,
   deleteLocalResource,
   deletePageSnapshot,
   deleteUndoSnapshot,
@@ -7958,6 +7959,24 @@ async function registerContextMenus(): Promise<void> {
 
 void configureActionSidePanelBehavior().catch(() => undefined);
 void hardenCloudTokenStorage().catch(() => undefined);
+// 清理历史“同一截图绑定多个网址”的错误快照：这类记录会让网页端
+// 多张卡片共用一张不属于它们的封面，应整组删除后重新截图。
+void (async () => {
+  try {
+    const snapshots = await getPageSnapshots();
+    const duplicated = duplicateSnapshotGroups(snapshots);
+    if (duplicated.length) {
+      for (const snapshot of duplicated) {
+        await deletePageSnapshot(snapshot.canonicalUrl);
+      }
+      console.log(
+        `已清理 ${duplicated.length} 条重复快照（同一截图绑定多个网址）。`
+      );
+    }
+  } catch {
+    // 清理失败不影响扩展启动，下次启动会重试。
+  }
+})();
 // 诊断探针：Service Worker 每次启动都会写入心跳，配合“菜单点击日志”
 // 可以判断右键菜单事件是否真正到达扩展后台（用于定位“点击无反应”）。
 void chrome.storage.local

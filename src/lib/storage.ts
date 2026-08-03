@@ -477,6 +477,26 @@ export async function deletePageSnapshot(canonicalUrl: string): Promise<void> {
   await db.delete("pageSnapshots", canonicalUrl);
 }
 
+/** 找出“同一张图片被写入多个网址快照”的重复记录。
+ * 历史上批量补拍曾把同一截图绑定到多个 canonicalUrl，导致网页端
+ * 多张卡片共用一张不属于它们的封面；这类记录应整组删除，
+ * 让对应资源回到兜底图并在下次访问时重新截图。 */
+export function duplicateSnapshotGroups(
+  snapshots: PageSnapshot[]
+): PageSnapshot[] {
+  const byImage = new Map<string, PageSnapshot[]>();
+  for (const snapshot of snapshots) {
+    const list = byImage.get(snapshot.imageDataUrl) || [];
+    list.push(snapshot);
+    byImage.set(snapshot.imageDataUrl, list);
+  }
+  const duplicated: PageSnapshot[] = [];
+  for (const list of byImage.values()) {
+    if (list.length > 1) duplicated.push(...list);
+  }
+  return duplicated;
+}
+
 export async function getPageSnapshots(): Promise<PageSnapshot[]> {
   const db = await database();
   return (
