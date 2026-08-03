@@ -8161,6 +8161,20 @@ async function handleContextMenuImageCover(
   info: chrome.contextMenus.OnClickData,
   tab?: chrome.tabs.Tab
 ): Promise<void> {
+  const probe = (stage: string, extra?: unknown) => {
+    void chrome.storage.local
+      .set({
+        "aarre:image-cover-debug": {
+          stage,
+          time: new Date().toISOString(),
+          ...(extra !== undefined
+            ? { extra: String(extra).slice(0, 300) }
+            : {})
+        }
+      })
+      .catch(() => undefined);
+  };
+  probe("entered");
   const srcUrl = info.srcUrl;
   if (!srcUrl || !/^https?:/i.test(srcUrl)) {
     throw new Error("这张图片不是可访问的网页图片，无法设为封面。");
@@ -8170,6 +8184,7 @@ async function handleContextMenuImageCover(
   }
 
   const bookmarkState = await getBookmarkSaveState(tab.url);
+  probe("bookmark-state", bookmarkState.status);
   let autoBookmarked = false;
   if (bookmarkState.status === "none") {
     // 右键图片设封面即代表用户意图收藏该页面：自动收藏到书签栏，
@@ -8188,6 +8203,7 @@ async function handleContextMenuImageCover(
     });
     autoBookmarked = true;
     await importNativeBookmarks();
+    probe("auto-bookmarked");
   }
   let resource = await bookmarkedResourceForLoadedUrl(tab.url);
   if (!resource?.nativeBookmarkIds.length) {
@@ -8198,6 +8214,7 @@ async function handleContextMenuImageCover(
   if (!resource?.nativeBookmarkIds.length) {
     throw new Error("收藏信息还没有同步完成，请稍后再试。");
   }
+  probe("resource-found", resource.resourceKey.slice(0, 12));
 
   const context = await getPrivacyProtectionContext();
   if (
@@ -8206,6 +8223,7 @@ async function handleContextMenuImageCover(
   ) {
     throw new Error("此页面受隐私保护规则限制，不能修改封面。");
   }
+  probe("privacy-ok");
 
   flashActionBadge(tab.id, "…", "#205aef", "正在下载图片…", 60_000);
   const response = await fetch(srcUrl, {
@@ -8217,16 +8235,22 @@ async function handleContextMenuImageCover(
   if (!response.ok) {
     throw new Error(`图片下载失败（${response.status}）。`);
   }
+  probe(
+    "fetched",
+    `${response.status} ${(response.headers.get("content-type") || "").slice(0, 40)}`
+  );
   const blob = await response.blob();
   if (blob.size > 15 * 1024 * 1024) {
     throw new Error("图片超过 15 MB，无法作为封面。");
   }
   flashActionBadge(tab.id, "…", "#205aef", "正在处理图片…", 60_000);
+  probe("blob-ready", `${blob.type} ${blob.size}`);
 
   // GIF 保留原始动图（不转码、不缩放），封面以动画形式展示；
   // 其余格式统一缩放到最长边 1600px 并转 WebP。
   if (blob.type.toLowerCase() === "image/gif") {
     const gifDataUrl = await blobToDataUrl(blob);
+    probe("gif-converted");
     await upsertLocalResource({
       ...resource,
       thumbnailDataUrl: gifDataUrl,
@@ -8249,6 +8273,7 @@ async function handleContextMenuImageCover(
   } catch {
     throw new Error("无法解析这张图片，请换一张试试。");
   }
+  probe("bitmap-ready", `${bitmap.width}x${bitmap.height}`);
   try {
     // 统一缩放到最长边 1600px，避免原图过大挤占本地与云端容量。
     const maxEdge = 1600;
@@ -8268,12 +8293,14 @@ async function handleContextMenuImageCover(
       type: "image/webp",
       quality: 0.88
     });
+    probe("canvas-converted", `${out.type} ${out.size}`);
     const dataUrl = await blobToDataUrl(out);
     await upsertLocalResource({
       ...resource,
       thumbnailDataUrl: dataUrl,
       coverUpdatedAt: new Date().toISOString()
     });
+    probe("saved");
     flashActionBadge(
       tab.id,
       "✓",
@@ -8325,6 +8352,15 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
       );
     });
     void Promise.race([task, timeout]).catch((error) => {
+      void chrome.storage.local
+        .set({
+          "aarre:image-cover-debug": {
+            stage: "error",
+            time: new Date().toISOString(),
+            extra: errorMessage(error).slice(0, 300)
+          }
+        })
+        .catch(() => undefined);
       flashActionBadge(
         tabId,
         "!",

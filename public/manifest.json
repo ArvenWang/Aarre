@@ -3,7 +3,7 @@
   "name": "Aarre",
   "short_name": "Aarre",
   "description": "保留 Chrome 原生书签，同步网页上下文，并用 AI 帮你重新找到真正需要的内容。",
-  "version": "0.5.45",
+  "version": "0.5.46",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAl7PAFyise3JcAlr02k25FLL5x7jTgSjK7TcCJdObik3EaQ26uxyM+sOd0qJyqNiWjUPEVP0z8a+qcqgdtdn0FRKO14zGt4Wtarz4GLzMnx28SLa3qsRNAbSZx0qfTwAvjwnZ8g55HdQGvFMeydDVkxQFN1H6yr152eY3r8zW5YhPnS5a8K9hPGn5LDouzH1CIpWWK7F1CrKANPn3eQFWvCEldyC90tMWnQw5rxwMASAl2yJCAmFG70wtYyq4rA2P3esSVvYfIjqsSd0wLmhWkJPtUO7rsvwQV4YT19734Ozx1kCKObMQQ17YlR55eDD5CdgRywSvZX89iO2TnAehCwIDAQAB",
   "minimum_chrome_version": "134",
   "permissions": [
