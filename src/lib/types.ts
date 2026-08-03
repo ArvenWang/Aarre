@@ -156,6 +156,8 @@ export interface ResourceRecord {
   createdAt: string;
   updatedAt: string;
   lastSyncedAt?: string;
+  /** 本地已删除，等待把删除墓碑推送到云端。 */
+  deletedAt?: string;
   /**
    * 每个可同步字段最后一次真正变化的时间，由 upsertLocalResource 自动维护。
    *
@@ -206,6 +208,24 @@ export interface PageSnapshot {
   capturedAt: string;
   width: number;
   height: number;
+}
+
+export interface VisualAsset {
+  /** `site-icon:<host>` 或 `cover:<resourceKey>`。 */
+  key: string;
+  kind: "site-icon" | "cover";
+  /** host 或 resourceKey。 */
+  identity: string;
+  /** 二进制是唯一的新存储格式；旧 dataURL 字段仅保留一版回滚。 */
+  blob: Blob;
+  mime: string;
+  width: number;
+  height: number;
+  origin: "user" | "auto";
+  source: string;
+  contentHash: string;
+  updatedAt: string;
+  renderVersion: number;
 }
 
 export type LinkHealthStatus =
@@ -432,6 +452,10 @@ export interface BookmarkAgentActionProposal {
   tags?: string[];
   userNote?: string;
   summary?: string;
+  /** 新文件夹尚无 Chrome ID 时，用路径在执行阶段解析。 */
+  plannedPath?: string;
+  targetFolderPath?: string;
+  selected?: boolean;
   resultMessage?: string;
 }
 

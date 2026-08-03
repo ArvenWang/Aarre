@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button } from "../../components/ui/button";
+import { Button } from "@/ui/components/ui/button";
 import type { CloudConflict } from "../../lib/cloud";
 import { sendExtensionRequest } from "../../lib/messages";
 

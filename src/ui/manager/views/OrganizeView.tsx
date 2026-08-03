@@ -1,9 +1,9 @@
-import { Button } from "../../../components/ui/button";
+import { Button } from "@/ui/components/ui/button";
 import {
   FluidInput,
   FluidTextarea,
   FluidSelect,
-} from "../../components/FluidControls";
+} from "@/ui/components/ui/input";
 import type { LibraryInsights } from "../../../lib/types";
 import { ResourceLink } from "../components/ResourceLink";
 
@@ -46,26 +46,19 @@ export function OrganizeView({
           <strong>
             {insights?.organizationPlan.actionableCount || 0} 组可执行建议
           </strong>
-          <small>
-            规则和相似度计算均在本机完成；失效链接来自实际网络检测。
-          </small>
         </div>
         <div>
           <Button
-            variant="unstyled"
+            variant="ghost"
             type="button"
-            className="button button-quiet"
+
             onClick={onSelectSafe}
           >
             全选安全项
           </Button>
           <Button
             type="button"
-            className={
-              confirmDestructiveApply
-                ? "button button-danger"
-                : "button button-dark"
-            }
+            variant={confirmDestructiveApply ? "danger" : "primary"}
             disabled={!selectedActionCount || Boolean(action)}
             onClick={onApply}
           >
@@ -84,9 +77,9 @@ export function OrganizeView({
             已执行 {appliedSuccessCount} 项；{appliedFailureCount} 项失败。
           </span>
           <Button
-            variant="unstyled"
+            variant="ghost"
             type="button"
-            className="button button-quiet"
+
             disabled={action === "undo-organize"}
             onClick={onUndo}
           >
@@ -172,8 +165,7 @@ export function OrganizeView({
         </div>
       ) : (
         <div className="empty-state">
-          <strong>当前没有整理建议</strong>
-          <p>完成一次全目录扫描后，这里会显示分类、重复和失效链接建议。</p>
+          <strong>暂无建议</strong>
         </div>
       )}
     </section>

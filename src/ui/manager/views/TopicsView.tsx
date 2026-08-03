@@ -740,7 +740,6 @@ export function TopicsView({
     return (
       <div className="empty-state">
         <strong>主题信息还不够</strong>
-        <p>完成 AI 元数据扫描后，主题之间的关系会显示在这里。</p>
       </div>
     );
   }
@@ -753,7 +752,6 @@ export function TopicsView({
           <header>
             <span className="section-eyebrow">主题社区</span>
             <h3>自然聚在一起的内容</h3>
-            <p>名称取该社区里收藏最多的主题。</p>
           </header>
           <InsightRows
             rest={Math.max(0, analysis.communities.length - ROW_CAP)}
@@ -777,7 +775,6 @@ export function TopicsView({
           <header>
             <span className="section-eyebrow">孤岛主题</span>
             <h3>尚未形成连接</h3>
-            <p>可能是独立兴趣，也可能需要补充相邻内容。</p>
           </header>
           {analysis.isolated.length ? (
             <InsightRows
@@ -793,9 +790,7 @@ export function TopicsView({
               ))}
             </InsightRows>
           ) : (
-            <p className="topic-insight-empty">
-              当前主题都已形成至少一条联系。
-            </p>
+            <p className="topic-insight-empty">无孤岛主题</p>
           )}
         </section>
 
@@ -803,7 +798,6 @@ export function TopicsView({
           <header>
             <span className="section-eyebrow">关联密度</span>
             <h3>收藏多但关联少</h3>
-            <p>优先补充跨主题内容，知识网络会更完整。</p>
           </header>
           {analysis.underconnected.map(({ node, degree }) => (
             <div className="topic-insight-row" key={node.id}>

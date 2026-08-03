@@ -29,7 +29,7 @@ export interface CloudSyncEstimate {
 }
 
 const DEFAULT_SETTINGS: CloudSyncSettings = {
-  enabled: false,
+  enabled: true,
   scope: "complete",
   updatedAt: ""
 };
@@ -39,7 +39,10 @@ export async function getCloudSyncSettings(): Promise<CloudSyncSettings> {
     CLOUD_SYNC_SETTINGS_KEY
   ] as Partial<CloudSyncSettings> | undefined;
   const next: CloudSyncSettings = {
-    enabled: stored?.enabled === true,
+    // Compatibility-only field. Account connection now owns sync lifecycle,
+    // so every migrated record is enabled and callers must not use this as a
+    // product switch.
+    enabled: true,
     // 产品只保留完整备份：读取时一律按 complete 处理，并把旧的 text
     // 存储迁移为 complete，避免旧账号继续停留在仅文字同步。
     scope: "complete",
@@ -52,10 +55,10 @@ export async function getCloudSyncSettings(): Promise<CloudSyncSettings> {
 }
 
 export async function saveCloudSyncSettings(
-  input: Pick<CloudSyncSettings, "enabled">
+  _input: Pick<CloudSyncSettings, "enabled">
 ): Promise<CloudSyncSettings> {
   const next: CloudSyncSettings = {
-    enabled: input.enabled,
+    enabled: true,
     scope: "complete",
     updatedAt: new Date().toISOString()
   };

@@ -11,6 +11,7 @@ import {
   SITE_ICON_SURFACE,
   type CachedSiteIcon
 } from "../lib/thumbnail";
+import { ICON_MAX_RATIO, ICON_MIN_INK, ICON_MIN_SIZE } from "../lib/icon-quality";
 
 const SITE_ICON_SIZE = 192;
 const MAX_DATA_URL_LENGTH = 6_000_000;
@@ -79,14 +80,14 @@ async function renderSiteIcon(
   if (!renderWidth || !renderHeight || !nativeWidth || !nativeHeight) {
     return { iconRejectReason: "empty-image-dimensions" };
   }
-  if (!request.vector && (nativeWidth < 128 || nativeHeight < 128)) {
-    return { iconRejectReason: "below-128px", nativeWidth, nativeHeight };
+  if (!request.vector && (nativeWidth < ICON_MIN_SIZE || nativeHeight < ICON_MIN_SIZE)) {
+    return { iconRejectReason: "below-16px", nativeWidth, nativeHeight };
   }
   if (
     Math.max(nativeWidth, nativeHeight) / Math.min(nativeWidth, nativeHeight) >
-    1.2
+    ICON_MAX_RATIO
   ) {
-    return { iconRejectReason: "non-square", nativeWidth, nativeHeight };
+    return { iconRejectReason: "extreme-ratio", nativeWidth, nativeHeight };
   }
 
   const canvas = document.createElement("canvas");
@@ -117,9 +118,9 @@ async function renderSiteIcon(
     height,
     canvasWidth: SITE_ICON_SIZE
   });
-  if (normalized.inkCoverage < 0.15) {
+  if (normalized.inkCoverage < ICON_MIN_INK) {
     return {
-      iconRejectReason: "low-ink-or-contrast",
+      iconRejectReason: "blank-image",
       nativeWidth,
       nativeHeight
     };

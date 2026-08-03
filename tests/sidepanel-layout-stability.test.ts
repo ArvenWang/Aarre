@@ -5,6 +5,14 @@ const sidepanelCssUrl = new URL(
   "../src/ui/sidepanel.css",
   import.meta.url
 );
+const sidepanelLazyCssUrl = new URL("../src/ui/sidepanel-lazy.css", import.meta.url);
+async function readSidepanelCss() {
+  return (await Promise.all([
+    readFile(sidepanelCssUrl, "utf8"),
+    readFile(sidepanelLazyCssUrl, "utf8"),
+  ])).join("\n");
+}
+
 const sidepanelAppUrl = new URL(
   "../src/ui/sidepanel/SidePanelApp.tsx",
   import.meta.url
@@ -14,6 +22,34 @@ const bookmarkEditorFieldsUrl = new URL(
   import.meta.url
 );
 const sidepanelHtmlUrl = new URL("../sidepanel.html", import.meta.url);
+const agentHookUrl = new URL(
+  "../src/ui/sidepanel/hooks/use-agent-chat.ts",
+  import.meta.url,
+);
+const agentThinkingUrl = new URL(
+  "../src/ui/sidepanel/components/AgentThinkingSteps.tsx",
+  import.meta.url,
+);
+const homePageUrl = new URL(
+  "../src/ui/sidepanel/pages/HomePage.tsx",
+  import.meta.url,
+);
+const appStateHookUrl = new URL(
+  "../src/ui/sidepanel/hooks/use-app-state.ts",
+  import.meta.url,
+);
+const editorDialogUrl = new URL(
+  "../src/ui/sidepanel/components/BookmarkEditorDialog.tsx",
+  import.meta.url,
+);
+const editorHookUrl = new URL(
+  "../src/ui/sidepanel/hooks/use-bookmark-editor.ts",
+  import.meta.url,
+);
+const agentComposerUrl = new URL(
+  "../src/ui/sidepanel/components/AgentComposer.tsx",
+  import.meta.url,
+);
 
 function rule(css: string, selector: string): string {
   const start = css.indexOf(`${selector} {`);
@@ -25,8 +61,8 @@ function rule(css: string, selector: string): string {
 describe("side panel notification layout", () => {
   it("keeps save feedback and errors floating above the list", async () => {
     const [css, source] = await Promise.all([
-      readFile(sidepanelCssUrl, "utf8"),
-      readFile(sidepanelAppUrl, "utf8")
+      readSidepanelCss(),
+      readFile(homePageUrl, "utf8")
     ]);
     const inlineNoticeRule = rule(css, ".native-error-layout,\n.native-notice");
     const settingsNoticeRule = rule(css, ".settings-notice");
@@ -49,7 +85,7 @@ describe("side panel notification layout", () => {
 
 describe("settings more entry layout", () => {
   it("stays full-width with the same padded title+chevron inset as other rows", async () => {
-    const css = await readFile(sidepanelCssUrl, "utf8");
+    const css = await readSidepanelCss();
     const more = rule(css, ".settings-more-button");
 
     expect(more).toContain("width: 100%");
@@ -62,7 +98,7 @@ describe("settings more entry layout", () => {
 
 describe("side panel startup rendering", () => {
   it("paints the native Chrome tree before the local index finishes importing", async () => {
-    const source = await readFile(sidepanelAppUrl, "utf8");
+    const source = await readFile(appStateHookUrl, "utf8");
     const refreshStart = source.indexOf("const refresh = useCallback");
     const refreshEnd = source.indexOf(
       "const loadOrganizationNotice = useCallback",
@@ -79,41 +115,50 @@ describe("side panel startup rendering", () => {
     expect(localIndexRead).toBeGreaterThan(nativePaint);
   });
 
-  it("keeps a visible boot shell before the React bundle mounts", async () => {
-    const [html, source, css] = await Promise.all([
+  it("uses synchronous onboarding state without a React boot gate", async () => {
+    const [html, source, css, agentHook, thinking, composer] = await Promise.all([
       readFile(sidepanelHtmlUrl, "utf8"),
       readFile(sidepanelAppUrl, "utf8"),
-      readFile(sidepanelCssUrl, "utf8"),
+      readSidepanelCss(),
+      readFile(agentHookUrl, "utf8"),
+      readFile(agentThinkingUrl, "utf8"),
+      readFile(agentComposerUrl, "utf8"),
     ]);
 
     expect(html).toContain('class="sidepanel-static-boot"');
-    expect(source).toContain('className="sidepanel-boot-screen"');
-    expect(css).toContain(".sidepanel-boot-screen {");
-    expect(source).toContain("AgentThinkingSteps");
-    expect(source).toContain('type: "CANCEL_BOOKMARK_AGENT"');
-    expect(source).toContain("StopIcon");
+    expect(source).not.toContain('className="sidepanel-boot-screen"');
+    expect(source).toContain('localStorage.getItem("aarre:onboarding-done")');
+    expect(thinking).toContain("AgentThinkingSteps");
+    expect(agentHook).toContain('type: "CANCEL_BOOKMARK_AGENT"');
+    expect(composer).toContain("StopIcon");
   });
 
   it("does not mount the AI setup card in the initial library footer", async () => {
     const source = await readFile(sidepanelAppUrl, "utf8");
-    const footerStart = source.indexOf("<BookmarkPreviewLayer");
-    const footerEnd = source.indexOf("{editor ? (", footerStart);
-    const footer = source.slice(footerStart, footerEnd);
-
-    expect(footer).toContain("{aiConfigured ? (");
-    expect(footer).not.toContain("configured={aiConfigured}");
+    const home = source.slice(source.lastIndexOf("<HomePage"));
+    expect(home).toContain("agent={aiConfigured ? {");
+    expect(home).not.toContain("configured={aiConfigured}");
   });
 });
 
 describe("side panel bookmark review density", () => {
   it("keeps ordinary search free of AI setup actions and trims review-only copy", async () => {
-    const source = await readFile(sidepanelAppUrl, "utf8");
-    const css = await readFile(sidepanelCssUrl, "utf8");
+    const [source, bookmarkTree] = await Promise.all([
+      readFile(sidepanelAppUrl, "utf8"),
+      readFile(
+        new URL(
+          "../src/ui/sidepanel/components/BookmarkTree.tsx",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    ]);
+    const css = await readSidepanelCss();
 
     expect(source).not.toContain("按回车查看完整排序");
     expect(source).not.toContain("配置 AI 后可以让它帮你找");
     expect(source).not.toContain("agent-history-limit");
-    expect(source).toContain('"--tree-depth": `${depth * 24}px`');
+    expect(bookmarkTree).toContain('"--tree-depth": `${depth * 24}px`');
     expect(css).toContain(".bookmark-thumbnail {\n  width: 42px;\n  height: 42px;");
     expect(css).toContain(
       ".library-search-result-main .bookmark-thumbnail {\n  width: 42px;\n  height: 42px;",
@@ -124,7 +169,7 @@ describe("side panel bookmark review density", () => {
 describe("agent progress controls", () => {
   it("keeps the stop control neutral, solid, and spacious", async () => {
     const [css, icons] = await Promise.all([
-      readFile(sidepanelCssUrl, "utf8"),
+      readSidepanelCss(),
       readFile(new URL("../src/ui/components/Icons.tsx", import.meta.url), "utf8"),
     ]);
     const stop = rule(css, ".agent-stop-button");
@@ -144,17 +189,22 @@ describe("agent progress controls", () => {
   });
 
   it("uses backend-confirmed progress and keeps source text in the row", async () => {
-    const [css, source] = await Promise.all([
-      readFile(sidepanelCssUrl, "utf8"),
-      readFile(sidepanelAppUrl, "utf8"),
+    const [css, agentHook, thinking, chat] = await Promise.all([
+      readSidepanelCss(),
+      readFile(agentHookUrl, "utf8"),
+      readFile(agentThinkingUrl, "utf8"),
+      readFile(
+        new URL("../src/ui/sidepanel/pages/AgentChatPage.tsx", import.meta.url),
+        "utf8"
+      )
     ]);
 
-    expect(source).toContain("new Set(progress?.completedStages || [])");
-    expect(source).toContain('progress?.stages || ["preparing"]');
-    expect(source).toContain("!Array.isArray(event.completedStages)");
-    expect(source).toContain("!Array.isArray(event.stages)");
-    expect(source).toContain('className="agent-source-button"');
-    expect(source).toContain('size="unstyled"');
+    expect(thinking).toContain("new Set(progress?.completedStages || [])");
+    expect(thinking).toContain('progress?.stages || ["preparing"]');
+    expect(agentHook).toContain("!Array.isArray(event.completedStages)");
+    expect(agentHook).toContain("!Array.isArray(event.stages)");
+    expect(chat).toContain('className="agent-source-button"');
+    expect(chat).toContain('size="unstyled"');
     expect(css).toContain(
       '.agent-message-sources > .agent-source-button > [data-slot="button-content"] {\n  grid-column: 1 / -1;',
     );
@@ -164,13 +214,17 @@ describe("agent progress controls", () => {
 
 describe("bookmark editor parity and tree hierarchy", () => {
   it("keeps both editor surfaces on one field component and indents child rows", async () => {
-    const [sidepanel, manager, fields, sidepanelCss, managerCss, tokens] =
+    const [sidepanel, editorHook, manager, fields, sidepanelCss, managerCss, tokens] =
       await Promise.all([
-        readFile(sidepanelAppUrl, "utf8"),
+        readFile(editorDialogUrl, "utf8"),
+        readFile(editorHookUrl, "utf8"),
         readFile(new URL("../src/ui/manager/components/LibraryCardEditor.tsx", import.meta.url), "utf8"),
         readFile(bookmarkEditorFieldsUrl, "utf8"),
-        readFile(sidepanelCssUrl, "utf8"),
-        readFile(new URL("../src/ui/manager.css", import.meta.url), "utf8"),
+        readSidepanelCss(),
+        Promise.all([
+          readFile(new URL("../src/ui/manager.css", import.meta.url), "utf8"),
+          readFile(new URL("../src/ui/editor-fields.css", import.meta.url), "utf8"),
+        ]).then((parts) => parts.join("\n")),
         readFile(new URL("../src/ui/tokens.css", import.meta.url), "utf8"),
       ]);
 
@@ -180,7 +234,7 @@ describe("bookmark editor parity and tree hierarchy", () => {
     expect(fields).not.toContain("<span>自定义标签</span>");
     expect(fields).not.toContain('className="library-card-editor-location"');
     expect(fields).toContain("locations.length > 1");
-    expect(sidepanel).toContain('type: "UPDATE_BOOKMARK_DETAILS"');
+    expect(editorHook).toContain('type: "UPDATE_BOOKMARK_DETAILS"');
     expect(sidepanel).toContain('"编辑收藏"');
     expect(sidepanelCss).toContain(
       ".bookmark-row:not([data-folder=\"true\"]) .bookmark-main {\n  height: 68px;\n  min-height: 68px;\n  padding: var(--sp-2) var(--sp-6) var(--sp-2)\n    var(--tree-depth, 0px);",

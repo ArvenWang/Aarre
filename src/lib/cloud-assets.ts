@@ -1,6 +1,4 @@
 import { cloudRequest } from "./auth";
-import { getCloudSyncSettings } from "./cloud-settings";
-import { updateCloudSyncProgress } from "./cloud-progress";
 import { pinnedBrandAssetNeedsRefresh } from "./cover-rules";
 import {
   buildProtectionPolicy,
@@ -14,10 +12,10 @@ import {
   getPageSnapshots,
   getSiteBrand,
   getSiteBrands,
-  putPageSnapshot,
   putSiteBrand,
   upsertLocalResource
 } from "./storage";
+import { putCoverSnapshot, putCoverVisual } from "./visuals";
 import { SITE_ICON_RENDER_VERSION } from "./thumbnail";
 import type { PageSnapshot, ResourceRecord, SiteBrandRecord } from "./types";
 import { resourceKeyForUrl } from "./url";
@@ -222,8 +220,6 @@ async function uploadAsset(input: {
 }
 
 export async function syncCloudAssets(maxUploads = 12): Promise<{ uploaded: number; remaining: boolean }> {
-  const settings = await getCloudSyncSettings();
-  if (!settings.enabled || settings.scope !== "complete") return { uploaded: 0, remaining: false };
   const [resources, snapshots, brands, protectionSettings, tree, storedState] = await Promise.all([
     getLocalResources(),
     getPageSnapshots(),
@@ -309,11 +305,6 @@ export async function syncCloudAssets(maxUploads = 12): Promise<{ uploaded: numb
     }));
   }
 
-  await updateCloudSyncProgress({
-    assetTotal: jobs.length,
-    statusText: "正在上传图片与快照…"
-  });
-
   let uploaded = 0;
   let inspected = 0;
   for (const job of jobs) {
@@ -322,9 +313,6 @@ export async function syncCloudAssets(maxUploads = 12): Promise<{ uploaded: numb
       uploaded += 1;
     }
     inspected += 1;
-    // 处理过的资产一律计入进度：跳过只发生在对账后确认云端已存在，
-    // 不应再显示成“0 张未完成”。
-    await updateCloudSyncProgress({ assetProcessedDelta: 1 });
   }
   // 对账结果需要持久化：服务器已删除资产的本地标记必须清掉，
   // 否则下一次同步仍然会误跳过。
@@ -344,16 +332,8 @@ async function downloadAsset(asset: CloudAssetDescriptor): Promise<Uint8Array> {
 }
 
 export async function restoreCloudAssets(maxDownloads = 24): Promise<{ restored: number; remaining: boolean }> {
-  const settings = await getCloudSyncSettings();
-  if (!settings.enabled || settings.scope !== "complete") return { restored: 0, remaining: false };
   const response = await cloudRequest<{ assets: CloudAssetDescriptor[] }>("/v1/assets");
   const state = await readState();
-  // 下载进度与上传共用同一套计数：让“图片 X/Y”实时反映云端图片
-  // 恢复到本机的进度，避免下载期间进度条看起来没在动。
-  await updateCloudSyncProgress({
-    assetTotal: response.assets.length,
-    statusText: "正在恢复云端图片…"
-  });
   let restored = 0;
   let inspected = 0;
   for (const asset of response.assets) {
@@ -373,35 +353,22 @@ export async function restoreCloudAssets(maxDownloads = 24): Promise<{ restored:
         localBrand.iconRenderVersion === SITE_ICON_RENDER_VERSION
       ) {
         inspected += 1;
-        await updateCloudSyncProgress({ assetProcessedDelta: 1 });
         continue;
       }
     } else if (!identity || state[identity]?.sha256 === asset.sha256) {
       inspected += 1;
       // 已在本地（或已恢复过）的图片也计入完成进度。
-      await updateCloudSyncProgress({ assetProcessedDelta: 1 });
       continue;
     }
     const bytes = await downloadAsset(asset);
     const dataUrl = bytesDataUrl(bytes, asset.mimeType);
     if (asset.kind === "snapshot" && asset.binding?.canonicalUrl) {
-      // 本地已有更新的快照封面（手动设置）时不回退到云端旧图。
-      const existing = await getPageSnapshot(asset.binding.canonicalUrl);
-      const localTime = existing?.capturedAt
-        ? Date.parse(existing.capturedAt)
-        : 0;
-      const remoteTime = asset.capturedAt
-        ? Date.parse(asset.capturedAt)
-        : 0;
-      if (
-        existing?.imageDataUrl &&
-        localTime > 0 &&
-        localTime >= remoteTime
-      ) {
+      const resource = await getLocalResource(asset.resourceKey);
+      if (!resource) {
         inspected += 1;
-        await updateCloudSyncProgress({ assetProcessedDelta: 1 });
         continue;
       }
+      const remoteOrigin = asset.binding.coverOrigin === "user" ? "user" : "auto";
       const snapshot: PageSnapshot = {
         canonicalUrl: asset.binding.canonicalUrl,
         imageDataUrl: dataUrl,
@@ -409,7 +376,10 @@ export async function restoreCloudAssets(maxDownloads = 24): Promise<{ restored:
         width: asset.width || 1,
         height: asset.height || 1
       };
-      await putPageSnapshot(snapshot);
+      await putCoverSnapshot(resource, snapshot, remoteOrigin, {
+        source: "cloud-snapshot",
+        contentHash: asset.sha256
+      });
     } else if (asset.kind === "site-icon" && asset.binding?.host) {
       const existing = await getSiteBrand(asset.binding.host);
       const brand: SiteBrandRecord = {
@@ -442,14 +412,28 @@ export async function restoreCloudAssets(maxDownloads = 24): Promise<{ restored:
           !remoteIsUserCover;
         if (sameContent || localUserCoverWins) {
           inspected += 1;
-          await updateCloudSyncProgress({ assetProcessedDelta: 1 });
+          continue;
+        }
+        const nextOrigin = remoteIsUserCover ? "user" : resource.coverOrigin || "auto";
+        const visualStored = await putCoverVisual({
+          resource,
+          dataUrl,
+          width: asset.width || 0,
+          height: asset.height || 0,
+          origin: nextOrigin,
+          source: "cloud-cover",
+          contentHash: asset.sha256,
+          updatedAt: asset.capturedAt || new Date().toISOString()
+        });
+        if (!visualStored) {
+          inspected += 1;
           continue;
         }
         await upsertLocalResource({
           ...resource,
           thumbnailDataUrl: dataUrl,
           coverContentHash: asset.sha256,
-          coverOrigin: remoteIsUserCover ? "user" : resource.coverOrigin || "auto",
+          coverOrigin: nextOrigin,
           coverUpdatedAt:
             asset.capturedAt || resource.coverUpdatedAt || new Date().toISOString()
         });
@@ -458,7 +442,6 @@ export async function restoreCloudAssets(maxDownloads = 24): Promise<{ restored:
     state[identity] = { assetId: asset.assetId, sha256: asset.sha256, revision: asset.revision };
     restored += 1;
     inspected += 1;
-    await updateCloudSyncProgress({ assetProcessedDelta: 1 });
   }
   if (restored) await writeState(state);
   return { restored, remaining: inspected < response.assets.length };

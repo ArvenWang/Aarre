@@ -40,26 +40,6 @@ const ALLOWED_TOKEN_COLORS = new Set([
   "#6fbf7c"
 ]);
 
-// 旧 CSS 按钮体系的全部类名。修饰类必须挂在基类上，且不能和 React Button 的
-// variant 混用——两套系统叠在同一个元素上正是「黑块」和「高度塌陷」的根因。
-const LEGACY_BUTTON_BASES = new Set([
-  "button",
-  "icon-button",
-  "text-button"
-]);
-const LEGACY_BUTTON_MODIFIERS = new Set([
-  "button-dark",
-  "button-quiet",
-  "button-small",
-  "button-danger",
-  "button-danger-quiet",
-  "text-button-danger"
-]);
-// 上色的 variant 用 hover:/active: 这类伪类选择器写背景，伪类的特异性天然高过
-// 同元素上的普通类选择器——所以只要项目 CSS 负责这个按钮的外观，variant 必须是
-// unstyled，否则鼠标一挪上去就会被 Tailwind 的背景盖掉。
-const projectClasses = new Set<string>();
-
 const errors: string[] = [];
 const entries = (await readdir(UI_DIRECTORY))
   .filter((file) => file.endsWith(".css"))
@@ -68,10 +48,6 @@ const entries = (await readdir(UI_DIRECTORY))
 for (const file of entries) {
   const source = await readFile(join(UI_DIRECTORY.pathname, file), "utf8");
   const lines = source.split(/\r?\n/);
-  for (const match of source.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)) {
-    projectClasses.add(match[1]);
-  }
-
   for (const [index, line] of lines.entries()) {
     const lineNumber = index + 1;
     const colorMatches =
@@ -250,6 +226,7 @@ async function collectTsxFiles(directory: string): Promise<string[]> {
 
 for (const file of await collectTsxFiles(SOURCE_DIRECTORY.pathname)) {
   const source = await readFile(file, "utf8");
+  const isUiPrimitive = file.includes("/ui/components/ui/");
   const buttonPattern = /<Button\b([\s\S]*?)>([\s\S]*?)<\/Button>/g;
   for (const match of source.matchAll(buttonPattern)) {
     const attributes = match[1];
@@ -266,34 +243,30 @@ for (const file of await collectTsxFiles(SOURCE_DIRECTORY.pathname)) {
       );
     }
 
-    const className =
-      attributes
-        .match(/className=(?:"([^"]*)"|\{"([^"]*)"\})/)
-        ?.slice(1)
-        .find(Boolean) || "";
-    const classes = className.split(/\s+/).filter(Boolean);
-    const usesLegacyBase = classes.some((name) =>
-      LEGACY_BUTTON_BASES.has(name)
-    );
-    const legacyModifiers = classes.filter((name) =>
-      LEGACY_BUTTON_MODIFIERS.has(name)
-    );
-    const lineNumber = source.slice(0, match.index).split(/\r?\n/).length;
-    const cssDriven = classes.filter((name) => projectClasses.has(name));
-    if (cssDriven.length && !/\bvariant="unstyled"/.test(attributes)) {
+    if (/\bvariant="unstyled"/.test(attributes)) {
+      const lineNumber = source.slice(0, match.index).split(/\r?\n/).length;
       errors.push(
-        `${file}:${lineNumber} 外观由项目 CSS 决定的 Button 必须用 variant="unstyled"：${cssDriven.join(" ")}`
-      );
-    }
-    if (legacyModifiers.length && !usesLegacyBase) {
-      errors.push(
-        `${file}:${lineNumber} 旧 CSS 按钮修饰类必须与基类 button 同时出现：${className}`
+        `${file}:${lineNumber} 禁止双轨按钮：使用 shadcn variant，不要使用 unstyled`
       );
     }
   }
 
   // tsx 里的硬编码尺寸和色值绕过了 token，是「收敛成 token」做了却没做到的主因。
   for (const [index, line] of source.split(/\r?\n/).entries()) {
+    if (
+      !isUiPrimitive &&
+      /<(?:button|input|textarea|select)\b/.test(line) &&
+      !/^\s*\/\//.test(line)
+    ) {
+      errors.push(
+        `${file}:${index + 1} 禁止手写原生控件，请使用 @/ui/components/ui/ 下的组件`
+      );
+    }
+    if (/from ["']\.\.\/.*components\/ui\//.test(line)) {
+      errors.push(
+        `${file}:${index + 1} 使用 @/ui/components/ui/ 别名，不要用相对路径`
+      );
+    }
     // 圆角、高度和色值是这个项目真正建立了 token 体系的三类，也正是硬编码
     // 造成过实际 bug 的三类。允许 calc()/min() 里引用 var() 的派生值。
     const arbitrary = (

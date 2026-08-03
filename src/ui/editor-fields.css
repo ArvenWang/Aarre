@@ -1,0 +1,183 @@
+.library-card-editor-field {
+  min-width: 0;
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.library-card-editor-field > span {
+  color: var(--ink-muted);
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-medium);
+}
+
+.library-card-editor-field input,
+.library-card-editor-field select,
+.library-card-editor-field textarea,
+.library-card-editor-tag-entry input {
+  width: 100%;
+  min-height: var(--control-h-lg);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+  font-size: var(--fs-small);
+  outline: 0;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease);
+}
+
+.library-card-editor-field textarea {
+  min-height: 92px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+/* The folder and location pickers use the same popup as the library toolbar
+   filters; only the trigger is restyled to sit in a form field's place. */
+.library-card-editor-field .editor-select-trigger {
+  width: 100%;
+  min-height: var(--control-h-lg);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  background: var(--surface);
+  font-size: var(--fs-small);
+}
+
+.library-card-editor-field .editor-select-trigger:hover,
+.library-card-editor-field .editor-select-trigger:focus-visible {
+  border-color: var(--line-strong);
+  background: var(--surface);
+}
+
+.library-card-editor-field .editor-select-trigger[data-state="open"] {
+  border-color: var(--line-strong);
+  background: var(--surface-sunken);
+}
+
+.editor-select-content .bg-active {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.editor-select-content .bg-hover {
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
+}
+
+.library-card-editor-field input:focus,
+.library-card-editor-field select:focus,
+.library-card-editor-field textarea:focus,
+.library-card-editor-tag-entry input:focus {
+  border-color: var(--line-strong);
+  background: var(--surface-sunken);
+}
+
+.library-card-editor-field input:disabled,
+.library-card-editor-field select:disabled,
+.library-card-editor-field textarea:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.library-card-editor-field small,
+.library-card-editor-ai small {
+  color: var(--ink-faint);
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-regular);
+}
+
+.library-card-editor-readonly,
+.library-card-editor-error {
+  margin: var(--sp-4) 0 0;
+  padding: var(--sp-3);
+  border-radius: var(--radius-md);
+  color: var(--ink-muted);
+  background: var(--surface-sunken);
+  font-size: var(--fs-caption);
+  line-height: 1.5;
+}
+
+.library-card-editor-error {
+  color: var(--negative);
+}
+
+.library-card-editor-grid {
+  margin-top: var(--sp-5);
+  display: grid;
+  gap: var(--sp-4);
+}
+
+.library-card-editor-ai {
+  margin-top: var(--sp-5);
+  padding-top: var(--sp-5);
+  display: grid;
+  gap: var(--sp-5);
+}
+
+.library-card-editor-ai-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.library-card-editor-ai strong {
+  font-size: var(--fs-small);
+  font-weight: var(--fw-strong);
+}
+
+.library-card-editor-status {
+  flex: 0 0 auto;
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--radius-md);
+  color: var(--ink-muted);
+  background: var(--surface-sunken);
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-medium);
+}
+
+.library-card-editor-ai p {
+  margin: var(--sp-2) 0;
+  color: var(--ink-muted);
+  font-size: var(--fs-small);
+  line-height: 1.55;
+}
+
+.library-card-editor-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.library-card-editor-tag-list > small {
+  color: var(--ink-faint);
+  font-size: var(--fs-caption);
+}
+
+.library-card-editor-tags {
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.library-card-editor-tag-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-2);
+}
+
+.library-card-editor-tag-submit {
+  min-width: 64px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  background: var(--surface-sunken);
+  font-size: var(--fs-caption);
+}
+
+.library-card-editor-tag-submit:not(:disabled):hover {
+  border-color: var(--line-strong);
+  background: var(--surface);
+}

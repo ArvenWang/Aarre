@@ -23,9 +23,21 @@ export default defineConfig({
       },
       output: {
         manualChunks(id) {
-          return id.includes("/node_modules/pinyin-pro/")
-            ? "pinyin-search"
-            : undefined;
+          if (id.includes("/node_modules/pinyin-pro/")) return "pinyin-search";
+          if (
+            id.includes("/node_modules/react/") ||
+            id.includes("/node_modules/react-dom/")
+          ) return "react-vendor";
+          if (
+            id.includes("/node_modules/@radix-ui/") ||
+            id.includes("/node_modules/@base-ui/")
+          ) return "ui-vendor";
+          if (
+            id.includes("/node_modules/react-markdown/") ||
+            id.includes("/node_modules/remark-") ||
+            id.includes("/node_modules/micromark")
+          ) return "markdown";
+          return undefined;
         },
         entryFileNames(chunkInfo) {
           return chunkInfo.name === "background"

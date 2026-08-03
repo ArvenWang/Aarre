@@ -35,7 +35,6 @@ export function ReadingView({
   ) : (
     <div className="empty-state">
       <strong>待读队列还是空的</strong>
-      <p>Chrome 书签进入本地索引后，会按使用时间排在这里。</p>
     </div>
   );
 }

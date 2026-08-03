@@ -33,7 +33,7 @@ const buttonVariants = cva(
         // every other control that inherited it. Click feedback is colour
         // change only.
         primary:
-          "text-background bg-foreground hover:bg-foreground/90 active:bg-foreground/80",
+          "bg-foreground hover:bg-foreground/90 active:bg-foreground/80",
         secondary:
           "text-foreground bg-accent hover:bg-accent/80 active:bg-accent",
         tertiary:
@@ -44,12 +44,6 @@ const buttonVariants = cva(
           "text-danger-foreground bg-danger hover:bg-danger-hover active:bg-danger-hover",
         "danger-quiet":
           "text-danger border border-danger/35 bg-transparent hover:bg-danger-soft active:bg-danger-soft",
-        // For buttons whose appearance is owned by the project's own CSS. The
-        // painted variants use hover:/active: utilities, and a pseudo-class
-        // selector outranks a plain class no matter the source order — so a
-        // painted variant would silently win over the CSS rule on the same
-        // element the moment the pointer enters it.
-        unstyled: "",
       },
       size: {
         sm: "h-[var(--control-h-sm)] px-3 text-[length:var(--fs-caption)] gap-1",
@@ -102,7 +96,6 @@ const heldVariants: Record<string, string> = {
   ghost: "bg-active text-foreground",
   danger: "bg-danger-hover",
   "danger-quiet": "bg-danger-soft",
-  unstyled: "",
 };
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -232,6 +225,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <Comp
         ref={ref}
         data-slot="button"
+        data-variant={variant ?? "primary"}
         className={cn(
           buttonVariants({
             variant,

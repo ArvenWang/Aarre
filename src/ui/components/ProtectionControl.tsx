@@ -4,7 +4,7 @@ import {
   type ProtectionTarget,
 } from "../../lib/messages";
 import type { ItemProtectionState } from "../../lib/protection";
-import { Button } from "../../components/ui/button";
+import { Button } from "@/ui/components/ui/button";
 
 interface ProtectionControlProps {
   target: ProtectionTarget;
@@ -102,7 +102,7 @@ export function ProtectionControl({
       </div>
       <Button
         type="button"
-        variant="unstyled"
+        variant="ghost"
         size="unstyled"
         className="protection-switch"
         role="switch"

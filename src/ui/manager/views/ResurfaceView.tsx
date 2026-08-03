@@ -28,7 +28,6 @@ export function ResurfaceView({
   ) : (
     <div className="empty-state">
       <strong>暂时没有值得重新带回来的收藏</strong>
-      <p>使用一段时间后，Aarre 会结合近期主题和收藏时间在这里推荐。</p>
     </div>
   );
 }

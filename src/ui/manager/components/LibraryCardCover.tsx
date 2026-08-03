@@ -5,8 +5,8 @@ import {
   categoryCoverBackground,
   categoryCoverUrl,
 } from "../../../lib/cover-registry";
-import { sendExtensionRequest } from "../../../lib/messages";
 import type { ResourceRecord } from "../../../lib/types";
+import { cachedVisualUrl, requestVisualUrl } from "../visual-url-cache";
 
 interface LibraryCardCoverImageProps {
   snapshotImageUrl?: string;
@@ -61,6 +61,7 @@ export function LibraryCardCoverImage({
           src={useSnapshot ? snapshotImageUrl : resolvedFallbackImageUrl}
           alt=""
           loading="lazy"
+          decoding="async"
           data-cover-kind={useSnapshot ? "page-snapshot" : "aarre-fallback"}
           data-fallback-cover-id={
             useSnapshot ? undefined : resolvedFallbackCoverId
@@ -79,6 +80,7 @@ export function LibraryCardCoverImage({
 }
 
 interface LibraryCardCoverProps {
+  resourceKey: string;
   canonicalUrl: string;
   label: string;
   snapshotRevision?: string;
@@ -94,11 +96,8 @@ interface LibraryCardCoverProps {
   >;
 }
 
-// 会话级快照缓存：瀑布流删除/排序导致卡片重挂时，直接用上次取到的
-// 封面初始化，避免“先显示兜底图、再变回封面”的闪烁。
-const sessionSnapshotCache = new Map<string, string>();
-
 export function LibraryCardCover({
+  resourceKey,
   canonicalUrl,
   label,
   snapshotRevision = "",
@@ -107,7 +106,7 @@ export function LibraryCardCover({
   const containerRef = useRef<HTMLSpanElement>(null);
   const [nearViewport, setNearViewport] = useState(false);
   const [snapshotImageUrl, setSnapshotImageUrl] = useState(
-    () => sessionSnapshotCache.get(canonicalUrl) || "",
+    () => cachedVisualUrl(`cover:${resourceKey}`),
   );
   const fallbackCoverId = aarreFallbackCoverId(
     fallbackResource || {
@@ -136,27 +135,16 @@ export function LibraryCardCover({
   }, []);
 
   useEffect(() => {
-    if (!nearViewport) {
-      // 瀑布流可能有上千条收藏，离开预加载区后释放 Base64 快照，
-      // 避免管理页把整个快照库同时保留在内存中。
-      setSnapshotImageUrl("");
-      return;
-    }
-    const cached = sessionSnapshotCache.get(canonicalUrl);
+    if (!nearViewport) return;
+    const cached = cachedVisualUrl(`cover:${resourceKey}`);
     if (cached) {
       setSnapshotImageUrl(cached);
     }
     let cancelled = false;
-    void sendExtensionRequest({
-      type: "GET_PAGE_SNAPSHOT",
-      canonicalUrl,
-    })
-      .then((snapshot) => {
+    void requestVisualUrl(`cover:${resourceKey}`)
+      .then((url) => {
         if (!cancelled) {
-          setSnapshotImageUrl(snapshot?.imageDataUrl || "");
-          if (snapshot?.imageDataUrl) {
-            sessionSnapshotCache.set(canonicalUrl, snapshot.imageDataUrl);
-          }
+          setSnapshotImageUrl(url);
         }
       })
       .catch(() => {
@@ -165,7 +153,7 @@ export function LibraryCardCover({
     return () => {
       cancelled = true;
     };
-  }, [canonicalUrl, nearViewport, snapshotRevision]);
+  }, [nearViewport, resourceKey, snapshotRevision]);
 
   return (
     <span ref={containerRef} className="library-card-cover-loader">

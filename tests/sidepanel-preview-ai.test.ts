@@ -10,6 +10,7 @@ afterEach(() => {
 describe("side panel preview AI", () => {
   it("validates the configured key and routes chat through the real provider path", async () => {
     let bodyRequest: RequestInit | undefined;
+    let agentRound = 0;
     const fetchMock = vi.fn(
       async (input: RequestInfo | URL, init?: RequestInit) => {
       bodyRequest = init;
@@ -22,25 +23,24 @@ describe("side panel preview AI", () => {
       }
       if (url === "https://api.deepseek.com/chat/completions") {
         const request = bodyRequest as RequestInit;
-        const body = JSON.parse(String(request.body)) as {
-          messages?: Array<{ content?: string }>;
-        };
-        const prompt = body.messages?.[1]?.content || "";
+        agentRound += 1;
         return new Response(
           JSON.stringify({
             choices: [
               {
-                message: {
-                  content: prompt.includes("- steps：")
-                    ? JSON.stringify({
-                        steps: ["先定位相关收藏", "再核对用途"]
-                      })
-                    : JSON.stringify({
-                        answer: "这是来自真实 Provider 路径的回答。",
-                        source_ids: ["r1"],
-                        actions: []
-                      })
-                }
+                message: agentRound === 1
+                  ? {
+                      content: null,
+                      tool_calls: [{
+                        id: "preview-search",
+                        type: "function",
+                        function: {
+                          name: "search_bookmarks",
+                          arguments: JSON.stringify({ query: "GitHub", limit: 30 })
+                        }
+                      }]
+                    }
+                  : { content: "这是来自真实 Provider 路径的回答。" }
               }
             ],
             usage: {
@@ -109,18 +109,16 @@ describe("side panel preview AI", () => {
         ok: true,
         data: expect.objectContaining({
           answer: "这是来自真实 Provider 路径的回答。",
-          thinking: ["先定位相关收藏", "再核对用途"],
-          sources: [expect.objectContaining({ title: "GitHub — 代码仓库" })]
+          thinking: ["正在使用 search_bookmarks"],
+          sources: []
         })
       })
     );
     expect(progress).toEqual([
       "preparing",
-      "selecting",
-      "thinking",
-      "synthesizing"
+      "scanning"
     ]);
-    expect(thinkingEvents).toEqual([["先定位相关收藏", "再核对用途"]]);
+    expect(thinkingEvents).toEqual([["正在使用 search_bookmarks"]]);
     expect(fetchMock.mock.calls.map(([input]) => String(input))).toEqual([
       "https://api.deepseek.com/models",
       "https://api.deepseek.com/chat/completions",

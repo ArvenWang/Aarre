@@ -12,8 +12,8 @@ import { createPortal } from "react-dom";
 import { sendExtensionRequest } from "../../../lib/messages";
 import type { BookmarkBarSnapshot, ResourceRecord } from "../../../lib/types";
 import { CloseIcon, EllipsisIcon, TrashIcon } from "../../components/Icons";
-import { Button } from "../../../components/ui/button";
-import { Tooltip } from "../../../components/ui/tooltip";
+import { Button } from "@/ui/components/ui/button";
+import { Tooltip } from "@/ui/components/ui/tooltip";
 import {
   buildLibraryBookmarkEditorModel,
   mergeLibraryEditorTags,
@@ -252,9 +252,9 @@ export function LibraryCardEditor({
         <Button
           ref={triggerRef}
           type="button"
-          variant="unstyled"
+          variant="ghost"
           size="icon-sm"
-          className="library-card-editor-trigger"
+ className="library-card-editor-trigger"
           aria-haspopup="dialog"
           aria-label={`编辑 ${resource.title}`}
           onClick={openEditor}
@@ -295,9 +295,9 @@ export function LibraryCardEditor({
                   </div>
                   <Button
                     type="button"
-                    variant="unstyled"
+                    variant="ghost"
                     size="icon-sm"
-                    className="library-card-editor-close"
+ className="library-card-editor-close"
                     aria-label="关闭编辑窗口"
                     onClick={closeEditor}
                     disabled={Boolean(action)}
@@ -373,18 +373,18 @@ export function LibraryCardEditor({
                       </p>
                       <div>
                         <Button
-                          variant="unstyled"
+                          variant="ghost"
                           type="button"
-                          className="button button-quiet"
+
                           disabled={Boolean(action)}
                           onClick={() => setConfirmDelete(false)}
                         >
                           取消
                         </Button>
                         <Button
-                          variant="unstyled"
+                          variant="danger"
                           type="button"
-                          className="button button-danger"
+
                           disabled={Boolean(action)}
                           onClick={() => void deleteSelectedLocation()}
                         >
@@ -395,9 +395,9 @@ export function LibraryCardEditor({
                   ) : (
                     <footer className="library-card-editor-actions">
                       <Button
-                        variant="unstyled"
+                        variant="danger-quiet"
                         type="button"
-                        className="button button-danger-quiet"
+
                         disabled={!writable || Boolean(action)}
                         onClick={() => setConfirmDelete(true)}
                       >
@@ -406,18 +406,18 @@ export function LibraryCardEditor({
                       </Button>
                       <div>
                         <Button
-                          variant="unstyled"
+                          variant="ghost"
                           type="button"
-                          className="button button-quiet"
+
                           onClick={closeEditor}
                           disabled={Boolean(action)}
                         >
                           取消
                         </Button>
                         <Button
-                          variant="unstyled"
+                          variant="primary"
                           type="submit"
-                          className="button button-dark"
+
                           disabled={
                             Boolean(action) ||
                             !selectedLocation ||

@@ -43,15 +43,17 @@ import type {
   CloudSyncEstimate,
   CloudSyncSettings
 } from "./cloud-settings";
-import type { CloudSyncProgress } from "./cloud-progress";
+import type { SyncStatus } from "./sync-engine";
 import type { CloudConflict } from "./cloud";
 import type { LocalDataSize } from "./local-size";
+import type { DisplaySettings } from "./display-settings";
 
 export type ProtectionTarget =
   | { kind: "bookmark"; id: string }
   | { kind: "folder"; id: string };
 
 export type ExtensionRequest =
+  | { type: "GET_BOOTSTRAP" }
   | { type: "GET_APP_STATE" }
   | { type: "GET_AI_SETTINGS" }
   | { type: "SAVE_AI_SETTINGS"; payload: SaveAiSettingsInput }
@@ -74,7 +76,9 @@ export type ExtensionRequest =
   | {
       type: "EXECUTE_BOOKMARK_AGENT_ACTIONS";
       actions: BookmarkAgentActionProposal[];
+      requestId?: string;
     }
+  | { type: "CANCEL_AGENT_PLAN_EXECUTION"; requestId: string }
   | { type: "GET_LIBRARY_INSIGHTS" }
   | { type: "GET_ORGANIZATION_NOTICE" }
   | { type: "DISMISS_ORGANIZATION_NOTICE" }
@@ -158,6 +162,7 @@ export type ExtensionRequest =
   | { type: "GET_CLOUD_SYNC_ESTIMATE" }
   | { type: "GET_LOCAL_DATA_SIZE" }
   | { type: "GET_CLOUD_SYNC_PROGRESS" }
+  | { type: "GET_SYNC_STATUS" }
   | { type: "GET_CLOUD_CONFLICTS" }
   | {
       type: "RESOLVE_CLOUD_CONFLICT";
@@ -169,6 +174,11 @@ export type ExtensionRequest =
   | { type: "AUTH_CHANGED" };
 
 export type ResponseDataByRequest = {
+  GET_BOOTSTRAP: {
+    appState: AppState;
+    aiSettings: AiSettingsStatus;
+    displaySettings: DisplaySettings;
+  };
   GET_APP_STATE: AppState;
   GET_AI_SETTINGS: AiSettingsStatus;
   SAVE_AI_SETTINGS: AiSettingsStatus;
@@ -186,7 +196,10 @@ export type ResponseDataByRequest = {
   EXECUTE_BOOKMARK_AGENT_ACTIONS: {
     results: BookmarkAgentActionExecutionResult[];
     batchId?: string;
+    requestId: string;
+    cancelled: boolean;
   };
+  CANCEL_AGENT_PLAN_EXECUTION: { cancelled: true };
   GET_LIBRARY_INSIGHTS: LibraryInsights;
   GET_ORGANIZATION_NOTICE: OrganizationNotice | null;
   DISMISS_ORGANIZATION_NOTICE: { dismissed: true };
@@ -237,7 +250,8 @@ export type ResponseDataByRequest = {
   GET_CLOUD_USAGE: CloudStorageUsage;
   GET_CLOUD_SYNC_ESTIMATE: CloudSyncEstimate;
   GET_LOCAL_DATA_SIZE: LocalDataSize;
-  GET_CLOUD_SYNC_PROGRESS: CloudSyncProgress;
+  GET_CLOUD_SYNC_PROGRESS: SyncStatus;
+  GET_SYNC_STATUS: SyncStatus;
   GET_CLOUD_CONFLICTS: CloudConflict[];
   RESOLVE_CLOUD_CONFLICT: { resolved: true };
   AUTH_CHANGED: AppState;

@@ -1,9 +1,9 @@
-import { Button } from "../../../components/ui/button";
+import { Button } from "@/ui/components/ui/button";
 import {
   FluidInput,
   FluidTextarea,
   FluidSelect,
-} from "../../components/FluidControls";
+} from "@/ui/components/ui/input";
 import {
   useCallback,
   useEffect,
@@ -93,7 +93,7 @@ function statusMessage(status: SnapshotBackfillStatus): string {
         ? `“${status.currentTitle}”正在等待；请切回专用补拍标签页，并保持 Chrome 窗口在前台。`
         : "请切回专用补拍标签页，并保持 Chrome 窗口在前台。";
     case "paused":
-      return "任务已暂停。继续时，Aarre 会重新激活专用补拍标签页。";
+      return "任务已暂停；继续后将重新激活专用补拍标签页。";
     case "completed":
       return status.total
         ? "补拍任务已完成，成功获得的截图会立即用于收藏封面。"
@@ -317,10 +317,10 @@ export function SnapshotBackfillControl({
     return (
       <>
         <Button
-          variant="unstyled"
+          variant="ghost"
           ref={triggerRef}
           type="button"
-          className="text-button snapshot-backfill-trigger"
+ className="text-button snapshot-backfill-trigger"
           onClick={() => {
             setError("");
             setConfirmOpen(true);
@@ -353,9 +353,9 @@ export function SnapshotBackfillControl({
                 </div>
                 <Button
                   type="button"
-                  variant="unstyled"
+                  variant="ghost"
                   size="icon-sm"
-                  className="snapshot-backfill-dialog-close"
+ className="snapshot-backfill-dialog-close"
                   aria-label="关闭批量补拍确认"
                   disabled={Boolean(action)}
                   onClick={closeConfirmation}
@@ -366,19 +366,10 @@ export function SnapshotBackfillControl({
 
               <div className="snapshot-backfill-dialog-body">
                 <p id="snapshot-backfill-description">
-                  Aarre 将新建一个后台专用标签页，依次打开约{" "}
-                  {effectiveMissingCount}{" "}
-                  项缺少封面的网页。每一页都会在加载完成并稳定后才截图，不会在刚打开时立即截取。
+                  将在后台依次打开约 {effectiveMissingCount} 项缺少封面的网页，加载稳定后截图，可随时暂停或取消。
                 </p>
-                <div className="snapshot-backfill-foreground-note">
-                  <strong>任务在后台运行，不占用当前页面</strong>
-                  <span>
-                    开始后你可以正常使用
-                    Chrome。浏览器可能短暂显示“扩展正在调试此浏览器”提示，这是后台截图所需权限的正常现象。你可以随时暂停或取消，已经完成的截图会保留。
-                  </span>
-                </div>
                 <p className="snapshot-backfill-privacy">
-                  此任务只在本机生成网页截图，不调用 AI，也不会上传网页或截图。
+                  仅在本机截图，不调用 AI，不上传网页或截图。
                 </p>
                 {error ? (
                   <p className="snapshot-backfill-error" role="alert">
@@ -389,19 +380,19 @@ export function SnapshotBackfillControl({
 
               <footer>
                 <Button
-                  variant="unstyled"
+                  variant="ghost"
                   type="button"
-                  className="button button-quiet"
+
                   disabled={Boolean(action)}
                   onClick={closeConfirmation}
                 >
                   暂不补拍
                 </Button>
                 <Button
-                  variant="unstyled"
+                  variant="primary"
                   ref={confirmButtonRef}
                   type="button"
-                  className="button button-dark"
+
                   disabled={Boolean(action)}
                   onClick={() => void runAction("start")}
                 >
@@ -472,9 +463,9 @@ export function SnapshotBackfillControl({
       <div className="snapshot-backfill-actions">
         {canPause ? (
           <Button
-            variant="unstyled"
+            variant="ghost" size="sm"
             type="button"
-            className="button button-quiet button-small"
+
             disabled={Boolean(action)}
             onClick={() => void runAction("pause")}
           >
@@ -483,9 +474,9 @@ export function SnapshotBackfillControl({
         ) : null}
         {canResume ? (
           <Button
-            variant="unstyled"
+            variant="primary" size="sm"
             type="button"
-            className="button button-dark button-small"
+
             disabled={Boolean(action)}
             onClick={() => void runAction("resume")}
           >
@@ -500,9 +491,9 @@ export function SnapshotBackfillControl({
         ) : null}
         {canCancel ? (
           <Button
-            variant="unstyled"
+            variant="ghost"
             type="button"
-            className="text-button snapshot-backfill-cancel"
+ className="text-button snapshot-backfill-cancel"
             disabled={Boolean(action)}
             onClick={() => void runAction("cancel")}
           >
@@ -511,9 +502,9 @@ export function SnapshotBackfillControl({
         ) : null}
         {canDismiss ? (
           <Button
-            variant="unstyled"
+            variant="ghost" size="sm"
             type="button"
-            className="button button-quiet button-small"
+
             onClick={dismissStatus}
           >
             关闭

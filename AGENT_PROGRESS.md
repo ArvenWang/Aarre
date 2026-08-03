@@ -1,8 +1,72 @@
 # Aarre 项目进展
 
-最后更新：2026-08-04（P0 同步根因修复已落地：T-01 / T-01.5 / T-02 / T-03 / T-04 / T-05）
+最后更新：2026-08-04（PRD v1.1 代码与自动化已收口；T-14c 待用户隐私决策，真实 Chrome / Provider 项待真人验收）
 
 > **⚠️ 下一位 Agent 必读：先读 [`docs/AUDIT_2026-08.md`](docs/AUDIT_2026-08.md)（问题分析）和 [`docs/PRD_REBUILD_2026-08.md`](docs/PRD_REBUILD_2026-08.md)（执行方案）。P0 部分（T-01 ~ T-05）已完成，从 T-06 继续，不要重做已完成项，也不要在旧架构上打补丁。**
+
+## 2026-08-04 · T-18 / T-19 / T-20（UI 极简化完成）
+
+- **文案。** 按 PRD 清单逐项删除说明性副文案并收口空状态；生产 UI 搜索 `Aarre 会`、`智能增强` 均为 0。隐私、不可逆操作和成本说明保留。
+- **组件。** 两个 UI 目录已统一到 `src/ui/components/ui/`，`src/components/` 已删除；所有按钮与输入控件均通过统一组件，新增 Radix Checkbox，`variant="unstyled"`、legacy `.button` 类、相对 UI import 和 `--space-*` 均为 0。
+- **规范与防回归。** 新增 `docs/UI_PRINCIPLES.md`；`check:design` 会拒绝 UI primitive 目录外的原生按钮/输入框、unstyled、相对 UI import 和硬编码颜色/尺寸。共享编辑字段样式独立为 `editor-fields.css`，侧边栏与 manager 不再互相加载整页 CSS。
+- **视觉验证。** `npm run ui:shots` 完整生成侧边栏、设置、编辑器、manager 各视图与键盘焦点截图；人工检查主按钮、弹窗、表单和瀑布流未见视觉回归。修复了审查中发现的主按钮深色背景/深色文字问题。
+
+## 2026-08-04 · X-01 ~ X-07（启动性能完成自动化收口）
+
+- **首屏。** 侧边栏与 manager 使用独立 CSS 入口；设置/Agent/引导样式拆为 lazy CSS。侧边栏首屏 CSS 从 **94.93 KB** 降到 **71.90 KB**，满足 `<80 KB`。onboarding 用 localStorage 同步乐观读取并移除 React boot gate。
+- **后台。** 首屏改为单条 `GET_BOOTSTRAP`，站点标识、重浮现、整理提示、完整 AppState 与 Agent 会话延迟 1 秒。重复视觉与过期撤销清理合并到每日 alarm。云同步、Agent、Agent 写计划、目录扫描和右键菜单重模块均通过同步注册的轻量代理动态加载。
+- **主包。** `dist/background.js` 从本轮基线 **212.14 KB** 降到 **144.62 KB**，下降约 **31.8%**，满足 `>30%`，并生成独立 `sync-engine`、`agent`、`agent-actions`、`library-scan-runner`、`context-menus`、`page-snapshot`、`cover-registry` 等 lazy chunk。React、Radix、Markdown 与拼音已固定手动分包。
+- **测量。** 新增 `scripts/measure-startup.mjs` 与 `docs/PERF_BASELINE.md`。当前自动化环境无法让 Chrome/Chromium 接受 MV3 side-load，15 秒内未出现 Service Worker，因此文档只确认 bundle 基线，运行时四项明确标为待真机，未伪造数据。
+
+## 2026-08-04 · PRD 最终自动化门
+
+- **验证。** 版本已递增为 **0.5.61**；`npm run check` 全绿：71 个测试文件 / 379 项测试、设计规则、TypeScript、生产构建和产物语法检查全部通过；`dist/manifest.json`、`public/manifest.json`、`package.json` 均为 0.5.61。`background.ts` 3 行；sidepanel 所有 TS/TSX 单文件均低于 500 行，原 1,846 行预览已拆成 8 个模块。
+- **产品决策门。** T-14c 公共 favicon 服务会把域名发给 Google / DuckDuckGo；PRD 明确要求用户先同意，因此未实现、默认无外发。若用户同意，必须加设置开关、敏感站点排除和隐私说明。
+- **真人验收门。** 仍需安装态 Chrome 手工验证：侧边栏/右键保存删除/登录保持、用户封面重访不变、100+ 卡片首屏与滚动内存、三家真实 Provider SSE、100+ Agent 写计划的取消/撤销、跨设备删除墓碑。自动化和截图不能替代这些门。
+
+## 2026-08-04 · T-15 / T-16 / T-17（代码与自动化完成）
+
+- **多轮工具 Agent。** 新增 `src/lib/agent/`：7 个立即执行的只读工具、5 个只生成待确认计划的写工具、Zod→JSON Schema、最多 12 轮 runner，以及 OpenAI/DeepSeek/Gemini tool-calling 适配器。重复组和失效链接直接复用 `library-insights` 的真实结果。生产 `askAgent` 已切换新链路；写工具不调用 Chrome API。
+- **旧管线删除。** `local-ai.ts` 已删除 `repairJsonStringNewlines`、旧 `generateAgentJson` 重试循环、`scanAgentCatalog` 与 `parseAgentActions`，JSON 只保留严格基础解析；文件从约 1,700 行降到 754 行。enrichment 仍保留自己的完整字段校验，不受影响。
+- **计划安全执行。** 固定顺序为建文件夹→移动→重命名→元数据→删除；自动补齐嵌套文件夹计划，执行时按路径解析新建文件夹 ID。上限 1000 项，每 50 项让出主线程并推送进度；取消后保留已完成项；单项失败继续；整批复用一个 undo batch。删除项 `selected=false`，UI 默认不选，按分组折叠预览并显示警告。
+- **真实流式。** UI 通过 `runtime.connect({name:"agent-stream"})` 主动建链，SW 在同步初始化路径注册 `onConnect`；工具阶段走结构化非流式，最终回答由 Provider SSE 分块发送。20 秒无 chunk 才超时，总请求上限 5 分钟；UI 断开立即 abort。
+- **验证。** `npm run check` 全绿：71 个测试文件 / 379 项测试、设计令牌、类型、构建和语法检查通过。专项覆盖 JSON Schema、只读/写工具边界、12 轮强停、完整工具场景、500 项批处理、取消、部分失败、顺序、单 undo、流式 delta 与断连取消。
+- **性能处理。** Agent runner/provider/Zod 已动态加载；修正前 background 一度涨到 293.47 KB，修正后恢复为 211.75 KB，接近拆分前 211.06 KB。独立 `runner` 76.21 KB、`providers` 5.58 KB，仅首次对话加载。
+- **未完成门。** 真实 Provider 的三家 SSE、100+ 条真实书签执行/取消/撤销仍需 Chrome 手工验收，自动化不能替代。当前计划卡片用了原生 checkbox，T-19 收敛组件时需迁到统一 UI 组件。
+
+## 2026-08-04 · T-11 / T-12 / T-13 / T-14a-b（代码与自动化完成）
+
+- **统一视觉存储。** IndexedDB 已升到 v5，新增 Blob 型 `visuals` store（`kind` / `identity` 索引）及单条、批量、按类型接口。旧 site brand、page snapshot、resource thumbnail 由独立 alarm 每批 50 条幂等迁移；损坏 dataURL 只跳过该项，不阻断全批；旧字段保留一版回滚。扩展页面直接读同源 IndexedDB，不通过 JSON 消息传 Blob。
+- **用户封面保护。** 所有生产封面写入已收敛到 `putVisual` / `putCoverSnapshot`：自动来源不能覆盖用户来源，除非显式 `force`。手动更新封面标记 `user`，批量补拍/自动截图/扫描标记 `auto`，云端恢复也经过同一守卫。危险的启动即整组删除旧快照已移除，改为每日只清理重复自动封面、每组保留最新一条。
+- **瀑布流。** manager 卡片同一帧请求合并为一次 IndexedDB 批量读取，使用 Blob object URL、200 项 LRU 和淘汰 revoke；滚出视口不清空，图片使用 lazy + async decode。源码不再逐卡发送 `GET_PAGE_SNAPSHOT` 消息。
+- **站点标识。** 主线程与离屏解码统一引用 `ICON_MIN_SIZE=16`、`ICON_MAX_RATIO=3`、`ICON_MIN_INK=0.01`；候选按 4 条一组并行探测、严格按原优先级选择，每条 5 秒超时，第一组成功后不访问低优先级组。测量器也改为引用同一常量。
+- **量化证据。** 对同一批 Chrome + Comet 真实书签、相同 300 条样本和并发 5 测量：旧规则分类兜底率 **54%**（`docs/cover-fallback-before-prd-t14.json`），新规则 **40%**（`docs/cover-fallback-after-prd-t14.json`），下降 14 个百分点，满足“改动后低于改动前”。
+- **验证。** `npm run check` 全绿：68 个测试文件 / 384 项测试、设计令牌、TypeScript、构建和产物语法通过。新增 visuals store、迁移幂等、origin 守卫、LRU/直读与并行候选专项测试。
+- **未完成门。** T-12 用户封面重新访问、T-13 100+ 条首屏 <500ms/滚动/Memory 及消息计数仍需真实 Chrome 手工测量。T-14c 会把访问域名交给公共 favicon 服务，PRD 明确要求用户先同意；当前没有实现、没有默认外发。
+
+## 2026-08-04 · T-08 / T-09 / T-10（代码与自动化完成）
+
+- **统一同步引擎。** 新增 `src/lib/sync-engine.ts`，所有触发统一进入单实例流水线：拉资源 → 拉其他实体 → 推 Outbox → 推其他实体 → 上传资产 → 下载资产。覆盖登录、启动、安装、联网、UI 打开、本地变更和 1 分钟 alarm；失败按 30 秒、1/2/5/15 分钟退避，未登录写 `paused`，状态通过 `chrome.storage.local` 持久化并用消息实时推送。旧 `cloud-progress.ts` 已删除，业务代码不再读取 `cloudSettings.enabled`，旧设置只作兼容并强制迁移为完整同步。
+- **删除墓碑。** `ResourceRecord.deletedAt` 已落地。最后一个 Chrome 书签位置删除后，本地资源转为墓碑、进入 Outbox 并请求同步；上传带 `deleted: true`；确认 Outbox 版本未被并发替换后才物理删除。本机拉到云端墓碑只删除 Aarre 智能层，不调用 `chrome.bookmarks.remove`。全量 bootstrap 与增量 change feed 均处理墓碑。
+- **云状态 UI。** 设置页登录态默认只显示头像/名字/一行状态；详情默认收起，用量仅达到 80% 后显示，只在 idle/error 提供立即同步，仅保留断开账号。新增 `CloudStatusRow` 与 `useSyncStatus`，状态靠消息订阅更新，没有轮询，也没有重新引入同步范围选择。
+- **验证。** `npm run check` 全绿：65 个测试文件 / 375 项测试、设计令牌、TypeScript、生产构建和产物语法检查均通过。`dist/` 已更新；主 sidepanel 61.30 KB，background 207.36 KB。T-08/T-09/T-10 新增专项测试均通过。
+- **下一步。** 执行 T-11～T-14 视觉资产统一。T-06/T-07 的真实 Chrome 手工清单仍是明确未完成门；受工具安全边界限制，不能用自动化冒充。T-07 生产入口已收口为 `SidePanelApp.tsx` 399 行，但开发预览 `preview.ts` 仍需在最终逐项审计前拆到单文件 <500。
+- **并行占用。** T-11～T-14 收口前，不要并行修改 `src/lib/storage.ts`、视觉资产/快照路径、`src/lib/cloud-assets.ts` 或对应测试。
+
+## 2026-08-04 · T-07 / 拆分 SidePanelApp（生产代码完成，待预览文件与真实 Chrome 门）
+
+- **已完成。** `AgentChatPage`、`AgentHistoryPage`、`OnboardingPage`、`SettingsPage` 均已迁到 `pages/` 并通过 `React.lazy` + `Suspense fallback={null}` 加载；`AgentComposer`、`AgentThinkingSteps`、`BookmarkTree`、`SearchBar`、`LibraryHeader`、`LibraryNotices`、`RankedBookmarkResults`、`FolderSelect` 和 `BookmarkPreview` 已迁到 `components/`。设置页进一步拆出账号云同步、AI 服务、显示、扫描、更多页和扫描确认弹窗；`SettingsPage.tsx` 已降到 479 行，满足单文件 <500。侧栏滚动条与书签预览状态已迁入独立 hooks。`react-markdown` 和 `remark-gfm` 现在只由 lazy 的 `pages/AgentChatPage.tsx` 引入。主 sidepanel 产物约 55 KB，已满足 ≤150 KB，并生成独立 AgentChat、AgentHistory、Onboarding、Settings chunks。
+- **验证。** TypeScript 通过；62 个测试文件 / 366 项测试及生产构建在本轮拆分过程中全绿。书签树迁出后相关源码守卫已改为读取新的权威文件，随后 highlight / preview / layout 22 项专项测试再次全绿。
+- **后续收口。** `SidePanelApp.tsx` 已降到 399 行，`HomePage` 与主要 hooks 均已拆出；生产组件满足目标。开发预览 `src/ui/sidepanel/preview.ts` 仍超过 500 行，需在最终审计前拆分。真实页面切换手动清单仍未执行。
+- **并行占用。** T-07 收口前不要并行修改 `src/ui/sidepanel/`、`tests/sidepanel-layout-stability.test.ts` 或相关 sidepanel 源码守卫。
+
+## 2026-08-04 · T-06 / 拆分 background.ts（代码收口完成，待真实 Chrome 手动清单）
+
+- **改动。** T-06 的 12 个代码拆分步骤已全部完成。`background.ts` 从 9,207 行降到 3 行，只导入并同步调用 `initializeBackground()`；同步装配位于 794 行的 `bootstrap.ts`。context menus、alarms、install、settings、site-icons、snapshots、agent、cloud、bookmarks、resources、page coordinators、enhancement queue、library scan 与各类 Chrome 事件均已分模块；消息路由已从 switch 改为 `handlers/index.ts` 表驱动。所有 `addListener` 都在 bootstrap 同步执行期间由显式注册函数注册，没有放入异步初始化。所有 extension TypeScript 文件均低于 800 行，最大文件为 `bootstrap.ts`（794 行）。
+- **验证。** 每个子步骤后均运行类型检查和全量测试；最近一次为 62 个测试文件 / 366 项测试全绿。生产构建与 JavaScript 语法检查通过，`dist/background.js` 为 209.68 KB，相对拆分前 211.06 KB 减少约 0.65%，满足 T-06 的 ±5% 门。为消除工厂装配带来的体积增长，已提前完成 X-05 的 `local-ai.ts` 动态加载，产出独立 `local-ai-*.js` lazy chunk；X-05 的最终“主包下降 >30%”门仍未完成，后续还需动态拆 cover/page-snapshot。
+- **遗留。** T-06 只剩真实 Chrome 手动清单（侧边栏、右键菜单、保存、删除、登录保持）；自动化证据不能冒充真人浏览器证据。完成该门后方可把 T-06 标记为完成并提交。随后进入 T-07 SidePanel 拆分。
+- **PRD 技术校正（暂不改 PRD 原文）。** ① T-08 已把同步范围固定为完整备份，T-10 详情面板不得按后文示例重新加入“仅文字 / 完整备份”；② 当前最低支持 Chrome 134，而 Chrome 扩展消息在兼容范围内仍使用 JSON 序列化，T-11 不能直接通过 `runtime.sendMessage` 返回 Blob，实施前应改为扩展页面直接读取同源 IndexedDB，或另做经验证的二进制通道；③ T-17 应由 UI 调用 `runtime.connect()`、Service Worker 顶层监听 `runtime.onConnect`，不能由后台自行 `connect()` 冒充向 UI 建链。以上均已由 Chrome 官方消息机制文档核对，实施对应任务前再写专项测试。
+- **并行占用。** 继续 T-06 前不要并行修改 `src/extension/background.ts`、`src/extension/lifecycle/`、`src/extension/handlers/` 或 `src/extension/snapshots/`；其他 UI 与文档文件可独立工作。
 
 ## 2026-08-04 · P0 同步根因修复（已完成，根目录 366 项 + 服务端 22 项测试与构建通过）
 

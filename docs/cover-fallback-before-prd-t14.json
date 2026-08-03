@@ -1,0 +1,371 @@
+{
+  "schemaVersion": 1,
+  "measuredAt": "2026-08-03T20:16:13.277Z",
+  "inputLabel": "Bookmarks + Bookmarks",
+  "composition": "white",
+  "availableUrlCount": 389,
+  "sampleCount": 300,
+  "sources": {
+    "registry": {
+      "count": 6,
+      "percent": 2
+    },
+    "apple-touch-icon": {
+      "count": 79,
+      "percent": 26.33
+    },
+    "conventional-favicon-ico": {
+      "count": 17,
+      "percent": 5.67
+    },
+    "manifest": {
+      "count": 7,
+      "percent": 2.33
+    },
+    "high-resolution-rel-icon": {
+      "count": 28,
+      "percent": 9.33
+    },
+    "og-image": {
+      "count": 1,
+      "percent": 0.33
+    },
+    "category-fallback": {
+      "count": 162,
+      "percent": 54
+    }
+  },
+  "fallback": {
+    "count": 162,
+    "percent": 54
+  },
+  "fallbackBreakdown": {
+    "withRejectedCandidates": 42,
+    "withoutCandidates": 120
+  },
+  "sourceHostSamples": {
+    "conventional-favicon-ico": [
+      "skills.sh",
+      "icon-studio-ebon.vercel.app",
+      "easings.net",
+      "devouringdetails.com",
+      "uibook.art",
+      "www.iconfont.cn",
+      "huggingface.co",
+      "library.phygital.plus",
+      "www.futuretools.io",
+      "ikuuu.win",
+      "3dpresso.ai",
+      "www.voxflow.studio",
+      "pro.xiaohongshu.com"
+    ]
+  },
+  "maxScale": 1,
+  "zeroUpsamplePassed": true,
+  "rejections": {
+    "below-128px": {
+      "count": 32,
+      "samples": [
+        {
+          "pageUrl": "https://detail.design/[path-8a5edab2]",
+          "assetUrl": "https://detail.design/[path-b1803648].ico",
+          "source": "conventional-favicon-ico",
+          "nativeWidth": 64,
+          "nativeHeight": 64
+        },
+        {
+          "pageUrl": "https://good-web-design.com/[path-1fc0c3fc]",
+          "assetUrl": "https://good-web-design.com/[path-b1803648].ico",
+          "source": "conventional-favicon-ico",
+          "nativeWidth": 80,
+          "nativeHeight": 80
+        },
+        {
+          "pageUrl": "https://beam.jakubantalik.com/[path-8a5edab2]",
+          "assetUrl": "https://beam.jakubantalik.com/[path-b1803648].ico",
+          "source": "conventional-favicon-ico",
+          "nativeWidth": 32,
+          "nativeHeight": 32
+        },
+        {
+          "pageUrl": "https://animejs.com/[path-8a5edab2]",
+          "assetUrl": "https://animejs.com/[path-379bfe54].png",
+          "source": "large-icon",
+          "nativeWidth": 64,
+          "nativeHeight": 64
+        },
+        {
+          "pageUrl": "https://namethatui.com/[path-8a5edab2]",
+          "assetUrl": "https://namethatui.com/[path-b1803648].ico",
+          "source": "conventional-favicon-ico",
+          "nativeWidth": 64,
+          "nativeHeight": 64
+        },
+        {
+          "pageUrl": "https://canvasui.dev/[path-8a5edab2]",
+          "assetUrl": "https://canvasui.dev/[path-b1803648].ico",
+          "source": "conventional-favicon-ico",
+          "nativeWidth": 48,
+          "nativeHeight": 48
+        },
+        {
+          "pageUrl": "https://devouringdetails.com/[path-8a5edab2]",
+          "assetUrl": "https://devouringdetails.com/[path-78108a7d].png",
+          "source": "apple-touch-icon",
+          "nativeWidth": 100,
+          "nativeHeight": 100
+        },
+        {
+          "pageUrl": "https://collectui.com/[path-8a5edab2]",
+          "assetUrl": "https://collectui.com/[path-78108a7d].png",
+          "source": "large-icon",
+          "nativeWidth": 80,
+          "nativeHeight": 80
+        },
+        {
+          "pageUrl": "http://www.iconfont.cn/[path-8a5edab2]",
+          "assetUrl": "https://img.alicdn.com/[path-952c2662].png",
+          "source": "apple-touch-icon",
+          "nativeWidth": 114,
+          "nativeHeight": 114
+        },
+        {
+          "pageUrl": "https://koboyo.com/[path-fbb59c2d]",
+          "assetUrl": "https://koboyo.com/[path-b1803648].ico",
+          "source": "conventional-favicon-ico",
+          "nativeWidth": 32,
+          "nativeHeight": 32
+        },
+        {
+          "pageUrl": "http://www.uisdc.com/[path-99b4bba3]",
+          "assetUrl": "http://www.uisdc.com/[path-43f0533a].png",
+          "source": "registry",
+          "nativeWidth": 120,
+          "nativeHeight": 120
+        },
+        {
+          "pageUrl": "https://www.upscayl.org/[path-8a5edab2]",
+          "assetUrl": "https://upscayl.org/[path-3c6a250b].png",
+          "source": "large-icon",
+          "nativeWidth": 64,
+          "nativeHeight": 64
+        }
+      ]
+    },
+    "non-square": {
+      "count": 0,
+      "samples": []
+    },
+    "low-ink-or-contrast": {
+      "count": 29,
+      "samples": [
+        {
+          "pageUrl": "https://layers.to/[path-1c8ad297]",
+          "assetUrl": "https://layers.to/[path-24b60dd6].png",
+          "source": "apple-touch-icon",
+          "nativeWidth": 192,
+          "nativeHeight": 192
+        },
+        {
+          "pageUrl": "https://good-web-design.com/[path-1fc0c3fc]",
+          "assetUrl": "https://good-web-design.com/[path-5e5fddbe].png",
+          "source": "apple-touch-icon",
+          "nativeWidth": 180,
+          "nativeHeight": 180
+        },
+        {
+          "pageUrl": "https://kasumi-docs.vercel.app/[path-8a5edab2]",
+          "assetUrl": "https://kasumi-docs.vercel.app/[path-78108a7d].png",
+          "source": "large-icon",
+          "nativeWidth": 1024,
+          "nativeHeight": 1024
+        },
+        {
+          "pageUrl": "https://fragcoord.xyz/[path-1c8ad297]",
+          "assetUrl": "https://fragcoord.xyz/[path-641b7316].svg",
+          "source": "svg-icon",
+          "nativeWidth": 32,
+          "nativeHeight": 32
+        },
+        {
+          "pageUrl": "https://chanhdai.com/[path-fbfabcdc]",
+          "assetUrl": "https://assets.chanhdai.com/[path-4c5bf64f].png",
+          "source": "apple-touch-icon",
+          "nativeWidth": 180,
+          "nativeHeight": 180
+        },
+        {
+          "pageUrl": "https://chanhdai.com/[path-fbfabcdc]",
+          "assetUrl": "https://assets.chanhdai.com/[path-9845a6d4].png",
+          "source": "manifest",
+          "nativeWidth": 512,
+          "nativeHeight": 512
+        },
+        {
+          "pageUrl": "https://chanhdai.com/[path-fbfabcdc]",
+          "assetUrl": "https://assets.chanhdai.com/[path-feb8b759].png",
+          "source": "manifest",
+          "nativeWidth": 512,
+          "nativeHeight": 512
+        },
+        {
+          "pageUrl": "https://gradient-spin.vercel.app/[path-8a5edab2]",
+          "assetUrl": "https://gradient-spin.vercel.app/[path-641b7316].svg",
+          "source": "svg-icon",
+          "nativeWidth": 64,
+          "nativeHeight": 64
+        },
+        {
+          "pageUrl": "https://amicro.vercel.app/[path-8a5edab2]",
+          "assetUrl": "https://amicro.vercel.app/[path-a6c6f63d].jpg",
+          "source": "large-icon",
+          "nativeWidth": 559,
+          "nativeHeight": 559
+        },
+        {
+          "pageUrl": "https://canvasui.dev/[path-8a5edab2]",
+          "assetUrl": "https://canvasui.dev/[path-43f0533a].png",
+          "source": "apple-touch-icon",
+          "nativeWidth": 180,
+          "nativeHeight": 180
+        },
+        {
+          "pageUrl": "https://www.fluidfunctionalism.com/[path-8a5edab2]",
+          "assetUrl": "https://www.fluidfunctionalism.com/[path-ea055fc9].png",
+          "source": "apple-touch-icon",
+          "nativeWidth": 180,
+          "nativeHeight": 180
+        },
+        {
+          "pageUrl": "https://icones.js.org/[path-8a5edab2]",
+          "assetUrl": "https://icones.js.org/[path-641b7316].svg",
+          "source": "svg-icon",
+          "nativeWidth": 283.46,
+          "nativeHeight": 283.46
+        }
+      ]
+    }
+  },
+  "fallbackTopDomains": [
+    {
+      "host": "aipetphotos.com",
+      "count": 2
+    },
+    {
+      "host": "animejs.com",
+      "count": 2
+    },
+    {
+      "host": "app.artflow.ai",
+      "count": 2
+    },
+    {
+      "host": "app.exactly.ai",
+      "count": 2
+    },
+    {
+      "host": "app.meshy.ai",
+      "count": 2
+    },
+    {
+      "host": "chat.qwen.ai",
+      "count": 2
+    },
+    {
+      "host": "chatglm.cn",
+      "count": 2
+    },
+    {
+      "host": "cli.im",
+      "count": 2
+    },
+    {
+      "host": "clipdrop.co",
+      "count": 2
+    },
+    {
+      "host": "convert.leiapix.com",
+      "count": 2
+    },
+    {
+      "host": "cursor.directory",
+      "count": 2
+    },
+    {
+      "host": "designsparks.io",
+      "count": 2
+    },
+    {
+      "host": "dubbing.tech",
+      "count": 2
+    },
+    {
+      "host": "generative-dynamics.github.io",
+      "count": 2
+    },
+    {
+      "host": "hailuoai.com",
+      "count": 2
+    },
+    {
+      "host": "home.blusea.cn",
+      "count": 2
+    },
+    {
+      "host": "icones.js.org",
+      "count": 2
+    },
+    {
+      "host": "iconly.pro",
+      "count": 2
+    },
+    {
+      "host": "jimeng.jianying.com",
+      "count": 2
+    },
+    {
+      "host": "liveportrait.org",
+      "count": 2
+    },
+    {
+      "host": "mcp.composio.dev",
+      "count": 2
+    },
+    {
+      "host": "medium.com",
+      "count": 2
+    },
+    {
+      "host": "openxlab.org.cn",
+      "count": 2
+    },
+    {
+      "host": "pika.art",
+      "count": 2
+    },
+    {
+      "host": "prompts.chat",
+      "count": 2
+    },
+    {
+      "host": "runwayml.com",
+      "count": 2
+    },
+    {
+      "host": "sketch.metademolab.com",
+      "count": 2
+    },
+    {
+      "host": "subtlepatterns.com",
+      "count": 2
+    },
+    {
+      "host": "textfx.withgoogle.com",
+      "count": 2
+    },
+    {
+      "host": "thepatternlibrary.com",
+      "count": 2
+    }
+  ]
+}

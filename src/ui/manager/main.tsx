@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { ManagerApp } from "./ManagerApp";
 import { initializeTheme } from "../../lib/theme";
-import "../styles.css";
+import "../styles-manager.css";
 
 document.documentElement.classList.add("manager-page");
 document.body.classList.add("manager-page");

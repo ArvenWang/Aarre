@@ -1,6 +1,6 @@
 {
   "name": "bookmark-layer",
-  "version": "0.5.60",
+  "version": "0.5.61",
   "private": true,
   "type": "module",
   "engines": {
@@ -15,6 +15,7 @@
     "check:node": "node scripts/check-node.mjs",
     "check:design": "tsx scripts/check-design-tokens.ts",
     "ui:shots": "node scripts/shoot.mjs",
+    "measure:startup": "node scripts/measure-startup.mjs",
     "ui:audit": "node scripts/audit-controls.mjs",
     "check": "npm run check:node && npm run check:design && npm run typecheck && npm run test && npm run build",
     "verify:artifacts": "node scripts/verify-artifacts.mjs",

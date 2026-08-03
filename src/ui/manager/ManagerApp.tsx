@@ -1,5 +1,5 @@
-import { Button } from "../../components/ui/button";
-import { TabsSubtle, TabsSubtleItem } from "../../components/ui/tabs-subtle";
+import { Button } from "@/ui/components/ui/button";
+import { TabsSubtle, TabsSubtleItem } from "@/ui/components/ui/tabs-subtle";
 import {
   useCallback,
   useEffect,
@@ -490,7 +490,6 @@ export function ManagerApp() {
       <div className="empty-state" aria-live="polite">
         <span className="loading-indicator" />
         <strong>正在读取你的收藏库</strong>
-        <p>本地索引、主题关系与收藏健康度会一起准备好。</p>
       </div>
     );
   } else {
@@ -640,7 +639,7 @@ export function ManagerApp() {
 
         <Button
           type="button"
-          variant="unstyled"
+          variant="ghost"
           size="icon"
           className="manager-theme-button"
           aria-label={

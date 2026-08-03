@@ -1,9 +1,9 @@
-import { Button } from "../../../components/ui/button";
+import { Button } from "@/ui/components/ui/button";
 import {
   FluidInput,
   FluidTextarea,
   FluidSelect,
-} from "../../components/FluidControls";
+} from "@/ui/components/ui/input";
 import type { KnowledgeDashboard, LibraryReport } from "../../../lib/types";
 import { ResourceLink } from "../components/ResourceLink";
 
@@ -57,7 +57,6 @@ export function ReportView({
     return (
       <div className="empty-state">
         <strong>报告还在准备</strong>
-        <p>完成本地索引后，这里会显示真实的收藏趋势和健康度。</p>
       </div>
     );
   }
@@ -94,10 +93,6 @@ export function ReportView({
       <header className="report-lead">
         <span>本周结论</span>
         <h2>{report.attentionShift}</h2>
-        <p>
-          本期新增 {report.createdCount} 条；有 {report.rarelyOpenedOver90Days}{" "}
-          条收藏超过 90 天很少通过书签打开。
-        </p>
       </header>
 
       <div className="report-metrics" aria-label="收藏指标">
@@ -115,7 +110,7 @@ export function ReportView({
           <header>
             <div>
               <span className="section-eyebrow">主题变化</span>
-              <h3>这段时间，你在关注什么</h3>
+              <h3>主题变化</h3>
             </div>
             <div className="trend-legend" aria-label="图例">
               <span data-series="current">本期</span>
@@ -145,9 +140,7 @@ export function ReportView({
                 </div>
               ))
             ) : (
-              <p className="report-empty-copy">
-                本期还没有形成明显的主题变化。
-              </p>
+              <p className="report-empty-copy">暂无数据</p>
             )}
           </div>
         </section>
@@ -156,7 +149,6 @@ export function ReportView({
           <header>
             <span className="section-eyebrow">知识缺口</span>
             <h3>主题覆盖角度</h3>
-            <p>满分 4 分别代表入门、实践、对比和深入四种内容角度。</p>
           </header>
           {report.knowledgeGaps.length ? (
             <div>
@@ -175,9 +167,7 @@ export function ReportView({
               ))}
             </div>
           ) : (
-            <p className="report-empty-copy">
-              当前还没有足够密集的同主题收藏来判断内容角度。
-            </p>
+            <p className="report-empty-copy">数据不足</p>
           )}
         </section>
       </div>
@@ -189,9 +179,9 @@ export function ReportView({
             <h3>值得再看一次</h3>
           </div>
           <Button
-            variant="unstyled"
+            variant="ghost"
             type="button"
-            className="button button-quiet"
+
             onClick={onOpenOrganize}
           >
             查看整理提案
@@ -211,9 +201,7 @@ export function ReportView({
             ))}
           </div>
         ) : (
-          <p className="report-empty-copy">
-            目前没有同时满足“足够久”和“与近期主题相关”的收藏。
-          </p>
+          <p className="report-empty-copy">暂无推荐</p>
         )}
       </section>
     </section>

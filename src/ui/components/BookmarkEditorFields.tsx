@@ -1,18 +1,18 @@
 import { type Ref } from "react";
-import { FluidInput, FluidTextarea } from "./FluidControls";
+import { FluidInput, FluidTextarea } from "@/ui/components/ui/input";
 import type {
   BookmarkEditorFolder,
   BookmarkEditorLocation,
 } from "../../lib/bookmark-editor";
 import type { ResourceRecord } from "../../lib/types";
 import { CloseIcon } from "./Icons";
-import { Button } from "../../components/ui/button";
+import { Button } from "@/ui/components/ui/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-} from "../../components/ui/select";
+} from "@/ui/components/ui/select";
 import { ProtectionControl } from "./ProtectionControl";
 
 interface BookmarkEditorFieldsProps {
@@ -198,7 +198,7 @@ export function BookmarkEditorFields({
           <p>
             {resource?.summary ||
               resource?.enhancementBlockMessage ||
-              "尚未生成摘要。下次打开网页时，Aarre 会继续完成智能增强。"}
+              "尚未生成摘要"}
           </p>
           <small>
             摘要由网页内容生成，因此这里保持只读，避免把人工文字误标为 AI 结果。
@@ -217,7 +217,7 @@ export function BookmarkEditorFields({
                   {tag}
                   <Button
                     type="button"
-                    variant="unstyled"
+                    variant="ghost"
                     size="unstyled"
                     className="tag-chip-remove"
                     aria-label={`移除标签 ${tag}`}
@@ -253,7 +253,7 @@ export function BookmarkEditorFields({
             />
             <Button
               type="button"
-              variant="unstyled"
+              variant="ghost"
               className="library-card-editor-tag-submit"
               onClick={onAddTag}
               disabled={!tagInput.trim() || disabled}

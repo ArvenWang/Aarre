@@ -125,13 +125,10 @@ describe("SnapshotBackfillControl", () => {
     ) as HTMLElement;
     expect(dialog).not.toBeNull();
     expect(dialog.textContent).toContain("约 7 项");
-    expect(dialog.textContent).toContain("加载完成并稳定后才截图");
-    expect(dialog.textContent).toContain(
-      "任务在后台运行，不占用当前页面"
-    );
-    expect(dialog.textContent).toContain("后台专用标签页");
+    expect(dialog.textContent).toContain("加载稳定后截图");
+    expect(dialog.textContent).toContain("可随时暂停或取消");
     expect(dialog.textContent).toContain("不调用 AI");
-    expect(dialog.textContent).toContain("不会上传网页或截图");
+    expect(dialog.textContent).toContain("不上传网页或截图");
 
     const close = container.querySelector(
       '[aria-label="关闭批量补拍确认"]'

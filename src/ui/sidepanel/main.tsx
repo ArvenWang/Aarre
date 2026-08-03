@@ -1,9 +1,9 @@
 import { Component, StrictMode, type ErrorInfo, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { SidePanelApp } from "./SidePanelApp";
-import { Button } from "../../components/ui/button";
+import { Button } from "@/ui/components/ui/button";
 import { initializeTheme } from "../../lib/theme";
-import "../styles.css";
+import "../styles-sidepanel.css";
 
 class SidePanelErrorBoundary extends Component<
   { children: ReactNode },
@@ -65,6 +65,10 @@ async function bootstrap(): Promise<void> {
       </SidePanelErrorBoundary>
     </StrictMode>,
   );
+  window.requestAnimationFrame(() => {
+    performance.mark("aarre-react-first-commit");
+    document.documentElement.dataset.aarreReactCommitted = "true";
+  });
 }
 
 void bootstrap();

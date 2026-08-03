@@ -499,7 +499,6 @@ async function currentProtectionBindings(
 
 export async function syncDurableCloudState(): Promise<{ synced: number }> {
   const cloudSettings = await getCloudSyncSettings();
-  if (!cloudSettings.enabled) return { synced: 0 };
   const state = await readSyncedState();
   let synced = 0;
   const now = new Date().toISOString();

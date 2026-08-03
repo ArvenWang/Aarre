@@ -6,6 +6,7 @@ import {
 } from "./protection";
 import {
   completeOutboxItem,
+  deleteLocalResource,
   deferOutboxItem,
   getLocalResource,
   getOutbox,
@@ -233,11 +234,12 @@ export async function syncOneResource(
             resource.fieldUpdatedAt?.[field] || resource.updatedAt
           ])
         ),
-        deleted: false
+        deleted: Boolean(resource.deletedAt)
       })
     }
   );
   await saveCloudResourceRevision(resource.resourceKey, response.revision);
+  if (resource.deletedAt) return resource;
   const local = await responseToLocal(response);
   await upsertLocalResource(local);
   return local;
@@ -256,7 +258,11 @@ async function pullFullCloudResources(): Promise<ResourceRecord[]> {
     }>(`/v1/sync/bootstrap?offset=${offset}&limit=200`);
     for (const cloud of page.resources) {
       revisions[cloud.resourceKey] = cloud.revision;
-      if (!cloud.deleted) incoming.push(await responseToLocal(cloud));
+      if (cloud.deleted) {
+        await deleteLocalResource(cloud.resourceKey);
+      } else {
+        incoming.push(await responseToLocal(cloud));
+      }
     }
     cursor = Math.max(cursor, page.cursor);
     if (page.nextOffset === null) break;
@@ -299,7 +305,13 @@ export async function pullCloudResources(): Promise<ResourceRecord[]> {
       if (change.entityType === "resource") {
         revisions[change.entityId] = change.revision;
       }
-      if (change.entityType !== "resource" || change.deleted || !change.payload) continue;
+      if (change.entityType !== "resource") continue;
+      if (change.deleted) {
+        // 云端墓碑只清理 Aarre 智能层。Chrome 原生书签由 Chrome Sync 管理。
+        await deleteLocalResource(change.entityId);
+        continue;
+      }
+      if (!change.payload) continue;
       incoming.push(await responseToLocal({
         resourceKey: change.entityId,
         payload: change.payload,
@@ -365,7 +377,10 @@ export async function processOutbox(): Promise<{
         continue;
       }
       await syncOneResource(item.resource, "", item.revision || crypto.randomUUID());
-      await completeOutboxItem(item);
+      const completed = await completeOutboxItem(item);
+      if (completed && item.resource.deletedAt) {
+        await deleteLocalResource(item.resource.resourceKey);
+      }
       synced += 1;
     } catch (error) {
       if ((error as { protectedResource?: boolean })?.protectedResource) {

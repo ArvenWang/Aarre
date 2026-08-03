@@ -4,6 +4,7 @@ import type {
   SiteIconSource
 } from "./types";
 import { pinnedBrandAssetNeedsRefresh } from "./cover-rules";
+import { ICON_MAX_RATIO, ICON_MIN_INK, ICON_MIN_SIZE } from "./icon-quality";
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const MAX_SVG_BYTES = 256 * 1024;
@@ -843,7 +844,7 @@ async function cacheSiteIconCandidate(
     // 质量门槛放宽：16px 是 favicon 的最小常见尺寸，只有连 16px 都
     // 没有的候选才拒绝；此前 128px 门槛会把大量真实 favicon 挡在
     // 门外导致误用兜底图。
-    if (nativeWidth < 16 || nativeHeight < 16) {
+    if (!candidate.vector && (nativeWidth < ICON_MIN_SIZE || nativeHeight < ICON_MIN_SIZE)) {
       return {
         iconRejectReason: "below-16px",
         nativeWidth,
@@ -855,9 +856,9 @@ async function cacheSiteIconCandidate(
       Math.min(nativeWidth, nativeHeight);
     // 比例上限放宽到 3:1：方形 favicon 之外，横幅/宽图标也允许进入，
     // 只有明显不成比例的候选才拒绝。
-    if (ratio > 3) {
+    if (ratio > ICON_MAX_RATIO) {
       return {
-        iconRejectReason: "non-square",
+        iconRejectReason: "extreme-ratio",
         nativeWidth,
         nativeHeight
       };
@@ -907,9 +908,9 @@ async function cacheSiteIconCandidate(
     );
     // 墨迹下限降到 0.01：几乎全白/全透明的图才拒绝，正常低对比度
     // favicon 也允许进入（用户要求“抓得到就用真实图标”）。
-    if (normalized.inkCoverage < 0.01) {
+    if (normalized.inkCoverage < ICON_MIN_INK) {
       return {
-        iconRejectReason: "low-ink-or-contrast",
+        iconRejectReason: "blank-image",
         nativeWidth,
         nativeHeight
       };
@@ -945,14 +946,32 @@ export async function cacheSiteBrandIcon(
   decodeFallback?: SiteIconDecodeFallback
 ): Promise<CachedSiteIcon> {
   let lastRejection = "no-candidate";
-  for (const candidate of candidates) {
-    try {
-      const result = await cacheSiteIconCandidate(candidate, decodeFallback);
-      if (result.iconDataUrlLight) return result;
-      lastRejection = result.iconRejectReason || lastRejection;
-    } catch (error) {
-      lastRejection =
-        error instanceof Error ? error.message : "image-processing-failed";
+  const groups = [candidates.slice(0, 4), candidates.slice(4)];
+  for (const group of groups) {
+    if (!group.length) continue;
+    const results = await Promise.allSettled(
+      group.map((candidate) => {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        return Promise.race([
+          cacheSiteIconCandidate(candidate, decodeFallback),
+          new Promise<CachedSiteIcon>((_, reject) => {
+            timer = setTimeout(() => reject(new Error("icon-candidate-timeout")), 5_000);
+          })
+        ]).finally(() => {
+          if (timer) clearTimeout(timer);
+        });
+      })
+    );
+    // 并行只降低等待时间；选择仍严格遵循候选原始优先级。
+    for (const result of results) {
+      if (result.status === "fulfilled" && result.value.iconDataUrlLight) {
+        return result.value;
+      }
+      lastRejection = result.status === "fulfilled"
+        ? result.value.iconRejectReason || lastRejection
+        : result.reason instanceof Error
+          ? result.reason.message
+          : "image-processing-failed";
     }
   }
   return { iconRejectReason: lastRejection };

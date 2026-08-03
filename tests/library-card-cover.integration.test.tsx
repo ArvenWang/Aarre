@@ -74,6 +74,7 @@ describe("manager masonry cover policy", () => {
   it("selects the semantic Aarre fallback without using og:image", () => {
     const markup = renderToStaticMarkup(
       createElement(LibraryCardCover, {
+        resourceKey: resource.resourceKey,
         canonicalUrl: resource.canonicalUrl,
         label: resource.title,
         fallbackResource: resource

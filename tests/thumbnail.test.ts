@@ -202,6 +202,45 @@ describe("thumbnail safety", () => {
     }
   });
 
+  it("probes a priority group in parallel and never touches the lower group after success", async () => {
+    const requested: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      requested.push(url);
+      if (url.includes("good.svg")) {
+        return new Response(
+          '<svg width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15"/></svg>',
+          { status: 200, headers: { "content-type": "image/svg+xml" } }
+        );
+      }
+      return new Response("missing", { status: 404 });
+    }));
+    vi.stubGlobal("createImageBitmap", vi.fn(async () => {
+      throw new Error("decode in offscreen document");
+    }));
+    const decodeFallback = vi.fn(async () => ({
+      iconDataUrlLight: "data:image/webp;base64,GOOD",
+      iconRenderVersion: 7,
+      nativeWidth: 32,
+      nativeHeight: 32
+    }));
+
+    try {
+      const result = await cacheSiteBrandIcon([
+        { url: "https://icons.example/good.svg", source: "svg-icon", vector: true },
+        { url: "https://icons.example/high-2.ico", source: "conventional-favicon-ico" },
+        { url: "https://icons.example/high-3.ico", source: "conventional-favicon-ico" },
+        { url: "https://icons.example/high-4.ico", source: "conventional-favicon-ico" },
+        { url: "https://icons.example/low.ico", source: "conventional-favicon-ico" }
+      ], decodeFallback);
+
+      expect(result.iconDataUrlLight).toContain("GOOD");
+      expect(requested).not.toContain("https://icons.example/low.ico");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("rejects scripts, event handlers and external references", () => {
     expect(() =>
       sanitizeStaticSvg("<svg><script>alert(1)</script></svg>")

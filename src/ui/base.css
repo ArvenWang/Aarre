@@ -167,13 +167,20 @@ button[data-slot="button"]:focus-visible {
   outline: 0;
 }
 
+/* Tailwind's generated `text-background` resolves to the inherited foreground
+   in the extension's layered CSS build. Keep the semantic colour on the one
+   shared component boundary so primary labels remain legible in both themes. */
+button[data-slot="button"][data-variant="primary"],
+a[data-slot="button"][data-variant="primary"] {
+  color: var(--bg);
+}
+
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
   outline: 0;
 }
 
-.button,
 .text-button,
 .icon-button {
   border: 0;
@@ -186,107 +193,12 @@ textarea:focus-visible {
     transform var(--dur-fast) var(--ease);
 }
 
-.button {
-  min-height: var(--control-h-lg);
-  padding: 0 var(--sp-4);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--sp-2);
-  border: 1px solid transparent;
-  border-radius: var(--radius-control);
-  font-size: var(--fs-small);
-  white-space: nowrap;
-}
-
-.button svg {
-  width: 1.1em;
-  height: 1.1em;
-}
-
-.button-dark {
-  color: var(--bg);
-  background: var(--ink);
-}
-
-.button-dark:not(:disabled):hover {
-  background: color-mix(in srgb, var(--ink) 88%, var(--bg));
-  transform: translateY(-1px);
-}
-
-.button-quiet {
-  min-height: var(--control-h-lg);
-  border-color: var(--line);
-  color: var(--ink);
-  background: var(--surface);
-}
-
-.button-quiet:not(:disabled):hover {
-  border-color: var(--line-strong);
-  background: var(--surface-sunken);
-}
-
-/* Destructive confirmation is the one place the product spends a colour. It
-   has to read as "this removes something" before the label is read. */
-.button-danger {
-  min-height: var(--control-h-lg);
-  color: var(--bg);
-  background: var(--negative);
-}
-
-.button-danger:not(:disabled):hover {
-  background: color-mix(in srgb, var(--negative) 88%, var(--ink));
-  transform: translateY(-1px);
-}
-
-/* Quiet destructive entry point: reads as dangerous without competing with the
-   confirm button that follows it. */
-.button-danger-quiet {
-  min-height: var(--control-h-lg);
-  border-color: color-mix(in srgb, var(--negative) 35%, transparent);
-  color: var(--negative);
-  background: transparent;
-}
-
-.button-danger-quiet:not(:disabled):hover {
-  border-color: color-mix(in srgb, var(--negative) 55%, transparent);
-  background: color-mix(in srgb, var(--negative) 10%, transparent);
-}
-
-/* Keep the compact action height after semantic button variants have declared
-   their default 40px minimum. */
-.button-small {
-  height: var(--control-h-button);
-  min-height: var(--control-h-button);
-  padding-inline: var(--sp-3);
-  font-size: var(--fs-caption);
-}
-
-.button:disabled,
-.text-button:disabled {
-  opacity: 0.42;
-}
-
 .text-button {
   min-height: var(--control-h-sm);
   padding: var(--sp-1) 0;
   display: inline-flex;
   align-items: center;
-  color: var(--ink-muted);
-  background: transparent;
   font-size: var(--fs-caption);
-}
-
-.text-button:hover {
-  color: var(--ink);
-}
-
-.text-button-danger {
-  color: var(--negative);
-}
-
-.text-button-danger:hover {
-  color: color-mix(in srgb, var(--negative) 82%, var(--ink));
 }
 
 .icon-button {
@@ -295,13 +207,6 @@ textarea:focus-visible {
   display: grid;
   place-items: center;
   padding: 0;
-  color: var(--ink-muted);
-  background: transparent;
-}
-
-.icon-button:hover {
-  color: var(--ink);
-  background: var(--surface-sunken);
 }
 
 /* A removable tag reads the same in the side panel and in the library editor,

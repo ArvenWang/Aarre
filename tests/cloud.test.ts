@@ -16,12 +16,10 @@ import {
   reconcileCloudAssetState
 } from "../src/lib/cloud-assets";
 import {
-  beginCloudSyncProgress,
-  CLOUD_SYNC_PROGRESS_KEY,
-  completeCloudSyncProgress,
-  getCloudSyncProgress,
-  updateCloudSyncProgress
-} from "../src/lib/cloud-progress";
+  readSyncStatus,
+  SYNC_STATUS_KEY,
+  writeSyncStatus
+} from "../src/lib/sync-engine";
 import type { ResourceRecord } from "../src/lib/types";
 
 let values: Record<string, unknown>;
@@ -111,9 +109,9 @@ describe("cloud privacy contract", () => {
     ).toBe(true);
   });
 
-  it("keeps cloud sync explicitly disabled until the user enables it", async () => {
-    expect(defaultCloudSyncSettings()).toEqual({ enabled: false, scope: "complete", updatedAt: "" });
-    await expect(getCloudSyncSettings()).resolves.toEqual({ enabled: false, scope: "complete", updatedAt: "" });
+  it("migrates cloud settings to login-implies-sync with complete backup", async () => {
+    expect(defaultCloudSyncSettings()).toEqual({ enabled: true, scope: "complete", updatedAt: "" });
+    await expect(getCloudSyncSettings()).resolves.toEqual({ enabled: true, scope: "complete", updatedAt: "" });
   });
 
   it("maps asset kinds to the same identity keys the uploader uses", () => {
@@ -238,40 +236,30 @@ describe("cloud privacy contract", () => {
     ]));
   });
 
-  it("persists real sync progress instead of treating cloud capacity as progress", async () => {
-    await beginCloudSyncProgress({ scope: "complete", resourceTotal: 4 });
-    await updateCloudSyncProgress({
-      resourceProcessedDelta: 2,
-      statusText: "正在同步收藏…"
+  it("persists the unified sync status", async () => {
+    await writeSyncStatus({
+      phase: "pushing",
+      current: 3,
+      total: 4,
+      lastSyncedAt: null,
+      error: null,
+      nextRetryAt: null
     });
-    await updateCloudSyncProgress({ resourceProcessedDelta: 1, resourceFailedDelta: 1 });
-
-    await expect(getCloudSyncProgress()).resolves.toMatchObject({
-      phase: "syncing",
-      resourceTotal: 4,
-      resourceProcessed: 3,
-      resourceFailed: 1,
-      statusText: "正在同步收藏…"
-    });
-
-    await completeCloudSyncProgress({ resourceFailed: 1 });
-    await expect(getCloudSyncProgress()).resolves.toMatchObject({
-      phase: "completed",
-      resourceProcessed: 3,
-      resourceFailed: 1
+    await expect(readSyncStatus()).resolves.toMatchObject({
+      phase: "pushing",
+      current: 3,
+      total: 4
     });
   });
 
   it("translates a persisted refresh replay into a recoverable sign-in message", async () => {
-    values[CLOUD_SYNC_PROGRESS_KEY] = {
+    values[SYNC_STATUS_KEY] = {
       phase: "error",
-      scope: "complete",
       error: "Refresh token replay was detected; this device must sign in again.",
-      resourceTotal: 4,
-      resourceProcessed: 2,
-      resourceFailed: 0
+      current: 2,
+      total: 4
     };
-    await expect(getCloudSyncProgress()).resolves.toMatchObject({
+    await expect(readSyncStatus()).resolves.toMatchObject({
       phase: "error",
       error: "云端登录会话已失效，请重新登录后继续同步。"
     });

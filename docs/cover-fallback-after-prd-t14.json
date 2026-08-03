@@ -1,0 +1,208 @@
+{
+  "schemaVersion": 1,
+  "measuredAt": "2026-08-03T20:21:33.087Z",
+  "inputLabel": "Bookmarks + Bookmarks",
+  "composition": "white",
+  "availableUrlCount": 389,
+  "sampleCount": 300,
+  "sources": {
+    "registry": {
+      "count": 8,
+      "percent": 2.67
+    },
+    "apple-touch-icon": {
+      "count": 99,
+      "percent": 33
+    },
+    "conventional-favicon-ico": {
+      "count": 26,
+      "percent": 8.67
+    },
+    "manifest": {
+      "count": 4,
+      "percent": 1.33
+    },
+    "high-resolution-rel-icon": {
+      "count": 42,
+      "percent": 14
+    },
+    "og-image": {
+      "count": 1,
+      "percent": 0.33
+    },
+    "category-fallback": {
+      "count": 120,
+      "percent": 40
+    }
+  },
+  "fallback": {
+    "count": 120,
+    "percent": 40
+  },
+  "fallbackBreakdown": {
+    "withRejectedCandidates": 0,
+    "withoutCandidates": 120
+  },
+  "sourceHostSamples": {
+    "conventional-favicon-ico": [
+      "detail.design",
+      "skills.sh",
+      "beam.jakubantalik.com",
+      "icon-studio-ebon.vercel.app",
+      "namethatui.com",
+      "easings.net",
+      "uibook.art",
+      "huggingface.co",
+      "library.phygital.plus",
+      "hailuoai.com",
+      "chatglm.cn",
+      "liveportrait.org",
+      "www.meigen.ai",
+      "www.genspark.ai",
+      "ikuuu.win",
+      "x.com",
+      "3dpresso.ai",
+      "www.voxflow.studio",
+      "pro.xiaohongshu.com",
+      "cowtransfer.com"
+    ]
+  },
+  "maxScale": 1,
+  "zeroUpsamplePassed": true,
+  "rejections": {
+    "below-128px": {
+      "count": 0,
+      "samples": []
+    },
+    "non-square": {
+      "count": 0,
+      "samples": []
+    },
+    "low-ink-or-contrast": {
+      "count": 0,
+      "samples": []
+    }
+  },
+  "fallbackTopDomains": [
+    {
+      "host": "aipetphotos.com",
+      "count": 2
+    },
+    {
+      "host": "app.artflow.ai",
+      "count": 2
+    },
+    {
+      "host": "app.exactly.ai",
+      "count": 2
+    },
+    {
+      "host": "app.meshy.ai",
+      "count": 2
+    },
+    {
+      "host": "cli.im",
+      "count": 2
+    },
+    {
+      "host": "clipdrop.co",
+      "count": 2
+    },
+    {
+      "host": "convert.leiapix.com",
+      "count": 2
+    },
+    {
+      "host": "cursor.directory",
+      "count": 2
+    },
+    {
+      "host": "designsparks.io",
+      "count": 2
+    },
+    {
+      "host": "dubbing.tech",
+      "count": 2
+    },
+    {
+      "host": "generative-dynamics.github.io",
+      "count": 2
+    },
+    {
+      "host": "home.blusea.cn",
+      "count": 2
+    },
+    {
+      "host": "iconly.pro",
+      "count": 2
+    },
+    {
+      "host": "jimeng.jianying.com",
+      "count": 2
+    },
+    {
+      "host": "mcp.composio.dev",
+      "count": 2
+    },
+    {
+      "host": "medium.com",
+      "count": 2
+    },
+    {
+      "host": "openxlab.org.cn",
+      "count": 2
+    },
+    {
+      "host": "pika.art",
+      "count": 2
+    },
+    {
+      "host": "prompts.chat",
+      "count": 2
+    },
+    {
+      "host": "runwayml.com",
+      "count": 2
+    },
+    {
+      "host": "sketch.metademolab.com",
+      "count": 2
+    },
+    {
+      "host": "subtlepatterns.com",
+      "count": 2
+    },
+    {
+      "host": "thepatternlibrary.com",
+      "count": 2
+    },
+    {
+      "host": "v.mp3juices.click",
+      "count": 2
+    },
+    {
+      "host": "weavesilk.com",
+      "count": 2
+    },
+    {
+      "host": "www.jeffhandesign.com",
+      "count": 2
+    },
+    {
+      "host": "www.libvio.me",
+      "count": 2
+    },
+    {
+      "host": "www.lookae.com",
+      "count": 2
+    },
+    {
+      "host": "www.pika.art",
+      "count": 2
+    },
+    {
+      "host": "www.tripo3d.ai",
+      "count": 2
+    }
+  ]
+}

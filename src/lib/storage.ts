@@ -8,7 +8,8 @@ import type {
   PageSnapshot,
   ResourceRecord,
   SiteBrandRecord,
-  UndoSnapshotBatch
+  UndoSnapshotBatch,
+  VisualAsset
 } from "./types";
 import { hasCompleteAiFields } from "./ai-fields";
 import { deriveFieldClocks, mergeResourceByFieldClocks } from "./field-clocks";
@@ -49,6 +50,14 @@ interface BookmarkLayerDatabase extends DBSchema {
     value: PageSnapshot;
     indexes: {
       "by-captured-at": string;
+    };
+  };
+  visuals: {
+    key: string;
+    value: VisualAsset;
+    indexes: {
+      kind: "site-icon" | "cover";
+      identity: string;
     };
   };
 }
@@ -234,6 +243,9 @@ export function normalizeResourceRecord(value: unknown): ResourceRecord {
     ...(stringValue(record.lastSyncedAt)
       ? { lastSyncedAt: stringValue(record.lastSyncedAt) }
       : {}),
+    ...(stringValue(record.deletedAt)
+      ? { deletedAt: stringValue(record.deletedAt) }
+      : {}),
     ...(record.fieldUpdatedAt && typeof record.fieldUpdatedAt === "object"
       ? { fieldUpdatedAt: stringRecord(record.fieldUpdatedAt) }
       : {})
@@ -252,7 +264,7 @@ function database(): Promise<IDBPDatabase<BookmarkLayerDatabase>> {
   if (!databasePromise) {
     databasePromise = openDB<BookmarkLayerDatabase>(
       "bookmark-layer",
-      4,
+      5,
       {
         upgrade(db, oldVersion) {
           if (oldVersion < 1) {
@@ -284,6 +296,11 @@ function database(): Promise<IDBPDatabase<BookmarkLayerDatabase>> {
             });
             pageSnapshots.createIndex("by-captured-at", "capturedAt");
           }
+          if (oldVersion < 5) {
+            const visuals = db.createObjectStore("visuals", { keyPath: "key" });
+            visuals.createIndex("kind", "kind");
+            visuals.createIndex("identity", "identity");
+          }
         }
       }
     );
@@ -298,11 +315,13 @@ export interface LocalIndexedDbSize {
   undoSnapshotsBytes: number;
   siteBrandsBytes: number;
   pageSnapshotsBytes: number;
+  visualsBytes: number;
   resourceCount: number;
   outboxCount: number;
   undoSnapshotCount: number;
   siteBrandCount: number;
   pageSnapshotCount: number;
+  visualCount: number;
 }
 
 function jsonByteLength(value: unknown): number {
@@ -327,19 +346,24 @@ function collectionByteLength(values: unknown[]): number {
  */
 export async function getLocalIndexedDbSize(): Promise<LocalIndexedDbSize> {
   const db = await database();
-  const [resources, outbox, undoSnapshots, siteBrands, pageSnapshots] =
+  const [resources, outbox, undoSnapshots, siteBrands, pageSnapshots, visuals] =
     await Promise.all([
       db.getAll("resources"),
       db.getAll("outbox"),
       db.getAll("undoSnapshots"),
       db.getAll("siteBrands"),
-      db.getAll("pageSnapshots")
+      db.getAll("pageSnapshots"),
+      db.getAll("visuals")
     ]);
   const resourcesBytes = collectionByteLength(resources);
   const outboxBytes = collectionByteLength(outbox);
   const undoSnapshotsBytes = collectionByteLength(undoSnapshots);
   const siteBrandsBytes = collectionByteLength(siteBrands);
   const pageSnapshotsBytes = collectionByteLength(pageSnapshots);
+  const visualsBytes = visuals.reduce(
+    (total, visual) => total + jsonByteLength({ ...visual, blob: undefined }) + visual.blob.size,
+    0
+  );
 
   return {
     totalBytes:
@@ -347,17 +371,20 @@ export async function getLocalIndexedDbSize(): Promise<LocalIndexedDbSize> {
       outboxBytes +
       undoSnapshotsBytes +
       siteBrandsBytes +
-      pageSnapshotsBytes,
+      pageSnapshotsBytes +
+      visualsBytes,
     resourcesBytes,
     outboxBytes,
     undoSnapshotsBytes,
     siteBrandsBytes,
     pageSnapshotsBytes,
+    visualsBytes,
     resourceCount: resources.length,
     outboxCount: outbox.length,
     undoSnapshotCount: undoSnapshots.length,
     siteBrandCount: siteBrands.length,
-    pageSnapshotCount: pageSnapshots.length
+    pageSnapshotCount: pageSnapshots.length,
+    visualCount: visuals.length
   };
 }
 
@@ -416,7 +443,13 @@ export async function putSiteBrand(
   brand: SiteBrandRecord
 ): Promise<void> {
   const db = await database();
-  await db.put("siteBrands", normalizeSiteBrand(brand));
+  const normalized = normalizeSiteBrand(brand);
+  await db.put("siteBrands", normalized);
+  if (normalized.iconDataUrlLight || normalized.iconDataUrl) {
+    await import("./visuals").then(({ putSiteBrandVisual }) =>
+      putSiteBrandVisual(normalized)
+    ).catch(() => undefined);
+  }
 }
 
 export async function getSiteBrand(
@@ -525,6 +558,39 @@ export async function getPageSnapshots(): Promise<PageSnapshot[]> {
 export async function countPageSnapshots(): Promise<number> {
   const db = await database();
   return db.count("pageSnapshots");
+}
+
+export async function writeVisual(visual: VisualAsset): Promise<void> {
+  const db = await database();
+  await db.put("visuals", visual);
+}
+
+export async function getVisual(key: string): Promise<VisualAsset | undefined> {
+  const db = await database();
+  return db.get("visuals", key);
+}
+
+export async function getVisuals(keys: string[]): Promise<Record<string, VisualAsset>> {
+  const uniqueKeys = [...new Set(keys)].slice(0, 500);
+  const db = await database();
+  const entries = await Promise.all(
+    uniqueKeys.map(async (key) => [key, await db.get("visuals", key)] as const)
+  );
+  return Object.fromEntries(
+    entries.filter((entry): entry is readonly [string, VisualAsset] => Boolean(entry[1]))
+  );
+}
+
+export async function getVisualsByKind(
+  kind: VisualAsset["kind"]
+): Promise<VisualAsset[]> {
+  const db = await database();
+  return db.getAllFromIndex("visuals", "kind", kind);
+}
+
+export async function deleteVisual(key: string): Promise<void> {
+  const db = await database();
+  await db.delete("visuals", key);
 }
 
 export async function putUndoSnapshot(

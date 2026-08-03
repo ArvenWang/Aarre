@@ -16,6 +16,11 @@ import {
   normalizeSiteIconPixels,
   SITE_ICON_SURFACE
 } from "../src/lib/thumbnail";
+import {
+  ICON_MAX_RATIO,
+  ICON_MIN_INK,
+  ICON_MIN_SIZE
+} from "../src/lib/icon-quality";
 import type {
   PageEssence,
   SiteIconCandidate
@@ -502,7 +507,7 @@ async function inspectCandidate(
       }
     };
   }
-  // 与生产一致：矢量资产按最长边 ICON_SIZE 重新栅格化，不受 128px 下限约束。
+  // 与生产一致：矢量资产按最长边 ICON_SIZE 重新栅格化，不受位图尺寸下限约束。
   let vector = false;
   let nativeWidth = icoFrame?.width || metadata.width || 0;
   let nativeHeight = icoFrame?.height || metadata.height || 0;
@@ -531,22 +536,22 @@ async function inspectCandidate(
     nativeWidth,
     nativeHeight
   };
-  if (!vector && (nativeWidth < 128 || nativeHeight < 128)) {
+  if (!vector && (nativeWidth < ICON_MIN_SIZE || nativeHeight < ICON_MIN_SIZE)) {
     return {
       accepted: false,
       scale: 0,
-      rejection: { ...base, reason: "below-128px" }
+      rejection: { ...base, reason: "below-16px" }
     };
   }
   if (
     Math.max(nativeWidth, nativeHeight) /
       Math.min(nativeWidth, nativeHeight) >
-    1.2
+    ICON_MAX_RATIO
   ) {
     return {
       accepted: false,
       scale: 0,
-      rejection: { ...base, reason: "non-square" }
+      rejection: { ...base, reason: "extreme-ratio" }
     };
   }
   const scale = vector
@@ -573,11 +578,11 @@ async function inspectCandidate(
         b: 0,
         alpha: 0
       });
-      if (inspectLegacyPixels(pixels, contentRect) < 0.15) {
+      if (inspectLegacyPixels(pixels, contentRect) < ICON_MIN_INK) {
         return {
           accepted: false,
           scale,
-          rejection: { ...base, reason: "low-ink-or-contrast" }
+          rejection: { ...base, reason: "blank-image" }
         };
       }
     } else {
@@ -597,12 +602,12 @@ async function inspectCandidate(
           sourcePixels,
           SITE_ICON_SURFACE,
           contentRect
-        ).inkCoverage < 0.15
+        ).inkCoverage < ICON_MIN_INK
       ) {
         return {
           accepted: false,
           scale,
-          rejection: { ...base, reason: "low-ink-or-contrast" }
+          rejection: { ...base, reason: "blank-image" }
         };
       }
     }

@@ -1,9 +1,6 @@
-@import "tailwindcss/theme.css";
-@import "tailwindcss/utilities.css";
 @import "./tokens.css";
 @import "./base.css";
-@import "./sidepanel.css";
-@import "./manager.css";
+@import "./editor-fields.css";
 
 :root {
   --background: var(--bg);
@@ -94,9 +91,9 @@
 
 .cloud-conflict-notice {
   display: grid;
-  gap: var(--space-3);
-  margin-block-end: var(--space-5);
-  padding: var(--space-4);
+  gap: var(--sp-3);
+  margin-block-end: var(--sp-5);
+  padding: var(--sp-4);
   border: 1px solid var(--line);
   border-radius: var(--radius-module);
   background: var(--surface-sunken);
@@ -107,7 +104,7 @@
 .cloud-conflict-versions dl > div {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--sp-2);
 }
 
 .cloud-conflict-heading {
@@ -128,17 +125,17 @@
 
 .cloud-conflict-versions {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--sp-3);
 }
 
 .cloud-conflict-versions > div {
   display: grid;
-  gap: var(--space-2);
+  gap: var(--sp-2);
 }
 
 .cloud-conflict-versions dl {
   display: grid;
-  gap: var(--space-1);
+  gap: var(--sp-1);
 }
 
 .cloud-conflict-versions dt {

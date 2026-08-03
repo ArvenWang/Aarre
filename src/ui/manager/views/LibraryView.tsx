@@ -2,7 +2,7 @@ import {
   FluidInput,
   FluidTextarea,
   FluidSelect,
-} from "../../components/FluidControls";
+} from "@/ui/components/ui/input";
 import {
   Fragment,
   useEffect,
@@ -16,15 +16,15 @@ import type {
   SiteBrandRecord,
 } from "../../../lib/types";
 import { CloseIcon, SearchIcon } from "../../components/Icons";
-import { Badge } from "../../components/ui/badge";
-import { Button } from "../../../components/ui/button";
-import { Card } from "../../components/ui/card";
+import { Badge } from "@/ui/components/ui/badge";
+import { Button } from "@/ui/components/ui/button";
+import { Card } from "@/ui/components/ui/card";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-} from "../../../components/ui/select";
+} from "@/ui/components/ui/select";
 import { ResourceIdentity } from "../../components/ResourceIdentity";
 import { currentSiteBrandImageUrl } from "../../../lib/thumbnail";
 import { LibraryCardEditor } from "../components/LibraryCardEditor";
@@ -145,9 +145,9 @@ export function LibrarySearchForm({
       {queryDraft || appliedQuery ? (
         <Button
           type="button"
-          variant="unstyled"
+          variant="ghost"
           size="icon-sm"
-          className="library-search-clear"
+ className="library-search-clear"
           aria-label="清除收藏搜索"
           title="清除搜索"
           onClick={onClearSearch}
@@ -156,9 +156,9 @@ export function LibrarySearchForm({
         </Button>
       ) : null}
       <Button
-        variant="unstyled"
+        variant="primary" size="sm"
         type="submit"
-        className="button button-dark button-small library-search-submit"
+ className="library-search-submit"
       >
         搜索
       </Button>
@@ -275,10 +275,10 @@ export function LibraryView({
               ).map(([value, label, count]) => (
                 <Button
                   type="button"
-                  variant="unstyled"
+                  variant="ghost"
                   size="sm"
                   active={filter === value}
-                  className="library-tab-button"
+ className="library-tab-button"
                   aria-pressed={filter === value}
                   data-active={filter === value}
                   key={value}
@@ -371,7 +371,7 @@ export function LibraryView({
             const summary =
               resource.summary ||
               resource.contentExcerpt ||
-              "尚未读取网页正文。再次打开该网页，Aarre 会在页面稳定后自动补全。";
+              "尚未读取正文";
             return (
               <Card
                 role="article"
@@ -388,6 +388,7 @@ export function LibraryView({
                 <div className="library-card-cover-frame">
                   <div className="library-card-cover">
                     <LibraryCardCover
+                      resourceKey={resource.resourceKey}
                       canonicalUrl={resource.canonicalUrl}
                       label={resource.title}
                       fallbackResource={resource}
@@ -468,20 +469,11 @@ export function LibraryView({
                     ? "这里还没有已完成理解的收藏"
                     : "这里没有待处理的收藏"}
           </strong>
-          <p>
-            {!libraryCount
-              ? "Chrome 书签中的内容会自动出现在这里，无需导入。"
-              : query && !results.length
-                ? "换一种标题、标签、摘要或文件夹关键词再试。"
-                : !scopeCount
-                  ? "选择其他 Chrome 文件夹，或清除当前筛选。"
-                  : "切换到“全部”查看当前范围内的收藏。"}
-          </p>
           {query ? (
             <Button
-              variant="unstyled"
+              variant="ghost"
               type="button"
-              className="button button-quiet"
+
               onClick={onClearSearch}
             >
               清除搜索
