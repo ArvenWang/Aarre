@@ -177,25 +177,39 @@ async function uploadAsset(input: {
   const digest = await sha256(bytes);
   if (input.state[input.identity]?.sha256 === digest) return false;
   const assetId = await stableAssetId(`${input.identity}:${digest}`);
-  const upload = await cloudRequest<{
-    uploadUrl: string;
-    headers: Record<string, string>;
-  }>("/v1/assets/upload", {
-    method: "POST",
-    body: JSON.stringify({
-      assetId,
-      operationId: crypto.randomUUID(),
-      resourceKey: input.resourceKey,
-      kind: input.kind,
-      sha256: digest,
-      byteSize: bytes.byteLength,
-      width: input.width,
-      height: input.height,
-      mimeType,
-      capturedAt: input.capturedAt,
-      binding: input.binding
-    })
-  });
+  const requestUpload = (id: string) =>
+    cloudRequest<{
+      uploadUrl: string;
+      headers: Record<string, string>;
+    }>("/v1/assets/upload", {
+      method: "POST",
+      body: JSON.stringify({
+        assetId: id,
+        operationId: crypto.randomUUID(),
+        resourceKey: input.resourceKey,
+        kind: input.kind,
+        sha256: digest,
+        byteSize: bytes.byteLength,
+        width: input.width,
+        height: input.height,
+        mimeType,
+        capturedAt: input.capturedAt,
+        binding: input.binding
+      })
+    });
+  let upload;
+  try {
+    upload = await requestUpload(assetId);
+  } catch (error) {
+    if ((error as { status?: number }).status === 409) {
+      // 历史恢复曾保留旧 assetId 却更换了内容哈希，导致同一 assetId
+      // 绑定不同内容被服务端拒绝；改用随机 UUID 重新上传，让这条
+      // 资产以当前内容重新落库，不再阻塞同步。
+      upload = await requestUpload(crypto.randomUUID());
+    } else {
+      throw error;
+    }
+  }
   const headers = new Headers(upload.headers);
   headers.delete("content-length");
   const response = await fetch(upload.uploadUrl, {
