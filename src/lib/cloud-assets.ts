@@ -394,6 +394,24 @@ export async function restoreCloudAssets(maxDownloads = 24): Promise<{ restored:
     } else if (asset.kind === "cover" || asset.kind === "user-cover") {
       const resource = await getLocalResource(asset.resourceKey);
       if (resource) {
+        // 手动设置的封面没有 capturedAt（视为 0）。本地已有封面且
+        // 时间不早于云端时跳过下载，避免全量恢复把刚设置的新封面
+        // 用云端旧图覆盖回去；重装后本地无封面仍会正常下载。
+        const localCoverTime = resource.coverUpdatedAt
+          ? Date.parse(resource.coverUpdatedAt)
+          : 0;
+        const remoteCoverTime = asset.capturedAt
+          ? Date.parse(asset.capturedAt)
+          : 0;
+        if (
+          resource.thumbnailDataUrl &&
+          localCoverTime > 0 &&
+          localCoverTime >= remoteCoverTime
+        ) {
+          inspected += 1;
+          await updateCloudSyncProgress({ assetProcessedDelta: 1 });
+          continue;
+        }
         await upsertLocalResource({
           ...resource,
           thumbnailDataUrl: dataUrl,

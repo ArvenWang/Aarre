@@ -1,10 +1,10 @@
 # Aarre 项目进展
 
-最后更新：2026-08-03（0.5.44 / 右键图片设封面：入口立即反馈 + 全程超时，可定位卡点）
+最后更新：2026-08-03（0.5.47 / 右键设封面根因修复：全量同步回退覆盖 + 页面 Toast）
 
 > **并行说明：** 本轮账号交接包、同步契约和生产发布已完成代码与服务器写入；当前没有新增的独占编辑文件。0.5.34 及此前累积的 UI / AI / icon / 云端改动已作为同一套可构建状态纳入 Git，后续 Agent 不得 reset、回退或删除 `/opt/aarre` 发布目录。完整图片备份、真实卸载重装恢复和正式 Web Store ID 仍是外部验收门，不能写成已完成。云端接管先读 `ops/README.md`。
 
-**当前工作区最新状态：0.5.44。** 0.5.44 为“右键图片设封面”增加入口级反馈与超时保护：点击菜单立即在工具栏徽标显示“正在处理…”（60 秒），后续按“正在下载图片… → 正在处理图片… → 封面已更新/已收藏并设为封面”分步更新，任何一步卡住都会在 60 秒超时报“处理超时”（红 ! 徽标 6 秒），异常也会显示具体错误文案——无论问题在哪一步都能看到反馈并定位。0.5.43 修复 FileReader 在 Service Worker 不存在的根因（改 ArrayBuffer+btoa，3 项单测）；0.5.42 自动收藏 + 菜单双注册 + 防盗链 referrer；0.5.41 标题头像化 + GIF 封面；0.5.40 右键图片设为封面；0.5.39 起完整备份循环恢复云端图片（391/391）；0.5.38 构建门强制云端；服务器 active 图片 391 张（原 409 的 95.6%）。0.5.37 上传前对账；0.5.36 只有完整备份；0.5.35 manifest 固定扩展 ID `ppjmhonejgpcdmjmcbbdjookgiagambm`。当前 `dist/` 为 cloud-enabled 0.5.44 正式构建（带 key）。F14 生产 API、数据库、COS/CAM、Google Web OAuth、DNS/TLS、定时备份、两分钟健康巡检、独立 GlitchTip project 与含 SSH Key 的加密恢复包已经部署；Google 品牌审核、卸载重装恢复和正式 Web Store ID 尚未完成。
+**当前工作区最新状态：0.5.47。** 0.5.47 修复右键图片设封面的最终根因：设置成功（探针 `stage: saved` + 对勾徽标）后，`syncNow()` 全量同步的“从云端恢复图片”阶段会把刚设置的新封面用云端旧图覆盖回退——表现为对勾出现但封面不变。现在保存后只调用 `syncCloudAssets()` 上传图片资产（含新封面），不再触发全量同步；`restoreCloudAssets` 下载封面时若本地已有更新封面（`coverUpdatedAt` 不早于云端）则跳过不回退；并在网页内动态注入 Toast（“封面已更新/已收藏并设为封面”，2.6 秒自动消失，仅成功后注入、不常驻脚本）。0.5.45/0.5.46 心跳/点击/分步探针定位了事件链路与保存成功；0.5.44 入口反馈+超时；0.5.43 FileReader 修复；0.5.42 自动收藏+菜单双注册；0.5.41 标题头像化+GIF；0.5.40 右键图片设为封面；0.5.39 完整备份循环恢复；0.5.38 构建门强制云端；服务器 active 图片 391 张（原 409 的 95.6%）。0.5.37 上传前对账；0.5.36 只有完整备份；0.5.35 manifest 固定扩展 ID `ppjmhonejgpcdmjmcbbdjookgiagambm`。当前 `dist/` 为 cloud-enabled 0.5.47 正式构建（带 key）。F14 生产 API、数据库、COS/CAM、Google Web OAuth、DNS/TLS、定时备份、两分钟健康巡检、独立 GlitchTip project 与含 SSH Key 的加密恢复包已经部署；Google 品牌审核、卸载重装恢复和正式 Web Store ID 尚未完成。
 
 ## 当前进展
 
@@ -57,6 +57,16 @@
 当前统一项目目录：`/Users/nefish/Desktop/Coding/Aarre`。
 
 ## 最近更新
+
+### 2026-08-03 · 0.5.47 / 右键设封面“对勾出现但封面不变”的根因修复
+
+- **探针定位。** 0.5.45/0.5.46 探针实测：Service Worker 心跳正常、菜单点击事件到达（`aarre:context-menu-debug` 记录 menuItemId/srcUrl/tabUrl），分步探针显示点击后 0.6 秒完成 `entered → bookmark-state → resource-found → privacy-ok → fetched → blob-ready → bitmap-ready → canvas-converted → saved`，徽标出现对勾；随后 `syncNow()` 全量同步的 `restoreCloudAssets` 把云端旧 cover 下载并覆盖了刚设置的新封面（与 0.5.39 的恢复下载共用同一写入路径）。
+- **修复。** ① 保存后不再调用 `syncNow()`，改为只循环 `syncCloudAssets()` 上传图片资产（新封面立即上传，state 记录后后续恢复不会再覆盖）；② `restoreCloudAssets` 的 cover/user-cover 分支增加本地优先保护：本地已有封面且 `coverUpdatedAt` 不早于云端（手动封面无 capturedAt 视为 0）时跳过下载；③ 新增页面内 Toast：成功时 `chrome.scripting.executeScript` 注入轻量提示（2.6 秒淡出），不常驻页面脚本。
+- **验证。** typecheck 与 335 项测试通过；cloud-enabled 0.5.47 构建（带 key）通过。真人浏览器验证：右键图片设封面后页面应弹 Toast、封面立即生效，且后续定时同步不再回退。
+
+### 2026-08-03 · 0.5.45 / 0.5.46 / 右键设封面诊断探针
+
+- 0.5.45 增加 Service Worker 启动心跳（`aarre:sw-heartbeat`）与右键菜单点击日志（`aarre:context-menu-debug`），从本地 storage 读取确认事件链路；0.5.46 在 `handleContextMenuImageCover` 每一步写 `aarre:image-cover-debug` 分步日志。实测结论见 0.5.47 记录。
 
 ### 2026-08-03 · 0.5.44 / 右键图片设封面：入口立即反馈 + 全程超时定位卡点
 

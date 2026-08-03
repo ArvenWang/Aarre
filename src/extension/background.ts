@@ -8263,7 +8263,7 @@ async function handleContextMenuImageCover(
       autoBookmarked ? "已收藏并设为封面" : "封面已更新",
       6_000
     );
-    void syncNow().catch(() => undefined);
+    void showCoverToastAndUpload(tab.id, autoBookmarked);
     return;
   }
 
@@ -8308,10 +8308,57 @@ async function handleContextMenuImageCover(
       autoBookmarked ? "已收藏并设为封面" : "封面已更新",
       6_000
     );
-    // 立即把新封面同步到云端，不等后台定时任务。
-    void syncNow().catch(() => undefined);
+    void showCoverToastAndUpload(tab.id, autoBookmarked);
   } finally {
     bitmap.close();
+  }
+}
+
+async function showCoverToastAndUpload(
+  tabId: number,
+  autoBookmarked: boolean
+): Promise<void> {
+  const message = autoBookmarked ? "已收藏并设为封面" : "封面已更新";
+  // 页面内 Toast：动态注入轻量提示，不常驻任何页面脚本。
+  await chrome.scripting
+    .executeScript({
+      target: { tabId },
+      func: (toastText: string) => {
+        const id = "aarre-cover-toast";
+        let el = document.getElementById(id) as HTMLDivElement | null;
+        if (!el) {
+          el = document.createElement("div");
+          el.id = id;
+          el.style.cssText =
+            "position:fixed;left:50%;bottom:36px;transform:translateX(-50%);" +
+            "z-index:2147483647;background:rgba(18,20,24,.92);color:#fff;" +
+            "font:500 14px/1.4 -apple-system,BlinkMacSystemFont,'PingFang SC'," +
+            "'Microsoft YaHei',sans-serif;padding:10px 16px;border-radius:10px;" +
+            "box-shadow:0 6px 24px rgba(0,0,0,.24);pointer-events:none;" +
+            "opacity:0;transition:opacity .25s ease;";
+          document.documentElement.appendChild(el);
+        }
+        el.textContent = toastText;
+        el.style.opacity = "1";
+        clearTimeout((el as HTMLDivElement & { __t?: number }).__t);
+        (el as HTMLDivElement & { __t?: number }).__t = window.setTimeout(
+          () => {
+            el!.style.opacity = "0";
+          },
+          2_600
+        );
+      },
+      args: [message]
+    })
+    .catch(() => undefined);
+
+  // 只上传图片资产（含刚设置的新封面）。不能调用全量同步：
+  // 全量同步的“从云端恢复图片”阶段会把云端旧封面下载回来覆盖新封面。
+  try {
+    let assets = await syncCloudAssets();
+    while (assets.remaining) assets = await syncCloudAssets();
+  } catch {
+    // 上传失败时下一次定时同步会补传，封面仍保留在本地。
   }
 }
 
