@@ -64,12 +64,18 @@ export function ProtectionControl({
   }, [target.id, target.kind]);
 
   const inheritedOnly = state?.inherited === true && !state.explicit;
-  const autoLocked =
+  const autoProtectedOnly =
     state?.autoProtected === true && !state.explicit && !state.inherited;
-  const unavailable = disabled || saving || !state || inheritedOnly || autoLocked;
+  const unavailable = disabled || saving || !state || inheritedOnly;
 
   async function toggleProtection() {
     if (!state || unavailable) return;
+    if (autoProtectedOnly) {
+      // 自动隐私保护是安全边界：开关保持可点击但给出明确反馈，
+      // 而不是灰掉让用户以为功能不可用。
+      setError("此网页属于敏感分类，保护由安全策略自动生效，无法关闭。");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
