@@ -35,6 +35,8 @@ export const resourcePayloadSchema = z.object({
   linkHealth: linkHealthSchema.optional(),
   coverSource: z.string().max(120).optional(),
   coverUpdatedAt: timestamp.optional(),
+  coverOrigin: z.enum(["user", "auto"]).optional(),
+  coverContentHash: z.string().max(256).optional(),
   categoryCoverId: z.string().max(120).optional(),
   createdAt: timestamp,
   updatedAt: timestamp
@@ -89,7 +91,8 @@ export const assetCreateSchema = z.object({
     canonicalUrl: z.string().url().max(8_192).optional(),
     host: z.string().max(253).optional(),
     iconRenderVersion: z.number().int().min(1).max(1_000).optional(),
-    iconAssetUrl: z.string().url().max(2_000).optional()
+    iconAssetUrl: z.string().url().max(2_000).optional(),
+    coverOrigin: z.enum(["user", "auto"]).optional()
   }).strict().optional()
 }).strict().superRefine((value, context) => {
   if (value.kind === "snapshot" && !value.binding?.canonicalUrl) {

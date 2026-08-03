@@ -10,6 +10,8 @@ import type {
   SiteBrandRecord,
   UndoSnapshotBatch
 } from "./types";
+import { hasCompleteAiFields } from "./ai-fields";
+import { deriveFieldClocks, mergeResourceByFieldClocks } from "./field-clocks";
 
 const MAX_OUTBOX_CONTENT_LENGTH = 50_000;
 
@@ -196,6 +198,12 @@ export function normalizeResourceRecord(value: unknown): ResourceRecord {
     ...(stringValue(record.coverUpdatedAt)
       ? { coverUpdatedAt: stringValue(record.coverUpdatedAt) }
       : {}),
+    ...(record.coverOrigin === "user" || record.coverOrigin === "auto"
+      ? { coverOrigin: record.coverOrigin }
+      : {}),
+    ...(stringValue(record.coverContentHash)
+      ? { coverContentHash: stringValue(record.coverContentHash) }
+      : {}),
     ...(stringValue(record.categoryCoverId)
       ? { categoryCoverId: stringValue(record.categoryCoverId) }
       : {}),
@@ -225,8 +233,19 @@ export function normalizeResourceRecord(value: unknown): ResourceRecord {
       timestamp,
     ...(stringValue(record.lastSyncedAt)
       ? { lastSyncedAt: stringValue(record.lastSyncedAt) }
+      : {}),
+    ...(record.fieldUpdatedAt && typeof record.fieldUpdatedAt === "object"
+      ? { fieldUpdatedAt: stringRecord(record.fieldUpdatedAt) }
       : {})
   };
+}
+
+function stringRecord(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object") return {};
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([, entry]) => typeof entry === "string" && entry.length > 0)
+  ) as Record<string, string>;
 }
 
 function database(): Promise<IDBPDatabase<BookmarkLayerDatabase>> {
@@ -569,7 +588,15 @@ export async function upsertLocalResource(
   nextResource: ResourceRecord
 ): Promise<void> {
   const db = await database();
-  await db.put("resources", normalizeResourceRecord(nextResource));
+  const transaction = db.transaction("resources", "readwrite");
+  const next = normalizeResourceRecord(nextResource);
+  const stored = await transaction.store.get(next.resourceKey);
+  const previous = stored ? normalizeResourceRecord(stored) : undefined;
+  await transaction.store.put({
+    ...next,
+    fieldUpdatedAt: deriveFieldClocks(previous, next)
+  });
+  await transaction.done;
 }
 
 export async function deleteLocalResource(resourceKey: string): Promise<void> {
@@ -589,19 +616,26 @@ export async function mergeLocalResources(
     const local = storedLocal
       ? normalizeResourceRecord(storedLocal)
       : undefined;
-    const preservePendingLocal =
-      local?.syncStatus === "pending" &&
-      local.updatedAt >= item.updatedAt;
+    const { record, localHasUnsyncedFields } = mergeResourceByFieldClocks(
+      local,
+      item
+    );
     await transaction.store.put({
-      ...item,
-      ...(preservePendingLocal ? local : {}),
+      ...record,
       ...(local?.thumbnailDataUrl
         ? { thumbnailDataUrl: local.thumbnailDataUrl }
         : {}),
       nativeBookmarkIds:
         local?.nativeBookmarkIds.length && !item.nativeBookmarkIds.length
           ? local.nativeBookmarkIds
-          : item.nativeBookmarkIds
+          : item.nativeBookmarkIds,
+      // aiStatus 不参与云端同步，合并又以本地记录为基底，
+      // 因此必须按合并后的字段重新判定：否则从云端取回一条已增强的收藏后，
+      // 本机仍会认为它欠一次 AI 调用，对同一个网页重复计费并覆盖对方的结果。
+      aiStatus: hasCompleteAiFields(record) ? "ready" : record.aiStatus,
+      // 本地留有云端尚未收录的字段时保持待同步，下一轮把差量补上去，
+      // 让补齐是双向的而不是只从云端流向本地。
+      syncStatus: localHasUnsyncedFields ? "pending" : record.syncStatus
     });
   }
 

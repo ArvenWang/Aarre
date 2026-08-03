@@ -80,8 +80,16 @@ export class AssetService {
       "SELECT object_key, state FROM assets WHERE user_id = $1 AND asset_id = $2",
       [account.userId, input.assetId]
     );
-    if (existing.rows[0] && existing.rows[0].object_key !== objectKey) {
-      throw Object.assign(new Error("The asset identifier is already bound to different content."), { statusCode: 409 });
+    // assetId 是「某个资源的某类图」这一槽位，换封面属于正常更新而非冲突。
+    // 对象路径按内容哈希寻址，因此内容变化会留下旧对象，排队回收即可。
+    // 延迟执行是为了给上传失败后的重试留出窗口，避免新图没传成旧图先没了。
+    const previousObjectKey = existing.rows[0]?.object_key;
+    if (previousObjectKey && previousObjectKey !== objectKey) {
+      await this.database.query(
+        `INSERT INTO asset_delete_jobs (user_id, asset_id, object_key, next_attempt_at)
+         VALUES ($1, $2, $3, now() + interval '1 hour')`,
+        [account.userId, input.assetId, previousObjectKey]
+      );
     }
     await this.database.query(
       `INSERT INTO assets
@@ -414,10 +422,12 @@ export class AssetService {
         const client = await this.database.connect();
         try {
           await client.query("BEGIN");
+          // 只有当这条资产仍指向被回收的对象时才标记删除。
+          // 同一 assetId 换过内容时，它已指向新对象，不能被旧对象的回收任务连坐。
           await client.query(
             `UPDATE assets SET state = 'deleted', updated_at = now()
-             WHERE user_id = $1 AND asset_id = $2`,
-            [job.user_id, job.asset_id]
+             WHERE user_id = $1 AND asset_id = $2 AND object_key = $3`,
+            [job.user_id, job.asset_id, job.object_key]
           );
           await client.query(
             "UPDATE asset_delete_jobs SET completed_at = now() WHERE id = $1",

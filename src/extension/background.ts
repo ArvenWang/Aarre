@@ -6534,13 +6534,27 @@ async function scanOneLibraryResource(
         // 原图仍作为备用；个别站点防盗链不应让整条扫描失败。
       }
     }
+    // 用户手动指定过封面时，自动扫描不得覆盖它，只更新非封面字段。
+    const keepUserCover = resource.coverOrigin === "user";
     scannedResource = {
       ...scannedResource,
-      imageUrl: representativeImageUrl,
+      imageUrl: keepUserCover ? resource.imageUrl : representativeImageUrl,
       faviconUrl: essence.faviconUrl || resource.faviconUrl,
-      coverSource,
-      coverUpdatedAt: now(),
-      ...(thumbnailDataUrl ? { thumbnailDataUrl } : {})
+      ...(keepUserCover
+        ? {
+            coverSource: resource.coverSource,
+            coverUpdatedAt: resource.coverUpdatedAt,
+            coverOrigin: "user" as const,
+            ...(resource.thumbnailDataUrl
+              ? { thumbnailDataUrl: resource.thumbnailDataUrl }
+              : {})
+          }
+        : {
+            coverSource,
+            coverUpdatedAt: now(),
+            coverOrigin: "auto" as const,
+            ...(thumbnailDataUrl ? { thumbnailDataUrl } : {})
+          })
     };
     await upsertLocalResource(scannedResource);
 
@@ -8324,7 +8338,9 @@ async function handleContextMenuImageCover(
     await upsertLocalResource({
       ...resource,
       thumbnailDataUrl: gifDataUrl,
-      coverUpdatedAt: new Date().toISOString()
+      coverUpdatedAt: new Date().toISOString(),
+      coverOrigin: "user",
+      coverContentHash: await hashText(gifDataUrl)
     });
     // 网页端卡片封面以页面快照为数据源，必须同步写入，
     // 否则网页端永远显示旧快照/兜底图。
@@ -8389,7 +8405,9 @@ async function handleContextMenuImageCover(
     await upsertLocalResource({
       ...resource,
       thumbnailDataUrl: dataUrl,
-      coverUpdatedAt: new Date().toISOString()
+      coverUpdatedAt: new Date().toISOString(),
+      coverOrigin: "user",
+      coverContentHash: await hashText(dataUrl)
     });
     const snapshotAt = new Date().toISOString();
     await putPageSnapshot({
@@ -9162,7 +9180,12 @@ chrome.alarms.onAlarm.addListener((alarm) => {
       await syncPendingIfReady();
       await pullCloudResources();
       await syncDurableCloudState();
-      if (settings.scope === "complete") await syncCloudAssets();
+      if (settings.scope === "complete") {
+        // 定时同步必须双向流动，只上传会让另一台设备的封面和图标永远到不了本机。
+        // 每轮限量处理，余量交给下一次定时任务，避免后台长时间占用。
+        await restoreCloudAssets();
+        await syncCloudAssets();
+      }
     })().catch(() => undefined);
   } else if (alarm.name === LIBRARY_SCAN_ALARM) {
     void runLibraryScan();

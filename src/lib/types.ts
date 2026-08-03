@@ -139,6 +139,10 @@ export interface ResourceRecord {
   thumbnailDataUrl?: string;
   coverSource?: string;
   coverUpdatedAt?: string;
+  /** `user` 表示封面由用户显式指定，自动采集与云端恢复都不得覆盖它。 */
+  coverOrigin?: "user" | "auto";
+  /** 当前封面内容的 SHA-256，用于与云端资产对账，不依赖时间戳。 */
+  coverContentHash?: string;
   categoryCoverId?: string;
   snapshotAt?: string;
   enhancementBlockReason?: "privacy";
@@ -152,6 +156,13 @@ export interface ResourceRecord {
   createdAt: string;
   updatedAt: string;
   lastSyncedAt?: string;
+  /**
+   * 每个可同步字段最后一次真正变化的时间，由 upsertLocalResource 自动维护。
+   *
+   * 云端按字段而非按整条记录裁决冲突，因此两台设备各自修改不同字段时都能保留。
+   * 记录级的 updatedAt 无法表达这一点：它会让最近写过任何字段的一方赢下所有字段。
+   */
+  fieldUpdatedAt?: Record<string, string>;
 }
 
 export type SiteIconSource =

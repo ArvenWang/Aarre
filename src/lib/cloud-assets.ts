@@ -47,6 +47,7 @@ interface CloudAssetDescriptor {
     host?: string;
     iconRenderVersion?: number;
     iconAssetUrl?: string;
+    coverOrigin?: "user" | "auto";
   } | null;
   revision: number;
 }
@@ -170,46 +171,36 @@ async function uploadAsset(input: {
     host?: string;
     iconRenderVersion?: number;
     iconAssetUrl?: string;
+    coverOrigin?: "user" | "auto";
   };
   state: CloudAssetState;
 }): Promise<boolean> {
   const { bytes, mimeType } = dataUrlBytes(input.dataUrl);
   const digest = await sha256(bytes);
   if (input.state[input.identity]?.sha256 === digest) return false;
-  const assetId = await stableAssetId(`${input.identity}:${digest}`);
-  const requestUpload = (id: string) =>
-    cloudRequest<{
-      uploadUrl: string;
-      headers: Record<string, string>;
-    }>("/v1/assets/upload", {
-      method: "POST",
-      body: JSON.stringify({
-        assetId: id,
-        operationId: crypto.randomUUID(),
-        resourceKey: input.resourceKey,
-        kind: input.kind,
-        sha256: digest,
-        byteSize: bytes.byteLength,
-        width: input.width,
-        height: input.height,
-        mimeType,
-        capturedAt: input.capturedAt,
-        binding: input.binding
-      })
-    });
-  let upload;
-  try {
-    upload = await requestUpload(assetId);
-  } catch (error) {
-    if ((error as { status?: number }).status === 409) {
-      // 历史恢复曾保留旧 assetId 却更换了内容哈希，导致同一 assetId
-      // 绑定不同内容被服务端拒绝；改用随机 UUID 重新上传，让这条
-      // 资产以当前内容重新落库，不再阻塞同步。
-      upload = await requestUpload(crypto.randomUUID());
-    } else {
-      throw error;
-    }
-  }
+  // assetId 标识「哪个资源的哪类图」这个槽位，与图片内容无关。
+  // 一旦把内容哈希编进来，换封面就会生成新 assetId，云端既积压孤儿资产，
+  // 又会因为同一资源绑定了两个 id 而彼此覆盖。
+  const assetId = await stableAssetId(input.identity);
+  const upload = await cloudRequest<{
+    uploadUrl: string;
+    headers: Record<string, string>;
+  }>("/v1/assets/upload", {
+    method: "POST",
+    body: JSON.stringify({
+      assetId,
+      operationId: crypto.randomUUID(),
+      resourceKey: input.resourceKey,
+      kind: input.kind,
+      sha256: digest,
+      byteSize: bytes.byteLength,
+      width: input.width,
+      height: input.height,
+      mimeType,
+      capturedAt: input.capturedAt,
+      binding: input.binding
+    })
+  });
   const headers = new Headers(upload.headers);
   headers.delete("content-length");
   const response = await fetch(upload.uploadUrl, {
@@ -269,7 +260,11 @@ export async function syncCloudAssets(maxUploads = 12): Promise<{ uploaded: numb
       resourceKey: resource.resourceKey,
       kind: "cover",
       dataUrl: resource.thumbnailDataUrl!,
-      binding: { canonicalUrl: resource.canonicalUrl },
+      capturedAt: resource.coverUpdatedAt,
+      binding: {
+        canonicalUrl: resource.canonicalUrl,
+        ...(resource.coverOrigin ? { coverOrigin: resource.coverOrigin } : {})
+      },
       state
     }));
   }
@@ -433,20 +428,19 @@ export async function restoreCloudAssets(maxDownloads = 24): Promise<{ restored:
     } else if (asset.kind === "cover" || asset.kind === "user-cover") {
       const resource = await getLocalResource(asset.resourceKey);
       if (resource) {
-        // 手动设置的封面没有 capturedAt（视为 0）。本地已有封面且
-        // 时间不早于云端时跳过下载，避免全量恢复把刚设置的新封面
-        // 用云端旧图覆盖回去；重装后本地无封面仍会正常下载。
-        const localCoverTime = resource.coverUpdatedAt
-          ? Date.parse(resource.coverUpdatedAt)
-          : 0;
-        const remoteCoverTime = asset.capturedAt
-          ? Date.parse(asset.capturedAt)
-          : 0;
-        if (
-          resource.thumbnailDataUrl &&
-          localCoverTime > 0 &&
-          localCoverTime >= remoteCoverTime
-        ) {
+        const remoteIsUserCover =
+          asset.kind === "user-cover" || asset.binding?.coverOrigin === "user";
+        // 按内容哈希而不是时间戳判断是否需要写入。上传方曾长期不带 capturedAt，
+        // 用时间比较会让本地任何封面都「不早于云端」，导致下载被永远跳过。
+        const sameContent =
+          Boolean(resource.thumbnailDataUrl) &&
+          resource.coverContentHash === asset.sha256;
+        // 用户手动指定的封面不接受自动采集封面的覆盖。
+        const localUserCoverWins =
+          Boolean(resource.thumbnailDataUrl) &&
+          resource.coverOrigin === "user" &&
+          !remoteIsUserCover;
+        if (sameContent || localUserCoverWins) {
           inspected += 1;
           await updateCloudSyncProgress({ assetProcessedDelta: 1 });
           continue;
@@ -454,7 +448,10 @@ export async function restoreCloudAssets(maxDownloads = 24): Promise<{ restored:
         await upsertLocalResource({
           ...resource,
           thumbnailDataUrl: dataUrl,
-          coverUpdatedAt: resource.coverUpdatedAt || new Date().toISOString()
+          coverContentHash: asset.sha256,
+          coverOrigin: remoteIsUserCover ? "user" : resource.coverOrigin || "auto",
+          coverUpdatedAt:
+            asset.capturedAt || resource.coverUpdatedAt || new Date().toISOString()
         });
       }
     }

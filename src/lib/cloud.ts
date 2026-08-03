@@ -35,6 +35,8 @@ interface CloudResourcePayload {
   linkHealth?: ResourceRecord["linkHealth"];
   coverSource?: string;
   coverUpdatedAt?: string;
+  coverOrigin?: "user" | "auto";
+  coverContentHash?: string;
   categoryCoverId?: string;
   createdAt: string;
   updatedAt: string;
@@ -139,6 +141,8 @@ export function resourceCloudPayload(resource: ResourceRecord): CloudResourcePay
     ...(resource.linkHealth ? { linkHealth: resource.linkHealth } : {}),
     ...(resource.coverSource ? { coverSource: resource.coverSource } : {}),
     ...(resource.coverUpdatedAt ? { coverUpdatedAt: resource.coverUpdatedAt } : {}),
+    ...(resource.coverOrigin ? { coverOrigin: resource.coverOrigin } : {}),
+    ...(nonEmpty(resource.coverContentHash) ? { coverContentHash: resource.coverContentHash } : {}),
     ...(resource.categoryCoverId ? { categoryCoverId: resource.categoryCoverId } : {}),
     createdAt: resource.createdAt,
     updatedAt: resource.updatedAt
@@ -186,6 +190,8 @@ async function responseToLocal(cloud: CloudResourceResponse): Promise<ResourceRe
     ...(existing?.thumbnailDataUrl ? { thumbnailDataUrl: existing.thumbnailDataUrl } : {}),
     ...(payload.coverSource ? { coverSource: payload.coverSource } : {}),
     ...(payload.coverUpdatedAt ? { coverUpdatedAt: payload.coverUpdatedAt } : {}),
+    ...(payload.coverOrigin ? { coverOrigin: payload.coverOrigin } : {}),
+    ...(payload.coverContentHash ? { coverContentHash: payload.coverContentHash } : {}),
     ...(payload.categoryCoverId ? { categoryCoverId: payload.categoryCoverId } : {}),
     ...(existing?.snapshotAt ? { snapshotAt: existing.snapshotAt } : {}),
     ...(payload.linkHealth ? { linkHealth: payload.linkHealth } : {}),
@@ -196,7 +202,9 @@ async function responseToLocal(cloud: CloudResourceResponse): Promise<ResourceRe
     syncStatus: "synced",
     createdAt: payload.createdAt || existing?.createdAt || timestamp,
     updatedAt: payload.updatedAt || timestamp,
-    lastSyncedAt: timestamp
+    lastSyncedAt: timestamp,
+    // 携带云端的字段时钟，让 mergeLocalResources 能逐字段裁决而不是整条覆盖。
+    fieldUpdatedAt: cloud.fieldUpdatedAt || {}
   };
 }
 
@@ -220,7 +228,10 @@ export async function syncOneResource(
         baseRevision,
         payload,
         fieldUpdatedAt: Object.fromEntries(
-          Object.keys(payload).map((field) => [field, resource.updatedAt])
+          Object.keys(payload).map((field) => [
+            field,
+            resource.fieldUpdatedAt?.[field] || resource.updatedAt
+          ])
         ),
         deleted: false
       })

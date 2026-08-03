@@ -24,7 +24,7 @@ export interface CloudSyncProgress {
 
 const EMPTY_PROGRESS: CloudSyncProgress = {
   phase: "idle",
-  scope: "text",
+  scope: "complete",
   startedAt: "",
   updatedAt: "",
   resourceTotal: 0,
