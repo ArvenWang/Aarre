@@ -21,6 +21,9 @@ function protectionDescription(
       ? "已由上级文件夹继承保护；请在上级文件夹中关闭。"
       : "已由所在文件夹继承保护；请在该文件夹中关闭。";
   }
+  if (state?.autoProtected && !state.explicit && !state.inherited) {
+    return "此网页属于银行、支付、医疗等敏感分类，Aarre 始终不会读取或上传，无法关闭。";
+  }
   if (state?.protected) {
     return target.kind === "folder"
       ? "此文件夹及所有后代网页不会被增强、截图或用于 AI 对话。"
@@ -61,7 +64,9 @@ export function ProtectionControl({
   }, [target.id, target.kind]);
 
   const inheritedOnly = state?.inherited === true && !state.explicit;
-  const unavailable = disabled || saving || !state || inheritedOnly;
+  const autoLocked =
+    state?.autoProtected === true && !state.explicit && !state.inherited;
+  const unavailable = disabled || saving || !state || inheritedOnly || autoLocked;
 
   async function toggleProtection() {
     if (!state || unavailable) return;

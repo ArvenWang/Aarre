@@ -26,6 +26,8 @@ export interface ItemProtectionState {
   protected: boolean;
   explicit: boolean;
   inherited: boolean;
+  /** 由自动隐私规则（敏感网址分类）生效的保护，不属于用户显式设置。 */
+  autoProtected?: boolean;
 }
 
 const DEFAULT_PROTECTION_SETTINGS: ProtectionSettings = {

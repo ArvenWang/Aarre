@@ -738,7 +738,22 @@ async function getItemProtectionState(
   }
   if (!node.url) throw new Error("这个保护目标不是网页收藏。");
   const { resourceKey } = await resourceForProtectionTarget(target.id);
-  return bookmarkProtectionState(resourceKey, target.id, context.policy);
+  const state = bookmarkProtectionState(
+    resourceKey,
+    target.id,
+    context.policy
+  );
+  // 自动隐私规则（银行/支付/医疗等敏感网址）也算“受保护”，
+  // 编辑界面的开关应如实显示开启；但它不是用户显式设置，
+  // 开关在 UI 上锁定，无法通过这里关闭。
+  const autoProtected = isSnapshotSensitiveUrl(
+    node.url,
+    context.excludedHosts
+  );
+  if (autoProtected) {
+    return { ...state, protected: true, autoProtected: true };
+  }
+  return state;
 }
 
 async function reconcileProtectionRules(): Promise<void> {
