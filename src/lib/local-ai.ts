@@ -230,8 +230,11 @@ export function parseJsonObject(content: string): Record<string, unknown> {
   throw new Error("AI 返回的内容格式不正确，请重试。");
 }
 
-/** 只修复 JSON 字符串值内的字面换行/制表符/回车（模型常见输出问题），
- * 不触碰 JSON 结构字符，避免误改键名或分隔符。 */
+/** 宽松修复模型常见的 JSON 输出问题：
+ * 1) 字符串值内的字面换行/制表符/回车（最常见）；
+ * 2) 字符串外的行注释与块注释；
+ * 3) 对象/数组末尾多余的逗号。
+ * 状态机只在字符串外处理结构问题，避免误改字符串内容。 */
 function repairJsonStringNewlines(content: string): string {
   let repaired = "";
   let inString = false;
@@ -262,8 +265,34 @@ function repairJsonStringNewlines(content: string): string {
     } else {
       if (char === '"') {
         inString = true;
+        repaired += char;
+      } else if (char === "/" && content[index + 1] === "/") {
+        // 行注释：跳过到行尾
+        while (index < content.length && content[index] !== "\n") {
+          index += 1;
+        }
+      } else if (char === "/" && content[index + 1] === "*") {
+        // 块注释：跳过到 */
+        index += 1;
+        while (
+          index + 1 < content.length &&
+          !(content[index] === "*" && content[index + 1] === "/")
+        ) {
+          index += 1;
+        }
+        index += 1;
+      } else if (char === ",") {
+        // 尾部逗号：跳过空白后若是 } 或 ] 则省略
+        let next = index + 1;
+        while (next < content.length && /\s/.test(content[next])) {
+          next += 1;
+        }
+        if (content[next] !== "}" && content[next] !== "]") {
+          repaired += char;
+        }
+      } else {
+        repaired += char;
       }
-      repaired += char;
     }
   }
   return repaired;
@@ -654,6 +683,23 @@ async function generateAgentJson(
         error instanceof Error
           ? error
           : new Error("AI 返回的内容格式不正确，请重试。");
+      // 诊断留痕：把解析失败的原始输出写入本地存储，便于定位
+      // 具体是哪种格式问题（换行、引号、围栏、注释等）。
+      try {
+        if (typeof chrome !== "undefined" && chrome.storage?.local) {
+          void chrome.storage.local
+            .set({
+              "aarre:ai-format-error": {
+                time: new Date().toISOString(),
+                attempt,
+                contentPreview: generated.content.slice(0, 3_000)
+              }
+            })
+            .catch(() => undefined);
+        }
+      } catch {
+        // 非扩展环境（单元测试）下忽略诊断写入。
+      }
     }
   }
   throw lastFormatError || new Error("AI 返回的内容格式不正确，请重试。");

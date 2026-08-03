@@ -1,6 +1,6 @@
 {
   "name": "bookmark-layer",
-  "version": "0.5.51",
+  "version": "0.5.52",
   "private": true,
   "type": "module",
   "engines": {
