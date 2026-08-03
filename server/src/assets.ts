@@ -89,7 +89,18 @@ export class AssetService {
          byte_size, width, height, mime_type, captured_at, binding_payload, state)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'uploading')
        ON CONFLICT (user_id, asset_id) DO UPDATE SET
-         updated_at = now(), state = CASE WHEN assets.state = 'ready' THEN assets.state ELSE 'uploading' END`,
+         resource_key = EXCLUDED.resource_key,
+         asset_kind = EXCLUDED.asset_kind,
+         object_key = EXCLUDED.object_key,
+         sha256 = EXCLUDED.sha256,
+         byte_size = EXCLUDED.byte_size,
+         width = EXCLUDED.width,
+         height = EXCLUDED.height,
+         mime_type = EXCLUDED.mime_type,
+         captured_at = EXCLUDED.captured_at,
+         binding_payload = EXCLUDED.binding_payload,
+         updated_at = now(),
+         state = CASE WHEN assets.state = 'ready' THEN assets.state ELSE 'uploading' END`,
       [
         account.userId,
         input.assetId,
@@ -104,6 +115,13 @@ export class AssetService {
         input.capturedAt || null,
         bindingPayload
       ]
+    );
+    // 取消该对象仍在排队的删除任务：历史清空/替换后，删除 worker
+    // 可能把客户端刚重新上传的对象物理删除，导致 complete 校验
+    // （head 404 / 元数据缺失）失败。新上传应优先于旧删除任务。
+    await this.database.query(
+      "DELETE FROM asset_delete_jobs WHERE object_key = $1 AND completed_at IS NULL",
+      [objectKey]
     );
     const signed = await this.objectStore.signUpload(objectKey, {
       mimeType: input.mimeType,
