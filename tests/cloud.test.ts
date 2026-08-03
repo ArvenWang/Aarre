@@ -10,7 +10,11 @@ import {
   shouldQueueResourceForCloud
 } from "../src/lib/cloud";
 import { usagePeriodCloudPayload } from "../src/lib/cloud-state";
-import { cloudSiteIconBindingIsCurrent } from "../src/lib/cloud-assets";
+import {
+  cloudAssetIdentity,
+  cloudSiteIconBindingIsCurrent,
+  reconcileCloudAssetState
+} from "../src/lib/cloud-assets";
 import {
   beginCloudSyncProgress,
   CLOUD_SYNC_PROGRESS_KEY,
@@ -110,6 +114,49 @@ describe("cloud privacy contract", () => {
   it("keeps cloud sync explicitly disabled until the user enables it", async () => {
     expect(defaultCloudSyncSettings()).toEqual({ enabled: false, scope: "complete", updatedAt: "" });
     await expect(getCloudSyncSettings()).resolves.toEqual({ enabled: false, scope: "complete", updatedAt: "" });
+  });
+
+  it("maps asset kinds to the same identity keys the uploader uses", () => {
+    expect(cloudAssetIdentity({
+      kind: "cover",
+      resourceKey: "r1",
+      binding: { canonicalUrl: "https://example.com/a" }
+    })).toBe("cover:r1");
+    expect(cloudAssetIdentity({
+      kind: "snapshot",
+      resourceKey: "r2",
+      binding: { canonicalUrl: "https://example.com/b" }
+    })).toBe("snapshot:r2");
+    expect(cloudAssetIdentity({
+      kind: "site-icon",
+      resourceKey: "r3",
+      binding: { host: "example.com" }
+    })).toBe("site-icon:example.com");
+  });
+
+  it("drops local uploaded marks whose assets no longer exist on the server", () => {
+    const state = {
+      "cover:r1": { assetId: "a", sha256: "s1", revision: 1 },
+      "snapshot:r2": { assetId: "b", sha256: "s2", revision: 1 },
+      "site-icon:example.com": { assetId: "c", sha256: "s3", revision: 1 }
+    };
+    const remote = [{
+      assetId: "a",
+      resourceKey: "r1",
+      kind: "cover" as const,
+      sha256: "s1",
+      byteSize: 10,
+      width: null,
+      height: null,
+      mimeType: "image/webp",
+      capturedAt: null,
+      binding: { canonicalUrl: "https://example.com/a" },
+      revision: 2
+    }];
+    expect(reconcileCloudAssetState(state, remote)).toEqual({
+      "cover:r1": { assetId: "a", sha256: "s1", revision: 1 }
+    });
+    expect(reconcileCloudAssetState(state, [])).toEqual({});
   });
 
   it("migrates a legacy text-only setting to a complete backup", async () => {

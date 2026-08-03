@@ -73,6 +73,40 @@ export function cloudSiteIconBindingIsCurrent(
   );
 }
 
+/**
+ * 把本地“已上传”标记转换为与服务器一致的 identity 键。
+ * site-icon 按 host 绑定，其余资产按 resourceKey 绑定。
+ */
+export function cloudAssetIdentity(asset: {
+  kind: CloudAssetDescriptor["kind"];
+  resourceKey: string;
+  binding?: {
+    host?: string;
+    canonicalUrl?: string;
+    iconRenderVersion?: number;
+    iconAssetUrl?: string;
+  } | null;
+}): string {
+  return asset.kind === "site-icon"
+    ? `site-icon:${asset.binding?.host || ""}`
+    : `${asset.kind}:${asset.resourceKey}`;
+}
+
+/**
+ * 用服务器当前 active 资产列表对账本地“已上传”标记。
+ * 服务器已删除（或从未接收）的资产，本地标记必须失效，否则上传会被
+ * 误判为“已上传”而跳过，导致云端实际缺图却显示同步完成。
+ */
+export function reconcileCloudAssetState(
+  state: CloudAssetState,
+  remoteAssets: CloudAssetDescriptor[]
+): CloudAssetState {
+  const remoteIdentities = new Set(remoteAssets.map(cloudAssetIdentity));
+  return Object.fromEntries(
+    Object.entries(state).filter(([identity]) => remoteIdentities.has(identity))
+  );
+}
+
 function dataUrlBytes(dataUrl: string): { bytes: Uint8Array; mimeType: string } {
   const match = /^data:([^;,]+);base64,(.+)$/s.exec(dataUrl);
   if (!match) throw new Error("图片缓存格式无效，无法上传云端。");
@@ -185,7 +219,7 @@ async function uploadAsset(input: {
 export async function syncCloudAssets(maxUploads = 12): Promise<{ uploaded: number; remaining: boolean }> {
   const settings = await getCloudSyncSettings();
   if (!settings.enabled || settings.scope !== "complete") return { uploaded: 0, remaining: false };
-  const [resources, snapshots, brands, protectionSettings, tree, state] = await Promise.all([
+  const [resources, snapshots, brands, protectionSettings, tree, storedState] = await Promise.all([
     getLocalResources(),
     getPageSnapshots(),
     getSiteBrands(),
@@ -193,6 +227,10 @@ export async function syncCloudAssets(maxUploads = 12): Promise<{ uploaded: numb
     chrome.bookmarks.getTree(),
     readState()
   ]);
+  // 上传前先与服务器对账：本地“已上传”标记但服务器已删除的资产，
+  // 必须重新上传，否则会被跳过导致云端缺图。
+  const remoteAssets = await cloudRequest<{ assets: CloudAssetDescriptor[] }>("/v1/assets");
+  const state = reconcileCloudAssetState(storedState, remoteAssets.assets);
   const policy = buildProtectionPolicy(tree, protectionSettings);
   const unprotected = resources.filter(
     (resource) => resource.nativeBookmarkIds.length && !isResourceUserProtected(resource, policy)
@@ -273,11 +311,15 @@ export async function syncCloudAssets(maxUploads = 12): Promise<{ uploaded: numb
     if (uploaded >= maxUploads) break;
     if (await job()) {
       uploaded += 1;
-      await updateCloudSyncProgress({ assetProcessedDelta: 1 });
     }
     inspected += 1;
+    // 处理过的资产一律计入进度：跳过只发生在对账后确认云端已存在，
+    // 不应再显示成“0 张未完成”。
+    await updateCloudSyncProgress({ assetProcessedDelta: 1 });
   }
-  if (uploaded) await writeState(state);
+  // 对账结果需要持久化：服务器已删除资产的本地标记必须清掉，
+  // 否则下一次同步仍然会误跳过。
+  await writeState(state);
   return { uploaded, remaining: inspected < jobs.length };
 }
 
