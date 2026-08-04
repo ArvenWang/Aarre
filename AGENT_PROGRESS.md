@@ -1,8 +1,31 @@
 # Aarre 项目进展
 
-最后更新：2026-08-04（整理提案已移除主题归纳；待读队列已完整下线；用户重载验收与真实 Provider 项待完成）
+最后更新：2026-08-04（Round 2 性能、同步与 Agent 收口完成；安装态 Chrome 与真实 Provider 项待真人验收）
 
 > **⚠️ 下一位 Agent 必读：先读 [`docs/AUDIT_2026-08.md`](docs/AUDIT_2026-08.md)（问题分析）和 [`docs/PRD_REBUILD_2026-08.md`](docs/PRD_REBUILD_2026-08.md)（执行方案），再以本页顶部最新记录为当前事实。T-01～T-20 与 T-14c 的代码和自动化已收口，不要重做已完成项，也不要在旧架构上打补丁；真人 Chrome / Provider 验收仍是外部门。**
+>
+> **当前待办以 [`docs/REVIEW_2026-08-05_ROUND3.md`](docs/REVIEW_2026-08-05_ROUND3.md) 为准**，其中 R1/R2/R3 三个根因缺陷优先级最高。
+
+## 2026-08-05 · Round 3 审核（审核方产出，尚未实施）
+
+- **上一轮修复已验收通过。** Round 2 报告提出的 7 项全部落实：`dist/background.js` 856 KB → 319 KB；markdown chunk 移出首屏依赖；`modulePreload` 恢复；首屏 `Promise.all` 拆分；网页端 `SYNC_NOW` 改后台执行；Agent 末轮不再重复调用 LLM；`sources` 接通。首屏必载 JS 446 KB 且恢复并行预加载（拆分前基线 642 KB）。`tsc --noEmit` 与 416 项测试全绿。
+- **新发现三个根因缺陷（详见 ROUND3 文档）。**
+  - **R1 所有下拉面板全透明**：`styles-sidepanel.css` / `styles-manager.css` 用了 `source(none)` 但没把 `src/lib/surface-classes.ts` 写进 `@source`，导致 `bg-surface-1..8` / `shadow-surface-1..8` 共 16 个类从未生成。已在产物 CSS 中实测确认缺失。两行 `@source` 即可修复，需补防回归测试。
+  - **R2 侧边栏吸顶条半透明且毛玻璃从未生效**：`.native-content` 的 `mask-image` 同时造成两个症状——顶部渐隐区（滚动时 52px）把吸顶条吃掉造成半透明；`mask` 使容器成为 backdrop root，令 `backdrop-filter: blur(14px)` 成为死代码。推荐去掉顶部渐隐 + 吸顶条用实色。
+  - **R3 历史会话丢失 AI 答案（数据丢失）**：`cloud-state.ts:900-902` 从云端恢复会话时无条件覆盖本地，不比较 `updatedAt`；配合提问瞬间即推送空答案会话，导致完整答案被旧版本覆盖。需要三处修复：拉取比较时间戳、空答案不入 outbox、提问时不触发同步。已损坏的历史记录无法恢复。
+- **Agent 对话内联引用方案已给出。** 卡片数量多于正文的原因是 `collectToolSources` 收集的是工具召回全集而非正文引用集；且 system prompt 明令禁止正文出现链接。方案为反转 prompt、按正文 URL 过滤 sources、在 `AgentMarkdown` 的 `components.a` 中渲染书签 chip（段落内用 inline chip，列表项内升级为横向卡片，规避 `<p>` 不能包含 `<div>` 的约束）。
+- **另有 8 项 UI 细节任务（T-1 ~ T-8）**，含账号按钮布局、显示模块重排、"更多"改"最近动作"、API Key 掩码只读态、编辑收藏去冗余、新建文件夹能力、搜索框回车角标、Toast 重做。均已给出精确文件行号与目标代码。
+
+## 2026-08-04 · Round 2 性能、同步与 Agent 收口（0.5.62）
+
+- **本地优先首屏。** 侧边栏原生 `chrome.bookmarks.getTree()` 与 `GET_BOOTSTRAP` 已拆开，书签树不再等待 Service Worker；网页端先加载本地资源并结束 loading，`SYNC_NOW` 改为后台运行，完成后静默刷新。云端慢或正在同步时不再用“正在读取收藏库”遮住本地数据。
+- **页面依赖修复。** 页面端恢复静态 module preload；移除强制 markdown 手工 chunk，让 React JSX runtime 保持在 `react-vendor`，`react-markdown` / remark 只进入 lazy `AgentChatPage`。首屏一级静态依赖不再含 markdown，约 347.3 KiB，低于 Round 2 的 350 KiB 门。
+- **合法的 MV3 后台减重。** 保持 `codeSplitting: false` 与产物无动态 `import()`，没有恢复会导致 MV3 崩溃的旧方案。后台 Agent 不再内联 `pinyin-pro`，12 个工具参数改用轻量严格校验与 JSON Schema，移除 Zod；构建增加 Terser 三轮压缩和 330,000 B 永久硬门。最终 `dist/background.js` **326,404 B / gzip 101,182 B**，相对审查基线 876,954 B 下降 **62.8%**。审查的 300 KB 目标仍差约 26 KB；继续下降需要把 AI 运行面迁出 SW，而 offscreen 缺少与此用途准确匹配的 Chrome reason，本轮不以权限灰区换数字。
+- **Agent 费用与结果。** 最后一轮已有正文时直接返回，不再额外调用 `streamFinal` 重生成；同轮工具用 `Promise.all` 并行。`search_bookmarks` 支持最多 12 个关键词一次查询，单次 run 复用搜索索引与洞察缓存；system prompt 预置库规模和最多 60 个文件夹概览，并约束工具策略和 Markdown 输出。
+- **Agent 卡片与界面。** `search_bookmarks` / `get_bookmarks` 命中的真实收藏去重、保序并最多返回 10 张卡片，正式后台和预览路径都已接通；移除虚假的“已检查 228/228”与 `2/12` 分数。新增复制回答、重新生成、编辑问题重发、失败重试四个消息级操作，计划仍必须用户确认后才执行。
+- **同步性能。** 新增 `PUT /v1/sync/entities/batch`，每批最多 100 条，服务端受控 12 并发并复用现有 operationId 幂等；客户端不再串行发送数百次实体 PUT。为支持滚动发布，旧服务端返回 404/405 时自动回退到同 operationId 的 12 并发单条接口。同步进度使用真实实体总数并按批更新，不再把整批 228 条写成 `0/1`。服务端 23 项测试包含真实数据库批量幂等验证。
+- **自动化验证。** 根目录 `npm run check` 全绿：78 个测试文件 / 416 项测试、设计 token、TypeScript、页面构建、MV3 单文件后台构建、Terser 压缩及 JS 语法检查全部通过；服务端 typecheck、23 项测试和 build 全绿。`dist/manifest.json`、`public/manifest.json`、`package.json` 均为 0.5.62。
+- **仍需真人验收。** `npm run measure:startup` 已记录静态产物，但自动 Chrome 15 秒内仍未出现扩展 Service Worker，不能提供真实冷启动数据。需在 `chrome://extensions` 重载最新 `dist/` 后验证：首次书签出现时间、首条后台消息、登录态网页端 <1 秒展示、228 条首次同步进度/耗时、三家 Provider 的卡片/消息操作/流式输出。服务端批量接口目前只是代码与本地集成测试完成、尚未部署生产；0.5.62 在旧服务端会安全回退到 12 并发单条写入，部署服务端后才会使用批量快路径。
 
 ## 2026-08-04 · 整理提案与导航范围收缩
 
