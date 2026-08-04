@@ -1,5 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+import { readAllSources } from "./source-test-utils";
+
+const sidepanelDirectory = new URL("../src/ui/sidepanel/", import.meta.url);
 
 const sidepanelCssUrl = new URL(
   "../src/ui/sidepanel.css",
@@ -28,6 +31,10 @@ const agentHookUrl = new URL(
 );
 const agentThinkingUrl = new URL(
   "../src/ui/sidepanel/components/AgentThinkingSteps.tsx",
+  import.meta.url,
+);
+const agentChatPageUrl = new URL(
+  "../src/ui/sidepanel/pages/AgentChatPage.tsx",
   import.meta.url,
 );
 const homePageUrl = new URL(
@@ -116,19 +123,23 @@ describe("side panel startup rendering", () => {
   });
 
   it("uses synchronous onboarding state without a React boot gate", async () => {
-    const [html, source, css, agentHook, thinking, composer] = await Promise.all([
+    const [html, source, allSidepanelSources, css, agentHook, agentChat, composer] = await Promise.all([
       readFile(sidepanelHtmlUrl, "utf8"),
       readFile(sidepanelAppUrl, "utf8"),
+      readAllSources(sidepanelDirectory),
       readSidepanelCss(),
       readFile(agentHookUrl, "utf8"),
-      readFile(agentThinkingUrl, "utf8"),
+      readFile(agentChatPageUrl, "utf8"),
       readFile(agentComposerUrl, "utf8"),
     ]);
 
     expect(html).toContain('class="sidepanel-static-boot"');
-    expect(source).not.toContain('className="sidepanel-boot-screen"');
+    expect(allSidepanelSources).not.toContain('className="sidepanel-boot-screen"');
     expect(source).toContain('localStorage.getItem("aarre:onboarding-done")');
-    expect(thinking).toContain("AgentThinkingSteps");
+    expect(agentChat).toContain(
+      'import { AgentThinkingSteps } from "../components/AgentThinkingSteps"',
+    );
+    expect(agentChat).toContain("<AgentThinkingSteps");
     expect(agentHook).toContain('type: "CANCEL_BOOKMARK_AGENT"');
     expect(composer).toContain("StopIcon");
   });
@@ -143,8 +154,8 @@ describe("side panel startup rendering", () => {
 
 describe("side panel bookmark review density", () => {
   it("keeps ordinary search free of AI setup actions and trims review-only copy", async () => {
-    const [source, bookmarkTree] = await Promise.all([
-      readFile(sidepanelAppUrl, "utf8"),
+    const [allSidepanelSources, bookmarkTree] = await Promise.all([
+      readAllSources(sidepanelDirectory),
       readFile(
         new URL(
           "../src/ui/sidepanel/components/BookmarkTree.tsx",
@@ -155,9 +166,9 @@ describe("side panel bookmark review density", () => {
     ]);
     const css = await readSidepanelCss();
 
-    expect(source).not.toContain("按回车查看完整排序");
-    expect(source).not.toContain("配置 AI 后可以让它帮你找");
-    expect(source).not.toContain("agent-history-limit");
+    expect(allSidepanelSources).not.toContain("按回车查看完整排序");
+    expect(allSidepanelSources).not.toContain("配置 AI 后可以让它帮你找");
+    expect(allSidepanelSources).not.toContain("agent-history-limit");
     expect(bookmarkTree).toContain('"--tree-depth": `${depth * 24}px`');
     expect(css).toContain(".bookmark-thumbnail {\n  width: 42px;\n  height: 42px;");
     expect(css).toContain(

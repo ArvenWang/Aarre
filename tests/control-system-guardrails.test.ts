@@ -1,8 +1,10 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { readAllSources } from "./source-test-utils";
 
 const uiDirectoryUrl = new URL("../src/ui/", import.meta.url);
+const sidepanelDirectoryUrl = new URL("../src/ui/sidepanel/", import.meta.url);
 const baseCssUrl = new URL("../src/ui/base.css", import.meta.url);
 const sidepanelCssUrl = new URL("../src/ui/sidepanel.css", import.meta.url);
 const sidepanelLazyCssUrl = new URL("../src/ui/sidepanel-lazy.css", import.meta.url);
@@ -50,11 +52,6 @@ const cloudHandlersUrl = new URL(
   "../src/extension/handlers/cloud.ts",
   import.meta.url
 );
-const backgroundUrl = new URL(
-  "../src/extension/background.ts",
-  import.meta.url
-);
-
 async function collectTsx(directory: string): Promise<string[]> {
   const files: string[] = [];
   for (const entry of await readdir(directory, { withFileTypes: true })) {
@@ -406,12 +403,12 @@ describe("status notices float above the list", () => {
 
 describe("the AI section explains itself through its own labels", () => {
   it("drops the paragraph that restated the field names", async () => {
-    const [source, css] = await Promise.all([
-      readFile(sidepanelAppUrl, "utf8"),
+    const [allSidepanelSources, css] = await Promise.all([
+      readAllSources(sidepanelDirectoryUrl),
       Promise.all([readFile(sidepanelCssUrl, "utf8"), readFile(sidepanelLazyCssUrl, "utf8")]).then((parts) => parts.join("\n"))
     ]);
 
-    expect(source).not.toContain("主题是 AI 归纳的内容方向");
+    expect(allSidepanelSources).not.toContain("主题是 AI 归纳的内容方向");
     expect(css).not.toContain("edit-ai-hint");
   });
 });

@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { statusText } from "../src/ui/sidepanel/components/CloudStatusRow";
 import type { SyncStatus } from "../src/lib/sync-engine";
+import { readAllSources } from "./source-test-utils";
 
 const base: SyncStatus = {
   phase: "idle",
@@ -22,14 +23,14 @@ describe("cloud status row", () => {
   });
 
   it("uses message subscription, never one-second polling", async () => {
-    const [hook, settings, row] = await Promise.all([
+    const [hook, allSidepanelSources, row] = await Promise.all([
       readFile(new URL("../src/ui/sidepanel/hooks/use-sync-status.ts", import.meta.url), "utf8"),
-      readFile(new URL("../src/ui/sidepanel/pages/SettingsPage.tsx", import.meta.url), "utf8"),
+      readAllSources(new URL("../src/ui/sidepanel/", import.meta.url)),
       readFile(new URL("../src/ui/sidepanel/components/CloudStatusRow.tsx", import.meta.url), "utf8"),
     ]);
     expect(hook).toContain('event.type === "SYNC_STATUS"');
     expect(hook).toContain("chrome.runtime.onMessage.addListener");
-    expect(settings).not.toContain("setInterval(refreshCloudState");
+    expect(allSidepanelSources).not.toContain("setInterval(refreshCloudState");
     expect(row).toContain("usage.usageRatio >= 0.8");
     expect(row).not.toContain("scope");
   });

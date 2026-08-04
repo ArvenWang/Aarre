@@ -1,8 +1,17 @@
 # Aarre 项目进展
 
-最后更新：2026-08-04（PRD v1.1 代码与自动化已收口；T-14c 待用户隐私决策，真实 Chrome / Provider 项待真人验收）
+最后更新：2026-08-04（T-06/T-07 审核残留已修复；PRD v1.1 代码与自动化已收口；T-14c 待用户隐私决策，真实 Chrome / Provider 项待真人验收）
 
-> **⚠️ 下一位 Agent 必读：先读 [`docs/AUDIT_2026-08.md`](docs/AUDIT_2026-08.md)（问题分析）和 [`docs/PRD_REBUILD_2026-08.md`](docs/PRD_REBUILD_2026-08.md)（执行方案）。P0 部分（T-01 ~ T-05）已完成，从 T-06 继续，不要重做已完成项，也不要在旧架构上打补丁。**
+> **⚠️ 下一位 Agent 必读：先读 [`docs/AUDIT_2026-08.md`](docs/AUDIT_2026-08.md)（问题分析）和 [`docs/PRD_REBUILD_2026-08.md`](docs/PRD_REBUILD_2026-08.md)（执行方案），再以本页顶部最新记录为当前事实。T-01～T-20 的代码与自动化已收口，不要重做已完成项，也不要在旧架构上打补丁；真人 Chrome / Provider 验收与 T-14c 隐私决策仍是外部门。**
+
+## 2026-08-04 · T-06 / T-07 审核残留修复
+
+- **审核基线校正。** `docs/REVIEW_2026-08-04_T06_T07.md` 基于旧提交 `ae19775`；报告中的 3 项失败测试与 T-07 未拆分问题在当前 `8bc41c5` 已解决。当前 `SidePanelApp.tsx` 为 393 行，侧边栏全部 TS/TSX 单文件均不超过 500 行。
+- **永久绿测试修复。** `surface-coexistence.test.ts` 不再只读取 3 行入口文件，而是递归扫描整个 `src/extension/`，确保禁止的 action click、side panel close 和 manager 协调逻辑不能迁移到其他模块后逃过检查。
+- **断言有效性。** `AgentThinkingSteps` 断言改为检查 `AgentChatPage` 是否真实导入并渲染该组件，不再读取组件自身证明自身存在；同时移除未使用的 `backgroundUrl`。
+- **统一源码守卫。** 新增递归源码读取工具，并把 React boot gate、已删除文案、旧 Agent 历史限制、云状态轮询和 AI 重复说明等全局禁用项扩大为整个 sidepanel 目录检查。组件和 CSS 局部约束仍保持精确文件范围。
+- **架构防回归。** 新增 T-06/T-07 专项测试：`background.ts` 必须低于 400 行且同步调用 `initializeBackground()`；侧边栏任一 TS/TSX 文件超过 500 行会直接失败。
+- **验证。** 专项 5 个测试文件 / 44 项通过；`npm run check` 全绿：72 个测试文件 / 381 项测试、设计规则、TypeScript、生产构建及 JavaScript 产物语法检查全部通过。`dist/background.js` 144.62 KB、首屏 sidepanel CSS 71.89 KB，版本保持 0.5.61。
 
 ## 2026-08-04 · T-18 / T-19 / T-20（UI 极简化完成）
 
