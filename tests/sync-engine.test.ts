@@ -19,8 +19,8 @@ function harness(overrides: Partial<Parameters<typeof createSyncEngine>[0]> = {}
     countOutbox: vi.fn(async () => 0),
     pushOutboxBatch: vi.fn(async () => ({ attempted: 0, synced: 0, failed: 0 })),
     pushEntities: vi.fn(async () => undefined),
-    uploadAssets: vi.fn(async () => ({ uploaded: 0, remaining: false })),
-    downloadAssets: vi.fn(async () => ({ restored: 0, remaining: false })),
+    uploadAssets: vi.fn(async () => ({ uploaded: 0, processed: 0, total: 0, remaining: false })),
+    downloadAssets: vi.fn(async () => ({ restored: 0, processed: 0, total: 0, remaining: false })),
     readStatus: vi.fn(async () => current),
     writeStatus: vi.fn(async (status) => {
       current = status;
@@ -76,6 +76,20 @@ describe("sync engine", () => {
     expect(phases.indexOf("pushing")).toBeLessThan(phases.indexOf("assets-up"));
     expect(phases.indexOf("assets-up")).toBeLessThan(phases.indexOf("assets-down"));
     expect(test.status().lastSyncedAt).toBe("2026-08-04T00:00:00.000Z");
+  });
+
+  it("reports a fixed asset total instead of growing the denominator by one", async () => {
+    const uploadAssets = vi.fn()
+      .mockResolvedValueOnce({ uploaded: 12, processed: 12, total: 121, remaining: true })
+      .mockResolvedValueOnce({ uploaded: 12, processed: 24, total: 121, remaining: true })
+      .mockResolvedValueOnce({ uploaded: 0, processed: 121, total: 121, remaining: false });
+    const test = harness({ uploadAssets });
+    await test.engine.sync("asset-progress");
+    expect(
+      test.writes
+        .filter((status) => status.phase === "assets-up" && status.total > 0)
+        .map(({ current, total }) => [current, total]),
+    ).toEqual([[12, 121], [24, 121], [121, 121]]);
   });
 
   it("pauses without making cloud requests when the account is unavailable", async () => {

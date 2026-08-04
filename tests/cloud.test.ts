@@ -11,7 +11,9 @@ import {
 } from "../src/lib/cloud";
 import { usagePeriodCloudPayload } from "../src/lib/cloud-state";
 import {
+  cloudAssetDimension,
   cloudAssetIdentity,
+  cloudAssetNeedsUpload,
   cloudSiteIconBindingIsCurrent,
   reconcileCloudAssetState
 } from "../src/lib/cloud-assets";
@@ -65,6 +67,15 @@ function privateLocalResource(): ResourceRecord {
 }
 
 describe("cloud privacy contract", () => {
+  it("normalizes SVG and legacy asset dimensions to the server integer contract", () => {
+    expect(cloudAssetDimension(31.5)).toBe(32);
+    expect(cloudAssetDimension(192.2)).toBe(192);
+    expect(cloudAssetDimension(20_000)).toBe(16_384);
+    expect(cloudAssetDimension(0)).toBeUndefined();
+    expect(cloudAssetDimension(Number.NaN)).toBeUndefined();
+    expect(cloudAssetDimension(undefined)).toBeUndefined();
+  });
+
   it("seeds local and account-untracked resources during the first full sync", () => {
     const local = privateLocalResource();
     local.syncStatus = "local";
@@ -132,7 +143,7 @@ describe("cloud privacy contract", () => {
     })).toBe("site-icon:example.com");
   });
 
-  it("drops local uploaded marks whose assets no longer exist on the server", () => {
+  it("rebuilds upload tracking from the active account's remote asset hashes", () => {
     const state = {
       "cover:r1": { assetId: "a", sha256: "s1", revision: 1 },
       "snapshot:r2": { assetId: "b", sha256: "s2", revision: 1 },
@@ -151,10 +162,32 @@ describe("cloud privacy contract", () => {
       binding: { canonicalUrl: "https://example.com/a" },
       revision: 2
     }];
-    expect(reconcileCloudAssetState(state, remote)).toEqual({
-      "cover:r1": { assetId: "a", sha256: "s1", revision: 1 }
+    const reconciled = reconcileCloudAssetState(state, remote);
+    expect(reconciled).toEqual({
+      "cover:r1": { assetId: "a", sha256: "s1", revision: 2 }
     });
+    expect(cloudAssetNeedsUpload(reconciled, "cover:r1", "s1")).toBe(false);
+    expect(cloudAssetNeedsUpload(reconciled, "cover:r1", "changed")).toBe(true);
     expect(reconcileCloudAssetState(state, [])).toEqual({});
+  });
+
+  it("uses the newest remote revision when an account contains a legacy duplicate", () => {
+    const base = {
+      resourceKey: "r1",
+      kind: "cover" as const,
+      byteSize: 10,
+      width: null,
+      height: null,
+      mimeType: "image/webp",
+      capturedAt: null,
+      binding: { canonicalUrl: "https://example.com/a" },
+    };
+    expect(reconcileCloudAssetState({}, [
+      { ...base, assetId: "old", sha256: "old", revision: 1 },
+      { ...base, assetId: "new", sha256: "new", revision: 3 },
+    ])).toEqual({
+      "cover:r1": { assetId: "new", sha256: "new", revision: 3 },
+    });
   });
 
   it("migrates a legacy text-only setting to a complete backup", async () => {

@@ -1,4 +1,4 @@
-import { readdir } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { spawnSync } from "node:child_process";
 
@@ -24,6 +24,28 @@ if (!files.length) {
 }
 
 for (const file of files) {
+  const source = await readFile(file, "utf8");
+  if (
+    relative(distRoot, file) === "background.js" &&
+    /\bimport\s*\(/.test(source)
+  ) {
+    console.error(
+      "dist/background.js 仍包含动态 import()；Chrome 扩展 MV3 " +
+        "Service Worker 不支持该语法。"
+    );
+    process.exit(1);
+  }
+  if (
+    relative(distRoot, file) === "background.js" &&
+    (source.includes("document.getElementsByTagName") ||
+      source.includes("window.dispatchEvent"))
+  ) {
+    console.error(
+      "dist/background.js 仍包含面向网页的 Vite 预加载助手；MV3 Service " +
+        "Worker 没有 document/window。"
+    );
+    process.exit(1);
+  }
   const result = spawnSync(process.execPath, ["--check", file], {
     stdio: "inherit",
     shell: false

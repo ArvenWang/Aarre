@@ -11,7 +11,6 @@ export type LibrarySort =
 export type ManagerView =
   | "library"
   | "organize"
-  | "reading"
   | "report"
   | "topics"
   | "resurface";

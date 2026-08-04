@@ -52,6 +52,11 @@ function run(command, args) {
 
 run("vite", ["build"]);
 
+// 扩展 Service Worker 明确不支持 import()。单入口 + inlineDynamicImports
+// 会保留源码的模块边界与异步调用语义，但把所有后台代码打进一个合法的
+// ESM 文件；不能把页面端也一起内联，否则会失去 React 页面按需加载。
+run("vite", ["build", "--config", "vite.background.config.ts"]);
+
 run("esbuild", [
   "src/content/capture.ts",
   "--bundle",

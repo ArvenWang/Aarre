@@ -116,7 +116,7 @@ mark {
   min-height: var(--toggle-track-h);
   padding: 0;
   flex: 0 0 var(--toggle-track-w);
-  border: 1px solid var(--line-strong);
+  border: var(--control-border-w) solid var(--line-strong);
   border-radius: var(--radius-chip);
   background: var(--surface);
   transition:
@@ -145,7 +145,7 @@ mark {
 .protection-switch[data-state="checked"] > span {
   translate: calc(
     var(--toggle-track-w) - var(--toggle-thumb) - var(--toggle-inset) -
-      var(--toggle-inset)
+      var(--toggle-inset) - var(--control-border-w) - var(--control-border-w)
   );
   background: var(--surface);
 }

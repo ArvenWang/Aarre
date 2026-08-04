@@ -24,6 +24,7 @@ export function useAppState(
   applyDisplaySettings: (settings: {
     listCoverStyle: "site" | "page";
     pageSnapshotsEnabled: boolean;
+    publicFaviconFallback: boolean;
   }) => void,
 ) {
   const [snapshot, setSnapshot] = useState<BookmarkBarSnapshot | null>(null);

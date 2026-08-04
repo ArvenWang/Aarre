@@ -6,6 +6,11 @@ export const PAGE_SNAPSHOT_ORIGINS = ["<all_urls>"] as const;
 export interface DisplaySettings {
   listCoverStyle: ListCoverStyle;
   /**
+   * 站点自身图标全部失败后，是否允许把非敏感域名发送给公共 favicon
+   * 服务。用户已批准默认开启，但随时可在设置中关闭。
+   */
+  publicFaviconFallback: boolean;
+  /**
    * 仅为兼容旧存储结构保留。完整增强层要求截图始终开启；
    * 用户仍可通过 snapshotExcludedHosts 排除不应截图的网站。
    */
@@ -16,6 +21,7 @@ export interface DisplaySettings {
 
 const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = {
   listCoverStyle: "site",
+  publicFaviconFallback: true,
   pageSnapshotsEnabled: true,
   snapshotExcludedHosts: [],
   scanCostLimitCny: 10
@@ -55,6 +61,7 @@ export async function getDisplaySettings(): Promise<DisplaySettings> {
   return {
     listCoverStyle:
       stored?.listCoverStyle === "page" ? "page" : "site",
+    publicFaviconFallback: stored?.publicFaviconFallback !== false,
     // 0.4.0 以前可能持久化过 false，但新版界面已经没有关闭入口。
     // 若继续尊重该隐藏值，原生收藏和旧收藏补拍会被永久静默禁用。
     pageSnapshotsEnabled: true,
@@ -83,6 +90,7 @@ export async function saveDisplaySettings(
     ...DEFAULT_DISPLAY_SETTINGS,
     listCoverStyle:
       merged.listCoverStyle === "page" ? "page" : "site",
+    publicFaviconFallback: merged.publicFaviconFallback !== false,
     pageSnapshotsEnabled: true,
     scanCostLimitCny:
       typeof merged.scanCostLimitCny === "number" &&

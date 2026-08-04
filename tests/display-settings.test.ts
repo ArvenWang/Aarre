@@ -23,6 +23,24 @@ beforeEach(() => {
 });
 
 describe("display settings", () => {
+  it("默认开启公共图标补全，并允许用户持久关闭", async () => {
+    expect((await getDisplaySettings()).publicFaviconFallback).toBe(true);
+    const saved = await saveDisplaySettings({ publicFaviconFallback: false });
+    expect(saved.publicFaviconFallback).toBe(false);
+    expect((await getDisplaySettings()).publicFaviconFallback).toBe(false);
+  });
+
+  it("恢复旧版云端显示字段时保留本机公共图标隐私选择", async () => {
+    await saveDisplaySettings({ publicFaviconFallback: false });
+    const restored = await saveDisplaySettings({
+      listCoverStyle: "page",
+      pageSnapshotsEnabled: true,
+      snapshotExcludedHosts: ["private.example.com"],
+      scanCostLimitCny: 8
+    });
+    expect(restored.publicFaviconFallback).toBe(false);
+  });
+
   it("迁移旧版隐藏的截图关闭值，完整增强层始终启用截图", async () => {
     values["aarre:display-settings"] = {
       pageSnapshotsEnabled: false,

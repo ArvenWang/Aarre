@@ -8,6 +8,7 @@ import type {
 
 export const ORGANIZATION_NOTICE_DISMISS_MS =
   24 * 60 * 60 * 1_000;
+export const ORGANIZATION_INSIGHTS_VERSION = 2;
 
 export interface LibraryFingerprint {
   bookmarkCount: number;
@@ -15,11 +16,26 @@ export interface LibraryFingerprint {
 }
 
 export interface StoredOrganizationInsights {
+  version: typeof ORGANIZATION_INSIGHTS_VERSION;
   insights: LibraryInsights;
   fingerprint: LibraryFingerprint;
   signature: string;
   dismissedSignature?: string;
   dismissedUntil?: string;
+}
+
+export function storedOrganizationInsightsIsCurrent(
+  value: unknown
+): value is StoredOrganizationInsights {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      (value as { version?: unknown }).version ===
+        ORGANIZATION_INSIGHTS_VERSION &&
+      "insights" in value &&
+      "fingerprint" in value &&
+      "signature" in value
+  );
 }
 
 export function buildLibraryFingerprint(
@@ -76,6 +92,7 @@ export function mergeStoredOrganizationInsights(
   );
   const sameProposalContent = previous?.signature === signature;
   return {
+    version: ORGANIZATION_INSIGHTS_VERSION,
     insights,
     fingerprint,
     signature,
@@ -119,7 +136,6 @@ export function organizationNoticeFromStored(
   const counts = {
     duplicate: 0,
     dead: 0,
-    classify: 0,
     largeFolder: 0
   };
   for (const proposal of stored.insights.organizationPlan.proposals) {

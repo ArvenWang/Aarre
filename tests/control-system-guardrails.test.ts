@@ -52,6 +52,10 @@ const cloudHandlersUrl = new URL(
   "../src/extension/handlers/cloud.ts",
   import.meta.url
 );
+const agentHistoryUrl = new URL(
+  "../src/ui/sidepanel/pages/AgentHistoryPage.tsx",
+  import.meta.url
+);
 async function collectTsx(directory: string): Promise<string[]> {
   const files: string[] = [];
   for (const entry of await readdir(directory, { withFileTypes: true })) {
@@ -138,6 +142,82 @@ describe("cloud settings stay local-first", () => {
 });
 
 describe("only one system paints a given control", () => {
+  it("resets native button chrome once at the shared Button boundary", async () => {
+    const source = await readFile(buttonUrl, "utf8");
+    const base = source.slice(
+      source.indexOf("const buttonVariants = cva("),
+      source.indexOf("variants: {")
+    );
+
+    expect(base).toContain("appearance-none");
+    expect(base).toContain("border-0");
+    expect(base).toContain("shadow-none");
+  });
+
+  it("lets the rounded bookmark row own its only hover surface", async () => {
+    const css = await readFile(sidepanelCssUrl, "utf8");
+    const hover = rule(
+      css,
+      ".native-panel .bookmark-main:hover,\n.native-panel .bookmark-main:focus-visible,\n.native-panel .bookmark-main:active"
+    );
+
+    expect(hover).toContain("background: transparent");
+    expect(rule(css, ".bookmark-row:hover,\n.bookmark-row:focus-within")).toContain(
+      "background: var(--surface-sunken)"
+    );
+  });
+
+  it("keeps checked toggle gaps equal after accounting for its border", async () => {
+    const [base, tokens] = await Promise.all([
+      readFile(baseCssUrl, "utf8"),
+      readFile(tokensCssUrl, "utf8"),
+    ]);
+    const checkedThumb = rule(
+      base,
+      '.protection-switch[data-state="checked"] > span'
+    );
+
+    expect(tokens).toContain("--control-border-w: 1px");
+    expect(checkedThumb.match(/var\(--control-border-w\)/g)).toHaveLength(2);
+  });
+
+  it("gives history layout controls fluid height and an explicit content grid", async () => {
+    const [source, css] = await Promise.all([
+      readFile(agentHistoryUrl, "utf8"),
+      readFile(sidepanelLazyCssUrl, "utf8"),
+    ]);
+
+    const open = source.slice(
+      source.indexOf('className="agent-history-open"') - 120,
+      source.indexOf('className="agent-history-open"') + 80
+    );
+    expect(open).toContain('size="unstyled"');
+    expect(rule(css, '.agent-history-open > [data-slot="button-content"]')).toContain(
+      "display: grid"
+    );
+    const historyContent = source.slice(
+      source.indexOf('className="agent-history-open"'),
+      source.indexOf('</Button>', source.indexOf('className="agent-history-open"'))
+    );
+    expect(historyContent.indexOf("<strong>")).toBeLessThan(
+      historyContent.indexOf("<small>")
+    );
+    expect(historyContent.indexOf("<small>")).toBeLessThan(
+      historyContent.indexOf("<time>")
+    );
+    expect(historyContent).not.toContain("ChevronRightIcon");
+  });
+
+  it("keeps cover action ink above generic ghost colours in both themes", async () => {
+    const css = await readFile(managerCssUrl, "utf8");
+    expect(rule(css, '.library-card-editor-trigger[data-slot="button"]')).toContain(
+      "color: var(--cover-action-ink)"
+    );
+    expect(
+      rule(css, '.library-card-editor-trigger[data-slot="button"]:active')
+    ).toContain("transform: scale(0.98)");
+  });
+
   it("does not expose the removed unstyled paint escape hatch", async () => {
     const source = await readFile(buttonUrl, "utf8");
     const base = source.slice(
@@ -456,7 +536,7 @@ describe("library cards are a single click target", () => {
       rule(css, ".library-card-link::after").match(/z-index:\s*(\d+)/)?.[1]
     );
     const editorZ = Number(
-      rule(css, ".library-card-editor-trigger").match(/z-index:\s*(\d+)/)?.[1]
+      rule(css, '.library-card-editor-trigger[data-slot="button"]').match(/z-index:\s*(\d+)/)?.[1]
     );
 
     expect(overlayZ).toBeGreaterThan(0);

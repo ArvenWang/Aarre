@@ -148,7 +148,7 @@ export type ExtensionRequest =
   | {
       type: "OPEN_MANAGER";
       query?: string;
-      view?: "organize" | "report" | "topics" | "resurface" | "reading";
+      view?: "organize" | "report" | "topics" | "resurface";
     }
   | { type: "OPEN_SIDE_PANEL" }
   | { type: "SIGN_IN_CLOUD" }

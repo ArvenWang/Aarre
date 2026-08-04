@@ -10,6 +10,7 @@ import { chromium } from "playwright";
 const BASE = process.env.SHOOT_BASE ?? "http://localhost:5173";
 const OUT = new URL("../.shots/", import.meta.url).pathname;
 const THEME = process.env.SHOOT_THEME ?? "light";
+const CHANNEL = process.env.PLAYWRIGHT_CHANNEL;
 
 const panel = { width: 420, height: 1000 };
 const manager = { width: 1440, height: 1000 };
@@ -125,7 +126,9 @@ const states = {
     });
     await shot(page, "manager-editor-footer");
 
-    const del = page.locator(".library-card-editor-actions .button-danger-quiet");
+    const del = page.locator(
+      '.library-card-editor-actions [data-variant="danger-quiet"]',
+    );
     if (await del.count()) {
       await del.click();
       await page.waitForTimeout(300);
@@ -150,7 +153,7 @@ const states = {
 
   async views(browser) {
     const page = await open(browser, "manager.html", manager);
-    for (const tab of ["整理提案", "待读队列", "报告", "主题图谱", "重新发现"]) {
+    for (const tab of ["整理提案", "报告", "主题图谱", "重新发现"]) {
       const link = page
         .locator("nav button, header button", { hasText: tab })
         .first();
@@ -192,7 +195,7 @@ const wanted = process.argv.slice(2);
 const list = wanted.length ? wanted : Object.keys(states);
 
 await mkdir(OUT, { recursive: true });
-const browser = await chromium.launch();
+const browser = await chromium.launch(CHANNEL ? { channel: CHANNEL } : {});
 for (const name of list) {
   if (!states[name]) {
     console.log(`跳过未知状态 ${name}`);

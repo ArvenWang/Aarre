@@ -20,7 +20,7 @@ import { useShape } from "@/lib/shape-context";
 // rendering as an opaque dark rectangle with invisible dark text.
 const buttonVariants = cva(
   [
-    "group relative isolate inline-flex items-center justify-center outline-none cursor-pointer",
+    "group relative isolate inline-flex appearance-none items-center justify-center border-0 shadow-none outline-none cursor-pointer",
     "transition-[background-color,color,border-color] duration-80",
     "disabled:opacity-50 disabled:pointer-events-none",
     "focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring)]",

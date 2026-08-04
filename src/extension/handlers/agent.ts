@@ -9,6 +9,7 @@ import {
   organizationBadgeText,
   organizationNoticeFromStored,
   sameLibraryFingerprint,
+  storedOrganizationInsightsIsCurrent,
   type StoredOrganizationInsights
 } from "../../lib/organization-notice";
 import type {
@@ -104,16 +105,7 @@ async function getStoredOrganizationInsights(): Promise<
   const stored = (await chrome.storage.local.get(
     ORGANIZATION_INSIGHTS_KEY
   ))[ORGANIZATION_INSIGHTS_KEY];
-  if (
-    !stored ||
-    typeof stored !== "object" ||
-    !("insights" in stored) ||
-    !("fingerprint" in stored) ||
-    !("signature" in stored)
-  ) {
-    return null;
-  }
-  return stored as StoredOrganizationInsights;
+  return storedOrganizationInsightsIsCurrent(stored) ? stored : null;
 }
 
 async function syncOrganizationBadge(

@@ -30,7 +30,9 @@ import type { CloudStorageUsage } from "../../../lib/cloud-settings";
 interface SettingsPageProps {
   appState: AppState | null;
   listCoverStyle: ListCoverStyle;
+  publicFaviconFallback: boolean;
   onListCoverStyleChange: (style: ListCoverStyle) => void;
+  onPublicFaviconFallbackChange: (enabled: boolean) => void;
   onRestartOnboarding: () => void;
   onAppStateChange: (state: AppState) => void;
   onClose: () => void;
@@ -39,7 +41,9 @@ interface SettingsPageProps {
 function SettingsPage({
   appState,
   listCoverStyle,
+  publicFaviconFallback,
   onListCoverStyleChange,
+  onPublicFaviconFallbackChange,
   onRestartOnboarding,
   onAppStateChange,
   onClose,
@@ -313,6 +317,21 @@ function SettingsPage({
     }
   }
 
+  async function handlePublicFaviconFallback(enabled: boolean) {
+    if (action) return;
+    setAction("public-favicon-fallback");
+    try {
+      const next = await saveDisplaySettings({
+        publicFaviconFallback: enabled,
+      });
+      onPublicFaviconFallbackChange(next.publicFaviconFallback);
+    } catch {
+      /* 设置页不再展示顶部提示条 */
+    } finally {
+      setAction("");
+    }
+  }
+
   return (
     <main className="native-panel native-settings-panel">
       <header className="settings-page-header">
@@ -374,7 +393,12 @@ function SettingsPage({
 
             <DisplaySettingsSection
               value={listCoverStyle}
+              publicFaviconFallback={publicFaviconFallback}
+              disabled={Boolean(action)}
               onChange={(style) => void handleCoverStyle(style)}
+              onPublicFaviconFallbackChange={(enabled) =>
+                void handlePublicFaviconFallback(enabled)
+              }
             />
 
             <LibraryScanSection

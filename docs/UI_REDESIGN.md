@@ -188,7 +188,7 @@ src/ui/manager.css     .manager-* .library-* .resource-* .report-* 等网页端�
 
 ## 批次 C · 拆分 `ManagerApp.tsx`（只搬不改）
 
-`ManagerApp.tsx` 用一条覆盖 423 行的嵌套三元渲染六个视图（592–1015 行），没有任何按视图拆分的组件。**这是各 tab 各自走样的直接原因**，也是后面每一批无法并行的原因。
+`ManagerApp.tsx` 用一条覆盖 423 行的嵌套三元渲染五个视图（592–1015 行），没有任何按视图拆分的组件。**这是各 tab 各自走样的直接原因**，也是后面每一批无法并行的原因。
 
 拆成：
 
@@ -196,7 +196,6 @@ src/ui/manager.css     .manager-* .library-* .resource-* .report-* 等网页端�
 src/ui/manager/ManagerApp.tsx        外壳：数据加载、view 状态、header、tabs
 src/ui/manager/views/LibraryView.tsx
 src/ui/manager/views/OrganizeView.tsx
-src/ui/manager/views/ReadingView.tsx
 src/ui/manager/views/ReportView.tsx
 src/ui/manager/views/TopicsView.tsx
 src/ui/manager/views/ResurfaceView.tsx
@@ -206,7 +205,7 @@ src/ui/manager/views/ResurfaceView.tsx
 
 **这一批不改任何视觉。** 拆完的渲染结果必须与拆之前逐像素一致。先拆再改，是为了让 D–G 四批可以独立回滚。
 
-验收：`npm run check` 通过；六个 tab 逐个切换，与拆分前截图比对无差异。
+验收：`npm run check` 通过；五个 tab 逐个切换，与拆分前截图比对无差异。
 
 ---
 
@@ -347,9 +346,9 @@ src/ui/manager/views/ResurfaceView.tsx
 
 ---
 
-## 批次 G · 其余三个 tab
+## 批次 G · 其余两个 tab
 
-整理提案 / 待读队列 / 重新发现。这三个的内容结构本身没有大问题，主要是接 token、去掉 SaaS 感的密度、统一空态与加载态。
+整理提案 / 重新发现。这两个的内容结构本身没有大问题，主要是接 token、去掉 SaaS 感的密度、统一空态与加载态。
 
 同时收掉跨界面分裂：
 

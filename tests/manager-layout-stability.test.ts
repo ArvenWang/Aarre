@@ -49,7 +49,7 @@ describe("manager layout stability", () => {
     );
     const editorTriggerRule = rule(
       css,
-      ".library-card-editor-trigger"
+      '.library-card-editor-trigger[data-slot="button"]'
     );
     const extraRule = rule(css, ".library-card-extra");
     const hoverExtraRule = rule(
@@ -93,7 +93,7 @@ describe("manager layout stability", () => {
     expect(editorTriggerRule).toContain("opacity: 0");
     expect(editorTriggerRule).toContain("pointer-events: none");
     expect(css).toContain(
-      ".library-card-editor-trigger:focus-visible"
+      '.library-card-editor-trigger[data-slot="button"]:focus-visible'
     );
     expect(css).toContain(".library-card-editor-heading {");
     expect(coverFrameRule).not.toMatch(/transition:[^}]*\bheight\b/s);

@@ -5,7 +5,11 @@ import {
   type CloudSyncSettings
 } from "./cloud-settings";
 import { getAgentConversations, saveAgentConversation } from "./conversations";
-import { getDisplaySettings, saveDisplaySettings } from "./display-settings";
+import {
+  getDisplaySettings,
+  saveDisplaySettings,
+  type DisplaySettings
+} from "./display-settings";
 import {
   buildProtectionPolicy,
   getProtectionSettings,
@@ -117,6 +121,20 @@ export function usagePeriodCloudPayload(input: {
     scanCount: input.usage.scanCount,
     priceUpdatedAt: input.usage.priceUpdatedAt,
     updatedAt: input.usage.updatedAt
+  };
+}
+
+/**
+ * 公共 favicon 开关是设备本地隐私偏好：不上传云端，也不允许其他设备
+ * 通过设置恢复覆盖。这里显式列出服务端契约字段，避免以后给本地设置新增
+ * 属性时再次触发 strict schema 的 unrecognized_keys。
+ */
+export function cloudDisplaySettingsPayload(input: DisplaySettings) {
+  return {
+    listCoverStyle: input.listCoverStyle,
+    pageSnapshotsEnabled: input.pageSnapshotsEnabled,
+    snapshotExcludedHosts: input.snapshotExcludedHosts,
+    scanCostLimitCny: input.scanCostLimitCny
   };
 }
 
@@ -518,7 +536,7 @@ export async function syncDurableCloudState(): Promise<{ synced: number }> {
     entityType: "setting-display",
     entityId: "display",
     updatedAt: now,
-    payload: display
+    payload: cloudDisplaySettingsPayload(display)
   })) synced += 1;
   if (theme && await putEntity(state, {
     entityType: "setting-theme",

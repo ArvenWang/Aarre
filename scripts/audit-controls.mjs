@@ -9,6 +9,7 @@ import { chromium } from "playwright";
 
 const BASE = process.env.SHOOT_BASE ?? "http://localhost:5173";
 const THEME = process.env.SHOOT_THEME ?? "light";
+const CHANNEL = process.env.PLAYWRIGHT_CHANNEL;
 
 const audit = () => {
   const findings = [];
@@ -287,7 +288,7 @@ const scenes = [
         .click({ force: true });
       await page.waitForTimeout(600);
       await page
-        .locator(".library-card-editor-actions .button-danger-quiet")
+        .locator('.library-card-editor-actions [data-variant="danger-quiet"]')
         .click();
       await page.waitForTimeout(300);
     },
@@ -313,7 +314,7 @@ const scenes = [
 ];
 
 const wanted = process.argv.slice(2);
-const browser = await chromium.launch();
+const browser = await chromium.launch(CHANNEL ? { channel: CHANNEL } : {});
 let total = 0;
 for (const [name, path, viewport, drive] of scenes) {
   if (wanted.length && !wanted.some((term) => name.includes(term))) continue;

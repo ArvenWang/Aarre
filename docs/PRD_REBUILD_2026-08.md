@@ -855,11 +855,11 @@ export async function cacheSiteBrandIcon(
 
 每个候选加 5 秒超时，避免一个卡住拖累整组。
 
-### T-14c：公共 favicon 服务兜底 ⚠️ 需要产品决策
+### T-14c：公共 favicon 服务兜底 ✅ 用户已同意并完成
 
-> **执行 Agent 注意：这一项在用户明确同意前不要做。** 见审计报告 §2.4。
+> **2026-08-04 决策：** 用户已明确同意。实现默认开启、设置可关闭、敏感站点强制排除，并已同步隐私说明。公共服务只在全部站点自身候选失败后调用，进一步减少不必要的域名外发。
 
-如果用户同意，实现方式：
+已采用的实现方式：
 
 在 `scanSiteBrand` 的候选列表末尾（分类兜底之前）追加：
 
@@ -1317,7 +1317,6 @@ const IDLE_TIMEOUT_MS = 20_000;   // 20 秒没有新内容才算超时
 | `SettingsPage` | 1604–1605 | `并发 / N 条任务` | 删除整个 `<dl>` 项 |
 | `SettingsPage` | 1615–1619 | 3 段免责声明 | 合并为一行：`用量为估算值，数据保存在本机。` |
 | `SnapshotBackfillControl.tsx` | 367–382 | 弹窗 4 段说明 | 合并为一行 + 一行隐私说明 |
-| `ReadingView.tsx` | 37–38 | 空状态第二行 | 删除 |
 | `ResurfaceView.tsx` | 30–31 | 空状态第二行 | 删除 |
 
 ### 必须保留（不要删）
@@ -1570,11 +1569,11 @@ GET_BOOTSTRAP: async () => {
 
 ---
 
-## X-05 🟢 background 大模块改动态 import
+## X-05 🔴 background 动态 import 方案已撤销
 
 `background.ts` 顶层静态 import 了 `local-ai.ts`（1744 行）、`cover-rules.ts`（1014 行）、`page-snapshot.ts`。
 
-改成在需要时动态 import：
+原方案要求在需要时动态 import：
 
 ```ts
 // handlers/agent.ts
@@ -1592,11 +1591,11 @@ async function scanSiteBrand(resource) {
 }
 ```
 
-**注意：动态 import 在 MV3 Service Worker 里是支持的**（需要 `"type": "module"`，manifest 已经是了）。
+**2026-08-04 纠错：上述判断错误。** Chrome 官方扩展文档明确说明 MV3 Service Worker 支持静态 `import`，但不支持动态 `import()`。实际安装态已连续出现 `document is not defined` 与 `window is not defined`，它们均来自 Vite 为失败的动态导入生成的 client 预加载助手。
 
-**收益：SW 冷启动解析时间减少 30–50%。**
+当前构建采用页面与后台双入口：页面继续动态分包；后台独立构建为单个 ESM 文件并设置 `codeSplitting: false`。若未来要继续降低 SW 冷启动成本，应把重计算迁到 offscreen document 或扩展页面，通过消息通信调用，不能再次向 background 引入 `import()`。
 
-验收：`dist/background.js` 体积下降 > 30%，且产生独立的 lazy chunk。
+修订验收：`dist/background.js` 中 `import()` 必须为 0；构建产物检查永久守卫；在真实安装态 Chrome 完成启动、右键菜单、同步、搜索和 Agent 回归。原“主包下降 >30% 且产生 lazy chunk”指标作废。
 
 ---
 

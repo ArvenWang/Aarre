@@ -8,6 +8,44 @@ import {
   previewSnapshot, previewState, previewSuggestions,
 } from "./preview-state";
 
+function previewParameter(name: string): string {
+  return typeof location === "undefined"
+    ? ""
+    : new URLSearchParams(location.search).get(name) || "";
+}
+
+function previewSyncStatus() {
+  const state = previewParameter("sync");
+  if (state === "active") {
+    return {
+      phase: "assets-up" as const,
+      current: 7,
+      total: 24,
+      lastSyncedAt: null,
+      error: null,
+      nextRetryAt: null
+    };
+  }
+  if (state === "error") {
+    return {
+      phase: "error" as const,
+      current: 0,
+      total: 0,
+      lastSyncedAt: null,
+      error: "部分封面暂时无法上传。请检查网络后重试；本地书签和已经同步的数据不会丢失。",
+      nextRetryAt: new Date(Date.now() + 60_000).toISOString()
+    };
+  }
+  return {
+    phase: "idle" as const,
+    current: 0,
+    total: 0,
+    lastSyncedAt: new Date(Date.now() - 30_000).toISOString(),
+    error: null,
+    nextRetryAt: null
+  };
+}
+
 export async function handlePreviewDataMessage(request: PreviewRequest, previewStorage: Record<string, unknown>) {
   switch (request.type) {
           case "GET_BOOKMARK_BAR":
@@ -20,6 +58,7 @@ export async function handlePreviewDataMessage(request: PreviewRequest, previewS
                 aiSettings: structuredClone(previewMutable.aiSettings),
                 displaySettings: {
                   listCoverStyle: "site",
+                  publicFaviconFallback: true,
                   pageSnapshotsEnabled: true,
                   snapshotExcludedHosts: [],
                   scanCostLimitCny: 10
@@ -29,6 +68,24 @@ export async function handlePreviewDataMessage(request: PreviewRequest, previewS
           case "GET_APP_STATE":
           case "AUTH_CHANGED":
             return { ok: true, data: previewState };
+          case "GET_SYNC_STATUS":
+            return {
+              ok: true,
+              data: previewSyncStatus()
+            };
+          case "GET_CLOUD_USAGE":
+            return {
+              ok: true,
+              data: {
+                quotaBytes: 250 * 1024 * 1024,
+                usedBytes: 8 * 1024 * 1024,
+                metadataBytes: 512 * 1024,
+                assetBytes: 7.5 * 1024 * 1024,
+                assetCount: 24,
+                resourceCount: 309,
+                usageRatio: previewParameter("usage") === "high" ? 0.86 : 0.032
+              }
+            };
           case "GET_LOCAL_RESOURCES":
             return {
               ok: true,
@@ -82,36 +139,9 @@ export async function handlePreviewDataMessage(request: PreviewRequest, previewS
               data: {
                 organizationPlan: {
                   generatedAt: new Date().toISOString(),
-                  proposalCount: 4,
-                  actionableCount: 3,
+                  proposalCount: 3,
+                  actionableCount: 2,
                   proposals: [
-                    {
-                      id: "preview-classify",
-                      kind: "classify",
-                      title: "把“前端性能”主题归到一起",
-                      description:
-                        "8 条同主题收藏已在「前端代码」，建议移动 2 条散落收藏。",
-                      destructive: false,
-                      selectedByDefault: true,
-                      actions: [
-                        {
-                          id: "preview-move",
-                          type: "move_bookmark",
-                          label: "移动 Web Vitals 实践",
-                          description: "稍后读 → 前端代码",
-                          destructive: false,
-                          status: "pending",
-                          targetId: "preview-folder-0-0",
-                          destinationId: "preview-folder-1"
-                        }
-                      ],
-                      resourceKeys: ["preview-0"],
-                      beforePaths: ["稍后读 / Web Vitals 实践"],
-                      afterPath: "前端代码",
-                      previewLines: [
-                        "稍后读 / 「Web Vitals 实践」 → 前端代码"
-                      ]
-                    },
                     {
                       id: "preview-duplicate",
                       kind: "duplicate",
@@ -183,28 +213,18 @@ export async function handlePreviewDataMessage(request: PreviewRequest, previewS
                     {
                       id: "preview-large",
                       kind: "large_folder",
-                      title: "大文件夹需要拆分",
+                      title: "大文件夹容量提醒",
                       description:
-                        "「设计赏析」有 182 条收藏；只展示主题分布，不自动移动。",
+                        "「设计赏析」有 182 条收藏。Aarre 只提醒容量问题，不会自动移动或拆分。",
                       destructive: false,
                       selectedByDefault: false,
                       actions: [],
                       resourceKeys: [],
                       beforePaths: ["书签栏 / 设计赏析"],
-                      previewLines: ["交互设计 54 条", "设计系统 39 条"]
+                      previewLines: ["位置：设计赏析", "收藏数量：182 条"]
                     }
                   ]
-                },
-                readingQueue: previewResources.slice(0, 12).map(
-                  (resource, index) => ({
-                    nodeId: `reading-${index}`,
-                    resourceKey: resource.resourceKey,
-                    title: resource.title,
-                    url: resource.url,
-                    path: resource.nativeFolderPath,
-                    dateAdded: Date.now() - (index + 30) * 86_400_000
-                  })
-                )
+                }
               }
             };
           case "GET_ORGANIZATION_NOTICE":
@@ -215,12 +235,11 @@ export async function handlePreviewDataMessage(request: PreviewRequest, previewS
                 : {
                     generatedAt: new Date().toISOString(),
                     signature: "preview-organization-notice",
-                    proposalCount: 12,
-                    actionableCount: 9,
+                    proposalCount: 8,
+                    actionableCount: 5,
                     counts: {
                       duplicate: 3,
                       dead: 5,
-                      classify: 4,
                       largeFolder: 0
                     }
                   }

@@ -97,13 +97,43 @@ export function cloudAssetIdentity(asset: {
  * 误判为“已上传”而跳过，导致云端实际缺图却显示同步完成。
  */
 export function reconcileCloudAssetState(
-  state: CloudAssetState,
+  _state: CloudAssetState,
   remoteAssets: CloudAssetDescriptor[]
 ): CloudAssetState {
-  const remoteIdentities = new Set(remoteAssets.map(cloudAssetIdentity));
-  return Object.fromEntries(
-    Object.entries(state).filter(([identity]) => remoteIdentities.has(identity))
-  );
+  const reconciled: CloudAssetState = {};
+  for (const asset of remoteAssets) {
+    const identity = cloudAssetIdentity(asset);
+    if (!identity || identity.endsWith(":")) continue;
+    const current = reconciled[identity];
+    if (!current || asset.revision >= current.revision) {
+      reconciled[identity] = {
+        assetId: asset.assetId,
+        sha256: asset.sha256,
+        revision: asset.revision,
+      };
+    }
+  }
+  return reconciled;
+}
+
+/**
+ * 服务端资产契约只接受 1..16384 的整数。SVG viewBox 可以合法使用小数，
+ * 历史缓存也可能含 0/NaN；尺寸只是元数据，统一在上传边界归一化，不能让
+ * 一张图标阻断整条同步流水线。
+ */
+export function cloudAssetDimension(value: number | undefined): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    return undefined;
+  }
+  return Math.min(16_384, Math.max(1, Math.round(value)));
+}
+
+export function cloudAssetNeedsUpload(
+  state: CloudAssetState,
+  identity: string,
+  sha256Digest: string,
+): boolean {
+  return state[identity]?.sha256 !== sha256Digest;
 }
 
 function dataUrlBytes(dataUrl: string): { bytes: Uint8Array; mimeType: string } {
@@ -132,6 +162,14 @@ async function sha256(bytes: Uint8Array): Promise<string> {
   return [...new Uint8Array(digest)]
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
+}
+
+async function dataUrlMatchesSha256(dataUrl: string, expected: string): Promise<boolean> {
+  try {
+    return await sha256(dataUrlBytes(dataUrl).bytes) === expected;
+  } catch {
+    return false;
+  }
 }
 
 async function stableAssetId(identity: string): Promise<string> {
@@ -175,7 +213,7 @@ async function uploadAsset(input: {
 }): Promise<boolean> {
   const { bytes, mimeType } = dataUrlBytes(input.dataUrl);
   const digest = await sha256(bytes);
-  if (input.state[input.identity]?.sha256 === digest) return false;
+  if (!cloudAssetNeedsUpload(input.state, input.identity, digest)) return false;
   // assetId 标识「哪个资源的哪类图」这个槽位，与图片内容无关。
   // 一旦把内容哈希编进来，换封面就会生成新 assetId，云端既积压孤儿资产，
   // 又会因为同一资源绑定了两个 id 而彼此覆盖。
@@ -192,8 +230,8 @@ async function uploadAsset(input: {
       kind: input.kind,
       sha256: digest,
       byteSize: bytes.byteLength,
-      width: input.width,
-      height: input.height,
+      width: cloudAssetDimension(input.width),
+      height: cloudAssetDimension(input.height),
       mimeType,
       capturedAt: input.capturedAt,
       binding: input.binding
@@ -219,7 +257,12 @@ async function uploadAsset(input: {
   return true;
 }
 
-export async function syncCloudAssets(maxUploads = 12): Promise<{ uploaded: number; remaining: boolean }> {
+export async function syncCloudAssets(maxUploads = 12): Promise<{
+  uploaded: number;
+  processed: number;
+  total: number;
+  remaining: boolean;
+}> {
   const [resources, snapshots, brands, protectionSettings, tree, storedState] = await Promise.all([
     getLocalResources(),
     getPageSnapshots(),
@@ -228,8 +271,8 @@ export async function syncCloudAssets(maxUploads = 12): Promise<{ uploaded: numb
     chrome.bookmarks.getTree(),
     readState()
   ]);
-  // 上传前先与服务器对账：本地“已上传”标记但服务器已删除的资产，
-  // 必须重新上传，否则会被跳过导致云端缺图。
+  // 云端 active 列表才是当前账号的权威上传状态。登录流程会清理本机追踪，
+  // 这里必须从远端哈希重新建账；否则退出后登录同一账号会重传全部图片。
   const remoteAssets = await cloudRequest<{ assets: CloudAssetDescriptor[] }>("/v1/assets");
   const state = reconcileCloudAssetState(storedState, remoteAssets.assets);
   const policy = buildProtectionPolicy(tree, protectionSettings);
@@ -317,7 +360,12 @@ export async function syncCloudAssets(maxUploads = 12): Promise<{ uploaded: numb
   // 对账结果需要持久化：服务器已删除资产的本地标记必须清掉，
   // 否则下一次同步仍然会误跳过。
   await writeState(state);
-  return { uploaded, remaining: inspected < jobs.length };
+  return {
+    uploaded,
+    processed: inspected,
+    total: jobs.length,
+    remaining: inspected < jobs.length,
+  };
 }
 
 async function downloadAsset(asset: CloudAssetDescriptor): Promise<Uint8Array> {
@@ -331,7 +379,12 @@ async function downloadAsset(asset: CloudAssetDescriptor): Promise<Uint8Array> {
   return bytes;
 }
 
-export async function restoreCloudAssets(maxDownloads = 24): Promise<{ restored: number; remaining: boolean }> {
+export async function restoreCloudAssets(maxDownloads = 24): Promise<{
+  restored: number;
+  processed: number;
+  total: number;
+  remaining: boolean;
+}> {
   const response = await cloudRequest<{ assets: CloudAssetDescriptor[] }>("/v1/assets");
   const state = await readState();
   let restored = 0;
@@ -355,10 +408,25 @@ export async function restoreCloudAssets(maxDownloads = 24): Promise<{ restored:
         inspected += 1;
         continue;
       }
-    } else if (!identity || state[identity]?.sha256 === asset.sha256) {
-      inspected += 1;
-      // 已在本地（或已恢复过）的图片也计入完成进度。
-      continue;
+    } else if (asset.kind === "snapshot" && asset.binding?.canonicalUrl) {
+      const localSnapshot = await getPageSnapshot(asset.binding.canonicalUrl);
+      if (
+        localSnapshot &&
+        await dataUrlMatchesSha256(localSnapshot.imageDataUrl, asset.sha256)
+      ) {
+        inspected += 1;
+        continue;
+      }
+    } else if (asset.kind === "cover" || asset.kind === "user-cover") {
+      const localResource = await getLocalResource(asset.resourceKey);
+      if (
+        localResource?.thumbnailDataUrl &&
+        (localResource.coverContentHash === asset.sha256 ||
+          await dataUrlMatchesSha256(localResource.thumbnailDataUrl, asset.sha256))
+      ) {
+        inspected += 1;
+        continue;
+      }
     }
     const bytes = await downloadAsset(asset);
     const dataUrl = bytesDataUrl(bytes, asset.mimeType);
@@ -444,5 +512,10 @@ export async function restoreCloudAssets(maxDownloads = 24): Promise<{ restored:
     inspected += 1;
   }
   if (restored) await writeState(state);
-  return { restored, remaining: inspected < response.assets.length };
+  return {
+    restored,
+    processed: inspected,
+    total: response.assets.length,
+    remaining: inspected < response.assets.length,
+  };
 }

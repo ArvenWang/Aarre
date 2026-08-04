@@ -77,8 +77,8 @@ interface SyncEngineDependencies {
   countOutbox(): Promise<number>;
   pushOutboxBatch(): Promise<{ attempted: number; synced: number; failed: number }>;
   pushEntities(): Promise<unknown>;
-  uploadAssets(): Promise<{ uploaded: number; remaining: boolean }>;
-  downloadAssets(): Promise<{ restored: number; remaining: boolean }>;
+  uploadAssets(): Promise<{ uploaded: number; processed: number; total: number; remaining: boolean }>;
+  downloadAssets(): Promise<{ restored: number; processed: number; total: number; remaining: boolean }>;
   readStatus(): Promise<SyncStatus>;
   writeStatus(status: SyncStatus): Promise<SyncStatus>;
   now(): number;
@@ -140,21 +140,17 @@ export function createSyncEngine(dependencies: SyncEngineDependencies): SyncEngi
       await dependencies.pushEntities();
       await status("pushing", outboxTotal + 1, outboxTotal + 1);
 
-      let uploaded = 0;
       await status("assets-up", 0, 0);
       for (let batch = 0; batch < 100; batch += 1) {
         const result = await dependencies.uploadAssets();
-        uploaded += result.uploaded;
-        await status("assets-up", uploaded, result.remaining ? uploaded + 1 : uploaded);
+        await status("assets-up", result.processed, result.total);
         if (!result.remaining) break;
       }
 
-      let downloaded = 0;
       await status("assets-down", 0, 0);
       for (let batch = 0; batch < 100; batch += 1) {
         const result = await dependencies.downloadAssets();
-        downloaded += result.restored;
-        await status("assets-down", downloaded, result.remaining ? downloaded + 1 : downloaded);
+        await status("assets-down", result.processed, result.total);
         if (!result.remaining) break;
       }
       failureCount = 0;

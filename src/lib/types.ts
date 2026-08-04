@@ -175,7 +175,8 @@ export type SiteIconSource =
   | "manifest"
   | "svg-icon"
   | "large-icon"
-  | "msapplication-tile";
+  | "msapplication-tile"
+  | "public-service";
 
 export interface SiteIconCandidate {
   url: string;
@@ -679,7 +680,6 @@ export interface SnapshotBackfillStatus {
 }
 
 export type OrganizationProposalKind =
-  | "classify"
   | "duplicate"
   | "dead"
   | "large_folder";
@@ -709,16 +709,6 @@ export interface OrganizationPlan {
   proposals: OrganizationProposal[];
 }
 
-export interface ReadingQueueItem {
-  nodeId: string;
-  resourceKey: string;
-  title: string;
-  url: string;
-  path: string[];
-  dateAdded?: number;
-  dateLastUsed?: number;
-}
-
 export interface FolderSuggestion {
   folderId: string;
   name: string;
@@ -729,7 +719,6 @@ export interface FolderSuggestion {
 
 export interface LibraryInsights {
   organizationPlan: OrganizationPlan;
-  readingQueue: ReadingQueueItem[];
 }
 
 export interface OrganizationNotice {
@@ -740,7 +729,6 @@ export interface OrganizationNotice {
   counts: {
     duplicate: number;
     dead: number;
-    classify: number;
     largeFolder: number;
   };
 }

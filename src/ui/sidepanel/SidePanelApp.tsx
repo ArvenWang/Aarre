@@ -23,6 +23,7 @@ const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 export function SidePanelApp() {
   const [organizationNoticeBusy, setOrganizationNoticeBusy] = useState(false);
   const [listCoverStyle, setListCoverStyle] = useState<ListCoverStyle>("site");
+  const [publicFaviconFallback, setPublicFaviconFallback] = useState(true);
   const [pageSnapshotsEnabled, setPageSnapshotsEnabled] = useState(true);
   const [onboardingVisible, setOnboardingVisible] = useState<boolean>(() =>
     localStorage.getItem("aarre:onboarding-done") !== "1"
@@ -31,9 +32,11 @@ export function SidePanelApp() {
   const applyDisplaySettings = useCallback((settings: {
     listCoverStyle: ListCoverStyle;
     pageSnapshotsEnabled: boolean;
+    publicFaviconFallback: boolean;
   }) => {
     setListCoverStyle(settings.listCoverStyle);
     setPageSnapshotsEnabled(settings.pageSnapshotsEnabled);
+    setPublicFaviconFallback(settings.publicFaviconFallback);
   }, []);
   const {
     placement: bookmarkPreview,
@@ -227,7 +230,9 @@ export function SidePanelApp() {
         <SettingsPage
           appState={appState}
           listCoverStyle={listCoverStyle}
+          publicFaviconFallback={publicFaviconFallback}
           onListCoverStyleChange={setListCoverStyle}
+          onPublicFaviconFallbackChange={setPublicFaviconFallback}
           onRestartOnboarding={() => {
             void restartOnboarding().then(() => {
               localStorage.removeItem("aarre:onboarding-done");

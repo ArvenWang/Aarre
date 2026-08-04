@@ -4,7 +4,6 @@ import { Button } from "@/ui/components/ui/button";
 import { FluidInput } from "@/ui/components/ui/input";
 import {
   ArrowLeftIcon,
-  ChevronRightIcon,
   CloseIcon,
   HistoryIcon,
   TrashIcon
@@ -87,6 +86,7 @@ function AgentHistoryPage({
                     <Button
                       type="button"
                       variant="ghost"
+                      size="sm"
                       className="agent-history-action"
                       disabled={Boolean(busyId)}
                       onClick={() => setEditingId("")}
@@ -96,6 +96,7 @@ function AgentHistoryPage({
                     <Button
                       type="submit"
                       variant="ghost"
+                      size="sm"
                       className="agent-history-action"
                       disabled={!editingTitle.trim() || Boolean(busyId)}
                     >
@@ -106,21 +107,20 @@ function AgentHistoryPage({
                   <>
                     <Button
                       variant="ghost"
+                      size="unstyled"
                       type="button"
                       className="agent-history-open"
                       onClick={() => onOpen(conversation)}
                     >
-                      <span>
-                        <strong>{conversation.title}</strong>
-                        <time>{conversationDate(conversation.updatedAt)}</time>
-                      </span>
+                      <strong>{conversation.title}</strong>
                       <small>{preview || "尚未生成回答"}</small>
-                      <ChevronRightIcon />
+                      <time>{conversationDate(conversation.updatedAt)}</time>
                     </Button>
                     <div className="agent-history-actions">
                       <Button
                         type="button"
                         variant="ghost"
+                        size="sm"
                         className="agent-history-action"
                         onClick={() => {
                           setEditingId(conversation.id);
@@ -133,6 +133,7 @@ function AgentHistoryPage({
                       <Button
                         type="button"
                         variant="ghost"
+                        size="sm"
                         className="agent-history-action"
                         data-danger={confirmDeleteId === conversation.id}
                         disabled={busyId === conversation.id}

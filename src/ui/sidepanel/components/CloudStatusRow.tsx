@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Button } from "@/ui/components/ui/button";
 import type { CloudStorageUsage } from "../../../lib/cloud-settings";
 import type { SyncStatus } from "../../../lib/sync-engine";
@@ -14,16 +13,24 @@ function relativeTime(value: string): string {
 
 export function statusText(status: SyncStatus): string {
   switch (status.phase) {
-    case "paused": return "未登录";
+    case "paused": return "同步已暂停";
     case "error":
-      return `同步失败 · ${status.error || "未知错误"}${status.nextRetryAt ? `（${relativeTime(status.nextRetryAt)}后重试）` : ""}`;
+      return status.nextRetryAt
+        ? `同步失败 · ${relativeTime(status.nextRetryAt)}后重试`
+        : "同步失败";
     case "pulling":
-    case "pushing": return status.total ? `正在同步 · ${status.current}/${status.total}` : "正在同步";
-    case "assets-up": return status.total ? `正在上传封面 · ${status.current}/${status.total}` : "正在上传封面";
-    case "assets-down": return status.total ? `正在下载封面 · ${status.current}/${status.total}` : "正在下载封面";
+    case "pushing":
+    case "assets-up":
+    case "assets-down": return status.total ? `正在同步数据 · ${status.current}/${status.total}` : "正在同步数据";
     case "idle":
     default: return status.lastSyncedAt ? `已同步 · ${relativeTime(status.lastSyncedAt)}` : "等待同步";
   }
+}
+
+export function syncIsActive(status: SyncStatus): boolean {
+  return ["pulling", "pushing", "assets-up", "assets-down"].includes(
+    status.phase,
+  );
 }
 
 interface CloudStatusRowProps {
@@ -35,24 +42,54 @@ interface CloudStatusRowProps {
 }
 
 export function CloudStatusRow({ status, usage, busy, onSync, onDisconnect }: CloudStatusRowProps) {
-  const [expanded, setExpanded] = useState(false);
   const showUsage = Boolean(usage && usage.usageRatio >= 0.8);
+  const syncing = syncIsActive(status);
   return (
-    <div className="cloud-status">
-      <Button type="button" variant="ghost" size="unstyled" className="cloud-status-row" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
+    <div className="cloud-status" aria-live="polite">
+      <div className="cloud-status-summary">
         <span className="cloud-status-dot" data-phase={status.phase} aria-hidden="true" />
         <span className="cloud-status-text">{statusText(status)}</span>
-      </Button>
-      {expanded ? (
-        <div className="cloud-status-detail">
-          {status.error ? <p role="alert">{status.error}</p> : null}
-          {showUsage && usage ? <p>云端用量 {Math.round(usage.usageRatio * 100)}%</p> : null}
-          {status.phase === "error" || status.phase === "idle" ? (
-            <Button type="button" variant="ghost" size="unstyled" className="cloud-status-sync" disabled={busy} onClick={onSync}>立即同步</Button>
-          ) : null}
-          <Button type="button" variant="ghost" size="unstyled" className="cloud-status-disconnect" disabled={busy} onClick={onDisconnect}>断开账号</Button>
-        </div>
+      </div>
+      {syncing && status.total > 0 ? (
+        <progress
+          className="cloud-status-progress"
+          value={Math.min(status.current, status.total)}
+          max={status.total}
+          aria-label="云端同步进度"
+        />
       ) : null}
+      {status.error ? (
+        <p className="cloud-status-error" role="alert" title={status.error}>
+          {status.error}
+        </p>
+      ) : null}
+      {showUsage && usage ? (
+        <p className="cloud-status-usage">
+          云端用量 {Math.round(usage.usageRatio * 100)}%
+        </p>
+      ) : null}
+      <div className="cloud-status-actions">
+        <Button
+          type="button"
+          variant="tertiary"
+          size="sm"
+          className="cloud-status-sync"
+          disabled={Boolean(busy) || syncing}
+          onClick={onSync}
+        >
+          {syncing ? "同步中…" : "立即同步"}
+        </Button>
+        <Button
+          type="button"
+          variant="danger-quiet"
+          size="sm"
+          className="cloud-status-disconnect"
+          disabled={Boolean(busy)}
+          onClick={onDisconnect}
+        >
+          断开账号
+        </Button>
+      </div>
     </div>
   );
 }

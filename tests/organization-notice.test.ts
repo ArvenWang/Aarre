@@ -4,8 +4,10 @@ import {
   dismissStoredOrganizationInsights,
   mergeStoredOrganizationInsights,
   organizationBadgeText,
+  ORGANIZATION_INSIGHTS_VERSION,
   organizationNoticeFromStored,
-  organizationPlanSignature
+  organizationPlanSignature,
+  storedOrganizationInsightsIsCurrent
 } from "../src/lib/organization-notice";
 import type {
   BookmarkAgentCatalog,
@@ -53,12 +55,23 @@ function insights(
         (item) => item.actions.length > 0
       ).length,
       proposals
-    },
-    readingQueue: []
+    }
   };
 }
 
 describe("organization notice cache", () => {
+  it("invalidates cached proposals from the removed topic organization model", () => {
+    expect(storedOrganizationInsightsIsCurrent({ version: 1 })).toBe(false);
+    expect(storedOrganizationInsightsIsCurrent({
+      ...mergeStoredOrganizationInsights(
+        null,
+        insights(),
+        { bookmarkCount: 2, lastUpdatedAt: "2026-08-04T00:00:00.000Z" }
+      ),
+      version: ORGANIZATION_INSIGHTS_VERSION,
+    })).toBe(true);
+  });
+
   it("fingerprints bookmark count and latest resource update", () => {
     const resources = [
       {
@@ -126,9 +139,9 @@ describe("organization notice cache", () => {
       insights([
         proposal(),
         proposal({
-          id: "classify:design",
-          kind: "classify",
-          title: "归类设计收藏"
+          id: "dead:resource-2",
+          kind: "dead",
+          title: "失效链接待确认"
         })
       ]),
       { bookmarkCount: 3, lastUpdatedAt: "2026-07-30T01:00:00.000Z" }
@@ -136,7 +149,7 @@ describe("organization notice cache", () => {
 
     expect(organizationNoticeFromStored(changed, 2_000)).toMatchObject({
       proposalCount: 2,
-      counts: { duplicate: 1, classify: 1 }
+      counts: { duplicate: 1, dead: 1 }
     });
   });
 

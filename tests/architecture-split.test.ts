@@ -9,6 +9,11 @@ const extensionBackground = new URL(
   import.meta.url,
 );
 const sidepanelDirectory = new URL("../src/ui/sidepanel/", import.meta.url);
+const viteConfig = new URL("../vite.config.ts", import.meta.url);
+const backgroundViteConfig = new URL(
+  "../vite.background.config.ts",
+  import.meta.url,
+);
 
 function lineCount(source: string): number {
   return source.replace(/\n$/, "").split(/\r?\n/).length;
@@ -19,6 +24,17 @@ describe("T-06/T-07 architecture limits", () => {
     const source = await readFile(extensionBackground, "utf8");
     expect(lineCount(source)).toBeLessThan(400);
     expect(source).toContain("initializeBackground();");
+  });
+
+  it("builds MV3 background separately without unsupported dynamic imports", async () => {
+    const [pageSource, backgroundSource] = await Promise.all([
+      readFile(viteConfig, "utf8"),
+      readFile(backgroundViteConfig, "utf8"),
+    ]);
+    expect(pageSource).not.toContain('background: resolve(__dirname');
+    expect(backgroundSource).toContain("codeSplitting: false");
+    expect(backgroundSource).toContain('fileName: () => "background.js"');
+    expect(backgroundSource).toContain('formats: ["es"]');
   });
 
   it("keeps every side-panel TypeScript module at or below 500 lines", async () => {

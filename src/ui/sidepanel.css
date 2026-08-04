@@ -1682,6 +1682,15 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   border-radius: 0;
 }
 
+/* The row owns the single hover/pressed surface. BookmarkMain is only the
+   semantic hit target; allowing the ghost variant to paint inside it creates
+   a second square layer over the rounded row. */
+.native-panel .bookmark-main:hover,
+.native-panel .bookmark-main:focus-visible,
+.native-panel .bookmark-main:active {
+  background: transparent;
+}
+
 .native-panel button.text-button-danger {
   color: var(--negative);
 }
@@ -1691,7 +1700,6 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
    restoring the bookmark row geometry. */
 .native-panel .bookmark-main > [data-slot="button-content"],
 .native-panel .library-search-result-main > [data-slot="button-content"],
-.native-panel .agent-history-open > [data-slot="button-content"],
 .native-panel .agent-composer-setup > button > [data-slot="button-content"],
 .native-panel .context-resurfacing > header button > [data-slot="button-content"],
 .native-panel .context-resurfacing > button > [data-slot="button-content"] {
@@ -1704,10 +1712,6 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   > [data-slot="button-label"],
 .native-panel
   .library-search-result-main
-  > [data-slot="button-content"]
-  > [data-slot="button-label"],
-.native-panel
-  .agent-history-open
   > [data-slot="button-content"]
   > [data-slot="button-label"],
 .native-panel
@@ -1745,17 +1749,21 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   gap: var(--sp-2);
 }
 
-.cloud-status-row {
+.cloud-status-summary {
   display: flex;
   width: 100%;
-  min-height: var(--control-h-sm);
   align-items: center;
   gap: var(--sp-2);
-  padding: 0;
-  border: 0;
   color: var(--ink-muted);
-  background: transparent;
-  text-align: left;
+  font-size: var(--fs-caption);
+  line-height: 1.35;
+}
+
+.cloud-status-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cloud-status-dot {
@@ -1780,20 +1788,55 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   50% { opacity: 0.4; }
 }
 
-.cloud-status-detail {
-  display: grid;
-  gap: var(--sp-2);
-  padding-inline-start: var(--sp-4);
+.cloud-status-progress {
+  width: min(100%, 240px);
+  height: var(--sp-1);
+  appearance: none;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunken);
+}
+
+.cloud-status-progress::-webkit-progress-bar {
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunken);
+}
+
+.cloud-status-progress::-webkit-progress-value {
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+}
+
+.cloud-status-error,
+.cloud-status-usage {
+  margin: 0;
+  font-size: var(--fs-caption);
+  line-height: 1.45;
+}
+
+.cloud-status-error {
+  max-width: 100%;
+  color: var(--negative);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+.cloud-status-usage {
   color: var(--ink-muted);
 }
 
-.cloud-status-detail p { margin: 0; }
+.cloud-status-actions {
+  margin-top: var(--sp-1);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
 .cloud-status-sync,
 .cloud-status-disconnect {
   width: fit-content;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--ink);
 }
-.cloud-status-disconnect { color: var(--negative); }

@@ -43,7 +43,6 @@ import {
 } from "./library-collection";
 import { LibraryView } from "./views/LibraryView";
 import { OrganizeView } from "./views/OrganizeView";
-import { ReadingView } from "./views/ReadingView";
 import { ReportView } from "./views/ReportView";
 import { ResurfaceView } from "./views/ResurfaceView";
 import { TopicsView } from "./views/TopicsView";
@@ -52,7 +51,6 @@ import { FloatingScrollbar } from "./components/FloatingScrollbar";
 const VALID_VIEWS: ManagerView[] = [
   "library",
   "organize",
-  "reading",
   "report",
   "topics",
   "resurface",
@@ -61,7 +59,6 @@ const VALID_VIEWS: ManagerView[] = [
 const VIEW_LABELS: Record<ManagerView, string> = {
   library: "收藏库",
   organize: "整理提案",
-  reading: "待读队列",
   report: "报告",
   topics: "主题图谱",
   resurface: "重新发现",
@@ -527,14 +524,6 @@ export function ManagerApp() {
           />
         );
         break;
-      case "reading":
-        viewContent = (
-          <ReadingView
-            insights={insights}
-            onOpenResource={(url) => void openResource(url)}
-          />
-        );
-        break;
       case "report":
         viewContent = (
           <ReportView
@@ -623,7 +612,6 @@ export function ManagerApp() {
                 "整理提案",
                 insights?.organizationPlan.proposalCount || 0,
               ],
-              ["reading", "待读队列", insights?.readingQueue.length || 0],
               ["report", "报告", dashboard?.weekly.createdCount || 0],
               ["topics", "主题图谱", dashboard?.topicGraph.nodes.length || 0],
               ["resurface", "重新发现", dashboard?.resurfacing.length || 0],

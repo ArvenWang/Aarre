@@ -158,6 +158,36 @@
   color: var(--ink);
 }
 
+.settings-toggle-row {
+  margin-top: var(--sp-4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.settings-toggle-row > div {
+  min-width: 0;
+}
+
+.settings-toggle-row strong,
+.settings-toggle-row small {
+  display: block;
+}
+
+.settings-toggle-row strong {
+  color: var(--ink);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-medium);
+}
+
+.settings-toggle-row small {
+  margin-top: var(--sp-1);
+  color: var(--ink-muted);
+  font-size: var(--fs-caption);
+  line-height: 1.45;
+}
+
 .settings-field-footer,
 .settings-empty-state {
   color: var(--ink-muted);
@@ -386,33 +416,41 @@
 .settings-account-row {
   margin-top: var(--sp-3);
   display: flex;
-  align-items: center;
   gap: var(--sp-3);
+}
+
+.settings-onboarding-section {
+  align-items: center;
+}
+
+.settings-account-row {
+  align-items: flex-start;
 }
 
 /* The text block takes the free space, which is what pushes the trailing
    button to the end of the row. */
 .settings-onboarding-section > div,
-.settings-account-row > div {
+.settings-account-identity {
   min-width: 0;
   flex: 1 1 auto;
 }
 
 /* Name over status. */
-.settings-account-row > div {
+.settings-account-identity {
   display: grid;
-  gap: 2px;
+  gap: var(--sp-1);
 }
 
-.settings-account-row > div strong {
-  font-size: var(--fs-small);
+.settings-account-identity strong {
+  font-size: var(--fs-body);
   font-weight: var(--fw-medium);
+  line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.settings-account-row > div small {
+.settings-account-identity small {
   color: var(--ink-muted);
   font-size: var(--fs-caption);
 }
@@ -456,13 +494,17 @@
 }
 
 .settings-account-avatar {
-  width: 34px;
-  height: 34px;
+  width: var(--control-h-md);
+  height: var(--control-h-md);
+  flex: 0 0 var(--control-h-md);
   display: grid;
   place-items: center;
   overflow: hidden;
   border-radius: 50%;
   background: var(--surface-sunken);
+  color: var(--ink-muted);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-medium);
 }
 
 .settings-account-avatar img {
@@ -1064,38 +1106,34 @@
   width: 100%;
   min-width: 0;
   padding: var(--sp-3);
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 16px;
-  gap: var(--sp-1) var(--sp-2);
+  display: block;
   border: 0;
-  border-radius: var(--agent-radius);
   color: var(--ink);
   background: transparent;
   text-align: left;
+}
+
+.agent-history-open > [data-slot="button-content"] {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-1);
 }
 
 .agent-history-open:hover {
   background: var(--surface-sunken);
 }
 
-.agent-history-open > span {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-  gap: var(--sp-2);
-}
-
 .agent-history-open strong {
   min-width: 0;
-  overflow-wrap: anywhere;
-  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.agent-history-open small {
+.agent-history-open > [data-slot="button-content"] > small {
   min-width: 0;
-  grid-column: 1 / -1;
-  margin-top: var(--sp-1);
   display: -webkit-box;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1105,27 +1143,20 @@
   -webkit-line-clamp: 2;
 }
 
-.agent-history-open strong {
+.agent-history-open > [data-slot="button-content"] strong {
   font-size: var(--fs-small);
   font-weight: var(--fw-strong);
 }
 
-.agent-history-open time,
-.agent-history-open small {
+.agent-history-open > [data-slot="button-content"] time,
+.agent-history-open > [data-slot="button-content"] small {
   color: var(--ink-faint);
   font-size: var(--fs-caption);
 }
 
-.agent-history-open time {
+.agent-history-open > [data-slot="button-content"] time {
+  display: block;
   white-space: nowrap;
-}
-
-.agent-history-open > svg {
-  grid-column: 2;
-  grid-row: 1 / 3;
-  align-self: center;
-  width: 14px;
-  color: var(--ink-faint);
 }
 
 .agent-history-actions {

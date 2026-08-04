@@ -103,12 +103,25 @@ export const previewSnapshot: BookmarkBarSnapshot = {
   syncing: true
 };
 
+const previewSignedIn =
+  typeof location !== "undefined" &&
+  new URLSearchParams(location.search).get("account") === "signed-in";
+
 export const previewState: AppState = {
-  auth: {
-    configured: false,
-    signedIn: false,
-    accountMatches: null
-  },
+  auth: previewSignedIn
+    ? {
+        configured: true,
+        signedIn: true,
+        accountMatches: true,
+        userName: "Arven wang (Nefish)",
+        userEmail: "preview@example.com",
+        chromeProfileEmail: "preview@example.com"
+      }
+    : {
+        configured: false,
+        signedIn: false,
+        accountMatches: null
+      },
   activeTab: {
     id: 1,
     url: "https://example.com/design-review",

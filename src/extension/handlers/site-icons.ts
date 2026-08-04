@@ -7,6 +7,8 @@ import {
   resolveRuleAsset
 } from "../../lib/cover-registry";
 import { extractPageEssenceFromHtml } from "../../lib/page-essence";
+import { getDisplaySettings } from "../../lib/display-settings";
+import { publicFaviconCandidates } from "../../lib/public-favicon";
 import {
   getLocalResources,
   getSiteBrand,
@@ -363,6 +365,22 @@ export function createSiteIconHandlers(
         const aliased = { ...baseRecord, host, updatedAt: now() };
         await putSiteBrand(aliased);
         return aliased;
+      }
+    }
+
+    // 只有站点自身、Manifest、固定品牌资产与主域候选全部失败后，才
+    // 根据用户设置尝试公共服务，避免对第三方发送不必要的域名请求。
+    if (!result.iconDataUrlLight) {
+      const displaySettings = await getDisplaySettings();
+      const publicCandidates = publicFaviconCandidates(
+        resource.url,
+        displaySettings
+      );
+      if (publicCandidates.length) {
+        result = await cacheSiteBrandIcon(
+          publicCandidates,
+          decodeSiteIconWithOffscreen
+        );
       }
     }
 
