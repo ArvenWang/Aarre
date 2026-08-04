@@ -41,6 +41,7 @@ export function useAgentChat({
   const activeExecution = useRef("");
   const activeAgentPort = useRef<chrome.runtime.Port | null>(null);
   const cancelledRequests = useRef(new Set<string>());
+  const editingBase = useRef<{ conversationId: string; conversation: AgentConversation } | null>(null);
 
   const loadConversations = useCallback(async () => {
     const next = await sendExtensionRequest({ type: "GET_AGENT_CONVERSATIONS" });
@@ -61,15 +62,6 @@ export function useAgentChat({
     await sendExtensionRequest({ type: "DELETE_AGENT_CONVERSATION", id });
     setConversations((current) => current.filter((item) => item.id !== id));
     setActiveConversation((current) => current?.id === id ? null : current);
-  }, []);
-
-  const renameConversation = useCallback(async (conversation: AgentConversation, title: string) => {
-    const updated = await sendExtensionRequest({
-      type: "SAVE_AGENT_CONVERSATION",
-      conversation: { ...conversation, title, updatedAt: new Date().toISOString() },
-    });
-    setConversations((current) => [updated, ...current.filter((item) => item.id !== updated.id)].slice(0, 50));
-    setActiveConversation((current) => current?.id === updated.id ? updated : current);
   }, []);
 
   async function persist(conversation: AgentConversation) {
@@ -150,9 +142,7 @@ export function useAgentChat({
           ...message,
           content: response.answer,
           thinking: response.thinking,
-          providerName: response.providerName
-            ? `${response.providerName} · ${response.catalogScanComplete ? "已检查" : "已召回"} ${response.examinedCount}/${response.catalogSize} 条收藏${response.excludedCount ? ` · ${response.excludedCount} 条受隐私保护` : ""}`
-            : undefined,
+          providerName: undefined,
           sources: response.sources,
           actions: response.actions,
           status: "complete",
@@ -366,10 +356,62 @@ export function useAgentChat({
       return;
     }
     const timestamp = new Date().toISOString();
-    const conversation = panelView === "chat" && activeConversation ? activeConversation : {
+    const pendingEdit = editingBase.current;
+    const edited = pendingEdit && pendingEdit.conversationId === activeConversation?.id
+      ? pendingEdit.conversation
+      : null;
+    editingBase.current = null;
+    const conversation = edited || (panelView === "chat" && activeConversation ? activeConversation : {
       id: crypto.randomUUID(), title: query.slice(0, 36), createdAt: timestamp, updatedAt: timestamp, messages: [],
-    };
+    });
     void runTurn(conversation, query);
+  }
+
+  function conversationBeforeMessage(messageId: string, role: "user" | "assistant") {
+    if (!activeConversation || busy) return null;
+    const index = activeConversation.messages.findIndex((message) => message.id === messageId && message.role === role);
+    if (index < 0) return null;
+    const userIndex = role === "user"
+      ? index
+      : activeConversation.messages.slice(0, index).findLastIndex((message) => message.role === "user");
+    if (userIndex < 0) return null;
+    const query = activeConversation.messages[userIndex]?.content.trim();
+    if (!query) return null;
+    return {
+      query,
+      conversation: {
+        ...activeConversation,
+        updatedAt: new Date().toISOString(),
+        messages: activeConversation.messages.slice(0, userIndex),
+      } satisfies AgentConversation,
+    };
+  }
+
+  function regenerate(messageId: string) {
+    const target = conversationBeforeMessage(messageId, "assistant");
+    if (target) void runTurn(target.conversation, target.query);
+  }
+
+  function editQuestion(messageId: string) {
+    const target = conversationBeforeMessage(messageId, "user");
+    if (!target || !activeConversation) return;
+    editingBase.current = {
+      conversationId: activeConversation.id,
+      conversation: target.conversation,
+    };
+    setPrompt(target.query);
+    setNotice("问题已放回输入框；修改后发送会从这里重新生成回答。");
+  }
+
+  async function copyAnswer(messageId: string) {
+    const message = activeConversation?.messages.find((item) => item.id === messageId && item.role === "assistant");
+    if (!message?.content.trim()) return;
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setNotice("回答已复制");
+    } catch {
+      setError("复制失败，请手动选择回答文本。");
+    }
   }
 
   useEffect(() => {
@@ -419,9 +461,10 @@ export function useAgentChat({
 
   return {
     prompt, setPrompt, conversations, activeConversation, setActiveConversation,
-    loadConversations, deleteConversation, renameConversation,
+    loadConversations, deleteConversation,
     cancelRun, confirmActions, dropAction: (messageId: string, actionId: string) => updatePendingActions(messageId, actionId),
     toggleAction: togglePendingAction,
     cancelActions: (messageId: string) => updatePendingActions(messageId), undoBatch, submit,
+    regenerate, editQuestion, copyAnswer,
   };
 }

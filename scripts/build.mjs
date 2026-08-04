@@ -1,5 +1,7 @@
 import { spawnSync } from "node:child_process";
+import { readFile, writeFile } from "node:fs/promises";
 import { loadEnv } from "vite";
+import { minify } from "terser";
 
 const buildEnvironment = {
   ...loadEnv("production", process.cwd(), ""),
@@ -56,6 +58,21 @@ run("vite", ["build"]);
 // 会保留源码的模块边界与异步调用语义，但把所有后台代码打进一个合法的
 // ESM 文件；不能把页面端也一起内联，否则会失去 React 页面按需加载。
 run("vite", ["build", "--config", "vite.background.config.ts"]);
+
+// Vite 的 library + 单文件构建会保留大量模块边界空白；再做一次模块级
+// 压缩，既不引入 MV3 不支持的 import()，也避免每次 SW 冷启动解析源码版。
+const backgroundPath = new URL("../dist/background.js", import.meta.url);
+const backgroundSource = await readFile(backgroundPath, "utf8");
+const compressedBackground = await minify(backgroundSource, {
+  module: true,
+  compress: { passes: 3 },
+  mangle: true,
+  format: { comments: false }
+});
+if (!compressedBackground.code) {
+  throw new Error("后台 Service Worker 压缩没有生成有效产物。");
+}
+await writeFile(backgroundPath, compressedBackground.code);
 
 run("esbuild", [
   "src/content/capture.ts",

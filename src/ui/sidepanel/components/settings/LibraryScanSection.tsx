@@ -56,11 +56,11 @@ export function LibraryScanSection({
         ) : scan?.state === "paused" ? (
           <>
             <Button variant="ghost" size="sm" type="button" disabled={Boolean(action)} onClick={() => onAction("cancel")}>取消</Button>
-            <Button variant="primary" size="sm" type="button" disabled={Boolean(action)} onClick={() => onAction("resume")}>继续扫描</Button>
+            <Button variant="tertiary" size="sm" type="button" disabled={Boolean(action)} onClick={() => onAction("resume")}>继续扫描</Button>
           </>
         ) : (
           <Button
-            variant="primary" size="sm"
+            variant="tertiary" size="sm"
             type="button"
 
             disabled={Boolean(action) || !appState?.localResourceCount}

@@ -80,6 +80,29 @@ export async function saveAgentConversation(
   return normalized;
 }
 
+export function conversationHasCompletedAnswer(
+  conversation: AgentConversation
+): boolean {
+  return conversation.messages.some(
+    (message) =>
+      message.role === "assistant" &&
+      message.status !== "sending" &&
+      message.content.trim().length > 0
+  );
+}
+
+export async function saveIncomingAgentConversation(
+  incoming: AgentConversation
+): Promise<boolean> {
+  const local = (await getAgentConversations()).find(
+    (conversation) => conversation.id === incoming.id
+  );
+  // 云端可能仍是提问瞬间的空占位版本；相同或更旧的版本不能覆盖本地。
+  if (local && local.updatedAt >= incoming.updatedAt) return false;
+  await saveAgentConversation(incoming);
+  return true;
+}
+
 export async function deleteAgentConversation(
   id: string
 ): Promise<void> {

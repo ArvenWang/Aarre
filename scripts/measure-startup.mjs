@@ -109,6 +109,6 @@ if (runtime) {
     `失败原因：${runtimeNote.replaceAll("\n", " ")}`,
   );
 }
-lines.push("", "运行命令：`npm run measure:startup`", "");
+lines.push("", "运行命令：`npm run measure:startup`");
 await writeFile(output, `${lines.join("\n")}\n`, "utf8");
 console.log(await readFile(output, "utf8"));

@@ -10,6 +10,7 @@ import { currentSiteBrandImageUrl } from "../../../lib/thumbnail";
 import type {
   AgentConversation,
   BookmarkAgentActionProposal,
+  BookmarkAgentSource,
   ResourceRecord,
   SiteBrandRecord
 } from "../../../lib/types";
@@ -19,21 +20,66 @@ import { AgentComposer } from "../components/AgentComposer";
 import { AgentThinkingSteps } from "../components/AgentThinkingSteps";
 import { hostFromUrl } from "../utils";
 
-function AgentMarkdown({ content }: { content: string }) {
+function AgentMarkdown({
+  content,
+  resourceByUrl,
+  siteBrandByHost,
+}: {
+  content: string;
+  resourceByUrl: Map<string, ResourceRecord>;
+  siteBrandByHost: Map<string, SiteBrandRecord>;
+}) {
   return (
     <div className="agent-markdown">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
-            <a href={href} target="_blank" rel="noreferrer noopener">{children}</a>
-          )
+          a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
+            const resource = href ? resourceForUrl(resourceByUrl, href) : undefined;
+            if (!resource) {
+              return <a href={href} target="_blank" rel="noreferrer noopener">{children}</a>;
+            }
+            return (
+              <a className="agent-inline-source" href={resource.url} target="_blank" rel="noreferrer noopener" title={resource.title}>
+                <SiteThumbnail
+                  url={resource.url}
+                  imageUrl={resource.thumbnailDataUrl}
+                  brandImageUrl={currentSiteBrandImageUrl(siteBrandForUrl(siteBrandByHost, resource.url))}
+                  categoryCoverId={resource.categoryCoverId}
+                  forceSiteBrand
+                  label={resource.siteName || resource.title}
+                  className="agent-inline-source-thumbnail"
+                />
+                <span>{children}</span>
+              </a>
+            );
+          }
         }}
       >
         {content}
       </ReactMarkdown>
     </div>
   );
+}
+
+function sourceIsCited(content: string, source: BookmarkAgentSource): boolean {
+  if (content.includes(source.url)) return true;
+  const links = [...content.matchAll(/\]\((https?:\/\/[^\s)]+)(?:\s+[^)]*)?\)/g)];
+  try {
+    const canonical = canonicalizeUrl(source.url);
+    return links.some((match) => {
+      try { return canonicalizeUrl(match[1]) === canonical; } catch { return false; }
+    });
+  } catch {
+    return false;
+  }
+}
+
+function uncitedSources(
+  content: string,
+  sources: BookmarkAgentSource[] | undefined
+): BookmarkAgentSource[] {
+  return (sources || []).filter((source) => !sourceIsCited(content, source));
 }
 
 function resourceForUrl(resourceByUrl: Map<string, ResourceRecord>, url: string) {
@@ -103,6 +149,9 @@ interface AgentChatPageProps {
   onBack: () => void;
   onSubmit: (event: React.FormEvent) => void;
   onOpenSource: (url: string) => void;
+  onRegenerate: (messageId: string) => void;
+  onEditQuestion: (messageId: string) => void;
+  onCopyAnswer: (messageId: string) => void;
   onConfirmActions: (messageId: string) => void;
   onCancelActions: (messageId: string) => void;
   onDropAction: (messageId: string, actionId: string) => void;
@@ -124,6 +173,9 @@ function AgentChatPage({
   onBack,
   onSubmit,
   onOpenSource,
+  onRegenerate,
+  onEditQuestion,
+  onCopyAnswer,
   onConfirmActions,
   onCancelActions,
   onDropAction,
@@ -186,7 +238,11 @@ function AgentChatPage({
                     </details>
                   ) : null}
                   {message.role === "assistant" ? (
-                    <AgentMarkdown content={message.content} />
+                    <AgentMarkdown
+                      content={message.content}
+                      resourceByUrl={resourceByUrl}
+                      siteBrandByHost={siteBrandByHost}
+                    />
                   ) : (
                     <p>{message.content}</p>
                   )}
@@ -196,10 +252,10 @@ function AgentChatPage({
                 <small>{message.providerName}</small>
               ) : null}
             </div>
-            {message.sources?.length ? (
+            {uncitedSources(message.content, message.sources).length ? (
               <div className="agent-message-sources">
-                <span>相关收藏</span>
-                {message.sources.map((source) => (
+                <span>其他相关收藏</span>
+                {uncitedSources(message.content, message.sources).map((source) => (
                   <Button
                     type="button"
                     variant="ghost"
@@ -358,6 +414,43 @@ function AgentChatPage({
               >
                 {busy ? "正在恢复…" : "撤销这批操作"}
               </Button>
+            ) : null}
+            {message.status !== "sending" ? (
+              <div className="agent-message-controls" aria-label="消息操作">
+                {message.role === "user" ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => onEditQuestion(message.id)}
+                  >
+                    编辑并重发
+                  </Button>
+                ) : (
+                  <Fragment>
+                    {message.content.trim() ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onCopyAnswer(message.id)}
+                      >
+                        复制
+                      </Button>
+                    ) : null}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={busy}
+                      onClick={() => onRegenerate(message.id)}
+                    >
+                      {message.status === "failed" ? "重试" : "重新生成"}
+                    </Button>
+                  </Fragment>
+                )}
+              </div>
             ) : null}
           </article>
         ))}

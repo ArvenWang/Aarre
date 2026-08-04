@@ -29,38 +29,10 @@ export function LibraryHeader({
   onOpenManager,
   onOpenSettings,
 }: LibraryHeaderProps) {
-  const auth = appState?.auth;
-  const identity = auth?.userEmail || auth?.chromeProfileEmail || "A";
   return (
     <header className="native-header">
       <div className="native-title-row">
-        <h1>
-          {auth?.signedIn && auth.userName ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="unstyled"
-              className="native-title-account"
-              title="打开账号与同步设置"
-              onClick={onOpenSettings}
-            >
-              {auth.userAvatarUrl ? (
-                <img
-                  src={auth.userAvatarUrl}
-                  alt=""
-                  className="native-title-avatar"
-                />
-              ) : identity ? (
-                <span className="native-title-avatar native-title-avatar-fallback">
-                  {identity.slice(0, 1).toUpperCase()}
-                </span>
-              ) : null}
-              我的书签
-            </Button>
-          ) : (
-            "我的书签"
-          )}
-        </h1>
+        <h1>我的书签</h1>
       </div>
       <div className="native-actions">
         <Button

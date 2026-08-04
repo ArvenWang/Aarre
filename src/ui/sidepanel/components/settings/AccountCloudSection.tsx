@@ -2,7 +2,7 @@ import { Button } from "@/ui/components/ui/button";
 import type { CloudStorageUsage } from "../../../../lib/cloud-settings";
 import type { SyncStatus } from "../../../../lib/sync-engine";
 import type { AppState } from "../../../../lib/types";
-import { CloudStatusRow } from "../CloudStatusRow";
+import { CloudStatusActions, CloudStatusRow } from "../CloudStatusRow";
 
 type Feedback = { tone: "error" | "success"; message: string } | null;
 
@@ -44,6 +44,7 @@ export function AccountCloudSection({
             <CloudStatusRow
               status={status || INITIAL_SYNC_STATUS}
               usage={usage}
+              showActions={false}
               busy={Boolean(action)}
               onSync={onSync}
               onDisconnect={onSignOut}
@@ -53,9 +54,17 @@ export function AccountCloudSection({
           )}
         </div>
         {appState?.auth.configured && !appState.auth.signedIn ? (
-          <Button variant="ghost" size="sm" type="button" disabled={Boolean(action)} onClick={onLogin}>
+          <Button variant="tertiary" size="sm" type="button" disabled={Boolean(action)} onClick={onLogin}>
             {action === "login" ? "登录中…" : "登录"}
           </Button>
+        ) : null}
+        {appState?.auth.signedIn ? (
+          <CloudStatusActions
+            status={status || INITIAL_SYNC_STATUS}
+            busy={Boolean(action)}
+            onSync={onSync}
+            onDisconnect={onSignOut}
+          />
         ) : null}
       </div>
       {feedback?.tone === "error" ? (

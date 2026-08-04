@@ -1,7 +1,7 @@
 # Aarre 架构
 
 最后更新：2026-08-03
-实现版本：0.5.33
+实现版本：0.5.62
 
 > 自建云端已部署到与 NexVoice 共用的腾讯云香港服务器：独立 API、数据库/用户、两只私有 COS、两套最小权限 CAM、Google Web OAuth client、每日/月度备份、两分钟健康巡检、Aarre 独立 GlitchTip project 和加密恢复材料均已建立，真实 COS 复制/全版本删除、PostgreSQL 隔离恢复及脱敏错误上报演练通过。当前生产发布指向 `/opt/aarre/releases/20260803-sync-rate-v27`，服务端版本 0.1.9；`sync.nexvoice.cc` 的 DNS、公开 TLS、隐私/条款页面、真实 OAuth 登录/登出和 262 条资源 metadata 首次同步均已通过。0.5.33 将显式范围选择改为本地立即保存、云端后台续传，并修复价格版本字段契约与 429 `Retry-After`。Google 品牌、完整图片备份、卸载重装恢复和正式 Web Store ID 仍是发布门。旧 Supabase / Edge Function / pgvector 路径已删除，不属于现状。
 
@@ -66,6 +66,7 @@ Token 仅由 Service Worker 读取，`chrome.storage.local` access level 固定�
 
 - 第一次登录按 200 条分页 bootstrap；现有本地资源按“当前账号是否真的返回过云端 revision”补种 Outbox，避免旧版本的 `synced` 标记让换账号或升级后的记录被漏传；以后使用单调递增的 `sync_changes.sequence` 拉增量。
 - 每个写入携带 UUID `operationId`，重试返回第一次结果，避免重复写入和重复计量。
+- durable entities 使用 `PUT /v1/sync/entities/batch` 每批最多 100 条；服务端受控 12 并发执行，逐项仍沿用相同的 `operationId` 幂等、配额、加密和用户隔离边界。
 - URL 级 AI 字段使用字段时钟合并，改一个字段不会覆盖整条资源。
 - 备注和用户标签携带 `baseRevision`。旧 revision 的不同内容不会静默覆盖：服务端把两份内容写入加密的 `conflict_versions`，备注保留当前权威值、标签先取并集；侧边栏和网页端编辑器可选择云端版、离线版或用当前编辑内容合并。
 - 删除写墓碑；游标落后于 180 天变更保留窗口时，服务端要求 full resync。

@@ -617,9 +617,7 @@ export async function askBookmarkAgent(
       sources: [],
       actions: [],
       catalogSize: 0,
-      examinedCount: 0,
-      excludedCount: 0,
-      catalogScanComplete: true
+      excludedCount: 0
     };
   }
   const [{ runAgent }, { configuredAgentProvider }] = await Promise.all([
@@ -632,7 +630,7 @@ export async function askBookmarkAgent(
     stages: ["preparing", "scanning", "synthesizing"],
     completedStages: [],
     completed: 0,
-    total: 12,
+    total: 0,
     label: "正在准备收藏库"
   });
   const result = await runAgent({
@@ -650,7 +648,7 @@ export async function askBookmarkAgent(
         stages: ["preparing", "scanning", "synthesizing"],
         completedStages: ["preparing"],
         completed: round,
-        total: 12,
+        total: 0,
         label
       });
     }
@@ -660,12 +658,10 @@ export async function askBookmarkAgent(
     answer: result.answer.slice(0, 12_000),
     thinking,
     providerName: result.providerName || "",
-    sources: [],
+    sources: result.sources,
     actions: result.plan.actions,
     catalogSize: resources.length,
-    examinedCount: resources.length,
-    excludedCount: 0,
-    catalogScanComplete: true
+    excludedCount: 0
   };
 }
 

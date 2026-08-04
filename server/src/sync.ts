@@ -8,6 +8,7 @@ import {
   conflictResolutionSchema,
   conversationSchema,
   displaySettingSchema,
+  entityBatchMutationSchema,
   entityMutationSchema,
   jsonByteLength,
   protectionRuleSchema,
@@ -938,6 +939,23 @@ export class SyncService {
     } finally {
       client.release();
     }
+  }
+
+  async upsertEntities(
+    account: AuthenticatedAccount,
+    rawInput: unknown
+  ): Promise<{ results: Record<string, unknown>[] }> {
+    const { mutations } = entityBatchMutationSchema.parse(rawInput);
+    const results: Record<string, unknown>[] = [];
+    const concurrency = 12;
+    for (let offset = 0; offset < mutations.length; offset += concurrency) {
+      results.push(...await Promise.all(
+        mutations
+          .slice(offset, offset + concurrency)
+          .map((mutation) => this.upsertEntity(account, mutation))
+      ));
+    }
+    return { results };
   }
 
   private async readEntityForUpdate(

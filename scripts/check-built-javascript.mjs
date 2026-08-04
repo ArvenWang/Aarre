@@ -27,6 +27,13 @@ for (const file of files) {
   const source = await readFile(file, "utf8");
   if (
     relative(distRoot, file) === "background.js" &&
+    Buffer.byteLength(source, "utf8") > 330_000
+  ) {
+    console.error("dist/background.js 超过 330 KB 冷启动体积硬门。当前字节数：" + Buffer.byteLength(source, "utf8"));
+    process.exit(1);
+  }
+  if (
+    relative(distRoot, file) === "background.js" &&
     /\bimport\s*\(/.test(source)
   ) {
     console.error(

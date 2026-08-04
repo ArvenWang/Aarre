@@ -1,11 +1,11 @@
-import { type Ref } from "react";
+import { useState, type Ref } from "react";
 import { FluidInput, FluidTextarea } from "@/ui/components/ui/input";
 import type {
   BookmarkEditorFolder,
   BookmarkEditorLocation,
 } from "../../lib/bookmark-editor";
 import type { ResourceRecord } from "../../lib/types";
-import { CloseIcon } from "./Icons";
+import { CloseIcon, PlusIcon } from "./Icons";
 import { Button } from "@/ui/components/ui/button";
 import {
   Select,
@@ -83,6 +83,14 @@ export function BookmarkEditorFields({
   onUserNoteChange,
   onProtectionChanged,
 }: BookmarkEditorFieldsProps) {
+  const [addingTag, setAddingTag] = useState(false);
+
+  function commitTag() {
+    if (!tagInput.trim()) return;
+    onAddTag();
+    setAddingTag(false);
+  }
+
   return (
     <>
       {locations.length > 1 ? (
@@ -200,9 +208,6 @@ export function BookmarkEditorFields({
               resource?.enhancementBlockMessage ||
               "尚未生成摘要"}
           </p>
-          <small>
-            摘要由网页内容生成，因此这里保持只读，避免把人工文字误标为 AI 结果。
-          </small>
         </div>
 
         <div className="library-card-editor-tags">
@@ -211,8 +216,7 @@ export function BookmarkEditorFields({
             role="group"
             aria-label="当前标签"
           >
-            {tags.length ? (
-              tags.map((tag) => (
+            {tags.map((tag) => (
                 <span className="tag-chip" key={tag}>
                   {tag}
                   <Button
@@ -227,39 +231,51 @@ export function BookmarkEditorFields({
                     <CloseIcon />
                   </Button>
                 </span>
-              ))
+              ))}
+            {addingTag ? (
+              <span className="tag-chip tag-chip-editor">
+                <FluidInput
+                  autoFocus
+                  value={tagInput}
+                  maxLength={120}
+                  disabled={disabled}
+                  aria-label="输入新标签"
+                  placeholder="新标签"
+                  onBlur={() => {
+                    if (!tagInput.trim()) setAddingTag(false);
+                  }}
+                  onChange={(event) => onTagInputChange(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") {
+                      event.preventDefault();
+                      onTagInputChange("");
+                      setAddingTag(false);
+                      return;
+                    }
+                    if (event.key === "Enter" || event.key === "," || event.key === "，") {
+                      event.preventDefault();
+                      commitTag();
+                    }
+                  }}
+                />
+              </span>
             ) : (
-              <small>还没有自定义标签</small>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="tag-chip tag-chip-add"
+                aria-label="添加标签"
+                title="添加标签"
+                disabled={disabled}
+                onClick={() => {
+                  onTagInputChange("");
+                  setAddingTag(true);
+                }}
+              >
+                <PlusIcon />
+              </Button>
             )}
-          </div>
-          <div className="library-card-editor-tag-entry">
-            <FluidInput
-              value={tagInput}
-              maxLength={120}
-              disabled={disabled}
-              aria-label="添加标签"
-              placeholder="输入标签，按回车添加"
-              onChange={(event) => onTagInputChange(event.target.value)}
-              onKeyDown={(event) => {
-                if (
-                  event.key === "Enter" ||
-                  event.key === "," ||
-                  event.key === "，"
-                ) {
-                  event.preventDefault();
-                  onAddTag();
-                }
-              }}
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              className="library-card-editor-tag-submit"
-              onClick={onAddTag}
-              disabled={!tagInput.trim() || disabled}
-            >
-              添加
-            </Button>
           </div>
         </div>
 

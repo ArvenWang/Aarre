@@ -275,8 +275,6 @@ const quick = await askBookmarkAgent(
 report.quickAgent = {
   elapsedMs: Date.now() - quickStartedAt,
   catalogSize: quick.catalogSize,
-  examinedCount: quick.examinedCount,
-  fullScan: quick.catalogScanComplete,
   sourceKeys: quick.sources.map((source) => source.resourceKey),
   answer: quick.answer.slice(0, 320),
   stages: quickProgress.map((progress) => progress.stage)
@@ -311,8 +309,6 @@ const recalledComponentKeys = full.sources
 report.fullAgent = {
   elapsedMs: Date.now() - fullStartedAt,
   catalogSize: full.catalogSize,
-  examinedCount: full.examinedCount,
-  fullScan: full.catalogScanComplete,
   expectedComponentKeys,
   recalledComponentKeys,
   allExpectedRecalled: expectedComponentKeys.every((key) =>
@@ -377,8 +373,6 @@ const quickPassed = quick.sources.some(
   (source) => source.resourceKey === github.resourceKey
 );
 const fullPassed =
-  full.catalogScanComplete &&
-  full.examinedCount === fullCatalog.length &&
   expectedComponentKeys.every((key) => recalledComponentKeys.includes(key));
 const enrichmentPassed =
   enriched.aiStatus === "ready" &&

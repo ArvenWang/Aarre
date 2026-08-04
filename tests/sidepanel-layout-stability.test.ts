@@ -85,7 +85,7 @@ describe("side panel notification layout", () => {
     expect(css).toContain(".native-error-layout > span,\n.native-notice > span");
     expect(settingsNoticeRule).toContain("min-height: var(--control-h-sm)");
     expect(settingsNoticeRule).toContain("align-items: center");
-    expect(frame).toContain('className="native-notice"');
+    expect(frame).not.toContain('className="native-notice"');
     expect(frame).toContain('className="native-error-layout"');
   });
 });

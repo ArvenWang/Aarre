@@ -1,4 +1,4 @@
-import type { ComponentProps, RefObject } from "react";
+import { useEffect, type ComponentProps, type RefObject } from "react";
 import { Button } from "@/ui/components/ui/button";
 import type { ListCoverStyle } from "../../../lib/display-settings";
 import type {
@@ -84,6 +84,19 @@ export default function HomePage({
   editor,
 }: HomePageProps) {
   const content = library.contentRef.current;
+
+  useEffect(() => {
+    if (!status.notice) return;
+    const timer = window.setTimeout(status.onDismissNotice, 2_000);
+    return () => window.clearTimeout(timer);
+  }, [status.notice, status.onDismissNotice]);
+
+  useEffect(() => {
+    if (!status.error) return;
+    const timer = window.setTimeout(status.onDismissError, 6_000);
+    return () => window.clearTimeout(timer);
+  }, [status.error, status.onDismissError]);
+
   return (
     <main className="native-panel">
       <LibraryHeader {...header} />
@@ -101,14 +114,6 @@ export default function HomePage({
                 <CloseIcon />
               </Button>
             </div>
-          </div>
-        ) : null}
-        {status.notice && !status.error ? (
-          <div className="native-notice" role="status">
-            <span>{status.notice}</span>
-            <Button type="button" variant="ghost" size="icon-sm" className="native-status-dismiss" aria-label="关闭提示" onClick={status.onDismissNotice}>
-              <CloseIcon />
-            </Button>
           </div>
         ) : null}
         <section
@@ -180,6 +185,11 @@ export default function HomePage({
           />
         ) : null}
       </div>
+      {status.notice && !status.error ? (
+        <div className="native-notice" role="status">
+          <span>{status.notice}</span>
+        </div>
+      ) : null}
       <BookmarkPreviewLayer {...preview} />
       {agent ? <AgentComposer {...agent} /> : null}
       <BookmarkEditorDialog {...editor} />

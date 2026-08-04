@@ -12,8 +12,7 @@
 
 .library-card-editor-field input,
 .library-card-editor-field select,
-.library-card-editor-field textarea,
-.library-card-editor-tag-entry input {
+.library-card-editor-field textarea {
   width: 100%;
   min-height: var(--control-h-lg);
   padding: var(--sp-2) var(--sp-3);
@@ -69,8 +68,7 @@
 
 .library-card-editor-field input:focus,
 .library-card-editor-field select:focus,
-.library-card-editor-field textarea:focus,
-.library-card-editor-tag-entry input:focus {
+.library-card-editor-field textarea:focus {
   border-color: var(--line-strong);
   background: var(--surface-sunken);
 }
@@ -111,13 +109,14 @@
 }
 
 .library-card-editor-ai {
-  margin-top: var(--sp-5);
-  padding-top: var(--sp-5);
+  margin-block-start: var(--sp-4);
+  padding-top: var(--sp-4);
   display: grid;
-  gap: var(--sp-5);
+  gap: var(--sp-4);
 }
 
 .library-card-editor-ai-heading {
+  margin-block-end: var(--sp-2);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -140,7 +139,7 @@
 }
 
 .library-card-editor-ai p {
-  margin: var(--sp-2) 0;
+  margin: 0;
   color: var(--ink-muted);
   font-size: var(--fs-small);
   line-height: 1.55;
@@ -162,22 +161,48 @@
   gap: var(--sp-2);
 }
 
-.library-card-editor-tag-entry {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--sp-2);
+.tag-chip-add {
+  width: var(--control-h-xs);
+  min-width: var(--control-h-xs);
+  height: var(--control-h-xs);
+  padding: 0;
+  color: var(--ink-muted);
 }
 
-.library-card-editor-tag-submit {
-  min-width: 64px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+.tag-chip-add:hover {
   color: var(--ink);
-  background: var(--surface-sunken);
-  font-size: var(--fs-caption);
+  background: var(--row-surface-hover);
 }
 
-.library-card-editor-tag-submit:not(:disabled):hover {
-  border-color: var(--line-strong);
-  background: var(--surface);
+.tag-chip-add svg {
+  width: var(--icon-xs);
+  height: var(--icon-xs);
+}
+
+.tag-chip-editor {
+  width: var(--tag-entry-width);
+  padding: 0 var(--sp-3);
+  border: 0;
+  background: var(--surface-sunken);
+}
+
+.tag-chip-editor input {
+  width: 100%;
+  min-width: 0;
+  height: var(--control-h-2xs);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--ink);
+  background: transparent;
+  font-size: var(--fs-caption);
+  outline: 0;
+  box-shadow: none;
+}
+
+.tag-chip-editor input:focus {
+  border: 0;
+  background: transparent;
+  outline: 0;
+  box-shadow: none;
 }

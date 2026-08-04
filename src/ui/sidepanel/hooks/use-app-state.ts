@@ -61,20 +61,27 @@ export function useAppState(
 
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([
-      readNativeBookmarkSnapshot(),
-      sendExtensionRequest({ type: "GET_BOOTSTRAP" }),
-    ])
-      .then(([nextSnapshot, bootstrap]) => {
+    void readNativeBookmarkSnapshot()
+      .then((nextSnapshot) => {
         if (cancelled) return;
         setSnapshot(nextSnapshot);
+      })
+      .catch((caught) => {
+        if (!cancelled) {
+          setError(caught instanceof Error ? caught.message : "书签读取失败");
+        }
+      });
+
+    void sendExtensionRequest({ type: "GET_BOOTSTRAP" })
+      .then((bootstrap) => {
+        if (cancelled) return;
         setAppState(bootstrap.appState);
         setAiConfigured(bootstrap.aiSettings.apiKeyConfigured);
         applyDisplaySettings(bootstrap.displaySettings);
       })
       .catch((caught) => {
         if (!cancelled) {
-          setError(caught instanceof Error ? caught.message : "书签读取失败");
+          setError(caught instanceof Error ? caught.message : "应用状态读取失败");
         }
       });
 

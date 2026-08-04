@@ -235,6 +235,10 @@ export const entityMutationSchema = z.object({
   deleted: z.boolean().default(false)
 }).strict();
 
+export const entityBatchMutationSchema = z.object({
+  mutations: z.array(entityMutationSchema).min(1).max(100)
+}).strict();
+
 const forbiddenField = /(?:api.?key|access.?token|refresh.?token|password|cookie|contentexcerpt|nativebookmarkid|nativefolderid|targetid|parentid|destinationid|creatednodeid|progress)/i;
 
 export function assertNoForbiddenFields(value: unknown, path = "payload"): void {

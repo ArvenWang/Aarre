@@ -127,35 +127,28 @@
   color: var(--ink);
 }
 
-/* Sunken track with a raised thumb. The thumb is the animated pill inside
-   TabsSubtle, so the tab element itself must stay transparent — painting a
-   second background on the selected tab produced two stacked indicators with
-   two different radii. */
-.settings-provider-tabs,
-.settings-cover-tabs {
-  --tabs-pill-radius: var(--radius-inset-module);
-  --tabs-pill-bg: var(--surface);
+.settings-model-field {
   margin-top: var(--sp-3);
-  padding: var(--sp-1);
-  gap: var(--sp-1);
+}
+
+.settings-model-select-trigger {
+  width: 100%;
+  min-height: var(--control-h-lg);
+  border-color: var(--line);
   border-radius: var(--radius-module);
-  background: var(--surface-sunken);
-}
-
-.settings-provider-tab {
-  min-height: var(--control-h-md);
-  padding-inline: var(--sp-2);
-  border: 0;
-  border-radius: var(--radius-inset-module);
-  color: var(--ink-muted);
-  background: transparent;
-  font-size: var(--fs-caption);
-  font-weight: var(--fw-medium);
-}
-
-.settings-provider-tab[data-active="true"],
-.settings-provider-tab[aria-selected="true"] {
   color: var(--ink);
+  background: var(--surface);
+  font-size: var(--fs-small);
+}
+
+.settings-model-select-trigger:disabled {
+  color: var(--ink-muted);
+  background: var(--field-readonly-surface);
+  opacity: 1;
+}
+
+.settings-model-select-content {
+  min-width: var(--radix-select-trigger-width);
 }
 
 .settings-toggle-row {
@@ -243,6 +236,28 @@
    (agent-composer-setup / agent-history-open). */
 .settings-more-entry {
   padding-block: var(--sp-2);
+}
+
+.settings-link-row {
+  min-height: var(--control-h-touch);
+  padding: var(--sp-2) var(--sp-3);
+  border-top: 1px solid var(--line-soft);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.settings-link-row strong {
+  color: var(--ink);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-medium);
+}
+
+.settings-field input[readonly] {
+  color: var(--ink-muted);
+  background: var(--field-readonly-surface);
+  cursor: default;
 }
 
 .settings-more-button {
@@ -369,25 +384,28 @@
 .settings-change-list {
   margin-top: var(--sp-3);
   display: grid;
-  gap: var(--sp-2);
+  gap: 0;
 }
 
-.settings-change-list article {
-  padding: var(--sp-2) var(--sp-3);
+.settings-change-list > .bookmark-row {
+  height: auto;
+  min-height: var(--control-h-touch);
+  padding: var(--sp-2);
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--sp-2);
-  border-radius: var(--radius-module);
-  background: var(--surface-sunken);
 }
 
-.settings-change-list article [data-slot="button"] {
-  border-radius: var(--radius-control);
+.settings-change-retention {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--fs-small);
 }
 
-.settings-change-list article[data-destructive="true"] {
-  background: var(--surface-sunken);
+.settings-row-action:hover,
+.settings-row-action:active {
+  background: transparent;
 }
 
 .settings-change-list article > div {
@@ -658,6 +676,36 @@
   line-height: 1.35;
 }
 
+.agent-message-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.agent-message[data-role="user"] .agent-message-controls {
+  justify-content: flex-end;
+}
+
+.agent-message:hover .agent-message-controls,
+.agent-message:focus-within .agent-message-controls {
+  opacity: 1;
+}
+
+.agent-message-controls [data-slot="button"] {
+  min-height: var(--control-h-sm);
+  padding-inline: var(--sp-2);
+  color: var(--ink-muted);
+  font-size: var(--fs-caption);
+}
+
+@media (hover: none) {
+  .agent-message-controls {
+    opacity: 1;
+  }
+}
+
 .agent-thinking {
   min-height: var(--control-h-lg);
   display: flex;
@@ -836,6 +884,46 @@
   color: var(--accent);
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+.agent-markdown .agent-inline-source {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  max-width: 100%;
+  padding: 0 var(--sp-2) 0 var(--sp-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+  vertical-align: baseline;
+  line-height: 1.4;
+}
+
+.agent-markdown .agent-inline-source:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-sunken);
+}
+
+.agent-inline-source > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-inline-source-thumbnail {
+  width: var(--sp-4);
+  height: var(--sp-4);
+  flex: 0 0 auto;
+}
+
+.agent-markdown li > .agent-inline-source:only-child {
+  width: 100%;
+  padding: var(--sp-2);
+  gap: var(--sp-2);
+  border-radius: var(--radius-md);
 }
 
 .agent-markdown table {
@@ -1092,20 +1180,20 @@
   padding: var(--sp-2) var(--sp-3) var(--sp-5);
 }
 
-.agent-history-list > article {
-  position: relative;
+.agent-history-list > .bookmark-row {
+  height: auto;
+  min-height: var(--control-h-touch);
+  padding: var(--sp-2);
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
+  align-items: center;
   gap: var(--sp-2);
-  padding-block: var(--sp-2);
-  border-bottom: 1px solid var(--line);
 }
 
 .agent-history-open {
   width: 100%;
   min-width: 0;
-  padding: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
   display: block;
   border: 0;
   color: var(--ink);
@@ -1121,8 +1209,9 @@
   gap: var(--sp-1);
 }
 
-.agent-history-open:hover {
-  background: var(--surface-sunken);
+.agent-history-open:hover,
+.agent-history-open:active {
+  background: transparent;
 }
 
 .agent-history-open strong {
@@ -1160,8 +1249,8 @@
 }
 
 .agent-history-actions {
-  align-self: start;
-  padding: var(--sp-3) var(--sp-2) 0 0;
+  align-self: center;
+  padding: 0 var(--sp-1) 0 0;
   display: flex;
   gap: var(--sp-1);
 }
@@ -1171,39 +1260,19 @@
   padding: var(--sp-1) var(--sp-2);
   border: 0;
   border-radius: var(--agent-control-radius);
-  color: var(--ink-muted);
-  background: var(--agent-surface);
+  color: var(--quiet-action-ink);
+  background: transparent;
   font-size: var(--fs-caption);
 }
 
 .agent-history-action:hover {
   color: var(--ink);
-  background: color-mix(in srgb, var(--agent-surface) 78%, var(--ink));
+  background: transparent;
 }
 
 .agent-history-action[data-danger="true"] {
-  color: var(--ink);
-}
-
-.agent-history-rename {
-  grid-column: 1 / -1;
-  min-height: 70px;
-  padding: var(--sp-3);
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: var(--sp-2);
-}
-
-.agent-history-rename input {
-  min-width: 0;
-  padding: var(--sp-2);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--agent-control-radius);
-  outline: 0;
-  color: var(--ink);
-  background: var(--surface);
-  font-size: var(--fs-small);
+  color: var(--quiet-danger-hover-ink);
+  background: var(--quiet-danger-hover-bg);
 }
 
 .agent-history-empty {

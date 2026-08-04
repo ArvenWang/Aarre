@@ -529,11 +529,8 @@ export interface BookmarkAgentResponse {
   sources: BookmarkAgentSource[];
   actions: BookmarkAgentActionProposal[];
   catalogSize: number;
-  examinedCount: number;
   /** Bookmarks intentionally kept out of provider prompts by privacy rules. */
   excludedCount: number;
-  /** Whether the response was produced only after checking the full catalog. */
-  catalogScanComplete: boolean;
 }
 
 export interface BookmarkAgentTurn {

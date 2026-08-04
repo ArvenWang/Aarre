@@ -4,13 +4,10 @@ import { Button } from "@/ui/components/ui/button";
 import { ArrowLeftIcon, ChevronRightIcon } from "../../components/Icons";
 import { getAiProviderPreset } from "../../../lib/settings";
 import {
-  getDisplaySettings,
   requestPageSnapshotPermission,
   saveDisplaySettings,
-  type ListCoverStyle
 } from "../../../lib/display-settings";
 import { sendExtensionRequest } from "../../../lib/messages";
-import { downloadAarreDataExport } from "../../../lib/data-export";
 import { SettingsMoreContent } from "../components/settings/SettingsMoreContent";
 import { LibraryScanConfirmDialog } from "../components/settings/LibraryScanConfirmDialog";
 import { AccountCloudSection } from "../components/settings/AccountCloudSection";
@@ -29,9 +26,7 @@ import type { CloudStorageUsage } from "../../../lib/cloud-settings";
 
 interface SettingsPageProps {
   appState: AppState | null;
-  listCoverStyle: ListCoverStyle;
   publicFaviconFallback: boolean;
-  onListCoverStyleChange: (style: ListCoverStyle) => void;
   onPublicFaviconFallbackChange: (enabled: boolean) => void;
   onRestartOnboarding: () => void;
   onAppStateChange: (state: AppState) => void;
@@ -40,9 +35,7 @@ interface SettingsPageProps {
 
 function SettingsPage({
   appState,
-  listCoverStyle,
   publicFaviconFallback,
-  onListCoverStyleChange,
   onPublicFaviconFallbackChange,
   onRestartOnboarding,
   onAppStateChange,
@@ -290,33 +283,6 @@ function SettingsPage({
     }
   }
 
-  async function exportLocalData() {
-    if (action) return;
-    setAction("export-data");
-    try {
-      await downloadAarreDataExport();
-    } catch {
-      /* 设置页不再展示顶部提示条 */
-    } finally {
-      setAction("");
-    }
-  }
-
-  async function handleCoverStyle(style: ListCoverStyle) {
-    if (action) return;
-    setAction("cover-style");
-    try {
-      const next = await saveDisplaySettings({
-        listCoverStyle: style,
-      });
-      onListCoverStyleChange(next.listCoverStyle);
-    } catch {
-      /* 设置页不再展示顶部提示条 */
-    } finally {
-      setAction("");
-    }
-  }
-
   async function handlePublicFaviconFallback(enabled: boolean) {
     if (action) return;
     setAction("public-favicon-fallback");
@@ -354,7 +320,7 @@ function SettingsPage({
           <ArrowLeftIcon />
         </Button>
         <div>
-          <h1>{settingsPage === "more" ? "更多" : "设置"}</h1>
+          <h1>{settingsPage === "more" ? "最近动作" : "设置"}</h1>
         </div>
       </header>
 
@@ -386,16 +352,13 @@ function SettingsPage({
                 setApiKey("");
                 setProviderFeedback(null);
               }}
-              onModelChange={setModel}
               onApiKeyChange={setApiKey}
               onSubmit={() => void saveApiSettings()}
             />
 
             <DisplaySettingsSection
-              value={listCoverStyle}
               publicFaviconFallback={publicFaviconFallback}
               disabled={Boolean(action)}
-              onChange={(style) => void handleCoverStyle(style)}
               onPublicFaviconFallbackChange={(enabled) =>
                 void handlePublicFaviconFallback(enabled)
               }
@@ -409,7 +372,7 @@ function SettingsPage({
               onAction={(intent) => void handleLibraryScan(intent)}
             />
 
-            <section className="settings-section settings-more-entry">
+            <section className="settings-section settings-more-entry" aria-label="更多设置">
               <Button
                 type="button"
                 variant="ghost"
@@ -420,10 +383,24 @@ function SettingsPage({
                 }}
               >
                 <span>
-                  <strong>更多</strong>
+                  <strong>最近动作</strong>
                 </span>
                 <ChevronRightIcon />
               </Button>
+              <div className="settings-link-row">
+                <strong>首次使用引导</strong>
+                <Button variant="tertiary" size="sm" type="button" onClick={onRestartOnboarding}>
+                  重新查看
+                </Button>
+              </div>
+              <div className="settings-link-row">
+                <strong>隐私与数据</strong>
+                <Button variant="tertiary" size="sm" asChild>
+                  <a href={chrome.runtime.getURL("privacy.html")} target="_blank" rel="noreferrer">
+                    查看
+                  </a>
+                </Button>
+              </div>
             </section>
           </>
         ) : (
@@ -431,8 +408,6 @@ function SettingsPage({
             action={action}
             undoBatches={undoBatches}
             onUndo={(batchId) => void handleUndoBatch(batchId)}
-            onRestartOnboarding={onRestartOnboarding}
-            onExport={() => void exportLocalData()}
           />
         )}
       </section>

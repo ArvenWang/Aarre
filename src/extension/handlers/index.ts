@@ -1,5 +1,6 @@
 import { getLocalResources } from "../../lib/storage";
 import {
+  conversationHasCompletedAnswer,
   deleteAgentConversation,
   getAgentConversations,
   saveAgentConversation
@@ -77,7 +78,9 @@ export function createMessageHandlers(
     GET_AGENT_CONVERSATIONS: async () => getAgentConversations(),
     SAVE_AGENT_CONVERSATION: async (request) => {
       const conversation = await saveAgentConversation(request.conversation);
-      requestSync("conversation-saved", 3_000);
+      if (conversationHasCompletedAnswer(conversation)) {
+        requestSync("conversation-saved", 3_000);
+      }
       return conversation;
     },
     DELETE_AGENT_CONVERSATION: async (request) => {

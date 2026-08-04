@@ -1,8 +1,23 @@
-import { StrictMode } from "react";
+import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { Button } from "@/ui/components/ui/button";
+import { downloadAarreDataExport } from "../../lib/data-export";
 import "./privacy.css";
 
 function PrivacyPage() {
+  const [exportState, setExportState] = useState<"idle" | "busy" | "error">("idle");
+
+  async function exportLocalData() {
+    if (exportState === "busy") return;
+    setExportState("busy");
+    try {
+      await downloadAarreDataExport();
+      setExportState("idle");
+    } catch {
+      setExportState("error");
+    }
+  }
+
   return (
     <main className="privacy-shell">
       <header>
@@ -120,7 +135,7 @@ function PrivacyPage() {
       <section>
         <h2>导出、删除与联系</h2>
         <p>
-          设置中的“导出全部本地数据”会生成 JSON，包含智能层数据、Agent
+          本页的“导出全部本地数据”会生成 JSON，包含智能层数据、Agent
           会话、站点资产、页面快照、撤销记录和安全的本机设置，并明确排除 API
           Key、Key
           尾号与登录令牌。你可以通过卸载扩展或清除扩展数据完成本机删除；云端数据需在账号设置中单独请求删除，服务端会先吊销设备 Token，再删除在线密文和 COS 全部对象版本，安全备份按公开保留期到期。
@@ -136,6 +151,21 @@ function PrivacyPage() {
           </a>{" "}
           提交；请勿附带私人书签、API Key 或页面正文。
         </p>
+        <div className="privacy-export-actions">
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            className="privacy-export-button"
+            disabled={exportState === "busy"}
+            onClick={() => void exportLocalData()}
+          >
+            {exportState === "busy" ? "正在打包…" : "导出全部本地数据"}
+          </Button>
+          {exportState === "error" ? (
+            <span role="alert">导出失败，请返回扩展后重试。</span>
+          ) : null}
+        </div>
       </section>
     </main>
   );

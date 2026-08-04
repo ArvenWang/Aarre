@@ -37,6 +37,8 @@ const audit = () => {
     const exempt =
       /^(?:checkbox|radio)$/.test(control.type || "") ||
       control.classList.contains("tag-chip-remove") ||
+      control.getAttribute("aria-hidden") === "true" ||
+      (control.tagName === "SELECT" && control.tabIndex < 0 && box.height <= 1) ||
       inlineByDesign;
     if (box.height < 24 && !exempt)
       findings.push(`高度不足 ${box.height.toFixed(1)}px：${label(control)}`);
@@ -288,7 +290,7 @@ const scenes = [
         .click({ force: true });
       await page.waitForTimeout(600);
       await page
-        .locator('.library-card-editor-actions [data-variant="danger-quiet"]')
+        .locator(".library-card-editor-delete")
         .click();
       await page.waitForTimeout(300);
     },

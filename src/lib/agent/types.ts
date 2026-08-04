@@ -1,4 +1,4 @@
-import type { BookmarkAgentActionProposal } from "../types";
+import type { BookmarkAgentActionProposal, BookmarkAgentSource } from "../types";
 
 export interface AgentToolCall {
   id: string;
@@ -28,6 +28,7 @@ export interface AgentPlan {
 export interface AgentRunResult {
   answer: string;
   plan: AgentPlan;
+  sources: BookmarkAgentSource[];
   rounds: number;
   providerName?: string;
   stoppedByLimit: boolean;

@@ -46,6 +46,8 @@
 }
 
 .native-panel {
+  --composer-height: 112px;
+  position: relative;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
@@ -117,42 +119,6 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   font-weight: var(--fw-strong);
   letter-spacing: -0.025em;
   line-height: 1;
-}
-
-/* 登录后标题变为账号入口：头像 + 固定标题，点击进入账号与同步设置 */
-.native-title-account {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  font: inherit;
-  letter-spacing: inherit;
-  color: inherit;
-  cursor: pointer;
-  text-align: left;
-}
-
-.native-title-account:hover {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.native-title-avatar {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  object-fit: cover;
-  flex: none;
-}
-
-.native-title-avatar-fallback {
-  display: grid;
-  place-items: center;
-  background: var(--surface-sunken);
-  font-size: var(--fs-caption);
-  font-weight: var(--fw-medium);
 }
 
 .native-actions {
@@ -309,18 +275,6 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   height: 13px;
 }
 
-[data-density="compact"] .search-box kbd {
-  min-width: 20px;
-  padding: calc(var(--sp-1) / 2) var(--sp-1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  color: var(--ink-faint);
-  background: var(--surface-sunken);
-  font-family: var(--font-ui);
-  font-size: var(--fs-caption);
-  text-align: center;
-}
-
 /* Status strips used to sit in the panel grid as another sunken row, so they
    fused with the bookmark list. They now live inside the content frame and
    float over the scroll surface — same role as the manager toast, just pinned
@@ -356,7 +310,28 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 }
 
 .native-notice {
-  color: var(--ink-muted);
+  top: auto;
+  right: auto;
+  bottom: calc(var(--composer-height) + var(--sp-3));
+  left: 50%;
+  width: max-content;
+  max-width: calc(100% - var(--sp-6) * 2);
+  min-height: 0;
+  padding: var(--sp-2) var(--sp-4);
+  transform: translateX(-50%);
+  border: 0;
+  border-radius: var(--radius-pill);
+  color: var(--scrim-ink);
+  background: var(--scrim);
+  box-shadow: var(--shadow-float);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: toast-in var(--dur-base) var(--ease) both;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(var(--sp-2)); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
 .native-error-layout > div {
@@ -412,7 +387,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   --bookmark-fade-end: 52px;
   width: 100%;
   height: 100%;
-  padding: var(--sp-1) var(--sp-4) var(--sp-4) var(--sp-2);
+  padding: 0 var(--sp-4) var(--sp-4) var(--sp-2);
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -431,13 +406,9 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
     var(--ink) calc(100% - var(--bookmark-fade-end)),
     transparent 100%
   );
-  animation:
-    bookmark-reveal-scroll-start linear both,
-    bookmark-reveal-scroll-end linear both;
-  animation-timeline: scroll(self), scroll(self);
-  animation-range:
-    0 var(--bookmark-scroll-fade),
-    calc(100% - var(--bookmark-scroll-fade)) 100%;
+  animation: bookmark-reveal-scroll-end linear both;
+  animation-timeline: scroll(self);
+  animation-range: calc(100% - var(--bookmark-scroll-fade)) 100%;
 }
 
 .native-content::-webkit-scrollbar {
@@ -455,16 +426,6 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   syntax: "<length>";
   inherits: false;
   initial-value: 52px;
-}
-
-@keyframes bookmark-reveal-scroll-start {
-  from {
-    --bookmark-fade-start: 0px;
-  }
-
-  to {
-    --bookmark-fade-start: 52px;
-  }
 }
 
 @keyframes bookmark-reveal-scroll-end {
@@ -550,9 +511,9 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   top: 0;
   z-index: 7;
   overflow: hidden;
-  background: color-mix(in srgb, var(--bg) 92%, transparent);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: var(--bg);
+  mask-image: none;
+  -webkit-mask-image: none;
 }
 
 .bookmark-main {
@@ -1344,6 +1305,48 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   white-space: nowrap;
 }
 
+.folder-select-create {
+  position: sticky;
+  bottom: 0;
+  margin-top: var(--sp-1);
+  padding-top: var(--sp-1);
+  border-top: 1px solid var(--line-soft);
+  background: var(--surface);
+}
+
+.folder-select-create-trigger {
+  width: 100%;
+  min-height: var(--control-h-md);
+  justify-content: flex-start;
+  gap: var(--sp-2);
+  color: var(--ink-muted);
+}
+
+.folder-select-create-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: var(--sp-1);
+}
+
+.folder-select-create-fields input {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--control-h-md);
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+  font-size: var(--fs-caption);
+}
+
+.folder-select-create-error {
+  margin: var(--sp-1) 0 0;
+  color: var(--negative);
+  font-size: var(--fs-caption);
+}
+
 .folder-suggestions {
   margin-top: var(--sp-2);
   display: grid;
@@ -1571,6 +1574,10 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   flex: 0 0 auto;
   justify-content: flex-end;
   gap: var(--sp-2);
+}
+
+.delete-confirmation [data-variant="danger"] {
+  color: var(--danger-ink);
 }
 
 .bookmark-preview-card {
@@ -1836,7 +1843,24 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   gap: var(--sp-2);
 }
 
+.settings-account-row > .cloud-status-actions {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  align-items: center;
+  margin-top: 0;
+  margin-left: auto;
+}
+
 .cloud-status-sync,
 .cloud-status-disconnect {
   width: fit-content;
+}
+
+.cloud-status-disconnect {
+  padding-inline: var(--sp-2);
+}
+
+.editor-delete-action svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
 }

@@ -187,19 +187,17 @@ export function ManagerApp() {
         setSiteBrands(nextSiteBrands);
         setPageSnapshotsEnabled(displaySettings.pageSnapshotsEnabled);
         setSnapshotExcludedHosts(displaySettings.snapshotExcludedHosts);
+        await loadResources();
         if (
           runSync &&
           state.auth.configured &&
           state.auth.signedIn &&
           state.auth.accountMatches === true
         ) {
-          try {
-            await sendExtensionRequest({ type: "SYNC_NOW" });
-          } catch {
-            // 网络不可用时，本地收藏仍然要完整可用。
-          }
+          void sendExtensionRequest({ type: "SYNC_NOW" })
+            .then(() => refresh(true, false, false))
+            .catch(() => undefined);
         }
-        await loadResources();
         const derived = loadDerivedData();
         if (waitForDerived) {
           await derived;

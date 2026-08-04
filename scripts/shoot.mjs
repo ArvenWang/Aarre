@@ -127,7 +127,7 @@ const states = {
     await shot(page, "manager-editor-footer");
 
     const del = page.locator(
-      '.library-card-editor-actions [data-variant="danger-quiet"]',
+      ".library-card-editor-delete",
     );
     if (await del.count()) {
       await del.click();

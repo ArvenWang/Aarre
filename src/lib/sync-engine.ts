@@ -76,7 +76,9 @@ interface SyncEngineDependencies {
   pullEntities(): Promise<unknown>;
   countOutbox(): Promise<number>;
   pushOutboxBatch(): Promise<{ attempted: number; synced: number; failed: number }>;
-  pushEntities(): Promise<unknown>;
+  pushEntities(
+    onProgress: (processed: number, total: number) => Promise<void>
+  ): Promise<{ synced: number; total: number }>;
   uploadAssets(): Promise<{ uploaded: number; processed: number; total: number; remaining: boolean }>;
   downloadAssets(): Promise<{ restored: number; processed: number; total: number; remaining: boolean }>;
   readStatus(): Promise<SyncStatus>;
@@ -129,16 +131,22 @@ export function createSyncEngine(dependencies: SyncEngineDependencies): SyncEngi
       await status("pulling", 2, 2);
 
       const outboxTotal = await dependencies.countOutbox();
-      await status("pushing", 0, outboxTotal + 1);
+      await status("pushing", 0, outboxTotal);
       let pushed = 0;
       for (let batch = 0; batch < 100; batch += 1) {
         const result = await dependencies.pushOutboxBatch();
         if (!result.attempted) break;
         pushed += result.synced + result.failed;
-        await status("pushing", Math.min(pushed, outboxTotal), outboxTotal + 1);
+        await status("pushing", Math.min(pushed, outboxTotal), outboxTotal);
       }
-      await dependencies.pushEntities();
-      await status("pushing", outboxTotal + 1, outboxTotal + 1);
+      const entityResult = await dependencies.pushEntities(async (processed, total) => {
+        await status("pushing", outboxTotal + processed, outboxTotal + total);
+      });
+      await status(
+        "pushing",
+        outboxTotal + entityResult.total,
+        outboxTotal + entityResult.total
+      );
 
       await status("assets-up", 0, 0);
       for (let batch = 0; batch < 100; batch += 1) {

@@ -61,12 +61,7 @@ function AgentThinkingSteps({
                 ))}
               </ol>
             ) : (
-              <span>
-                {step.label}
-                {step.stage === "scanning" && progress?.stage === "scanning"
-                  ? ` · ${progress.completed}/${progress.total}`
-                  : null}
-              </span>
+              <span>{step.label}</span>
             )}
           </div>
         );

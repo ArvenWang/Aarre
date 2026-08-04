@@ -3,5 +3,6 @@
 @source "./sidepanel";
 @source "./components";
 @source "../lib/shape-context.tsx";
+@source "../lib/surface-classes.ts";
 @import "./styles.css";
 @import "./sidepanel.css";

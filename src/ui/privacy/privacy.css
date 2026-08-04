@@ -99,3 +99,37 @@ body {
   text-decoration-color: #9ebd76;
   text-underline-offset: 3px;
 }
+
+.privacy-export-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.privacy-export-button {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid #242424;
+  border-radius: 999px;
+  background: #242424;
+  color: #f7f6f1;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.privacy-export-button:hover:not(:disabled) {
+  background: #454540;
+}
+
+.privacy-export-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.privacy-export-actions span {
+  color: #a33b31;
+  font-size: 12px;
+}

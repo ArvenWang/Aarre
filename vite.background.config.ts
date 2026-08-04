@@ -15,6 +15,7 @@ export default defineConfig({
     target: "chrome116",
     emptyOutDir: false,
     modulePreload: false,
+    minify: "oxc",
     // 单文件是 Chrome MV3 的兼容性要求，不应提示改回不受支持的 import()。
     chunkSizeWarningLimit: 750,
     // library 模式不会注入面向网页 client 的 modulepreload 助手；否则即使

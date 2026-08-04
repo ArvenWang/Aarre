@@ -247,6 +247,18 @@ textarea:focus-visible {
   height: 12px;
 }
 
+/* Low-frequency destructive actions stay visually neutral until intent. */
+.quiet-danger-action {
+  border: 0;
+  color: var(--quiet-action-ink);
+  background: transparent;
+}
+
+.quiet-danger-action:hover:not(:disabled) {
+  color: var(--quiet-danger-hover-ink);
+  background: var(--quiet-danger-hover-bg);
+}
+
 .eyebrow,
 .section-eyebrow {
   color: var(--ink-faint);

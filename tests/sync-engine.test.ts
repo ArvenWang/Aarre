@@ -18,7 +18,10 @@ function harness(overrides: Partial<Parameters<typeof createSyncEngine>[0]> = {}
     pullEntities: vi.fn(async () => undefined),
     countOutbox: vi.fn(async () => 0),
     pushOutboxBatch: vi.fn(async () => ({ attempted: 0, synced: 0, failed: 0 })),
-    pushEntities: vi.fn(async () => undefined),
+    pushEntities: vi.fn(async (onProgress) => {
+      await onProgress(0, 0);
+      return { synced: 0, total: 0 };
+    }),
     uploadAssets: vi.fn(async () => ({ uploaded: 0, processed: 0, total: 0, remaining: false })),
     downloadAssets: vi.fn(async () => ({ restored: 0, processed: 0, total: 0, remaining: false })),
     readStatus: vi.fn(async () => current),
@@ -90,6 +93,25 @@ describe("sync engine", () => {
         .filter((status) => status.phase === "assets-up" && status.total > 0)
         .map(({ current, total }) => [current, total]),
     ).toEqual([[12, 121], [24, 121], [121, 121]]);
+  });
+
+  it("reports every durable entity instead of collapsing hundreds of writes into 0/1", async () => {
+    const pushEntities = vi.fn(async (onProgress: (processed: number, total: number) => Promise<void>) => {
+      await onProgress(0, 228);
+      await onProgress(100, 228);
+      await onProgress(200, 228);
+      await onProgress(228, 228);
+      return { synced: 228, total: 228 };
+    });
+    const test = harness({ pushEntities });
+
+    await test.engine.sync("entity-progress");
+
+    expect(
+      test.writes
+        .filter((status) => status.phase === "pushing" && status.total === 228)
+        .map(({ current, total }) => [current, total]),
+    ).toEqual([[0, 228], [100, 228], [200, 228], [228, 228], [228, 228]]);
   });
 
   it("pauses without making cloud requests when the account is unavailable", async () => {

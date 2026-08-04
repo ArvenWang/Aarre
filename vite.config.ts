@@ -13,9 +13,9 @@ export default defineConfig({
   build: {
     target: "chrome116",
     sourcemap: false,
-    // 页面端继续使用原生 ESM 动态导入；关闭额外依赖预加载，避免无意义
-    // 的脚本预取。MV3 后台由 vite.background.config.ts 单独构建。
-    modulePreload: false,
+    // 只预加载页面入口静态依赖；React.lazy 产生的动态 chunk 不会被预取。
+    // MV3 后台由 vite.background.config.ts 单独构建。
+    modulePreload: true,
     rollupOptions: {
       input: {
         sidepanel: resolve(__dirname, "sidepanel.html"),
@@ -27,6 +27,8 @@ export default defineConfig({
         manualChunks(id) {
           if (id.includes("/node_modules/pinyin-pro/")) return "pinyin-search";
           if (
+            id.includes("/node_modules/react/jsx-runtime") ||
+            id.includes("/node_modules/react/jsx-dev-runtime") ||
             id.includes("/node_modules/react/") ||
             id.includes("/node_modules/react-dom/")
           ) return "react-vendor";
@@ -34,11 +36,6 @@ export default defineConfig({
             id.includes("/node_modules/@radix-ui/") ||
             id.includes("/node_modules/@base-ui/")
           ) return "ui-vendor";
-          if (
-            id.includes("/node_modules/react-markdown/") ||
-            id.includes("/node_modules/remark-") ||
-            id.includes("/node_modules/micromark")
-          ) return "markdown";
           return undefined;
         },
         entryFileNames: "assets/[name]-[hash].js",

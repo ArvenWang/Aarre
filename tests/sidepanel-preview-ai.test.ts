@@ -40,7 +40,7 @@ describe("side panel preview AI", () => {
                         }
                       }]
                     }
-                  : { content: "这是来自真实 Provider 路径的回答。" }
+                  : { content: "这是来自 [GitHub — 代码仓库](https://github.com/) 的真实 Provider 路径回答。" }
               }
             ],
             usage: {
@@ -108,9 +108,14 @@ describe("side panel preview AI", () => {
       expect.objectContaining({
         ok: true,
         data: expect.objectContaining({
-          answer: "这是来自真实 Provider 路径的回答。",
+          answer: "这是来自 [GitHub — 代码仓库](https://github.com/) 的真实 Provider 路径回答。",
           thinking: ["正在使用 search_bookmarks"],
-          sources: []
+          sources: [
+            expect.objectContaining({
+              title: "GitHub — 代码仓库",
+              url: "https://github.com/"
+            })
+          ]
         })
       })
     );

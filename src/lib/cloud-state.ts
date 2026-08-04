@@ -4,7 +4,11 @@ import {
   saveCloudSyncSettings,
   type CloudSyncSettings
 } from "./cloud-settings";
-import { getAgentConversations, saveAgentConversation } from "./conversations";
+import {
+  conversationHasCompletedAnswer,
+  getAgentConversations,
+  saveIncomingAgentConversation
+} from "./conversations";
 import {
   getDisplaySettings,
   saveDisplaySettings,
@@ -73,6 +77,20 @@ interface CloudEntity {
   payload: unknown;
   revision: number;
   deleted: boolean;
+}
+
+interface EntityMutationInput {
+  entityType: string;
+  entityId: string;
+  updatedAt: string;
+  payload: unknown;
+  deleted?: boolean;
+}
+
+interface PreparedEntityMutation {
+  stateKey: string;
+  hash: string;
+  mutation: EntityMutationInput & { operationId: string; deleted: boolean };
 }
 
 interface BookmarkItemPayload {
@@ -217,27 +235,83 @@ async function readBookmarkBindings(): Promise<BookmarkItemBinding[]> {
 
 async function putEntity(
   state: SyncedState,
-  input: {
-    entityType: string;
-    entityId: string;
-    updatedAt: string;
-    payload: unknown;
-    deleted?: boolean;
-  }
+  input: EntityMutationInput
 ): Promise<boolean> {
-  const stateKey = `${input.entityType}:${input.entityId}`;
-  const nextHash = await digest({ payload: input.payload, deleted: Boolean(input.deleted) });
-  if (state[stateKey]?.hash === nextHash) return false;
+  const prepared = await prepareEntity(state, input);
+  if (!prepared) return false;
   const result = await cloudRequest<{ revision: number }>("/v1/sync/entities", {
     method: "PUT",
-    body: JSON.stringify({
+    body: JSON.stringify(prepared.mutation)
+  });
+  state[prepared.stateKey] = { hash: prepared.hash, revision: result.revision };
+  return true;
+}
+
+async function prepareEntity(
+  state: SyncedState,
+  input: EntityMutationInput
+): Promise<PreparedEntityMutation | null> {
+  const stateKey = `${input.entityType}:${input.entityId}`;
+  const hash = await digest({ payload: input.payload, deleted: Boolean(input.deleted) });
+  if (state[stateKey]?.hash === hash) return null;
+  return {
+    stateKey,
+    hash,
+    mutation: {
       operationId: crypto.randomUUID(),
       ...input,
       deleted: Boolean(input.deleted)
-    })
-  });
-  state[stateKey] = { hash: nextHash, revision: result.revision };
-  return true;
+    }
+  };
+}
+
+async function flushEntityBatch(
+  state: SyncedState,
+  pending: PreparedEntityMutation[],
+  onProgress?: (processed: number, total: number) => void | Promise<void>
+): Promise<number> {
+  await onProgress?.(0, pending.length);
+  let processed = 0;
+  for (let offset = 0; offset < pending.length; offset += 100) {
+    const batch = pending.slice(offset, offset + 100);
+    let results: Array<{ revision: number }>;
+    try {
+      const response = await cloudRequest<{ results: Array<{ revision: number }> }>(
+        "/v1/sync/entities/batch",
+        { method: "PUT", body: JSON.stringify({ mutations: batch.map((item) => item.mutation) }) }
+      );
+      results = response.results;
+    } catch (error) {
+      const status = (error as { status?: number }).status;
+      if (status !== 404 && status !== 405) throw error;
+      // 滚动发布兼容：旧服务端尚无 batch 路由时，使用同一 operationId
+      // 受控并发写入，避免退回数百条完全串行请求。
+      results = [];
+      for (let fallbackOffset = 0; fallbackOffset < batch.length; fallbackOffset += 12) {
+        results.push(...await Promise.all(
+          batch.slice(fallbackOffset, fallbackOffset + 12).map((item) =>
+            cloudRequest<{ revision: number }>("/v1/sync/entities", {
+              method: "PUT",
+              body: JSON.stringify(item.mutation)
+            })
+          )
+        ));
+        await onProgress?.(
+          processed + Math.min(fallbackOffset + 12, batch.length),
+          pending.length
+        );
+      }
+    }
+    if (results.length !== batch.length) {
+      throw new Error("云端批量同步返回数量不一致。");
+    }
+    batch.forEach((item, index) => {
+      state[item.stateKey] = { hash: item.hash, revision: results[index].revision };
+    });
+    processed += batch.length;
+    await onProgress?.(processed, pending.length);
+  }
+  return processed;
 }
 
 function stableConversation(conversation: AgentConversation): AgentConversation {
@@ -515,10 +589,16 @@ async function currentProtectionBindings(
   return result;
 }
 
-export async function syncDurableCloudState(): Promise<{ synced: number }> {
+export async function syncDurableCloudState(
+  onProgress?: (processed: number, total: number) => void | Promise<void>
+): Promise<{ synced: number; total: number }> {
   const cloudSettings = await getCloudSyncSettings();
   const state = await readSyncedState();
-  let synced = 0;
+  const pending: PreparedEntityMutation[] = [];
+  const queueEntity = async (input: EntityMutationInput) => {
+    const prepared = await prepareEntity(state, input);
+    if (prepared) pending.push(prepared);
+  };
   const now = new Date().toISOString();
   const [display, ai, usage, conversations, protection, organization, theme, undoSnapshots, bookmarkTree, resources] = await Promise.all([
     getDisplaySettings(),
@@ -532,32 +612,32 @@ export async function syncDurableCloudState(): Promise<{ synced: number }> {
     chrome.bookmarks.getTree(),
     getLocalResources()
   ]);
-  if (await putEntity(state, {
+  await queueEntity({
     entityType: "setting-display",
     entityId: "display",
     updatedAt: now,
     payload: cloudDisplaySettingsPayload(display)
-  })) synced += 1;
-  if (theme && await putEntity(state, {
+  });
+  if (theme) await queueEntity({
     entityType: "setting-theme",
     entityId: "theme",
     updatedAt: now,
     payload: { mode: theme }
-  })) synced += 1;
-  if (await putEntity(state, {
+  });
+  await queueEntity({
     entityType: "setting-ai-models",
     entityId: "ai-models",
     updatedAt: now,
     payload: { provider: ai.provider, models: ai.providerModels }
-  })) synced += 1;
-  if (await putEntity(state, {
+  });
+  await queueEntity({
     entityType: "setting-cloud-scope",
     entityId: "cloud-scope",
     updatedAt: cloudSettings.updatedAt || now,
     payload: cloudSettings
-  })) synced += 1;
+  });
   const period = now.slice(0, 7);
-  if (await putEntity(state, {
+  await queueEntity({
     entityType: "usage-period",
     entityId: `${period}:${ai.provider}:${ai.model}`,
     updatedAt: usage.updatedAt || now,
@@ -567,15 +647,16 @@ export async function syncDurableCloudState(): Promise<{ synced: number }> {
       model: ai.model,
       usage
     })
-  })) synced += 1;
+  });
   for (const conversation of conversations) {
     if (!/^[0-9a-f-]{36}$/i.test(conversation.id)) continue;
-    if (await putEntity(state, {
+    if (!conversationHasCompletedAnswer(conversation)) continue;
+    await queueEntity({
       entityType: "conversation",
       entityId: conversation.id,
       updatedAt: conversation.updatedAt,
       payload: stableConversation(conversation)
-    })) synced += 1;
+    });
   }
   for (const snapshot of undoSnapshots) {
     if (!/^[0-9a-f-]{36}$/i.test(snapshot.batchId)) continue;
@@ -584,7 +665,7 @@ export async function syncDurableCloudState(): Promise<{ synced: number }> {
         .map((mutation) => "resourceKey" in mutation ? mutation.resourceKey : undefined)
         .filter((value): value is string => Boolean(value && /^[a-f0-9]{64}$/.test(value)))
     )];
-    if (await putEntity(state, {
+    await queueEntity({
       entityType: "operation-history",
       entityId: snapshot.batchId,
       updatedAt: snapshot.createdAt,
@@ -597,7 +678,7 @@ export async function syncDurableCloudState(): Promise<{ synced: number }> {
         createdAt: snapshot.createdAt,
         expiresAt: snapshot.expiresAt
       }
-    })) synced += 1;
+    });
   }
   const protectionPolicy = buildProtectionPolicy(bookmarkTree, protection);
   const protectedResourceKeys = new Set(
@@ -634,23 +715,23 @@ export async function syncDurableCloudState(): Promise<{ synced: number }> {
           updatedAt: ruleUpdatedAt,
           deleted
         };
-    if (await putEntity(state, {
+    await queueEntity({
       entityType: "protection-rule",
       entityId: binding.ruleId,
       updatedAt: ruleUpdatedAt,
       payload,
       deleted
-    })) synced += 1;
+    });
   }
 
   for (const legacy of await drainLegacyBookmarkBindings()) {
-    if (await putEntity(state, {
+    await queueEntity({
       entityType: "bookmark-item",
       entityId: legacy.bookmarkItemId,
       updatedAt: now,
       payload: legacy.payload,
       deleted: true
-    })) synced += 1;
+    });
   }
   const bookmarkBindings = await currentBookmarkBindings(
     bookmarkTree,
@@ -659,20 +740,20 @@ export async function syncDurableCloudState(): Promise<{ synced: number }> {
   );
   for (const binding of [...bookmarkBindings.current, ...bookmarkBindings.deleted]) {
     const deleted = bookmarkBindings.deleted.includes(binding);
-    if (await putEntity(state, {
+    await queueEntity({
       entityType: "bookmark-item",
       entityId: binding.bookmarkItemId,
       updatedAt: deleted ? now : binding.payload.updatedAt,
       payload: binding.payload,
       deleted
-    })) synced += 1;
+    });
   }
   const report = organization[ORGANIZATION_INSIGHTS_KEY];
   if (report && typeof report === "object") {
     const reportId = await stableUuid("organization-insights");
     const generatedAt = (report as { insights?: { organizationPlan?: { generatedAt?: string } } })
       .insights?.organizationPlan?.generatedAt || now;
-    if (await putEntity(state, {
+    await queueEntity({
       entityType: "report",
       entityId: reportId,
       updatedAt: generatedAt,
@@ -683,14 +764,15 @@ export async function syncDurableCloudState(): Promise<{ synced: number }> {
         generatedAt,
         data: sanitizeReport(report)
       }
-    })) synced += 1;
+    });
   }
+  const synced = await flushEntityBatch(state, pending, onProgress);
   await chrome.storage.local.set({
     [CLOUD_STATE_KEY]: state,
     [CLOUD_PROTECTION_BINDINGS_KEY]: bindings,
     [CLOUD_BOOKMARK_BINDINGS_KEY]: bookmarkBindings.current
   });
-  return { synced };
+  return { synced, total: pending.length };
 }
 
 export async function syncCloudScopeSetting(
@@ -821,8 +903,9 @@ export async function restoreDurableCloudState(
         restored += 1;
       }
     } else if (entity.entityType === "conversation") {
-      await saveAgentConversation(entity.payload as AgentConversation);
-      restored += 1;
+      if (await saveIncomingAgentConversation(entity.payload as AgentConversation)) {
+        restored += 1;
+      }
     } else if (entity.entityType === "usage-period") {
       await mergeAiUsageStats(entity.payload as Parameters<typeof mergeAiUsageStats>[0]);
       restored += 1;

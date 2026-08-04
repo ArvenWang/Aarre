@@ -61,9 +61,6 @@ export function BookmarkEditorDialog({
                 : editor.kind === "folder" ? "新建文件夹"
                   : editor.node.url ? "编辑收藏" : "编辑文件夹"}
             </h2>
-            {editor.kind === "bookmark" && editor.node.url ? (
-              <p>Chrome 保存名称、网址和文件夹；Aarre 保存备注与自定义标签。</p>
-            ) : null}
           </div>
           <Button variant="ghost" size="icon-sm" className="dialog-close" onClick={close} disabled={Boolean(busy)} aria-label="关闭">
             <CloseIcon />
@@ -213,12 +210,6 @@ export function BookmarkEditorDialog({
                   <span>备注</span>
                   <FluidTextarea value={note} onChange={(event) => setNote(event.target.value)} rows={3} maxLength={2_000} placeholder="可选。记录你保存它的原因。" />
                 </label>
-                <div className="native-check smart-layer-required">
-                  <span aria-hidden="true">✓</span>
-                  <span>
-                    <strong>自动生成摘要</strong>
-                  </span>
-                </div>
                 {captureWarning ? <p className="dialog-warning">{captureWarning}</p> : null}
               </>
             ) : null}
@@ -242,12 +233,13 @@ export function BookmarkEditorDialog({
                 <>
                   {editor.kind === "bookmark" && !editor.node.folderType ? (
                     <Button
-                      variant="danger-quiet"
+                      variant="ghost"
+                      size="sm"
                       type="button"
-
+                      className="editor-delete-action quiet-danger-action"
                       onClick={() => setConfirmDeleteId(editBookmarkId || editor.node.id)}
                       disabled={Boolean(busy)}
-                    ><TrashIcon />删除</Button>
+                    >删除</Button>
                   ) : <span />}
                   <div>
                     <Button variant="ghost" type="button" onClick={close} disabled={Boolean(busy)}>取消</Button>

@@ -49,9 +49,7 @@ export function SearchBar({
         >
           <CloseIcon />
         </Button>
-      ) : (
-        <kbd>↵</kbd>
-      )}
+      ) : null}
     </form>
   );
 }

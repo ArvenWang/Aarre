@@ -395,13 +395,13 @@ export function LibraryCardEditor({
                   ) : (
                     <footer className="library-card-editor-actions">
                       <Button
-                        variant="danger-quiet"
+                        variant="ghost"
+                        size="sm"
                         type="button"
-
+                        className="library-card-editor-delete quiet-danger-action"
                         disabled={!writable || Boolean(action)}
                         onClick={() => setConfirmDelete(true)}
                       >
-                        <TrashIcon />
                         删除
                       </Button>
                       <div>

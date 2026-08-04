@@ -49,6 +49,8 @@ export function SidePanelApp() {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const dismissError = useCallback(() => setError(""), []);
+  const dismissNotice = useCallback(() => setNotice(""), []);
   const {
     snapshot,
     appState,
@@ -168,7 +170,6 @@ export function SidePanelApp() {
     setActiveConversation,
     loadConversations,
     deleteConversation,
-    renameConversation,
     cancelRun: cancelAgentRun,
     confirmActions: handleConfirmAgentActions,
     dropAction: handleDropAgentAction,
@@ -176,6 +177,9 @@ export function SidePanelApp() {
     cancelActions: handleCancelAgentActions,
     undoBatch: handleUndoAgentBatch,
     submit: submitAgentQuery,
+    regenerate: regenerateAgentAnswer,
+    editQuestion: editAgentQuestion,
+    copyAnswer: copyAgentAnswer,
   } = useAgentChat({
     busy,
     setBusy,
@@ -229,9 +233,7 @@ export function SidePanelApp() {
       <Suspense fallback={null}>
         <SettingsPage
           appState={appState}
-          listCoverStyle={listCoverStyle}
           publicFaviconFallback={publicFaviconFallback}
-          onListCoverStyleChange={setListCoverStyle}
           onPublicFaviconFallbackChange={setPublicFaviconFallback}
           onRestartOnboarding={() => {
             void restartOnboarding().then(() => {
@@ -256,7 +258,6 @@ export function SidePanelApp() {
         <AgentHistoryPage
           conversations={conversations}
           onDelete={deleteConversation}
-          onRename={renameConversation}
           onBack={() => setPanelView("library")}
           onOpen={(conversation) => {
             setActiveConversation(conversation);
@@ -291,6 +292,9 @@ export function SidePanelApp() {
         }}
         onSubmit={handleAgentSubmit}
         onOpenSource={(url) => void openNavigation({ text: url, url }, true)}
+        onRegenerate={regenerateAgentAnswer}
+        onEditQuestion={editAgentQuestion}
+        onCopyAnswer={(messageId) => void copyAgentAnswer(messageId)}
         onConfirmActions={(messageId) =>
           void handleConfirmAgentActions(messageId)
         }
@@ -344,8 +348,8 @@ export function SidePanelApp() {
         error,
         notice,
         onRetry: () => void refresh().catch((caught) => setError(caught instanceof Error ? caught.message : "重新读取失败")),
-        onDismissError: () => setError(""),
-        onDismissNotice: () => setNotice(""),
+        onDismissError: dismissError,
+        onDismissNotice: dismissNotice,
       }}
       library={{
         snapshot,

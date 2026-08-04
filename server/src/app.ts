@@ -236,6 +236,10 @@ export async function buildApp(dependencies: {
     config: { rateLimit: { max: 600, timeWindow: "1 minute" } }
   }, async (request) => sync.upsertEntity(await requireAccount(request), request.body));
 
+  app.put("/v1/sync/entities/batch", {
+    config: { rateLimit: { max: 60, timeWindow: "1 minute" } }
+  }, async (request) => sync.upsertEntities(await requireAccount(request), request.body));
+
   app.get("/v1/sync/entities", async (request) => sync.bootstrapEntities(await requireAccount(request)));
 
   app.get("/v1/sync/conflicts", async (request) => sync.listConflicts(await requireAccount(request)));

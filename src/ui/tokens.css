@@ -16,6 +16,7 @@
   --accent: #12a594;
   --positive: #12a594;
   --negative: #d2493a;
+  --danger-ink: var(--scrim-ink);
   --cover-action-bg: var(--surface);
   --cover-action-ink: var(--ink);
 
@@ -83,6 +84,11 @@
   --toggle-thumb: 18px;
   --toggle-inset: 2px;
   --control-border-w: 1px;
+  --tag-entry-width: 128px;
+  --icon-xs: 12px;
+  --icon-sm: 14px;
+  --icon-md: 18px;
+  --icon-lg: 20px;
 
   --sp-1: 4px;
   --sp-2: 8px;
@@ -125,6 +131,24 @@
   --agent-radius: var(--radius-module);
   --agent-control-radius: var(--radius-control);
   --agent-content-gap: var(--sp-2);
+
+  /* Shared dense-row interaction: transparent at rest, surfaced on intent. */
+  --row-surface: transparent;
+  --row-surface-hover: var(--surface-sunken);
+  --row-surface-active: color-mix(
+    in srgb,
+    var(--surface-sunken) 72%,
+    var(--line)
+  );
+  --row-divider: var(--line);
+  --quiet-action-ink: var(--ink-muted);
+  --quiet-danger-hover-ink: var(--negative);
+  --quiet-danger-hover-bg: color-mix(
+    in srgb,
+    var(--negative) 8%,
+    transparent
+  );
+  --field-readonly-surface: var(--surface-sunken);
 
   /* The manager page uses a floating thumb instead of a browser-owned track.
      Geometry stays tokenized so the overlay never changes document width. */

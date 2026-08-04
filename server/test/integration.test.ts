@@ -382,6 +382,40 @@ test("protection purges metadata and every COS object version and blocks stale d
   assert.deepEqual(objectStore.deletedBackup, [objectKey, replacementObjectKey]);
 });
 
+test("durable entities support idempotent batches", async () => {
+  const owner = await signedInAccount();
+  const mutations = [
+    {
+      operationId: randomUUID(),
+      entityType: "setting-theme",
+      entityId: "theme",
+      updatedAt: "2026-08-04T12:00:00.000Z",
+      payload: { mode: "dark" },
+      deleted: false
+    },
+    {
+      operationId: randomUUID(),
+      entityType: "setting-cloud-scope",
+      entityId: "cloud-scope",
+      updatedAt: "2026-08-04T12:00:00.000Z",
+      payload: {
+        scope: "complete",
+        enabled: true,
+        updatedAt: "2026-08-04T12:00:00.000Z"
+      },
+      deleted: false
+    }
+  ];
+
+  const first = await sync.upsertEntities(owner.account, { mutations });
+  const repeated = await sync.upsertEntities(owner.account, { mutations });
+
+  assert.equal(first.results.length, 2);
+  assert.deepEqual(repeated, first);
+  const entities = await sync.bootstrapEntities(owner.account);
+  assert.equal(entities.entities.filter((item) => item.entityType.startsWith("setting-")).length, 2);
+});
+
 test("folder protection purges descendant metadata and blocks resource, bookmark, and asset uploads", async () => {
   const owner = await signedInAccount();
   const key = "9".repeat(64);

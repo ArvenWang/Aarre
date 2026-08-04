@@ -50,7 +50,7 @@ describe("cloud status row states", () => {
     const buttons = [...container.querySelectorAll("button")];
     expect(buttons.map((button) => button.textContent)).toEqual([
       "立即同步",
-      "断开账号",
+      "断开",
     ]);
     expect(buttons.every((button) => !button.disabled)).toBe(true);
     expect(container.querySelector("[aria-expanded]")).toBeNull();

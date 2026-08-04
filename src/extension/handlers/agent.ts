@@ -268,7 +268,7 @@ async function askAgent(
       stages: ["preparing", "scanning", "synthesizing"],
       completedStages: [],
       completed: 0,
-      total: 12,
+      total: 0,
       label: "正在准备收藏库"
     }).catch(() => undefined);
     const response = await runAgent({
@@ -294,7 +294,7 @@ async function askAgent(
           stages: ["preparing", "scanning", "synthesizing"],
           completedStages: ["preparing"],
           completed: round,
-          total: 12,
+          total: 0,
           label
         }).catch(() => undefined);
         void chrome.runtime.sendMessage({
@@ -309,12 +309,10 @@ async function askAgent(
       answer: response.answer,
       thinking,
       providerName: response.providerName || "",
-      sources: [],
+      sources: response.sources,
       actions: response.plan.actions,
       catalogSize: linkedResources.length,
-      examinedCount: linkedResources.length,
-      excludedCount: safeLibrary.excludedCount,
-      catalogScanComplete: true
+      excludedCount: safeLibrary.excludedCount
     };
   } finally {
     if (activeAgentRuns.get(requestId) === controller) {

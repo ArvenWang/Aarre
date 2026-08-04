@@ -36,12 +36,55 @@ export function syncIsActive(status: SyncStatus): boolean {
 interface CloudStatusRowProps {
   status: SyncStatus;
   usage: CloudStorageUsage | null;
+  showActions?: boolean;
   busy?: boolean;
   onSync: () => void;
   onDisconnect: () => void;
 }
 
-export function CloudStatusRow({ status, usage, busy, onSync, onDisconnect }: CloudStatusRowProps) {
+interface CloudStatusActionsProps {
+  status: SyncStatus;
+  busy?: boolean;
+  onSync: () => void;
+  onDisconnect: () => void;
+}
+
+export function CloudStatusActions({ status, busy, onSync, onDisconnect }: CloudStatusActionsProps) {
+  const syncing = syncIsActive(status);
+  return (
+    <div className="cloud-status-actions">
+      <Button
+        type="button"
+        variant="tertiary"
+        size="sm"
+        className="cloud-status-sync"
+        disabled={Boolean(busy) || syncing}
+        onClick={onSync}
+      >
+        {syncing ? "同步中…" : "立即同步"}
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="cloud-status-disconnect quiet-danger-action"
+        disabled={Boolean(busy)}
+        onClick={onDisconnect}
+      >
+        断开
+      </Button>
+    </div>
+  );
+}
+
+export function CloudStatusRow({
+  status,
+  usage,
+  showActions = true,
+  busy,
+  onSync,
+  onDisconnect,
+}: CloudStatusRowProps) {
   const showUsage = Boolean(usage && usage.usageRatio >= 0.8);
   const syncing = syncIsActive(status);
   return (
@@ -68,28 +111,14 @@ export function CloudStatusRow({ status, usage, busy, onSync, onDisconnect }: Cl
           云端用量 {Math.round(usage.usageRatio * 100)}%
         </p>
       ) : null}
-      <div className="cloud-status-actions">
-        <Button
-          type="button"
-          variant="tertiary"
-          size="sm"
-          className="cloud-status-sync"
-          disabled={Boolean(busy) || syncing}
-          onClick={onSync}
-        >
-          {syncing ? "同步中…" : "立即同步"}
-        </Button>
-        <Button
-          type="button"
-          variant="danger-quiet"
-          size="sm"
-          className="cloud-status-disconnect"
-          disabled={Boolean(busy)}
-          onClick={onDisconnect}
-        >
-          断开账号
-        </Button>
-      </div>
+      {showActions ? (
+        <CloudStatusActions
+          status={status}
+          busy={busy}
+          onSync={onSync}
+          onDisconnect={onDisconnect}
+        />
+      ) : null}
     </div>
   );
 }

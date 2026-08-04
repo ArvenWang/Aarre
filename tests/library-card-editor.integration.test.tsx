@@ -176,15 +176,14 @@ describe("LibraryCardEditor", () => {
         "https://new.example/page"
       );
       setControlValue(folderSelect, "folder-a");
-      setControlValue(
-        document.body.querySelector(
-          "[aria-label='添加标签']"
-        ) as HTMLInputElement,
-        "research"
-      );
     });
     await act(async () => {
-      buttonWithText(document.body, "添加")?.click();
+      (document.body.querySelector("button[aria-label='添加标签']") as HTMLButtonElement)?.click();
+    });
+    await act(async () => {
+      const tagInput = document.body.querySelector("input[aria-label='输入新标签']") as HTMLInputElement;
+      setControlValue(tagInput, "research");
+      tagInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
       setControlValue(
         document.body.querySelector("textarea") as HTMLTextAreaElement,
         "updated note"
@@ -442,9 +441,9 @@ describe("LibraryCardEditor", () => {
       ".library-card-editor-grid select"
     ) as HTMLSelectElement;
     const deleteButton = buttonWithText(document.body, "删除")!;
-    const tagInput = document.body.querySelector(
-      "[aria-label='添加标签']"
-    ) as HTMLInputElement;
+    const addTagButton = document.body.querySelector(
+      "button[aria-label='添加标签']"
+    ) as HTMLButtonElement;
     const note = document.body.querySelector("textarea") as HTMLTextAreaElement;
     const saveButton = buttonWithText(document.body, "保存修改")!;
 
@@ -458,15 +457,17 @@ describe("LibraryCardEditor", () => {
     ).toBe(true);
     expect(folderSelect.disabled).toBe(true);
     expect(deleteButton.disabled).toBe(true);
-    expect(tagInput.disabled).toBe(false);
+    expect(addTagButton.disabled).toBe(false);
     expect(note.disabled).toBe(false);
     expect(saveButton.disabled).toBe(false);
 
     await act(async () => {
-      setControlValue(tagInput, "policy");
+      addTagButton.click();
     });
     await act(async () => {
-      buttonWithText(document.body, "添加")?.click();
+      const tagInput = document.body.querySelector("input[aria-label='输入新标签']") as HTMLInputElement;
+      setControlValue(tagInput, "policy");
+      tagInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
       setControlValue(note, "managed bookmark note");
     });
     await act(async () => {

@@ -297,7 +297,7 @@ describe("only one system paints a given control", () => {
     expect(source).not.toContain("var(--accent)");
   });
 
-  it("does not mix the ghost hover paint into CSS-owned tag submit buttons", async () => {
+  it("uses one tokenized inline add-tag control instead of a second form row", async () => {
     const [sidepanel, editor, fields, managerCss] = await Promise.all([
       readFile(sidepanelEditorUrl, "utf8"),
       readFile(cardEditorUrl, "utf8"),
@@ -308,10 +308,10 @@ describe("only one system paints a given control", () => {
     expect(sidepanel).toContain("<BookmarkEditorFields");
     expect(editor).toContain("<BookmarkEditorFields");
     expect(fields).toContain('variant="ghost"');
-    expect(fields).toContain('className="library-card-editor-tag-submit"');
-    expect(
-      rule(managerCss, ".library-card-editor-tag-submit:not(:disabled):hover")
-    ).toContain("background:");
+    expect(fields).toContain('className="tag-chip tag-chip-add"');
+    expect(fields).toContain("<PlusIcon />");
+    expect(fields).not.toContain("library-card-editor-tag-submit");
+    expect(rule(managerCss, ".tag-chip-add:hover")).toContain("var(--row-surface-hover)");
   });
 });
 
@@ -442,8 +442,9 @@ describe("nested surfaces use a tokenized radius ladder", () => {
       '.organization-notice-banner [data-slot="button"] {\n  border-radius: var(--radius-control);',
     );
     expect(sidepanel).toContain(
-      '.settings-change-list article [data-slot="button"] {\n  border-radius: var(--radius-control);',
+      '.settings-change-list > .bookmark-row {\n  height: auto;\n  min-height: var(--control-h-touch);',
     );
+    expect(sidepanel).toContain("border-radius: var(--radius-control)");
     expect(manager).toContain("border-radius: var(--radius-shell)");
   });
 });
@@ -460,7 +461,7 @@ describe("elevated surfaces keep a faint edge", () => {
 });
 
 describe("status notices float above the list", () => {
-  it("keeps sidepanel notices inside the content frame as elevated overlays", async () => {
+  it("keeps errors over the list and moves transient notices above the composer", async () => {
     const [source, css] = await Promise.all([
       readFile(homePageUrl, "utf8"),
       Promise.all([readFile(sidepanelCssUrl, "utf8"), readFile(sidepanelLazyCssUrl, "utf8")]).then((parts) => parts.join("\n"))
@@ -469,15 +470,16 @@ describe("status notices float above the list", () => {
       source.indexOf('className="native-content-frame"'),
       source.indexOf('id="bookmark-list"')
     );
-    const notice = rule(css, ".native-error-layout,\n.native-notice");
+    const overlay = rule(css, ".native-error-layout,\n.native-notice");
 
     // A document-flow strip with the same sunken fill as the list reads as
     // one fused block; the notice must sit above the scroll surface instead.
-    expect(frame).toContain('className="native-notice"');
+    expect(frame).not.toContain('className="native-notice"');
     expect(frame).toContain("native-error-layout");
-    expect(notice).toContain("position: absolute");
-    expect(notice).toContain("box-shadow: var(--shadow-float)");
-    expect(notice).toContain("background: var(--surface)");
+    expect(overlay).toContain("position: absolute");
+    expect(css).toContain("bottom: calc(var(--composer-height) + var(--sp-3))");
+    expect(css).toContain("background: var(--scrim)");
+    expect(source.indexOf('className="native-notice"')).toBeGreaterThan(source.indexOf('id="bookmark-list"'));
   });
 });
 

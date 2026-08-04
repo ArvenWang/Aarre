@@ -51,7 +51,7 @@ describe("cloud status row", () => {
     expect(allSidepanelSources).not.toContain("setInterval(refreshCloudState");
     expect(row).toContain("usage.usageRatio >= 0.8");
     expect(row).toContain('className="cloud-status-actions"');
-    expect(row).toContain('variant="danger-quiet"');
+    expect(row).toContain('variant="ghost"');
     expect(row).toContain('aria-live="polite"');
     expect(row).toContain('className="cloud-status-progress"');
     expect(row).not.toContain("aria-expanded");

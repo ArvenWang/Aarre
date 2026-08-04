@@ -5,7 +5,12 @@ import {
   toolDefinitions,
   type AgentToolContext
 } from "../src/lib/agent/tools";
-import { MAX_TOOL_ROUNDS, runAgent, type AgentProvider } from "../src/lib/agent/runner";
+import {
+  MAX_TOOL_ROUNDS,
+  runAgent,
+  sourcesCitedIn,
+  type AgentProvider
+} from "../src/lib/agent/runner";
 import type { AgentToolCall } from "../src/lib/agent/types";
 import type { ResourceRecord } from "../src/lib/types";
 
@@ -119,7 +124,7 @@ describe("agent tools", () => {
     expect(result.plan.actions.every((action) => action.status === "pending")).toBe(true);
   });
 
-  it("streams the final natural-language answer in chunks", async () => {
+  it("does not pay for a second generation when the tool round already returned an answer", async () => {
     const deltas: string[] = [];
     const provider: AgentProvider = {
       call: vi.fn(async () => response(undefined, "non-stream fallback")),
@@ -135,8 +140,32 @@ describe("agent tools", () => {
       provider,
       onDelta: (text) => deltas.push(text)
     });
-    expect(deltas).toEqual(["第一段", "，第二段"]);
-    expect(result.answer).toBe("第一段，第二段");
-    expect(provider.streamFinal).toHaveBeenCalledTimes(1);
+    expect(deltas).toEqual(["non-stream fallback"]);
+    expect(result.answer).toBe("non-stream fallback");
+    expect(provider.call).toHaveBeenCalledTimes(1);
+    expect(provider.streamFinal).not.toHaveBeenCalled();
+  });
+
+  it("returns deduplicated source cards from searches and accepts keyword arrays", async () => {
+    const sequence = [
+      response({ id: "search", name: "search_bookmarks", arguments: { queries: ["设计", "组件"], limit: 30 } }),
+      response(undefined, "建议阅读 [设计系统指南](https://example.com/design)。")
+    ];
+    const provider: AgentProvider = { call: vi.fn(async () => sequence.shift()!) };
+
+    const result = await runAgent({ query: "找设计资料", context: context(), provider });
+
+    expect(result.sources).toEqual([expect.objectContaining({
+      resourceKey: "resource-design",
+      title: "设计系统指南"
+    })]);
+  });
+
+  it("keeps only sources actually cited by the final Markdown answer", () => {
+    const sources = [
+      { resourceKey: "one", title: "One", url: "https://example.com/one?utm_source=test", siteName: "Example", faviconUrl: "" },
+      { resourceKey: "two", title: "Two", url: "https://example.com/two", siteName: "Example", faviconUrl: "" },
+    ];
+    expect(sourcesCitedIn("查看 [One](https://example.com/one)。", sources)).toEqual([sources[0]]);
   });
 });

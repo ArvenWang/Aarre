@@ -1,6 +1,6 @@
 {
   "name": "bookmark-layer",
-  "version": "0.5.61",
+  "version": "0.5.65",
   "private": true,
   "type": "module",
   "engines": {
@@ -65,6 +65,7 @@
     "playwright": "^1.62.1",
     "sharp": "0.35.0",
     "tailwindcss": "^4.3.3",
+    "terser": "^5.43.1",
     "tsx": "4.20.6",
     "typescript": "7.0.2",
     "vite": "8.1.5",
