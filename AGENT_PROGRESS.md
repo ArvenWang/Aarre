@@ -1,18 +1,21 @@
 # Aarre 项目进展
 
-最后更新：2026-08-05（0.5.67 + 服务端 0.1.14 同步死锁修复待发布）
+最后更新：2026-08-05（0.5.67 + 服务端 0.1.14 同步死锁修复已发布并通过真实同步）
 
 > **⚠️ 下一位 Agent 必读：先读 [`docs/AUDIT_2026-08.md`](docs/AUDIT_2026-08.md)（问题分析）和 [`docs/PRD_REBUILD_2026-08.md`](docs/PRD_REBUILD_2026-08.md)（执行方案），再以本页顶部最新记录为当前事实。T-01～T-20 与 T-14c 的代码和自动化已收口，不要重做已完成项，也不要在旧架构上打补丁；真人 Chrome / Provider 验收仍是外部门。**
 >
 > **Round 3 已按用户选择的三个 A 方案完成。** 后续不要恢复透明 surface、会覆盖新会话的云端拉取、毛玻璃吸顶条、设置页封面风格切换或常驻白色提示条。
 
-## 2026-08-05 · 批量同步生产死锁修复（服务端 0.1.14，待发布）
+## 2026-08-05 · 批量同步生产死锁修复（服务端 0.1.14，已发布）
 
 - **用户现象。** 断开账号、重载扩展并重新登录后，全量同步在推送 255 条 durable entities 时反复显示“服务暂时不可用，请稍后再试”。
 - **生产铁证。** `PUT /v1/sync/entities/batch` 在 14:59～15:02 UTC 返回 500；PostgreSQL 报 `40P01 deadlock detected`。OID 18126 是 `users`。数据库日志显示普通实体的配额查询与 `usage-period` 的 `sync_changes` 外键写入形成反向锁链。
 - **代码根因。** 单账号批次开启 12 路并发，但每条写入最终都更新同一个 `account_usage` 行；普通配额查询还用无目标的 `FOR UPDATE` 同时强锁 `users` 与 `account_usage`，而用量写入先更新 `account_usage`、再通过外键读取 `users`，锁顺序相反。并发既不能增加吞吐，又制造死锁。
 - **修复。** 配额查询统一为 `FOR UPDATE OF a`，只锁计数行；同一账号批次依次提交；`40P01` / `40001` 最多重试 3 次并保留原 operationId 幂等；资产完成路径同步收口相同锁边界。
-- **验证计划。** 服务端 typecheck、全量测试、build；新增混合设置 + 用量批次集成测试、锁范围守卫和死锁重试/单并发测试。发布后需用当前账号完成真实立即同步，并确认生产日志不再出现新死锁。
+- **自动化验证。** 服务端 typecheck、25/25 测试、build、`npm audit --audit-level=high` 全绿；新增混合设置 + 用量批次集成测试、锁范围守卫和死锁重试/单并发测试。
+- **生产发布。** 不可变 release `/opt/aarre/releases/20260805-sync-deadlock-v32` 已切换为 current，服务端版本 **0.1.14**；旧 release `20260805-cover-origin-v31` 保留可回滚。生产容器 running/healthy，公网 `/ready` 为 `{"ok":true}`，migrations/tables 为 8/26，运行产物含目标锁和重试逻辑。
+- **真实账号验证。** 当前 Chrome 安装态于 15:15 UTC 自动重试：三个 `PUT /v1/sync/entities/batch` 均返回 200（约 638/597/497ms），随后完成资产阶段并于 15:16:27 UTC 进入 `idle`；本地同步状态 `error: null`、`nextRetryAt: null`。新容器自启动至验证时未出现 `40P01` 或 `deadlock detected`。
+- **Git。** 修复提交 `bfee06dd86f985ce6bbf488dcaf917b755101d42` 已推送并与 `origin/main` 一致。
 
 ## 2026-08-05 · 网站标识未重抓补丁（0.5.67）
 
