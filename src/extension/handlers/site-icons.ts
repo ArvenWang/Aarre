@@ -40,12 +40,14 @@ export interface SiteIconHandlers {
   ensurePinnedSiteBrandIcons(): Promise<number>;
   ensureSiteBrandForResource(
     resource: ResourceRecord,
-    force?: boolean
+    force?: boolean,
+    candidatesSeed?: SiteIconCandidate[]
   ): Promise<boolean>;
   scanSiteBrand(
     resource: ResourceRecord,
     essence: ReturnType<typeof extractPageEssenceFromHtml>,
-    force: boolean
+    force: boolean,
+    candidatesSeed?: SiteIconCandidate[]
   ): Promise<SiteBrandRecord | undefined>;
   registerPageImageSample(
     resource: ResourceRecord,
@@ -144,7 +146,6 @@ export function createSiteIconHandlers(
   ): Promise<SiteIconCandidate[]> {
     try {
       const origin = new URL(pageUrl).origin;
-      const candidates: SiteIconCandidate[] = [];
       const paths = [
         "/apple-touch-icon-180x180.png",
         "/apple-touch-icon.png",
@@ -154,79 +155,62 @@ export function createSiteIconHandlers(
         "/apple-icon-180x180.png",
         "/icon.png"
       ];
-      for (const path of paths) {
-        const url = new URL(path, origin).toString();
-        try {
-          const response = await fetch(url, {
-            method: "HEAD",
-            credentials: "omit",
-            redirect: "follow",
-            signal: AbortSignal.timeout(5_000)
-          });
-          const contentType = (response.headers.get("content-type") || "").toLowerCase();
-          // 软 404 / 登录页常返回 200 + text/html，不能当图标候选。
-          if (
-            response.ok &&
-            !contentType.startsWith("text/html") &&
-            !contentType.startsWith("application/json")
-          ) {
-            candidates.push({
-              url,
-              source: "conventional-apple-touch-icon",
-              declaredSize: path.includes("152") ? 152 : 180
+      const probes: SiteIconCandidate[] = [
+        ...paths.map((path, index) => ({
+          url: new URL(path, origin).toString(),
+          source: "conventional-apple-touch-icon" as const,
+          declaredSize: path.includes("152") ? 152 : 180
+        })),
+        {
+          url: new URL("/favicon.ico", origin).toString(),
+          source: "conventional-favicon-ico" as const
+        },
+        {
+          url: new URL("/favicon.svg", origin).toString(),
+          source: "svg-icon" as const,
+          vector: true
+        }
+      ];
+      // 全部并行 HEAD，再把命中的候选按原始优先级返回：典型站点一次
+      // 往返即可定位图标，不再串行逐个探测。
+      const results = await Promise.allSettled(
+        probes.map(async (candidate) => {
+          try {
+            const response = await fetch(candidate.url, {
+              method: "HEAD",
+              credentials: "omit",
+              redirect: "follow",
+              signal: AbortSignal.timeout(5_000)
             });
-            break;
+            const contentType =
+              (response.headers.get("content-type") || "").toLowerCase();
+            // 软 404 / 登录页常返回 200 + text/html，不能当图标候选。
+            if (
+              response.ok &&
+              !contentType.startsWith("text/html") &&
+              !contentType.startsWith("application/json")
+            ) {
+              return candidate;
+            }
+          } catch {
+            // 单个探测失败不阻塞其他候选。
           }
-        } catch {
-          // Continue to the next conventional path.
-        }
-      }
-      const icoUrl = new URL("/favicon.ico", origin).toString();
-      try {
-        const response = await fetch(icoUrl, {
-          method: "HEAD",
-          credentials: "omit",
-          redirect: "follow",
-          signal: AbortSignal.timeout(5_000)
-        });
-        const contentType = (response.headers.get("content-type") || "").toLowerCase();
-        if (
-          response.ok &&
-          !contentType.startsWith("text/html") &&
-          !contentType.startsWith("application/json")
-        ) {
-          candidates.push({
-            url: icoUrl,
-            source: "conventional-favicon-ico"
-          });
-        }
-      } catch {
-        // Continue to the conventional SVG candidate.
-      }
-      const svgUrl = new URL("/favicon.svg", origin).toString();
-      try {
-        const response = await fetch(svgUrl, {
-          method: "HEAD",
-          credentials: "omit",
-          redirect: "follow",
-          signal: AbortSignal.timeout(5_000)
-        });
-        const contentType = (response.headers.get("content-type") || "").toLowerCase();
-        if (
-          response.ok &&
-          !contentType.startsWith("text/html") &&
-          !contentType.startsWith("application/json")
-        ) {
-          candidates.push({
-            url: svgUrl,
-            source: "svg-icon",
-            vector: true
-          });
-        }
-      } catch {
-        // No conventional SVG icon.
-      }
-      return candidates;
+          return undefined;
+        })
+      );
+      return results.flatMap((result, index) =>
+        result.status === "fulfilled" && result.value
+          ? [result.value as SiteIconCandidate]
+          : []
+      ).sort((left, right) => {
+        const leftIndex = probes.findIndex(
+          (candidate) => candidate.url === left.url
+        );
+        const rightIndex = probes.findIndex(
+          (candidate) => candidate.url === right.url
+        );
+        return leftIndex - rightIndex;
+      });
     } catch {
       // Invalid URLs are filtered before this function.
     }
@@ -335,7 +319,8 @@ export function createSiteIconHandlers(
    */
   async function ensureSiteBrandForResource(
     resource: ResourceRecord,
-    force = false
+    force = false,
+    candidatesSeed: SiteIconCandidate[] = []
   ): Promise<boolean> {
     let host: string;
     try {
@@ -349,6 +334,20 @@ export function createSiteIconHandlers(
     if (inFlight) return inFlight;
 
     const task = siteBrandFetchRateLimiter.run(resource.url, async () => {
+      if (candidatesSeed.length) {
+        // 保存时已拿到页面声明的 favicon：先直接试它，跳过整轮 HTML
+        // 读取；失败再走完整候选扫描。
+        const seeded = await scanSiteBrand(
+          resource,
+          extractPageEssenceFromHtml("", resource.url),
+          force,
+          candidatesSeed
+        );
+        if (seeded?.iconDataUrlLight && !siteBrandIconCacheIsFresh(existing)) {
+          notifySiteBrandsUpdated();
+          return true;
+        }
+      }
       let essence = extractPageEssenceFromHtml("", resource.url);
       try {
         const response = await fetch(resource.url, {
@@ -381,7 +380,12 @@ export function createSiteIconHandlers(
         // 正文读不到时不阻塞图标：scanSiteBrand 仍会尝试常规路径、
         // 主域别名与公共服务候选。
       }
-      const result = await scanSiteBrand(resource, essence, force);
+      const result = await scanSiteBrand(
+        resource,
+        essence,
+        force,
+        candidatesSeed
+      );
       if (result?.iconDataUrlLight && !siteBrandIconCacheIsFresh(existing)) {
         notifySiteBrandsUpdated();
         return true;
@@ -399,7 +403,8 @@ export function createSiteIconHandlers(
   async function scanSiteBrand(
     resource: ResourceRecord,
     essence: ReturnType<typeof extractPageEssenceFromHtml>,
-    force: boolean
+    force: boolean,
+    candidatesSeed: SiteIconCandidate[] = []
   ): Promise<SiteBrandRecord | undefined> {
     const pageUrl = new URL(resource.url);
     const host = pageUrl.hostname.toLocaleLowerCase();
@@ -434,6 +439,7 @@ export function createSiteIconHandlers(
       ...(registryAsset
         ? [{ url: registryAsset, source: "registry" as const }]
         : []),
+      ...candidatesSeed,
       ...apple,
       ...(await conventionalIconCandidates(resource.url)),
       ...(await manifestIconCandidates(essence.manifestUrl)),

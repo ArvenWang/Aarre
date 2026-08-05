@@ -23,6 +23,7 @@ import type {
   BookmarkEnhancementPart,
   SnapshotEnhancementProgress
 } from "../../lib/bookmark-enhancement";
+import type { SiteIconCandidate } from "../../lib/types";
 import type {
   BookmarkSaveState,
   NativeBookmarkNode,
@@ -56,7 +57,8 @@ interface BookmarkSaveDependencies {
   processBookmarkEnhancements(): Promise<void>;
   ensureSiteBrandForResource(
     resource: ResourceRecord,
-    force?: boolean
+    force?: boolean,
+    candidatesSeed?: SiteIconCandidate[]
   ): Promise<boolean>;
   errorMessage(error: unknown): string;
   hostFromUrl(url: string): string;
@@ -446,9 +448,15 @@ async function saveBookmark(
   }
   await upsertLocalResource(resource);
   // 网站标识即时补全：保存点击即自动抓取，不等待手动扫描；隐私保护的
-  // 页面不发起读取，与扫描管线行为一致。
+  // 页面不发起读取，与扫描管线行为一致。保存时已拿到页面声明的
+  // favicon，直接作为首选候选，跳过 HTML 整页读取。
   if (!privacyBlocked) {
-    void ensureSiteBrandForResource(resource).catch(() => undefined);
+    const siteIconSeed: SiteIconCandidate[] = resource.faviconUrl
+      ? [{ url: resource.faviconUrl, source: "capture-favicon" }]
+      : [];
+    void ensureSiteBrandForResource(resource, false, siteIconSeed).catch(
+      () => undefined
+    );
   }
   let synced = resource;
   if (auth.signedIn && auth.accountMatches === true) {

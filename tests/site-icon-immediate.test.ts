@@ -169,6 +169,57 @@ describe("ensureSiteBrandForResource", () => {
     expect(pageFetches).toHaveLength(1);
     expect(putSiteBrand).toHaveBeenCalledTimes(1);
   });
+
+  it("tries the captured favicon first and skips the HTML read", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url === "https://example.com/article") {
+          return htmlResponse();
+        }
+        return new Response(null, { status: 404 });
+      });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.mocked(getSiteBrand).mockResolvedValue(undefined);
+    vi.mocked(cacheSiteBrandIcon).mockResolvedValue({
+      iconDataUrlLight: "data:image/png;base64,c2VlZA==",
+      iconRenderVersion: SITE_ICON_RENDER_VERSION,
+      iconSource: "capture-favicon"
+    });
+    vi.mocked(putSiteBrand).mockResolvedValue(undefined);
+
+    const handlers = createSiteIconHandlers({
+      readLimitedText: async (response) => (await response.text()).slice(0, 300_000),
+      upsertLocalResource: vi.fn()
+    });
+    const faviconUrl = "https://example.com/favicon.png";
+
+    const result = await handlers.ensureSiteBrandForResource(
+      resource(),
+      false,
+      [{ url: faviconUrl, source: "capture-favicon" }]
+    );
+
+    expect(result).toBe(true);
+    expect(
+      fetchMock.mock.calls.some(
+        ([input]) => String(input) === "https://example.com/article"
+      )
+    ).toBe(false);
+    expect(cacheSiteBrandIcon).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ url: faviconUrl, source: "capture-favicon" })
+      ]),
+      expect.any(Function)
+    );
+    expect(putSiteBrand).toHaveBeenCalledWith(
+      expect.objectContaining({
+        host: "example.com",
+        iconDataUrlLight: "data:image/png;base64,c2VlZA=="
+      })
+    );
+  });
 });
 
 describe("save-path icon wiring guards", () => {
@@ -184,8 +235,11 @@ describe("save-path icon wiring guards", () => {
       )
     ]);
 
-    expect(save).toContain("void ensureSiteBrandForResource(resource)");
+    expect(save).toContain(
+      "void ensureSiteBrandForResource(resource, false, siteIconSeed)"
+    );
     expect(save).toContain("!privacyBlocked");
+    expect(save).toContain("capture-favicon");
     expect(resources).toContain("void ensureSiteBrandForResource(resource)");
     expect(resources).toContain("!privacyBlocked");
   });

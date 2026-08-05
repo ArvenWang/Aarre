@@ -169,6 +169,7 @@ export interface ResourceRecord {
 
 export type SiteIconSource =
   | "registry"
+  | "capture-favicon"
   | "apple-touch-icon"
   | "conventional-apple-touch-icon"
   | "conventional-favicon-ico"
