@@ -48,3 +48,20 @@ test("HTTP user-data routes authenticate before invoking services", async () => 
     assert.match(routeWindow, /requireAccount\(request\)/, `${path} must require an account.`);
   }
 });
+
+test("quota checks lock only the account usage row", async () => {
+  const sources = await Promise.all([
+    readFile(resolve(process.cwd(), "src/sync.ts"), "utf8"),
+    readFile(resolve(process.cwd(), "src/assets.ts"), "utf8")
+  ]);
+  const combined = sources.join("\n");
+  const quotaQueries = combined.match(
+    /SELECT u\.quota_bytes, a\.metadata_bytes, a\.asset_bytes[\s\S]*?WHERE u\.id = \$1 FOR UPDATE(?: OF a)?/g
+  ) || [];
+
+  assert.equal(quotaQueries.length, 4);
+  assert.ok(
+    quotaQueries.every((query) => query.endsWith("FOR UPDATE OF a")),
+    "Quota checks must not strongly lock users rows needed by child-table foreign keys."
+  );
+});

@@ -382,8 +382,9 @@ test("protection purges metadata and every COS object version and blocks stale d
   assert.deepEqual(objectStore.deletedBackup, [objectKey, replacementObjectKey]);
 });
 
-test("durable entities support idempotent batches", async () => {
+test("durable entities support mixed idempotent batches without quota deadlocks", async () => {
   const owner = await signedInAccount();
+  const updatedAt = "2026-08-04T12:00:00.000Z";
   const mutations = [
     {
       operationId: randomUUID(),
@@ -404,16 +405,37 @@ test("durable entities support idempotent batches", async () => {
         updatedAt: "2026-08-04T12:00:00.000Z"
       },
       deleted: false
+    },
+    {
+      operationId: randomUUID(),
+      entityType: "usage-period",
+      entityId: "2026-08:deepseek:deepseek-v4-flash",
+      updatedAt,
+      payload: {
+        period: "2026-08",
+        provider: "deepseek",
+        model: "deepseek-v4-flash",
+        inputTokens: 120,
+        outputTokens: 40,
+        cachedInputTokens: 0,
+        estimatedTokens: 160,
+        estimatedCostCny: 0.01,
+        scanCount: 1,
+        priceUpdatedAt: "2026-08-04",
+        updatedAt
+      },
+      deleted: false
     }
   ];
 
   const first = await sync.upsertEntities(owner.account, { mutations });
   const repeated = await sync.upsertEntities(owner.account, { mutations });
 
-  assert.equal(first.results.length, 2);
+  assert.equal(first.results.length, 3);
   assert.deepEqual(repeated, first);
   const entities = await sync.bootstrapEntities(owner.account);
   assert.equal(entities.entities.filter((item) => item.entityType.startsWith("setting-")).length, 2);
+  assert.equal(entities.entities.filter((item) => item.entityType === "usage-period").length, 1);
 });
 
 test("folder protection purges descendant metadata and blocks resource, bookmark, and asset uploads", async () => {

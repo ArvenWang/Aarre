@@ -24,6 +24,23 @@ import type { AuthenticatedAccount } from "./auth.js";
 type ResourceMutation = z.infer<typeof resourceMutationSchema>;
 type EntityMutation = z.infer<typeof entityMutationSchema>;
 
+const ENTITY_BATCH_TRANSACTION_ATTEMPTS = 3;
+const RETRYABLE_TRANSACTION_CODES = new Set(["40P01", "40001"]);
+
+function isRetryableTransactionError(error: unknown): boolean {
+  return Boolean(
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    typeof error.code === "string" &&
+    RETRYABLE_TRANSACTION_CODES.has(error.code)
+  );
+}
+
+function waitForTransactionRetry(attempt: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 25 * 2 ** attempt));
+}
+
 type CloudResource = {
   resourceKey: string;
   payload: ResourcePayload;
@@ -283,7 +300,7 @@ export class SyncService {
       }>(
         `SELECT u.quota_bytes, a.metadata_bytes, a.asset_bytes
          FROM users u JOIN account_usage a ON a.user_id = u.id
-         WHERE u.id = $1 FOR UPDATE`,
+         WHERE u.id = $1 FOR UPDATE OF a`,
         [account.userId]
       );
       const usage = quota.rows[0];
@@ -899,7 +916,7 @@ export class SyncService {
       }>(
         `SELECT u.quota_bytes, a.metadata_bytes, a.asset_bytes
          FROM users u JOIN account_usage a ON a.user_id = u.id
-         WHERE u.id = $1 FOR UPDATE`,
+         WHERE u.id = $1 FOR UPDATE OF a`,
         [account.userId]
       );
       const usage = quota.rows[0];
@@ -947,13 +964,22 @@ export class SyncService {
   ): Promise<{ results: Record<string, unknown>[] }> {
     const { mutations } = entityBatchMutationSchema.parse(rawInput);
     const results: Record<string, unknown>[] = [];
-    const concurrency = 12;
-    for (let offset = 0; offset < mutations.length; offset += concurrency) {
-      results.push(...await Promise.all(
-        mutations
-          .slice(offset, offset + concurrency)
-          .map((mutation) => this.upsertEntity(account, mutation))
-      ));
+    // Every mutation updates the same per-account quota row. Parallel
+    // transactions cannot increase database throughput here; they only make
+    // different entity writers acquire the users/account_usage locks in
+    // competing orders. Keep the HTTP batch, but commit one account mutation
+    // at a time and retry PostgreSQL's safe-to-retry transaction failures.
+    for (const mutation of mutations) {
+      for (let attempt = 0; attempt < ENTITY_BATCH_TRANSACTION_ATTEMPTS; attempt += 1) {
+        try {
+          results.push(await this.upsertEntity(account, mutation));
+          break;
+        } catch (error) {
+          const finalAttempt = attempt === ENTITY_BATCH_TRANSACTION_ATTEMPTS - 1;
+          if (!isRetryableTransactionError(error) || finalAttempt) throw error;
+          await waitForTransactionRetry(attempt);
+        }
+      }
     }
     return { results };
   }
@@ -1157,7 +1183,7 @@ export class SyncService {
       }>(
         `SELECT u.quota_bytes, a.metadata_bytes, a.asset_bytes
          FROM users u JOIN account_usage a ON a.user_id = u.id
-         WHERE u.id = $1 FOR UPDATE`,
+         WHERE u.id = $1 FOR UPDATE OF a`,
         [account.userId]
       );
       const usage = quota.rows[0];

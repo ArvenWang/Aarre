@@ -239,7 +239,7 @@ export class AssetService {
       }>(
         `SELECT u.quota_bytes, a.metadata_bytes, a.asset_bytes
          FROM users u JOIN account_usage a ON a.user_id = u.id
-         WHERE u.id = $1 FOR UPDATE`,
+         WHERE u.id = $1 FOR UPDATE OF a`,
         [account.userId]
       );
       const usage = quota.rows[0];

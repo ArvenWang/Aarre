@@ -66,7 +66,7 @@ Token 仅由 Service Worker 读取，`chrome.storage.local` access level 固定�
 
 - 第一次登录按 200 条分页 bootstrap；现有本地资源按“当前账号是否真的返回过云端 revision”补种 Outbox，避免旧版本的 `synced` 标记让换账号或升级后的记录被漏传；以后使用单调递增的 `sync_changes.sequence` 拉增量。
 - 每个写入携带 UUID `operationId`，重试返回第一次结果，避免重复写入和重复计量。
-- durable entities 使用 `PUT /v1/sync/entities/batch` 每批最多 100 条；服务端受控 12 并发执行，逐项仍沿用相同的 `operationId` 幂等、配额、加密和用户隔离边界。
+- durable entities 使用 `PUT /v1/sync/entities/batch` 每批最多 100 条；同一账号的配额计数行是天然串行点，服务端在单次 HTTP 批次内依次提交，并对 PostgreSQL 死锁/序列化冲突做有限重试。逐项仍沿用相同的 `operationId` 幂等、配额、加密和用户隔离边界。
 - URL 级 AI 字段使用字段时钟合并，改一个字段不会覆盖整条资源。
 - 备注和用户标签携带 `baseRevision`。旧 revision 的不同内容不会静默覆盖：服务端把两份内容写入加密的 `conflict_versions`，备注保留当前权威值、标签先取并集；侧边栏和网页端编辑器可选择云端版、离线版或用当前编辑内容合并。
 - 删除写墓碑；游标落后于 180 天变更保留窗口时，服务端要求 full resync。
