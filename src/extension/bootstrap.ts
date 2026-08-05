@@ -394,6 +394,11 @@ function processBookmarkEnhancements(): Promise<void> {
   return enhancementQueue.processBookmarkEnhancements();
 }
 
+const siteIconHandlers = createSiteIconHandlers({
+  readLimitedText,
+  upsertLocalResource
+});
+
 bookmarkSaveHandlers = createBookmarkSaveHandlers({
   markNativeBookmarksDirty,
   defaultFolderId,
@@ -416,6 +421,8 @@ bookmarkSaveHandlers = createBookmarkSaveHandlers({
   queueEnhancementsUntilVisit,
   enqueueBookmarkEnhancement,
   processBookmarkEnhancements,
+  ensureSiteBrandForResource: (resource, force) =>
+    siteIconHandlers.ensureSiteBrandForResource(resource, force),
   errorMessage,
   hostFromUrl,
   getUserProtectionMessage: () => USER_PROTECTION_MESSAGE
@@ -507,11 +514,6 @@ const {
   rememberPendingSaveDraft
 } = createPendingSaveHandlers({ activeTab, syncOrganizationBadge });
 
-const siteIconHandlers = createSiteIconHandlers({
-  readLimitedText,
-  upsertLocalResource
-});
-
 const {
   libraryScanCandidates,
   getLibraryScanEstimate
@@ -563,6 +565,8 @@ const {
   coordinateActiveBookmarkedPage,
   queueEnhancementsUntilVisit,
   processBookmarkEnhancements,
+  ensureSiteBrandForResource: (resource, force) =>
+    siteIconHandlers.ensureSiteBrandForResource(resource, force),
   getUserProtectionMessage: () => USER_PROTECTION_MESSAGE
 });
 

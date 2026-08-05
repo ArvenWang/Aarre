@@ -35,6 +35,10 @@ interface ResourcesDependencies {
   coordinateActiveBookmarkedPage(tab: chrome.tabs.Tab, documentId?: string, trigger?: SnapshotEnhancementProgress["trigger"]): Promise<void>;
   queueEnhancementsUntilVisit(resource: ResourceRecord, trigger?: "chrome_bookmark"): Promise<void>;
   processBookmarkEnhancements(): Promise<void>;
+  ensureSiteBrandForResource(
+    resource: ResourceRecord,
+    force?: boolean
+  ): Promise<boolean>;
   getUserProtectionMessage(): string;
 }
 
@@ -57,6 +61,7 @@ export function createResourceHandlers(dependencies: ResourcesDependencies) {
     coordinateActiveBookmarkedPage,
     queueEnhancementsUntilVisit,
     processBookmarkEnhancements,
+    ensureSiteBrandForResource,
     getUserProtectionMessage
   } = dependencies;
   const now = () => new Date().toISOString();
@@ -244,6 +249,9 @@ async function indexNativeBookmark(
       });
       return;
     }
+    // 网站标识即时补全：不依赖手动扫描，公开 HTML 抓取失败也由
+    // ensureSiteBrandForResource 内部兜底，不影响收藏本身。
+    void ensureSiteBrandForResource(resource).catch(() => undefined);
     const current = await activeTab();
     const activeMatch =
       current?.url && resourceMatchesLoadedUrl(resource, current.url);

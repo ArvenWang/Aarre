@@ -54,6 +54,10 @@ interface BookmarkSaveDependencies {
   queueEnhancementsUntilVisit(resource: ResourceRecord, trigger?: "aarre_save"): Promise<void>;
   enqueueBookmarkEnhancement(resource: ResourceRecord, parts: BookmarkEnhancementPart[], snapshot?: Omit<SnapshotEnhancementProgress, "updatedAt">): Promise<void>;
   processBookmarkEnhancements(): Promise<void>;
+  ensureSiteBrandForResource(
+    resource: ResourceRecord,
+    force?: boolean
+  ): Promise<boolean>;
   errorMessage(error: unknown): string;
   hostFromUrl(url: string): string;
   getUserProtectionMessage(): string;
@@ -82,6 +86,7 @@ export function createBookmarkSaveHandlers(dependencies: BookmarkSaveDependencie
     queueEnhancementsUntilVisit,
     enqueueBookmarkEnhancement,
     processBookmarkEnhancements,
+    ensureSiteBrandForResource,
     errorMessage,
     hostFromUrl,
     getUserProtectionMessage
@@ -440,6 +445,11 @@ async function saveBookmark(
     resource.snapshotAt = latestResource.snapshotAt;
   }
   await upsertLocalResource(resource);
+  // 网站标识即时补全：保存点击即自动抓取，不等待手动扫描；隐私保护的
+  // 页面不发起读取，与扫描管线行为一致。
+  if (!privacyBlocked) {
+    void ensureSiteBrandForResource(resource).catch(() => undefined);
+  }
   let synced = resource;
   if (auth.signedIn && auth.accountMatches === true) {
     const queued = await enqueueOutbox(

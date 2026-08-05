@@ -22,6 +22,7 @@ import {
   siteBrandIconCacheIsFresh,
   type CachedSiteIcon
 } from "../../lib/thumbnail";
+import { DomainRateLimiter } from "../../lib/scan-scheduler";
 import type {
   ResourceRecord,
   SiteBrandRecord,
@@ -37,6 +38,10 @@ interface SiteIconHandlerDependencies {
 export interface SiteIconHandlers {
   getSiteBrands(): Promise<SiteBrandRecord[]>;
   ensurePinnedSiteBrandIcons(): Promise<number>;
+  ensureSiteBrandForResource(
+    resource: ResourceRecord,
+    force?: boolean
+  ): Promise<boolean>;
   scanSiteBrand(
     resource: ResourceRecord,
     essence: ReturnType<typeof extractPageEssenceFromHtml>,
@@ -49,6 +54,13 @@ export interface SiteIconHandlers {
 }
 
 const SITE_BRAND_REGEN_CONCURRENCY = 4;
+const SITE_BRAND_HTML_MAX_BYTES = 300_000;
+const SITE_BRAND_HTML_TIMEOUT_MS = 10_000;
+const SITE_BRAND_FETCH_RATE_LIMIT_MS = 750;
+const siteBrandFetchRateLimiter = new DomainRateLimiter(
+  SITE_BRAND_FETCH_RATE_LIMIT_MS
+);
+const siteBrandFetchInFlight = new Map<string, Promise<boolean>>();
 
 function notifySiteBrandsUpdated(): void {
   if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) return;
@@ -315,6 +327,75 @@ export function createSiteIconHandlers(
     return pinnedSiteBrandRefreshPromise;
   }
 
+  /**
+   * 收藏保存后的即时图标补全：缓存新鲜直接跳过；缺失或过期时读取公开
+   * HTML 提取图标候选并落库，随后广播让侧边栏刷新。同域名限速、同主机
+   * 并发去重；正文读不到（登录墙/网络失败）也继续尝试常规路径与公共服务，
+   * 失败只返回 false，绝不影响收藏本身。
+   */
+  async function ensureSiteBrandForResource(
+    resource: ResourceRecord,
+    force = false
+  ): Promise<boolean> {
+    let host: string;
+    try {
+      host = new URL(resource.url).hostname.toLocaleLowerCase();
+    } catch {
+      return false;
+    }
+    const existing = await getSiteBrand(host);
+    if (!force && siteBrandIconCacheIsFresh(existing)) return false;
+    const inFlight = siteBrandFetchInFlight.get(host);
+    if (inFlight) return inFlight;
+
+    const task = siteBrandFetchRateLimiter.run(resource.url, async () => {
+      let essence = extractPageEssenceFromHtml("", resource.url);
+      try {
+        const response = await fetch(resource.url, {
+          credentials: "omit",
+          redirect: "follow",
+          headers: {
+            Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.2"
+          },
+          signal: AbortSignal.timeout(SITE_BRAND_HTML_TIMEOUT_MS)
+        });
+        const contentType =
+          (response.headers.get("content-type") || "").toLowerCase();
+        if (
+          response.ok &&
+          !/(?:^|\/)(?:login|signin|sign-in|auth)(?:\/|$)/i.test(
+            new URL(response.url || resource.url).pathname
+          ) &&
+          (contentType.includes("text/html") ||
+            contentType.includes("application/xhtml+xml"))
+        ) {
+          essence = extractPageEssenceFromHtml(
+            await dependencies.readLimitedText(
+              response,
+              SITE_BRAND_HTML_MAX_BYTES
+            ),
+            response.url || resource.url
+          );
+        }
+      } catch {
+        // 正文读不到时不阻塞图标：scanSiteBrand 仍会尝试常规路径、
+        // 主域别名与公共服务候选。
+      }
+      const result = await scanSiteBrand(resource, essence, force);
+      if (result?.iconDataUrlLight && !siteBrandIconCacheIsFresh(existing)) {
+        notifySiteBrandsUpdated();
+        return true;
+      }
+      return false;
+    });
+    siteBrandFetchInFlight.set(host, task);
+    try {
+      return await task;
+    } finally {
+      siteBrandFetchInFlight.delete(host);
+    }
+  }
+
   async function scanSiteBrand(
     resource: ResourceRecord,
     essence: ReturnType<typeof extractPageEssenceFromHtml>,
@@ -537,6 +618,7 @@ export function createSiteIconHandlers(
   return {
     getSiteBrands: getSiteBrandRecords,
     ensurePinnedSiteBrandIcons,
+    ensureSiteBrandForResource,
     scanSiteBrand,
     registerPageImageSample
   };
