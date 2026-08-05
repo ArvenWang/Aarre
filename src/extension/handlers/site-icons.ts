@@ -48,6 +48,13 @@ export interface SiteIconHandlers {
   ): Promise<boolean>;
 }
 
+const SITE_BRAND_REGEN_CONCURRENCY = 4;
+
+function notifySiteBrandsUpdated(): void {
+  if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) return;
+  void chrome.runtime.sendMessage({ type: "SITE_BRANDS_UPDATED" }).catch(() => undefined);
+}
+
 function now(): string {
   return new Date().toISOString();
 }
@@ -64,6 +71,7 @@ export function createSiteIconHandlers(
   dependencies: SiteIconHandlerDependencies
 ): SiteIconHandlers {
   let pinnedSiteBrandRefreshPromise: Promise<number> | undefined;
+  let missingSiteBrandRegenPromise: Promise<number> | undefined;
 
   async function manifestIconCandidates(
     manifestUrl: string
@@ -129,7 +137,10 @@ export function createSiteIconHandlers(
         "/apple-touch-icon-180x180.png",
         "/apple-touch-icon.png",
         "/apple-touch-icon-precomposed.png",
-        "/apple-touch-icon-152x152.png"
+        "/apple-touch-icon-152x152.png",
+        "/apple-icon.png",
+        "/apple-icon-180x180.png",
+        "/icon.png"
       ];
       for (const path of paths) {
         const url = new URL(path, origin).toString();
@@ -140,7 +151,13 @@ export function createSiteIconHandlers(
             redirect: "follow",
             signal: AbortSignal.timeout(5_000)
           });
-          if (response.ok) {
+          const contentType = (response.headers.get("content-type") || "").toLowerCase();
+          // 软 404 / 登录页常返回 200 + text/html，不能当图标候选。
+          if (
+            response.ok &&
+            !contentType.startsWith("text/html") &&
+            !contentType.startsWith("application/json")
+          ) {
             candidates.push({
               url,
               source: "conventional-apple-touch-icon",
@@ -160,7 +177,12 @@ export function createSiteIconHandlers(
           redirect: "follow",
           signal: AbortSignal.timeout(5_000)
         });
-        if (response.ok) {
+        const contentType = (response.headers.get("content-type") || "").toLowerCase();
+        if (
+          response.ok &&
+          !contentType.startsWith("text/html") &&
+          !contentType.startsWith("application/json")
+        ) {
           candidates.push({
             url: icoUrl,
             source: "conventional-favicon-ico"
@@ -177,7 +199,12 @@ export function createSiteIconHandlers(
           redirect: "follow",
           signal: AbortSignal.timeout(5_000)
         });
-        if (response.ok) {
+        const contentType = (response.headers.get("content-type") || "").toLowerCase();
+        if (
+          response.ok &&
+          !contentType.startsWith("text/html") &&
+          !contentType.startsWith("application/json")
+        ) {
           candidates.push({
             url: svgUrl,
             source: "svg-icon",
@@ -435,9 +462,75 @@ export function createSiteIconHandlers(
     return true;
   }
 
+  async function regenerateMissingSiteBrandIcons(): Promise<number> {
+    const [brands, resources] = await Promise.all([
+      getSiteBrands(),
+      getLocalResources()
+    ]);
+    const hostsNeedingIcon = new Set(
+      brands
+        .filter((brand) => !brand.iconDataUrlLight)
+        .map((brand) => brand.host.toLocaleLowerCase())
+    );
+    if (!hostsNeedingIcon.size) return 0;
+
+    const resourceByHost = new Map<string, ResourceRecord>();
+    for (const resource of resources) {
+      if (!resource.nativeBookmarkIds.length) continue;
+      try {
+        const host = new URL(resource.url).hostname.toLocaleLowerCase();
+        if (hostsNeedingIcon.has(host) && !resourceByHost.has(host)) {
+          resourceByHost.set(host, resource);
+        }
+      } catch {
+        // Skip invalid bookmark URLs.
+      }
+    }
+
+    const queue = [...resourceByHost.values()];
+    let updated = 0;
+    let cursor = 0;
+    const workers = Array.from(
+      { length: Math.min(SITE_BRAND_REGEN_CONCURRENCY, queue.length) },
+      async () => {
+        while (cursor < queue.length) {
+          const index = cursor;
+          cursor += 1;
+          const resource = queue[index]!;
+          const essence = extractPageEssenceFromHtml("", resource.url);
+          const result = await scanSiteBrand(resource, essence, true);
+          if (result?.iconDataUrlLight) {
+            updated += 1;
+            if (updated === 1 || updated % 8 === 0) {
+              notifySiteBrandsUpdated();
+            }
+          }
+        }
+      }
+    );
+    await Promise.all(workers);
+    if (updated > 0) notifySiteBrandsUpdated();
+    return updated;
+  }
+
+  function ensureMissingSiteBrandIcons(): Promise<number> {
+    if (!missingSiteBrandRegenPromise) {
+      missingSiteBrandRegenPromise = regenerateMissingSiteBrandIcons().finally(
+        () => {
+          missingSiteBrandRegenPromise = undefined;
+        }
+      );
+    }
+    return missingSiteBrandRegenPromise;
+  }
+
   async function getSiteBrandRecords(): Promise<SiteBrandRecord[]> {
-    await invalidateStaleSiteBrandIcons(SITE_ICON_RENDER_VERSION);
+    const cleared = await invalidateStaleSiteBrandIcons(SITE_ICON_RENDER_VERSION);
     await ensurePinnedSiteBrandIcons();
+    if (cleared > 0) {
+      // 清掉旧管线像素后立刻后台重抓，不等用户手动扫描。
+      void ensureMissingSiteBrandIcons().catch(() => undefined);
+    }
     return getSiteBrands();
   }
 

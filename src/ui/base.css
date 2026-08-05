@@ -362,7 +362,7 @@ textarea:focus-visible {
 }
 
 .site-thumbnail-image {
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .site-thumbnail-image[data-cover-kind="site"] {

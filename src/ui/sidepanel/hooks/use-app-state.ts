@@ -132,15 +132,25 @@ export function useAppState(
         })
         .catch(() => undefined);
     };
+    const handleSiteBrandsUpdate = (message: { type?: string }) => {
+      if (message.type !== "SITE_BRANDS_UPDATED") return;
+      void sendExtensionRequest({ type: "GET_SITE_BRANDS" })
+        .then((nextSiteBrands) => {
+          if (Array.isArray(nextSiteBrands)) setSiteBrands(nextSiteBrands);
+        })
+        .catch(() => undefined);
+    };
     const handleOrganizationUpdate = (message: { type?: string }) => {
       if (message.type === "ORGANIZATION_INSIGHTS_UPDATED") {
         void loadOrganizationNotice().catch(() => undefined);
       }
     };
     eventSource?.addListener(handleScanUpdate);
+    eventSource?.addListener(handleSiteBrandsUpdate);
     eventSource?.addListener(handleOrganizationUpdate);
     return () => {
       eventSource?.removeListener(handleScanUpdate);
+      eventSource?.removeListener(handleSiteBrandsUpdate);
       eventSource?.removeListener(handleOrganizationUpdate);
     };
   }, [loadOrganizationNotice]);

@@ -92,7 +92,7 @@ describe("thumbnail safety", () => {
       currentSiteBrandImageUrl({
         iconDataUrl: "data:image/webp;base64,TRANSPARENT_CURRENT",
         iconDataUrlLight: "data:image/webp;base64,TRANSPARENT_CURRENT",
-        iconRenderVersion: 7,
+        iconRenderVersion: 9,
       }),
     ).toBe("data:image/webp;base64,TRANSPARENT_CURRENT");
     expect(
@@ -100,7 +100,7 @@ describe("thumbnail safety", () => {
         host: "github.com",
         iconDataUrl: "data:image/webp;base64,OLD_GITHUB",
         iconDataUrlLight: "data:image/webp;base64,OLD_GITHUB",
-        iconRenderVersion: 7,
+        iconRenderVersion: 9,
         iconAssetUrl: "https://github.com/apple-touch-icon-180x180.png",
       }),
     ).toBe("");
@@ -109,7 +109,7 @@ describe("thumbnail safety", () => {
         host: "github.com",
         iconDataUrl: "data:image/webp;base64,CURRENT_GITHUB",
         iconDataUrlLight: "data:image/webp;base64,CURRENT_GITHUB",
-        iconRenderVersion: 7,
+        iconRenderVersion: 9,
         iconAssetUrl:
           "https://github.githubassets.com/favicons/favicon.svg",
       }),
@@ -134,8 +134,30 @@ describe("thumbnail safety", () => {
       siteBrandIconCacheIsFresh(
         {
           iconDataUrlLight: "data:image/webp;base64,CURRENT",
-          iconRenderVersion: 7,
+          iconRenderVersion: 9,
           updatedAt: "2026-08-01T00:00:00.000Z"
+        },
+        now
+      )
+    ).toBe(true);
+    expect(
+      siteBrandIconCacheIsFresh(
+        {
+          iconDataUrlLight: "data:image/webp;base64,PUBLIC",
+          iconRenderVersion: 9,
+          iconSource: "public-service",
+          updatedAt: "2026-07-20T00:00:00.000Z"
+        },
+        now
+      )
+    ).toBe(false);
+    expect(
+      siteBrandIconCacheIsFresh(
+        {
+          iconDataUrlLight: "data:image/webp;base64,PUBLIC",
+          iconRenderVersion: 9,
+          iconSource: "public-service",
+          updatedAt: "2026-07-28T00:00:00.000Z"
         },
         now
       )
@@ -169,7 +191,7 @@ describe("thumbnail safety", () => {
     const decodeFallback = vi.fn(async (_input: SiteIconDecodeFallbackInput) => ({
       iconDataUrl: "data:image/webp;base64,DOM_DECODED",
       iconDataUrlLight: "data:image/webp;base64,DOM_DECODED",
-      iconRenderVersion: 7,
+      iconRenderVersion: 9,
       nativeWidth: 32,
       nativeHeight: 32
     }));
@@ -220,7 +242,7 @@ describe("thumbnail safety", () => {
     }));
     const decodeFallback = vi.fn(async () => ({
       iconDataUrlLight: "data:image/webp;base64,GOOD",
-      iconRenderVersion: 7,
+      iconRenderVersion: 9,
       nativeWidth: 32,
       nativeHeight: 32
     }));
@@ -503,5 +525,32 @@ describe("svg viewport normalisation", () => {
 
     expect(result.intrinsicWidth).toBe(0);
     expect(result.source).toBe(source);
+  });
+});
+
+describe("site icon render contract", () => {
+  it("upsizes small bitmaps to fill the canvas and bumps the render version", async () => {
+    const [thumbnailSource, processorSource, baseCss] = await Promise.all([
+      readFile(thumbnailSourceUrl, "utf8"),
+      readFile(new URL("../src/extension/icon-processor.ts", import.meta.url), "utf8"),
+      readFile(baseCssUrl, "utf8")
+    ]);
+
+    expect(thumbnailSource).toMatch(/SITE_ICON_RENDER_VERSION = 9/);
+    expect(thumbnailSource).not.toMatch(
+      /const scale = Math\.min\(\s*1,\s*SITE_ICON_SIZE/
+    );
+    expect(thumbnailSource).toMatch(
+      /const scale = SITE_ICON_SIZE \/ Math\.max\(renderWidth, renderHeight\)/
+    );
+    expect(processorSource).not.toMatch(
+      /const scale = Math\.min\(\s*1,\s*SITE_ICON_SIZE/
+    );
+    expect(processorSource).toMatch(
+      /const scale = SITE_ICON_SIZE \/ Math\.max\(renderWidth, renderHeight\)/
+    );
+    expect(baseCss).toMatch(
+      /\.site-thumbnail-image\s*\{\s*object-fit:\s*contain;/
+    );
   });
 });

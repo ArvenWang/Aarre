@@ -95,15 +95,15 @@ async function renderSiteIcon(
   canvas.height = SITE_ICON_SIZE;
   const context = canvas.getContext("2d", { willReadFrequently: true });
   if (!context) throw new Error("image-processing-unavailable");
-  const scale = Math.min(
-    1,
-    SITE_ICON_SIZE / Math.max(renderWidth, renderHeight)
-  );
+  // Contain 填满画布：小 favicon 必须放大，否则 42px 列表里只剩中心小点。
+  const scale = SITE_ICON_SIZE / Math.max(renderWidth, renderHeight);
   const width = renderWidth * scale;
   const height = renderHeight * scale;
   const x = (SITE_ICON_SIZE - width) / 2;
   const y = (SITE_ICON_SIZE - height) / 2;
   context.clearRect(0, 0, SITE_ICON_SIZE, SITE_ICON_SIZE);
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
   context.drawImage(image, x, y, width, height);
   const source = context.getImageData(
     0,

@@ -121,7 +121,7 @@ describe("IndexedDB storage", () => {
       iconDataUrl: "data:image/webp;base64,BRAND",
       iconDataUrlLight: "data:image/webp;base64,LIGHT",
       iconDataUrlDark: "data:image/webp;base64,DARK",
-      iconRenderVersion: 7,
+      iconRenderVersion: 9,
       iconAssetUrl: "https://docs.example.com/manifest-icon.png",
       nativeWidth: 512,
       nativeHeight: 512,
@@ -133,7 +133,7 @@ describe("IndexedDB storage", () => {
       iconSource: "manifest",
       iconDataUrlLight: "data:image/webp;base64,LIGHT",
       iconDataUrlDark: "data:image/webp;base64,DARK",
-      iconRenderVersion: 7,
+      iconRenderVersion: 9,
       iconAssetUrl: "https://docs.example.com/manifest-icon.png",
       nativeWidth: 512
     });
@@ -144,7 +144,7 @@ describe("IndexedDB storage", () => {
     ).toBe(true);
   });
 
-  it("keeps accepted icon bytes and only bumps the render version for legacy caches", async () => {
+  it("clears stale icon bytes so the next scan regenerates under the current pipeline", async () => {
     await putSiteBrand({
       host: "legacy.example.com",
       iconDataUrl: "data:image/webp;base64,LEGACY",
@@ -152,24 +152,25 @@ describe("IndexedDB storage", () => {
       iconDataUrlDark: "data:image/webp;base64,LEGACY_DARK",
       iconRenderVersion: 1,
       iconSource: "svg-icon",
+      iconAssetUrl: "https://legacy.example.com/icon.svg",
       nativeWidth: 192,
       nativeHeight: 192,
       skipPageImage: true,
       updatedAt: "2026-07-30T00:00:00.000Z",
     });
 
-    expect(await invalidateStaleSiteBrandIcons(7)).toBe(1);
-    expect(await getSiteBrand("legacy.example.com")).toMatchObject({
+    expect(await invalidateStaleSiteBrandIcons(9)).toBe(1);
+    const brand = await getSiteBrand("legacy.example.com");
+    expect(brand).toMatchObject({
       host: "legacy.example.com",
-      iconSource: "svg-icon",
-      nativeWidth: 192,
-      nativeHeight: 192,
       skipPageImage: true,
-      iconRenderVersion: 7,
-      iconDataUrl: "data:image/webp;base64,LEGACY",
-      iconDataUrlLight: "data:image/webp;base64,LEGACY_LIGHT",
-      iconDataUrlDark: "data:image/webp;base64,LEGACY_DARK",
+      iconRenderVersion: 9,
     });
+    expect(brand?.iconDataUrl).toBeUndefined();
+    expect(brand?.iconDataUrlLight).toBeUndefined();
+    expect(brand?.iconDataUrlDark).toBeUndefined();
+    expect(brand?.iconSource).toBeUndefined();
+    expect(brand?.iconAssetUrl).toBeUndefined();
   });
 
   it("evicts the oldest page snapshot above the local capacity", async () => {

@@ -3,6 +3,7 @@ import type {
   SiteIconCandidate,
   SiteIconSource
 } from "./types";
+import { registrableHost } from "./cover-registry";
 
 const MAX_HTML_LENGTH = 600_000;
 
@@ -90,6 +91,24 @@ function absoluteUrl(value: string, pageUrl: string): string {
   }
 }
 
+/**
+ * 页面声明的图标必须与当前站点同可注册域，或为 data:。
+ * 否则停放页/注入脚本里的第三方图标（例如搜狗导航）会被当成该站标识缓存。
+ */
+export function isAcceptableSiteIconUrl(href: string, pageUrl: string): boolean {
+  try {
+    const icon = new URL(href);
+    if (icon.protocol === "data:") return true;
+    if (icon.protocol !== "http:" && icon.protocol !== "https:") return false;
+    const page = new URL(pageUrl);
+    return (
+      registrableHost(icon.hostname) === registrableHost(page.hostname)
+    );
+  } catch {
+    return false;
+  }
+}
+
 function attribute(tag: string, name: string): string {
   const escaped = escapeRegExp(name);
   const quoted = tag.match(
@@ -143,7 +162,7 @@ function iconCandidates(
     const tag = match[0];
     const rel = attribute(tag, "rel").toLowerCase().split(/\s+/);
     const href = absoluteUrl(attribute(tag, "href"), pageUrl);
-    if (!href) continue;
+    if (!href || !isAcceptableSiteIconUrl(href, pageUrl)) continue;
     const declaredSize = declaredIconSize(tag);
     const candidate = (
       source: SiteIconSource,
@@ -183,7 +202,7 @@ function iconCandidates(
     ...apple.sort(sortLargest),
     ...svg.sort(sortLargest),
     ...bitmap.sort(sortLargest),
-    ...(tileUrl
+    ...(tileUrl && isAcceptableSiteIconUrl(tileUrl, pageUrl)
       ? [
           {
             url: tileUrl,

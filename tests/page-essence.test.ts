@@ -139,4 +139,38 @@ describe("page essence", () => {
 
     expect(essence.imageUrl).toBe("");
   });
+
+  it("rejects cross-registrable-domain icon declarations that would poison the host cache", () => {
+    const essence = extractPageEssenceFromHtml(
+      `
+        <link rel="apple-touch-icon" sizes="180x180" href="https://www.sogou.com/images/logo/new/favicon.ico">
+        <link rel="icon" type="image/svg+xml" href="/icon.svg">
+        <meta name="msapplication-TileImage" content="https://cdn.unrelated.example/tile.png">
+      `,
+      "https://loading-ui.com/"
+    );
+
+    expect(essence.siteIconCandidates).toEqual([
+      {
+        url: "https://loading-ui.com/icon.svg",
+        source: "svg-icon",
+        vector: true
+      }
+    ]);
+  });
+
+  it("still accepts same-site CDN icons under the registrable host", () => {
+    const essence = extractPageEssenceFromHtml(
+      `<link rel="apple-touch-icon" sizes="180x180" href="https://static.example.com/apple.png">`,
+      "https://www.example.com/page"
+    );
+
+    expect(essence.siteIconCandidates).toEqual([
+      {
+        url: "https://static.example.com/apple.png",
+        source: "apple-touch-icon",
+        declaredSize: 180
+      }
+    ]);
+  });
 });

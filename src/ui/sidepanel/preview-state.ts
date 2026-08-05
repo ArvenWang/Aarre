@@ -255,7 +255,7 @@ export function previewSiteBrand(host: string): SiteBrandRecord {
     host,
     iconDataUrl: previewBrandDataUrl("#18191c"),
     iconDataUrlLight: previewBrandDataUrl("#18191c"),
-    iconRenderVersion: 6,
+    iconRenderVersion: 9,
     iconSource: "registry",
     nativeWidth: 192,
     nativeHeight: 192,

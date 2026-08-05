@@ -20,7 +20,7 @@ describe("offscreen site-icon decoder client", () => {
       result: {
         iconDataUrl: "data:image/webp;base64,OFFSCREEN",
         iconDataUrlLight: "data:image/webp;base64,OFFSCREEN",
-        iconRenderVersion: 7,
+        iconRenderVersion: 9,
         nativeWidth: 192,
         nativeHeight: 192
       }

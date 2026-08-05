@@ -465,9 +465,10 @@ export async function getSiteBrands(): Promise<SiteBrandRecord[]> {
 }
 
 /**
- * Remove rendered icon bytes produced by an older compositor. The host-level
- * record and its diagnostics remain so the normal site scan can regenerate a
- * current alpha-preserving icon without losing other metadata.
+ * Drop rendered icon bytes produced by an older compositor so the normal site
+ * scan can regenerate them. Host metadata (skip flags, samples) is kept.
+ * Pipeline changes such as upscaling or stricter candidate filters require a
+ * real refetch; only bumping iconRenderVersion would leave bad pixels in place.
  */
 export async function invalidateStaleSiteBrandIcons(
   currentRenderVersion: number,
@@ -484,13 +485,23 @@ export async function invalidateStaleSiteBrandIcons(
   if (!stale.length) return 0;
 
   const transaction = db.transaction("siteBrands", "readwrite");
+  const clearedAt = new Date().toISOString();
   for (const brand of stale) {
-    // 已接受的图标保留渲染字节，只升级版本号：质量门槛放宽（或未来
-    // 其他规则调整）不应该让已有真实图标消失回退到兜底图；需要按新
-    // 规则重试的只是那些没有图标的 reject 记录，它们本来就没有字节。
+    const {
+      iconDataUrl: _iconDataUrl,
+      iconDataUrlLight: _iconDataUrlLight,
+      iconDataUrlDark: _iconDataUrlDark,
+      iconAssetUrl: _iconAssetUrl,
+      iconSource: _iconSource,
+      iconRejectReason: _iconRejectReason,
+      nativeWidth: _nativeWidth,
+      nativeHeight: _nativeHeight,
+      ...kept
+    } = brand;
     await transaction.store.put({
-      ...brand,
-      iconRenderVersion: currentRenderVersion
+      ...kept,
+      iconRenderVersion: currentRenderVersion,
+      updatedAt: clearedAt
     });
   }
   await transaction.done;

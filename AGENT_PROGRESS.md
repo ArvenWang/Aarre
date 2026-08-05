@@ -1,10 +1,45 @@
 # Aarre 项目进展
 
-最后更新：2026-08-05（0.5.65 截图反馈修复完成；安装态 Chrome 与真实 Provider 项待真人验收）
+最后更新：2026-08-05（0.5.67 网站标识清字节重抓 + 服务端 0.1.13 已推远端）
 
 > **⚠️ 下一位 Agent 必读：先读 [`docs/AUDIT_2026-08.md`](docs/AUDIT_2026-08.md)（问题分析）和 [`docs/PRD_REBUILD_2026-08.md`](docs/PRD_REBUILD_2026-08.md)（执行方案），再以本页顶部最新记录为当前事实。T-01～T-20 与 T-14c 的代码和自动化已收口，不要重做已完成项，也不要在旧架构上打补丁；真人 Chrome / Provider 验收仍是外部门。**
 >
 > **Round 3 已按用户选择的三个 A 方案完成。** 后续不要恢复透明 surface、会覆盖新会话的云端拉取、毛玻璃吸顶条、设置页封面风格切换或常驻白色提示条。
+
+## 2026-08-05 · 网站标识未重抓补丁（0.5.67）
+
+- **用户反馈。** 0.5.66 重载后过小/错标/重复问题依旧，看起来没有重抓。
+- **根因。** `invalidateStaleSiteBrandIcons` 在版本 7→8 时**只改 `iconRenderVersion`、保留旧 `iconDataUrlLight`**。缓存仍被当成新鲜，扫描不会重抓；列表继续显示旧像素。
+- **修复。**
+  1. `SITE_ICON_RENDER_VERSION` **8→9**（覆盖已盖上 8 但仍是旧图的用户）。
+  2. invalidate **清空**图标字节与来源字段，只保留 host 元数据。
+  3. `GET_SITE_BRANDS` 若清掉了旧图，后台并发重抓缺失图标，并广播 `SITE_BRANDS_UPDATED`；侧边栏监听后刷新。
+  4. 管线侧保留 0.5.66：小图放大填满、同可注册域校验、`apple-icon` 路径、HTML 软 404 拒绝、Google S2 `sz=256`、公共服务缓存 7 天。
+- **顺带。** 生产服务端 **0.1.13**（`coverOrigin`）已发布；`server/package.json` 一并纳入本提交。
+- **验证。** 相关 7 文件 / 73 测试通过；`tsc` + 生产构建通过；`dist/manifest.json` 为 0.5.67。
+- **Git。** 本轮变更已提交并推送 `origin/main`。
+- **用户验收。** `chrome://extensions` 重载 **0.5.67** 的 `dist/`。打开侧边栏后图标可能先短暂退回分类封面，随后逐批换成正确图标。重点看 loading-ui / namethatui / generative-dynamics / uibook / aconvert / pika。
+
+## 2026-08-05 · 网站标识过小 / 错标 / 重复（0.5.66，重抓未生效）
+
+- **现象。** 侧边栏书签列表：① 图标明显过小；② 错站标识；③ 不同站共用错误标识。
+- **根因（管线）。** 小图不放大；跨域页面图标可污染缓存；常规路径/软 404/长缓存。
+- **状态。** 管线修复保留；因 invalidate 未清字节，重抓未发生。已由上方 0.5.67 收口。
+
+## 2026-08-05 · 生产发布 0.1.13：coverOrigin 同步失败已修复
+
+- **问题。** 扩展上传 `coverOrigin`，生产 strict schema 不认识 → `unrecognized_keys`，设置页「同步失败」。
+- **发布。** 不可变 release `/opt/aarre/releases/20260805-cover-origin-v31`；`/opt/aarre/current` 已切换；服务端版本 **0.1.13**。旧 release `20260803-upload-race-v30` 保留可回滚。
+- **范围。** 资源 payload 与资产 `binding` 正式接纳 `coverOrigin` / `coverContentHash`；顺带带上已合入仓库的实体批量写入接口。无需 migration，未改扩展。
+- **验证。** 本机服务端 typecheck + 23/23 测试 + build 通过；生产 `/ready` 本地与公网均为 `{"ok":true}`；容器 healthy；运行中 `dist/contracts.js` 含 `coverOrigin`；容器内 schema smoke：`coverOrigin`/`coverContentHash` 接受，未知字段仍拒绝；`verify-production-access.sh` 全绿（migrations 8/26，fatal 0）。
+- **用户验收。** 在设置页点「立即同步」（或等自动重试）。成功后红字 `unrecognized_keys` 应消失。若仍失败，保存新错误原文再查。
+- **Git。** 服务端版本与进展已随 0.5.67 一并推送。
+
+## 2026-08-05 · 同步失败根因：生产服务端未接纳 coverOrigin（已发布）
+
+- **现象。** 设置页 Google 账号显示「同步失败」，错误原文：`unrecognized_keys` / `keys: ["coverOrigin"]`。
+- **根因。** 扩展客户端（0.5.65）在资源 payload 与封面资产 `binding` 中上传 `coverOrigin`；本地仓库 `server/src/contracts.ts` 已在 `ae19775`（2026-08-04）放行该字段。但生产此前仍指向 `/opt/aarre/releases/20260803-upload-race-v30`（2026-08-03），其 strict schema **没有** `coverOrigin` / `coverContentHash`，Zod 拒绝请求。
+- **状态。** 已由上方 0.1.13 发布收口。
 
 ## 2026-08-05 · 列表行与删除确认截图反馈（0.5.65）
 

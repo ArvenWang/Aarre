@@ -12,9 +12,9 @@ describe("public favicon fallback", () => {
       publicFaviconCandidates("https://Docs.Example.com/private?q=secret", enabled)
     ).toEqual([
       {
-        url: "https://www.google.com/s2/favicons?domain=docs.example.com&sz=128",
+        url: "https://www.google.com/s2/favicons?domain=docs.example.com&sz=256",
         source: "public-service",
-        declaredSize: 128
+        declaredSize: 256
       },
       {
         url: "https://icons.duckduckgo.com/ip3/docs.example.com.ico",

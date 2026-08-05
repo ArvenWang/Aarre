@@ -98,7 +98,7 @@ describe("visuals store", () => {
     await putSiteBrand({
       host: `${suffix}.example.com`,
       iconDataUrlLight: "data:image/png;base64,aWNvbg==",
-      iconRenderVersion: 7,
+      iconRenderVersion: 9,
       updatedAt: "2026-08-04T01:00:00.000Z"
     });
 

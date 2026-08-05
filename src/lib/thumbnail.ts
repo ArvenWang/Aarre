@@ -11,6 +11,7 @@ const MAX_SVG_BYTES = 256 * 1024;
 const SITE_ICON_SIZE = 192;
 const PAGE_COVER_LONG_EDGE = 512;
 const SITE_ICON_CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1_000;
+const PUBLIC_SERVICE_ICON_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1_000;
 
 export interface SiteIconSurface {
   red: number;
@@ -23,15 +24,15 @@ export const SITE_ICON_SURFACE = {
   green: 255,
   blue: 255
 } as const satisfies SiteIconSurface;
-// 7：放宽 favicon 质量门槛（16px 下限、3:1 比例、0.01 墨迹），
-// 让之前被 128px/1.2/0.15 门槛拒绝的站点按新规则重新生成。
-export const SITE_ICON_RENDER_VERSION = 7;
+// 9：渲染管线变更必须清字节重抓。8 曾只抬版本号保留旧图，导致过小/错标
+// 仍显示；本版 invalidate 会清空图标字节并后台重抓。
+export const SITE_ICON_RENDER_VERSION = 9;
 
 export function siteBrandIconCacheIsFresh(
   brand:
     | Pick<
         SiteBrandRecord,
-        "iconDataUrlLight" | "iconRenderVersion" | "updatedAt"
+        "iconDataUrlLight" | "iconRenderVersion" | "updatedAt" | "iconSource"
       >
     | undefined,
   referenceTime = Date.now()
@@ -43,10 +44,11 @@ export function siteBrandIconCacheIsFresh(
     return false;
   }
   const updatedAt = Date.parse(brand.updatedAt);
-  return (
-    Number.isFinite(updatedAt) &&
-    referenceTime - updatedAt < SITE_ICON_CACHE_MAX_AGE_MS
-  );
+  const maxAge =
+    brand.iconSource === "public-service"
+      ? PUBLIC_SERVICE_ICON_CACHE_MAX_AGE_MS
+      : SITE_ICON_CACHE_MAX_AGE_MS;
+  return Number.isFinite(updatedAt) && referenceTime - updatedAt < maxAge;
 }
 
 /**
@@ -873,14 +875,14 @@ async function cacheSiteIconCandidate(
     });
     if (!sourceContext) throw new Error("image-processing-unavailable");
     sourceContext.clearRect(0, 0, SITE_ICON_SIZE, SITE_ICON_SIZE);
-    const scale = Math.min(
-      1,
-      SITE_ICON_SIZE / Math.max(renderWidth, renderHeight)
-    );
+    // Contain 填满画布：小 favicon 必须放大，否则 42px 列表里只剩中心小点。
+    const scale = SITE_ICON_SIZE / Math.max(renderWidth, renderHeight);
     const width = renderWidth * scale;
     const height = renderHeight * scale;
     const x = (SITE_ICON_SIZE - width) / 2;
     const y = (SITE_ICON_SIZE - height) / 2;
+    sourceContext.imageSmoothingEnabled = true;
+    sourceContext.imageSmoothingQuality = "high";
     sourceContext.drawImage(
       bitmap,
       x,

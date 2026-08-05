@@ -25,9 +25,9 @@ export function publicFaviconCandidates(
     if (!host) return [];
     return [
       {
-        url: `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`,
+        url: `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=256`,
         source: "public-service",
-        declaredSize: 128
+        declaredSize: 256
       },
       {
         url: `https://icons.duckduckgo.com/ip3/${encodeURIComponent(host)}.ico`,

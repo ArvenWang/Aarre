@@ -101,13 +101,13 @@ describe("cloud privacy contract", () => {
     expect(
       cloudSiteIconBindingIsCurrent({
         host: "github.com",
-        iconRenderVersion: 7,
+        iconRenderVersion: 9,
       }),
     ).toBe(false);
     expect(
       cloudSiteIconBindingIsCurrent({
         host: "github.com",
-        iconRenderVersion: 7,
+        iconRenderVersion: 9,
         iconAssetUrl:
           "https://github.githubassets.com/favicons/favicon.svg",
       }),
@@ -115,7 +115,7 @@ describe("cloud privacy contract", () => {
     expect(
       cloudSiteIconBindingIsCurrent({
         host: "example.com",
-        iconRenderVersion: 7,
+        iconRenderVersion: 9,
       }),
     ).toBe(true);
   });
