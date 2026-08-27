@@ -131,6 +131,9 @@
   --agent-radius: var(--radius-module);
   --agent-control-radius: var(--radius-control);
   --agent-content-gap: var(--sp-2);
+  /* Inline bookmark sources include a 16px site mark plus their border. Keep
+     prose leading roomy enough that cited and uncited lines share one rhythm. */
+  --agent-markdown-leading: 2.2;
 
   /* Shared dense-row interaction: transparent at rest, surfaced on intent. */
   --row-surface: transparent;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { needsAiEnrichment } from "../../../lib/ai-fields";
 import { buildBookmarkBarSnapshot } from "../../../lib/bookmark-tree";
 import { sendExtensionRequest } from "../../../lib/messages";
@@ -10,6 +10,10 @@ import type {
   ResurfacingItem,
   SiteBrandRecord,
 } from "../../../lib/types";
+import {
+  readActiveTabSummary,
+  subscribeToActiveTabChanges
+} from "../active-tab-events";
 
 async function readNativeBookmarkSnapshot(): Promise<BookmarkBarSnapshot> {
   const bookmarks = typeof chrome !== "undefined" ? chrome.bookmarks : undefined;
@@ -34,8 +38,19 @@ export function useAppState(
   const [contextResurfacing, setContextResurfacing] = useState<ResurfacingItem[]>([]);
   const [organizationNotice, setOrganizationNotice] = useState<OrganizationNotice | null>(null);
   const [aiConfigured, setAiConfigured] = useState(false);
+  const activeTabRefreshRevision = useRef(0);
+
+  const refreshActiveTab = useCallback(async () => {
+    const revision = ++activeTabRefreshRevision.current;
+    const activeTab = await readActiveTabSummary();
+    if (revision !== activeTabRefreshRevision.current) return;
+    setAppState((current) =>
+      current ? { ...current, activeTab } : current
+    );
+  }, []);
 
   const refresh = useCallback(async () => {
+    const activeTabRevisionAtStart = activeTabRefreshRevision.current;
     const nextSnapshot = await readNativeBookmarkSnapshot();
     setSnapshot(nextSnapshot);
     void sendExtensionRequest({ type: "GET_LOCAL_RESOURCES" })
@@ -48,7 +63,11 @@ export function useAppState(
       sendExtensionRequest({ type: "GET_CONTEXT_RESURFACING" }).catch(() => []),
       sendExtensionRequest({ type: "GET_ORGANIZATION_NOTICE" }).catch(() => null),
     ]);
-    setAppState(nextState);
+    setAppState((current) =>
+      current && activeTabRefreshRevision.current !== activeTabRevisionAtStart
+        ? { ...nextState, activeTab: current.activeTab }
+        : nextState
+    );
     setSiteBrands(nextSiteBrands);
     setAiConfigured(nextAiSettings.apiKeyConfigured);
     setContextResurfacing(nextResurfacing);
@@ -78,6 +97,7 @@ export function useAppState(
         setAppState(bootstrap.appState);
         setAiConfigured(bootstrap.aiSettings.apiKeyConfigured);
         applyDisplaySettings(bootstrap.displaySettings);
+        void refreshActiveTab().catch(() => undefined);
       })
       .catch((caught) => {
         if (!cancelled) {
@@ -112,7 +132,15 @@ export function useAppState(
       bookmarks?.onRemoved.removeListener(handleChange);
       bookmarks?.onChildrenReordered.removeListener(handleChange);
     };
-  }, [applyDisplaySettings, refresh, setError]);
+  }, [applyDisplaySettings, refresh, refreshActiveTab, setError]);
+
+  useEffect(
+    () =>
+      subscribeToActiveTabChanges(() =>
+        refreshActiveTab().catch(() => undefined)
+      ),
+    [refreshActiveTab]
+  );
 
   useEffect(() => {
     const eventSource = typeof chrome !== "undefined" ? chrome.runtime?.onMessage : undefined;

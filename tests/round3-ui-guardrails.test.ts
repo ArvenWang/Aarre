@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 const sidepanelCssUrl = new URL("../src/ui/sidepanel.css", import.meta.url);
 const agentPageUrl = new URL("../src/ui/sidepanel/pages/AgentChatPage.tsx", import.meta.url);
 const agentCssUrl = new URL("../src/ui/sidepanel-lazy.css", import.meta.url);
+const tokensUrl = new URL("../src/ui/tokens.css", import.meta.url);
 const folderSelectUrl = new URL("../src/ui/sidepanel/components/FolderSelect.tsx", import.meta.url);
 const homePageUrl = new URL("../src/ui/sidepanel/pages/HomePage.tsx", import.meta.url);
 const searchBarUrl = new URL("../src/ui/sidepanel/components/SearchBar.tsx", import.meta.url);
@@ -35,10 +36,36 @@ describe("Round 3 UI root-cause guardrails", () => {
       readFile(agentCssUrl, "utf8"),
     ]);
     expect(page).toContain('className="agent-inline-source"');
+    expect(page).toContain("bookmarkSourceForUrl(sources, href)");
+    expect(page).toContain("sources={message.sources}");
     expect(page).toContain("uncitedSources(message.content, message.sources)");
     expect(page).toContain("其他相关收藏");
     expect(css).toContain(".agent-markdown .agent-inline-source");
     expect(page).not.toContain('<div className="agent-inline-source"');
+  });
+
+  it("gives Markdown prose enough leading for bookmark chips without shrinking them", async () => {
+    const [css, tokens] = await Promise.all([
+      readFile(agentCssUrl, "utf8"),
+      readFile(tokensUrl, "utf8"),
+    ]);
+    const markdown = rule(css, ".agent-markdown");
+    const source = rule(css, ".agent-markdown .agent-inline-source");
+    const thumbnail = rule(css, ".agent-inline-source-thumbnail");
+
+    expect(tokens).toContain("--agent-markdown-leading: 2.2");
+    expect(markdown).toContain("line-height: var(--agent-markdown-leading)");
+    expect(source).toContain(
+      "padding: var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-1)",
+    );
+    expect(source).toContain("line-height: var(--sp-4)");
+    expect(source).toContain("vertical-align: middle");
+    expect(source).not.toContain("vertical-align: baseline");
+    expect(thumbnail).toContain("width: var(--sp-4)");
+    expect(thumbnail).toContain("height: var(--sp-4)");
+    expect(css).not.toContain(
+      ".agent-markdown li > .agent-inline-source:only-child",
+    );
   });
 
   it("creates a real Chrome folder inline and selects the result", async () => {

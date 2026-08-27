@@ -807,6 +807,7 @@
 .agent-markdown {
   white-space: normal;
   overflow-wrap: anywhere;
+  line-height: var(--agent-markdown-leading);
 }
 
 .agent-markdown > :first-child {
@@ -891,14 +892,14 @@
   align-items: center;
   gap: var(--sp-1);
   max-width: 100%;
-  padding: 0 var(--sp-2) 0 var(--sp-1);
+  padding: var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-1);
   border: 1px solid var(--line);
   border-radius: var(--radius-pill);
   background: var(--surface);
   color: var(--ink);
   text-decoration: none;
-  vertical-align: baseline;
-  line-height: 1.4;
+  vertical-align: middle;
+  line-height: var(--sp-4);
 }
 
 .agent-markdown .agent-inline-source:hover {
@@ -917,13 +918,6 @@
   width: var(--sp-4);
   height: var(--sp-4);
   flex: 0 0 auto;
-}
-
-.agent-markdown li > .agent-inline-source:only-child {
-  width: 100%;
-  padding: var(--sp-2);
-  gap: var(--sp-2);
-  border-radius: var(--radius-md);
 }
 
 .agent-markdown table {

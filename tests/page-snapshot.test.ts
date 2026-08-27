@@ -12,14 +12,14 @@ import {
   PAGE_SNAPSHOT_REFRESH_INTERVAL_MS,
   PAGE_SNAPSHOT_WIDTH,
   prepareBackgroundPageForCaptureInDocument,
-  showSnapshotUpdatedToastInDocument,
+  showAarreToastInDocument,
   waitForStablePageInDocument
 } from "../src/lib/page-snapshot";
 import { normalizeSnapshotExcludedHost } from "../src/lib/display-settings";
 
 afterEach(() => {
   vi.useRealTimers();
-  document.getElementById("aarre-snapshot-updated-toast")?.remove();
+  document.getElementById("aarre-page-toast")?.remove();
 });
 
 describe("page snapshot privacy", () => {
@@ -253,14 +253,14 @@ describe("page snapshot privacy", () => {
 
   it("reuses one isolated toast host and removes it after success feedback", () => {
     vi.useFakeTimers();
-    showSnapshotUpdatedToastInDocument();
-    showSnapshotUpdatedToastInDocument();
+    showAarreToastInDocument();
+    showAarreToastInDocument();
     expect(
-      document.querySelectorAll("#aarre-snapshot-updated-toast")
+      document.querySelectorAll("#aarre-page-toast")
     ).toHaveLength(1);
     vi.advanceTimersByTime(3_500);
     expect(
-      document.querySelector("#aarre-snapshot-updated-toast")
+      document.querySelector("#aarre-page-toast")
     ).toBeNull();
   });
 });

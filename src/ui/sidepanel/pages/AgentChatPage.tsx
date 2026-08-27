@@ -18,16 +18,19 @@ import { ArrowLeftIcon, CloseIcon } from "../../components/Icons";
 import { SiteThumbnail } from "../../components/SiteThumbnail";
 import { AgentComposer } from "../components/AgentComposer";
 import { AgentThinkingSteps } from "../components/AgentThinkingSteps";
+import { bookmarkSourceForUrl } from "../bookmark-link";
 import { hostFromUrl } from "../utils";
 
-function AgentMarkdown({
+export function AgentMarkdown({
   content,
   resourceByUrl,
   siteBrandByHost,
+  sources,
 }: {
   content: string;
   resourceByUrl: Map<string, ResourceRecord>;
   siteBrandByHost: Map<string, SiteBrandRecord>;
+  sources?: BookmarkAgentSource[];
 }) {
   return (
     <div className="agent-markdown">
@@ -36,18 +39,25 @@ function AgentMarkdown({
         components={{
           a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
             const resource = href ? resourceForUrl(resourceByUrl, href) : undefined;
-            if (!resource) {
+            const source = href ? bookmarkSourceForUrl(sources, href) : undefined;
+            const bookmarkUrl = resource?.url || source?.url;
+            if (!bookmarkUrl) {
               return <a href={href} target="_blank" rel="noreferrer noopener">{children}</a>;
             }
+            const bookmarkTitle = resource?.title || source?.title || bookmarkUrl;
             return (
-              <a className="agent-inline-source" href={resource.url} target="_blank" rel="noreferrer noopener" title={resource.title}>
+              <a className="agent-inline-source" href={bookmarkUrl} target="_blank" rel="noreferrer noopener" title={bookmarkTitle}>
                 <SiteThumbnail
-                  url={resource.url}
-                  imageUrl={resource.thumbnailDataUrl}
-                  brandImageUrl={currentSiteBrandImageUrl(siteBrandForUrl(siteBrandByHost, resource.url))}
-                  categoryCoverId={resource.categoryCoverId}
+                  url={bookmarkUrl}
+                  imageUrl={resource?.thumbnailDataUrl}
+                  brandImageUrl={
+                    currentSiteBrandImageUrl(
+                      siteBrandForUrl(siteBrandByHost, bookmarkUrl),
+                    ) || source?.faviconUrl
+                  }
+                  categoryCoverId={resource?.categoryCoverId}
                   forceSiteBrand
-                  label={resource.siteName || resource.title}
+                  label={resource?.siteName || source?.siteName || bookmarkTitle}
                   className="agent-inline-source-thumbnail"
                 />
                 <span>{children}</span>
@@ -242,6 +252,7 @@ function AgentChatPage({
                       content={message.content}
                       resourceByUrl={resourceByUrl}
                       siteBrandByHost={siteBrandByHost}
+                      sources={message.sources}
                     />
                   ) : (
                     <p>{message.content}</p>

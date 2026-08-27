@@ -4,7 +4,12 @@ import { enqueueOutbox, getLocalResource, getLocalResources, getOutbox, getPageS
 import { searchLocalResources } from "../../lib/search";
 import { needsAiEnrichment, preservedAiRetrievalFields } from "../../lib/ai-fields";
 import { categoryCoverForResource } from "../../lib/cover-registry";
+import { getAiRuntimeSettings } from "../../lib/settings";
 import { canonicalizeUrl, isSupportedPageUrl, resourceKeyForUrl } from "../../lib/url";
+import {
+  nativeBookmarkFeedbackMessage,
+  showNativeBookmarkFeedback
+} from "../bookmark-feedback";
 import type {
   ActiveTabSummary,
   AppState,
@@ -39,6 +44,13 @@ interface ResourcesDependencies {
     resource: ResourceRecord,
     force?: boolean
   ): Promise<boolean>;
+  flashActionBadge(
+    tabId: number | undefined,
+    text: string,
+    color: string,
+    title: string,
+    durationMs?: number
+  ): void;
   getUserProtectionMessage(): string;
 }
 
@@ -62,6 +74,7 @@ export function createResourceHandlers(dependencies: ResourcesDependencies) {
     queueEnhancementsUntilVisit,
     processBookmarkEnhancements,
     ensureSiteBrandForResource,
+    flashActionBadge,
     getUserProtectionMessage
   } = dependencies;
   const now = () => new Date().toISOString();
@@ -140,7 +153,11 @@ async function getResources(query = "") {
 async function indexNativeBookmark(
   id: string,
   node: chrome.bookmarks.BookmarkTreeNode,
-  options: { enhance?: boolean; seed?: ResourceRecord } = {}
+  options: {
+    enhance?: boolean;
+    seed?: ResourceRecord;
+    feedback?: boolean;
+  } = {}
 ) {
   if (!node.url || !isSupportedPageUrl(node.url)) {
     return;
@@ -225,8 +242,9 @@ async function indexNativeBookmark(
     const privacyContext = await getPrivacyProtectionContext();
     const protection = resourceProtectionState(resource, privacyContext);
     const privacyBlocked = protection.protected;
+    const needsAi = needsAiEnrichment(resource);
     const pending: BookmarkEnhancementPart[] = [];
-    if (!privacyBlocked && needsAiEnrichment(resource)) {
+    if (!privacyBlocked && needsAi) {
       pending.push("ai");
     }
     if (
@@ -235,6 +253,27 @@ async function indexNativeBookmark(
       !(await getPageSnapshot(resource.canonicalUrl))
     ) {
       pending.push("snapshot");
+    }
+    const current = await activeTab();
+    const activeMatch = Boolean(
+      current?.url && resourceMatchesLoadedUrl(resource, current.url)
+    );
+    if (
+      options.feedback &&
+      activeMatch &&
+      typeof current?.id === "number"
+    ) {
+      const runtime =
+        needsAi && !privacyBlocked ? await getAiRuntimeSettings() : null;
+      const message = nativeBookmarkFeedbackMessage({
+        privacyBlocked,
+        needsAi,
+        aiConfigured: Boolean(runtime?.apiKey)
+      });
+      flashActionBadge(current.id, "✓", "#2c7a52", message);
+      void showNativeBookmarkFeedback(current.id, message).catch(
+        () => undefined
+      );
     }
     if (privacyBlocked) {
       await cancelEnhancementForResource(resource.resourceKey);
@@ -252,10 +291,7 @@ async function indexNativeBookmark(
     // 网站标识即时补全：不依赖手动扫描，公开 HTML 抓取失败也由
     // ensureSiteBrandForResource 内部兜底，不影响收藏本身。
     void ensureSiteBrandForResource(resource).catch(() => undefined);
-    const current = await activeTab();
-    const activeMatch =
-      current?.url && resourceMatchesLoadedUrl(resource, current.url);
-    if (activeMatch) {
+    if (activeMatch && current) {
       await enqueueBookmarkEnhancement(
         resource,
         pending,

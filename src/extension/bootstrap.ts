@@ -567,6 +567,7 @@ const {
   processBookmarkEnhancements,
   ensureSiteBrandForResource: (resource, force) =>
     siteIconHandlers.ensureSiteBrandForResource(resource, force),
+  flashActionBadge,
   getUserProtectionMessage: () => USER_PROTECTION_MESSAGE
 });
 

@@ -10,7 +10,15 @@ interface BookmarkEventDependencies {
   internalBookmarkIds: Set<string>;
   internalBookmarkTargets: Set<string>;
   bookmarkTarget(parentId: string, url: string): string;
-  indexNativeBookmark(id: string, node: chrome.bookmarks.BookmarkTreeNode, options?: { enhance?: boolean; seed?: ResourceRecord }): Promise<void>;
+  indexNativeBookmark(
+    id: string,
+    node: chrome.bookmarks.BookmarkTreeNode,
+    options?: {
+      enhance?: boolean;
+      seed?: ResourceRecord;
+      feedback?: boolean;
+    }
+  ): Promise<void>;
   importNativeBookmarks(force?: boolean): Promise<ImportResult>;
   reconcileProtectionRules(): Promise<void>;
   queueIndexedResourcesUntilVisit(): Promise<void>;
@@ -62,7 +70,10 @@ chrome.bookmarks.onCreated.addListener((id, node) => {
   ) {
     return;
   }
-  void indexNativeBookmark(id, node, { enhance: true });
+  void indexNativeBookmark(id, node, {
+    enhance: true,
+    feedback: true
+  });
 });
 
 chrome.bookmarks.onImportBegan.addListener(() => {

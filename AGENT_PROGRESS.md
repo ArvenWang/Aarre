@@ -1,10 +1,38 @@
 # Aarre 项目进展
 
-最后更新：2026-08-05（0.5.69 收藏后图标/截图提速 + 服务端 0.1.14 已发布）
+最后更新：2026-08-28（0.5.73 原生星标反馈、右键自动开侧栏与跨标签收藏状态同步；安装态待重载复看）
 
 > **⚠️ 下一位 Agent 必读：先读 [`docs/AUDIT_2026-08.md`](docs/AUDIT_2026-08.md)（问题分析）和 [`docs/PRD_REBUILD_2026-08.md`](docs/PRD_REBUILD_2026-08.md)（执行方案），再以本页顶部最新记录为当前事实。T-01～T-20 与 T-14c 的代码和自动化已收口，不要重做已完成项，也不要在旧架构上打补丁；真人 Chrome / Provider 验收仍是外部门。**
 >
 > **Round 3 已按用户选择的三个 A 方案完成。** 后续不要恢复透明 surface、会覆盖新会话的云端拉取、毛玻璃吸顶条、设置页封面风格切换或常驻白色提示条。
+
+## 2026-08-28 · 原生星标反馈、右键自动开侧栏与跨标签收藏状态同步（0.5.73）
+
+- **用户现象。** ① 用 Chrome 原生星标收藏后，不知道 Aarre 是否捕获成功、AI 是否启动；② 右键「添加到收藏」后侧边栏没有可靠自动打开；③ 侧边栏在已收藏标签显示实心星后，切到未收藏标签仍保持实心。
+- **三个根因。** Chrome 不允许扩展改造原生星标弹窗，现有 `bookmarks.onCreated` 虽已真实登记原生书签并排队增强，但没有可见反馈；右键保存先经过 `context-menus-lazy.ts` 的异步加载，`sidePanel.open()` 执行时 Chrome 的用户手势可能已经失效；侧边栏只监听书签树变化，没有监听 `tabs.onActivated`、活动标签 URL 更新与窗口焦点变化，`appState.activeTab` 因此停留在旧标签。
+- **修复。** 原生 `onCreated` 仅在新书签与当前活动页匹配时显示一次隔离的网页 Toast，并同步短暂绿色扩展角标；文案按真实状态区分「AI 分析中」「配置 AI 后自动分析」「隐私保护，未做 AI 分析」和「AI 信息已就绪」，不把未完成状态冒充成功。右键页/链接菜单现在直接在原始 `contextMenus.onClicked` 回调里发起 `sidePanel.open()`，再把已经开始的 Promise 交给延迟加载的草稿流程，既保留用户手势又不增加后台冷启动负担。侧边栏新增轻量活动标签订阅，直接读取 Chrome 当前聚焦标签，并用 revision 防止快速切换或并发全量刷新把旧状态写回来。
+- **权限与性能。** 没有新增 Manifest 权限；页面提示复用原有 Shadow DOM Toast。清理了右键菜单每次点击都会写入本地存储的历史调试记录。生产 `dist/background.js` 为 **329,976 bytes**，继续低于 **330 KB** 硬门；`dist/manifest.json` 为 **0.5.73**。
+- **自动化与产物。** `npm run check` 全绿：Node/设计 token、TypeScript、**87 个测试文件 / 451 项测试**、生产构建与全部 JavaScript 产物语法检查通过。新增行为回归覆盖：反馈文案不虚报、提示注入精确 tab、右键打开早于懒加载、活动标签激活/导航/窗口聚焦订阅与清理、直接读取最新聚焦标签。
+- **真人验收门。** 已连接真实 Chrome，但当前可控标签中没有 Aarre 安装页/侧边栏，且控制通道不能读取 `chrome://extensions`，所以没有把安装态写成已验收。需要在 `chrome://extensions` 重载本仓库最新 `dist/` 后走三条：① 在普通网页用 Chrome 原生星标收藏，页面应出现与真实 AI 状态一致的提示；② 右键「添加到收藏」应立即打开侧边栏编辑表单；③ 从已收藏标签切到未收藏标签，顶部星标应立即变空，切回后恢复实心。
+
+## 2026-08-08 · Agent 三种收藏链接统一为精确内联胶囊（0.5.72）
+
+- **用户现象。** 同一条 Agent 回答里同时出现绿色下划线链接、通栏大胶囊和常规小胶囊三种收藏链接；常规胶囊高度偏小，且前置 icon 到容器左、上、下的距离不相等。
+- **三个根因。** ① `AgentMarkdown` 过去只查当前 `resourceByUrl`，已经存在于 `message.sources` 的真实收藏若资源映射暂时缺失，会错误退化为普通 Markdown 链接；② `.agent-markdown li > .agent-inline-source:only-child` 以“唯一元素子节点”判断独立卡片，CSS `:only-child` 不计算链接前后的文本节点，因此列表里只有一个链接元素时会误变成通栏卡片；③ 常规胶囊纵向 padding 为 0，高度主要由 16px icon 和文字行高偶然撑起，无法保证对称留白。
+- **统一规则。** `AgentMarkdown` 现在同时使用本地资源映射和回答自带的、经过工具结果及引用过滤的 `BookmarkAgentSource`；两者任一按 canonical URL 命中，就渲染为同一种内联收藏胶囊。普通非收藏网页链接继续使用下划线，不把任意网址冒充收藏。删除列表 `:only-child` 通栏升级规则，列表与段落不再产生两套收藏样式。
+- **精确几何。** 胶囊固定由 **16px icon + 4px 上下/左 padding + 1px 边框**构成，浏览器实测总高度 **26px**；icon 到可见边缘的左、上、下距离全部为 **5px**，右侧文字 padding 保持 8px，整体继续 `vertical-align: middle`。三种上下文的胶囊浏览器实测高度均为 26px，且 CSS 中已无通栏规则。验证截图为 `output/playwright/agent-bookmark-links-0.5.72.png`。
+- **架构与回归。** 新增真实渲染测试，证明资源映射缺失但 `message.sources` 命中的收藏仍生成胶囊，同时普通外链不生成胶囊；样式守卫锁定 26px 几何、对称 padding、垂直居中和通栏规则移除。完整检查第一次准确拦截 `AgentChatPage.tsx` 达到 504 行；来源匹配随后拆到 `bookmark-link.ts`，页面回落到 489 行，没有放宽 500 行门禁。
+- **自动化与产物。** 最终 `npm run check` 全绿：设计 token、TypeScript、**84 个测试文件 / 443 项测试**、生产构建和全部 JavaScript 产物语法检查通过。`dist/manifest.json` 为 **0.5.72**，生产 `sidepanel-lazy` CSS 含统一胶囊几何且不含 `li > .agent-inline-source:only-child`。
+- **真人验收门。** 需要在 `chrome://extensions` 重载 **0.5.72** 的 `dist/`，用截图同类真实回答复看：三个真实收藏都应为同高度内联胶囊，普通非收藏网址才显示下划线。
+
+## 2026-08-08 · AI Markdown 与内联书签链接行高、垂直居中收口（0.5.71）
+
+- **用户现象。** Agent 回答里的普通 Markdown 行与新内联书签链接胶囊高度不一致；同一段或列表内混排时，有书签链接的行明显比纯文字行高。0.5.70 放松行高后，用户真实复看进一步确认整枚链接仍相对相邻文字居上，要求真正垂直居中。
+- **完整根因。** `.agent-message-copy` 沿用全局正文行高；紧凑密度下普通 Markdown 单行实测 **18.59px**，含 16px 站点图标与边框的 `.agent-inline-source` 会把同一行撑到 **22.98px**，单行差 **4.39px / 约 24%**。同时链接使用 `vertical-align: baseline`，链接中心比相邻文字中心高 **4px**；已有 `align-items: center` 只让图标与文字在胶囊内部居中，并不控制整枚胶囊相对外部行盒的位置。
+- **修复。** 保留 0.5.70 的语义 token `--agent-markdown-leading: 2.2`，仅放松 `.agent-markdown`；0.5.71 将 `.agent-inline-source` 的外部对齐从 `baseline` 改为 `middle`。没有缩小链接图标、内边距、边框、圆角或自身 `line-height`；标题、用户消息和侧边栏其他文字不受影响。
+- **浏览器几何验证。** 使用项目真实侧边栏 CSS 渲染混排 fixture：舒适密度下，链接中心相对文字中心由 **-4px** 收敛到 **+0.95px**，相对整行中心仅 **+0.66px**；纯文字与链接混排行高继续保持上一轮的近似一致，链接本体尺寸未变。最终截图为 `output/playwright/agent-inline-center-0.5.71.png`。
+- **自动化与产物。** 回归测试同时锁定 Markdown 行高、`vertical-align: middle` 与链接现有几何，并明确禁止退回 `baseline`；`npm run check` 全绿：设计 token、TypeScript、**83 个测试文件 / 442 项测试**、生产构建和全部 JavaScript 产物语法检查通过。`dist/manifest.json` 为 **0.5.71**，生产 `sidepanel-lazy` CSS 含目标 token 与 `vertical-align: middle`。
+- **真人验收门。** Playwright 几何验证证明源码和生产 CSS 已垂直居中，但不能冒充安装态。需要在 `chrome://extensions` 重载 **0.5.71** 的 `dist/`，再次查看包含 GitHub、LeiaPix 等内联收藏链接的真实 Agent 回答。
 
 ## 2026-08-05 · 收藏后图标与截图耗时收口（0.5.69）
 

@@ -73,7 +73,8 @@ export interface ContextMenuLifecycle {
   refresh(knownTab?: chrome.tabs.Tab): Promise<void>;
   handleSave(
     info: chrome.contextMenus.OnClickData,
-    tab?: chrome.tabs.Tab
+    tab?: chrome.tabs.Tab,
+    openPanelRequest?: Promise<void>
   ): Promise<void>;
   handleUpdateSnapshot(tab?: chrome.tabs.Tab): Promise<void>;
   handleImageCover(
@@ -175,7 +176,8 @@ export function createContextMenuLifecycle<
 
   async function handleSave(
     info: chrome.contextMenus.OnClickData,
-    tab?: chrome.tabs.Tab
+    tab?: chrome.tabs.Tab,
+    openPanelRequest?: Promise<void>
   ): Promise<void> {
     if (
       info.menuItemId !== CONTEXT_MENU_PAGE_ID &&
@@ -191,7 +193,8 @@ export function createContextMenuLifecycle<
       const storeDraft = chrome.storage.session.set({
         [pendingSaveKey(draft.tabId)]: draft
       });
-      const openPanel = chrome.sidePanel.open({ tabId: draft.tabId });
+      const openPanel =
+        openPanelRequest || chrome.sidePanel.open({ tabId: draft.tabId });
       await storeDraft;
       await openPanel.catch((error) => {
         dependencies.flashActionBadge(

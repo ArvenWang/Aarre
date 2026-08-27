@@ -483,8 +483,10 @@ export function detectBotChallengeInDocument(): boolean {
  * 本函数会被序列化到网页上下文中执行。Shadow DOM 用来隔离站点样式，
  * 固定宿主 id 则避免重复提示叠在一起。
  */
-export function showSnapshotUpdatedToastInDocument(): void {
-  const hostId = "aarre-snapshot-updated-toast";
+export function showAarreToastInDocument(
+  message = "封面截图已更新",
+  hostId = "aarre-page-toast"
+): void {
   document.getElementById(hostId)?.remove();
 
   const host = document.createElement("div");
@@ -500,7 +502,7 @@ export function showSnapshotUpdatedToastInDocument(): void {
   const toast = document.createElement("div");
   toast.setAttribute("role", "status");
   toast.setAttribute("aria-live", "polite");
-  toast.textContent = "封面截图已更新";
+  toast.textContent = message;
   Object.assign(toast.style, {
     boxSizing: "border-box",
     maxWidth: "calc(100vw - 32px)",

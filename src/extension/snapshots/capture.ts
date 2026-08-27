@@ -7,7 +7,7 @@ import {
   prepareBackgroundPageForCaptureInDocument,
   isLoadedSnapshotTab,
   isSnapshotSensitiveUrl,
-  showSnapshotUpdatedToastInDocument,
+  showAarreToastInDocument,
   waitForStablePageInDocument
 } from "../../lib/page-snapshot";
 import type { SnapshotBackfillLease } from "../../lib/snapshot-backfill";
@@ -454,7 +454,7 @@ export function createSnapshotCapture<
       await chrome.scripting
         .executeScript({
           target: { tabId },
-          func: showSnapshotUpdatedToastInDocument
+          func: showAarreToastInDocument
         })
         .catch(() => undefined);
     }
