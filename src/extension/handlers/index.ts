@@ -1,3 +1,4 @@
+import { openFloatingMenu } from "../floating/lifecycle";
 import { getLocalResources } from "../../lib/storage";
 import {
   conversationHasCompletedAnswer,
@@ -119,9 +120,8 @@ export function createMessageHandlers(
       const current = senderTab || (await actions.activeTab());
       const windowId = current?.windowId ?? (await actions.messageWindowId(sender));
       if (typeof windowId !== "number") throw new Error("无法确定当前 Chrome 窗口。");
-      await chrome.sidePanel.open(
-        typeof current?.id === "number" ? { tabId: current.id } : { windowId }
-      );
+      if (current) await openFloatingMenu(current);
+      else await actions.openManagerPage("manager.html", windowId);
       return { opened: true };
     },
     AUTH_CHANGED: async () => {

@@ -12,6 +12,7 @@ import {
   getOutbox,
   upsertLocalResource
 } from "../src/lib/storage";
+import { readCloudResourceTracking, commitCloudResourceChanges } from "../src/lib/cloud-resource-store";
 import { createResourceTombstone } from "../src/extension/coordinators/bookmark-events";
 import type { ResourceRecord } from "../src/lib/types";
 
@@ -111,7 +112,8 @@ describe("cloud deletion tombstones", () => {
   it("removes only Aarre local data when pulling a cloud tombstone", async () => {
     const key = `remote-delete-${crypto.randomUUID()}`;
     await upsertLocalResource(resource(key));
-    localValues["aarre:cloud-sync-cursor:v1"] = 12;
+    const tracking = await readCloudResourceTracking();
+    await commitCloudResourceChanges(tracking.generation, [], 12);
     request.mockResolvedValue({
       changes: [{
         sequence: 13,

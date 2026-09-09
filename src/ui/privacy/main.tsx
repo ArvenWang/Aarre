@@ -2,7 +2,12 @@ import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Button } from "@/ui/components/ui/button";
 import { downloadAarreDataExport } from "../../lib/data-export";
+import "../styles.css";
+import "@heroui/styles";
+import "../heroui-theme.css";
 import "./privacy.css";
+import { initializeTheme } from "../../lib/theme";
+initializeTheme();
 
 function PrivacyPage() {
   const [exportState, setExportState] = useState<"idle" | "busy" | "error">("idle");
@@ -24,7 +29,7 @@ function PrivacyPage() {
         <span>AARRE · PRIVACY</span>
         <h1>你的书签属于你。</h1>
         <p>
-          生效日期：2026 年 8 月 2 日。本政策说明 Aarre
+          生效日期：2026 年 9 月 9 日。本政策说明 Aarre
           浏览器扩展在本机处理什么、哪些请求会离开设备，以及你如何带走自己的数据。
         </p>
       </header>
@@ -48,7 +53,7 @@ function PrivacyPage() {
         <p>
           Aarre 在扩展的 IndexedDB 与 Chrome
           本地存储中保存摘要、标签、主题、检索别名、用户备注、Agent
-          会话、链接健康状态、站点标识、页面封面、页面快照、撤销记录、扫描用量与界面设置。卸载扩展或清除扩展数据会删除这些本机副本；若你此前开启云端同步，可在重新安装并登录后恢复允许同步的内容。
+          会话、链接健康状态、站点标识、页面封面、页面快照、撤销记录、扫描用量与界面设置。卸载扩展或清除扩展数据会删除这些本机副本；若你此前开启云端同步，可在重新安装、登录并明确重新开启完整备份后恢复允许同步的内容。
         </p>
       </section>
 
@@ -71,7 +76,7 @@ function PrivacyPage() {
         </p>
         <h3>可选的跨设备同步</h3>
         <p>
-          云端默认关闭，且本构建只有在已配置正式 Aarre 服务时才显示可连接状态。开启同步即为完整备份：加密同步摘要、标签、主题、别名、备注、设置、稳定会话、报告、保护规则与恢复信息，并把页面快照、封面和站点标识上传到腾讯云私有 COS。图片和元数据由服务端加密保护，但这不是只有你能解密的端到端加密。
+          云端默认关闭，登录只连接账号，不会自动上传。你在确认数据范围并选择“开启完整备份”后，才会加密同步摘要、标签、主题、别名、备注、设置、稳定会话、报告、保护规则与恢复信息，并把页面快照、封面和站点标识上传到腾讯云私有 COS。图片和元数据由服务端加密保护，但这不是只有你能解密的端到端加密。
         </p>
         <p>
           API Key、网页正文、Cookie、完整浏览历史、Chrome 原生书签 ID、运行中的任务和受保护资源不进入 Aarre 云端。启用保护会停止后续上传，并排队删除该资源已经上传的元数据和全部对象版本。
@@ -111,7 +116,7 @@ function PrivacyPage() {
             <dt>http / https 网站访问</dt>
             <dd>
               Chrome 自带星标不会授予临时网页权限；Aarre
-              需要在新收藏后自动生成摘要、标签和本机截图；批量补拍还会在后台专用标签页中打开已收藏网址。该权限也用于你主动启动的全目录扫描，不用于持续监控普通浏览。
+              需要在新收藏后自动生成摘要、标签和本机截图；批量补拍还会在后台专用标签页中打开已收藏网址。该权限也用于你主动启动的全目录扫描，以及在普通网页显示悬浮球。悬浮菜单不改变网页宽度，截图时会先隐藏，不用于持续监控普通浏览。
             </dd>
           </div>
           <div>
@@ -135,10 +140,7 @@ function PrivacyPage() {
       <section>
         <h2>导出、删除与联系</h2>
         <p>
-          本页的“导出全部本地数据”会生成 JSON，包含智能层数据、Agent
-          会话、站点资产、页面快照、撤销记录和安全的本机设置，并明确排除 API
-          Key、Key
-          尾号与登录令牌。你可以通过卸载扩展或清除扩展数据完成本机删除；云端数据需在账号设置中单独请求删除，服务端会先吊销设备 Token，再删除在线密文和 COS 全部对象版本，安全备份按公开保留期到期。
+          “导出完整备份”会生成带有文件及图片校验信息的 JSON，包含完整原生书签目录、智能信息、AI 会话、图片和隐私排除规则。可在完整收藏库的“本地备份与恢复”导入到独立文件夹；重复导入会识别恢复记录。API Key、登录令牌、同步授权、撤销记录和旧设备的待执行操作不会导出或重放。你可以通过卸载扩展或清除扩展数据完成本机删除；云端数据需在账号设置中单独请求删除，服务端会先吊销设备 Token，再删除在线密文和 COS 全部对象版本，安全备份按公开保留期到期。
         </p>
         <p>
           如需报告隐私问题，请在{" "}
@@ -160,7 +162,7 @@ function PrivacyPage() {
             disabled={exportState === "busy"}
             onClick={() => void exportLocalData()}
           >
-            {exportState === "busy" ? "正在打包…" : "导出全部本地数据"}
+            {exportState === "busy" ? "正在打包…" : "导出完整备份"}
           </Button>
           {exportState === "error" ? (
             <span role="alert">导出失败，请返回扩展后重试。</span>

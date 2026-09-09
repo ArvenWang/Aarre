@@ -55,6 +55,7 @@ interface ScrollModel {
 }
 
 interface HomePageProps {
+  floating?: boolean;
   header: ComponentProps<typeof LibraryHeader>;
   notices: ComponentProps<typeof LibraryNotices>;
   search: ComponentProps<typeof SearchBar>;
@@ -73,6 +74,7 @@ interface HomePageProps {
 }
 
 export default function HomePage({
+  floating,
   header,
   notices,
   search,
@@ -99,8 +101,12 @@ export default function HomePage({
 
   return (
     <main className="native-panel">
-      <LibraryHeader {...header} />
-      <LibraryNotices {...notices} />
+      {floating ? <div className="floating-current-page">
+        <Button variant={header.currentSaved ? "secondary" : "primary"} onClick={header.onSaveCurrent} disabled={!header.appState?.activeTab?.supported}>
+          <StarIcon />{header.currentSaved ? "管理此收藏" : "收藏当前网页"}
+        </Button>
+        <Button variant="ghost" size="icon" aria-label="新建文件夹" onClick={header.onCreateFolder}>＋</Button>
+      </div> : <><LibraryHeader {...header} /><LibraryNotices {...notices} /></>}
       <SearchBar {...search} />
       <div className="native-content-frame" data-has-folders={library.hasVisibleFolders} data-at-end={scroll.atEnd}>
         {status.error ? (
@@ -191,7 +197,7 @@ export default function HomePage({
         </div>
       ) : null}
       <BookmarkPreviewLayer {...preview} />
-      {agent ? <AgentComposer {...agent} /> : null}
+      {agent && !floating ? <AgentComposer {...agent} /> : null}
       <BookmarkEditorDialog {...editor} />
     </main>
   );

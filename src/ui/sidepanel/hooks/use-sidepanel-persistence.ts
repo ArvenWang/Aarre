@@ -35,6 +35,7 @@ export function useSidepanelPersistence({
   useEffect(() => {
     void Promise.all([getSidepanelState(), getOnboardingState()])
       .then(([persisted, onboarding]) => {
+        if (new URLSearchParams(location.search).get("onboarding") === "1") onboarding = { ...onboarding, completed: false };
         setExpanded(new Set(persisted.expandedFolderIds));
         if (onboarding.completed) {
           localStorage.setItem("aarre:onboarding-done", "1");

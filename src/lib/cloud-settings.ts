@@ -29,41 +29,36 @@ export interface CloudSyncEstimate {
 }
 
 const DEFAULT_SETTINGS: CloudSyncSettings = {
-  enabled: true,
+  enabled: false,
   scope: "complete",
   updatedAt: ""
 };
 
+interface StoredConsent extends CloudSyncSettings { consentVersion?: number; consentedUserId?: string }
+const SESSION_KEY = "aarre:cloud-session:v1";
+
 export async function getCloudSyncSettings(): Promise<CloudSyncSettings> {
-  const stored = (await chrome.storage.local.get(CLOUD_SYNC_SETTINGS_KEY))[
-    CLOUD_SYNC_SETTINGS_KEY
-  ] as Partial<CloudSyncSettings> | undefined;
-  const next: CloudSyncSettings = {
-    // Compatibility-only field. Account connection now owns sync lifecycle,
-    // so every migrated record is enabled and callers must not use this as a
-    // product switch.
-    enabled: true,
-    // 产品只保留完整备份：读取时一律按 complete 处理，并把旧的 text
-    // 存储迁移为 complete，避免旧账号继续停留在仅文字同步。
+  const values = await chrome.storage.local.get([CLOUD_SYNC_SETTINGS_KEY, SESSION_KEY]);
+  const stored = values[CLOUD_SYNC_SETTINGS_KEY] as StoredConsent | undefined;
+  const session = values[SESSION_KEY] as { userId?: string } | undefined;
+  return {
+    enabled: stored?.enabled === true && stored.scope === "complete" && stored.consentVersion === 1 &&
+      Boolean(session?.userId) && stored.consentedUserId === session?.userId,
     scope: "complete",
-    updatedAt: typeof stored?.updatedAt === "string" ? stored.updatedAt : ""
+    updatedAt: typeof stored?.updatedAt === "string" ? stored.updatedAt : "",
   };
-  if (stored && (stored.scope !== "complete" || stored.enabled !== next.enabled)) {
-    await chrome.storage.local.set({ [CLOUD_SYNC_SETTINGS_KEY]: next });
-  }
-  return next;
 }
 
-export async function saveCloudSyncSettings(
-  _input: Pick<CloudSyncSettings, "enabled">
-): Promise<CloudSyncSettings> {
-  const next: CloudSyncSettings = {
-    enabled: true,
-    scope: "complete",
-    updatedAt: new Date().toISOString()
+export async function saveCloudSyncSettings(input: Pick<CloudSyncSettings, "enabled">): Promise<CloudSyncSettings> {
+  const values = await chrome.storage.local.get([CLOUD_SYNC_SETTINGS_KEY, SESSION_KEY]);
+  const session = values[SESSION_KEY] as { userId?: string } | undefined;
+  if (input.enabled && !session?.userId) throw new Error("请先登录，再开启完整备份。");
+  const next: StoredConsent = {
+    enabled: input.enabled, scope: "complete", updatedAt: new Date().toISOString(),
+    consentVersion: 1, consentedUserId: session?.userId,
   };
   await chrome.storage.local.set({ [CLOUD_SYNC_SETTINGS_KEY]: next });
-  return next;
+  return { enabled: next.enabled, scope: next.scope, updatedAt: next.updatedAt };
 }
 
 export function defaultCloudSyncSettings(): CloudSyncSettings {

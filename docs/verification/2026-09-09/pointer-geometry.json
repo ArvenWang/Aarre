@@ -1,0 +1,102 @@
+{
+  "scope": "Production host in DEV harness, actual mouse pointer input",
+  "closedDragDidNotOpen": true,
+  "corners": [
+    {
+      "name": "top-left",
+      "ball": {
+        "x": 12,
+        "y": 12,
+        "width": 52,
+        "height": 52,
+        "right": 64,
+        "bottom": 64
+      },
+      "menu": {
+        "x": 76,
+        "y": 12,
+        "width": 400,
+        "height": 600,
+        "right": 476,
+        "bottom": 612
+      },
+      "viewport": {
+        "width": 1425,
+        "height": 1000
+      }
+    },
+    {
+      "name": "top-right",
+      "ball": {
+        "x": 1361,
+        "y": 12,
+        "width": 52,
+        "height": 52,
+        "right": 1413,
+        "bottom": 64
+      },
+      "menu": {
+        "x": 949,
+        "y": 12,
+        "width": 400,
+        "height": 600,
+        "right": 1349,
+        "bottom": 612
+      },
+      "viewport": {
+        "width": 1425,
+        "height": 1000
+      }
+    },
+    {
+      "name": "bottom-left",
+      "ball": {
+        "x": 12,
+        "y": 936,
+        "width": 52,
+        "height": 52,
+        "right": 64,
+        "bottom": 988
+      },
+      "menu": {
+        "x": 76,
+        "y": 388,
+        "width": 400,
+        "height": 600,
+        "right": 476,
+        "bottom": 988
+      },
+      "viewport": {
+        "width": 1425,
+        "height": 1000
+      }
+    },
+    {
+      "name": "bottom-right",
+      "ball": {
+        "x": 1361,
+        "y": 936,
+        "width": 52,
+        "height": 52,
+        "right": 1413,
+        "bottom": 988
+      },
+      "menu": {
+        "x": 949,
+        "y": 388,
+        "width": 400,
+        "height": 600,
+        "right": 1349,
+        "bottom": 988
+      },
+      "viewport": {
+        "width": 1425,
+        "height": 1000
+      }
+    }
+  ],
+  "resized": {
+    "width": 460,
+    "height": 680
+  }
+}

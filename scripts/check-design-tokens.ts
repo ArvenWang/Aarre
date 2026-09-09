@@ -6,6 +6,8 @@ const SOURCE_DIRECTORY = new URL("../src/", import.meta.url);
 const TOKEN_FILE = "tokens.css";
 const ALLOWED_TOKEN_COLORS = new Set([
   "#ffffff",
+  // 0.6.0: contrast-tested secondary and accent text palette.
+  "#58616a", "#68717a", "#087b70", "#adb5be", "#919aa4",
   "#fcfcfc",
   "#fafafa",
   "#f5f6f7",
@@ -15,7 +17,7 @@ const ALLOWED_TOKEN_COLORS = new Set([
   "#ebedef",
   "#dadde0",
   "#12a594",
-  "#d2493a",
+  "#b83b30", // 0.6.0: warning text stays above 4.5:1 on light surfaces.
   "#5b7cd8",
   "#c2762e",
   "#7b6bc4",
@@ -114,7 +116,12 @@ for (const file of entries) {
       }
     }
 
-    if (line.includes("!important")) {
+    // Accessibility overrides must beat third-party component transitions.
+    // This exception permits only these fixed motion values inside this media rule.
+    const reducedMotionOverride = file === "heroui-theme.css" &&
+      lines[index - 1]?.trim() === "@media (prefers-reduced-motion: reduce) {" &&
+      !line.replace(/(?:scroll-behavior: auto|animation-duration: 0\.01ms|animation-iteration-count: 1|transition-duration: 0\.01ms) !important/g, "").includes("!important");
+    if (line.includes("!important") && !reducedMotionOverride) {
       errors.push(`${file}:${lineNumber} 不允许使用 !important`);
     }
 

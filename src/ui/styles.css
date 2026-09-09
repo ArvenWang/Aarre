@@ -1,6 +1,7 @@
 @import "./tokens.css";
 @import "./base.css";
 @import "./editor-fields.css";
+@import "./heroui-theme.css";
 
 :root {
   --background: var(--bg);

@@ -28,6 +28,7 @@ const localValues: Record<string, unknown> = {
 
 beforeEach(() => {
   vi.stubGlobal("chrome", {
+    bookmarks: { getTree: async () => [{ id: "0", title: "", children: [{ id: "1", title: "书签栏", children: [] }] }] },
     runtime: {
       getManifest: () => ({ version: "0.3.0" })
     },
@@ -52,11 +53,10 @@ describe("data export privacy contract", () => {
       "SECRET_API_KEY_SHOULD_NEVER_EXPORT"
     );
     expect(serialized).not.toContain("PORT");
-    expect(result.settings.ai).not.toHaveProperty("apiKeySuffix");
-    expect(result.settings.ai.apiKeyConfigured).toBe(true);
+    expect(result).not.toHaveProperty("settings.ai");
     expect(result.data.conversations).toHaveLength(1);
-    expect(result.data.libraryScan).toEqual(
-      expect.objectContaining({ id: "scan-1" })
-    );
+    expect(result.data.bookmarks[0].children?.[0].title).toBe("书签栏");
+    expect(result.integrity.payload).toMatch(/^[a-f0-9]{64}$/);
+    expect(result.data).not.toHaveProperty("outbox");
   });
 });

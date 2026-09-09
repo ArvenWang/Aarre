@@ -222,6 +222,17 @@ function AgentChatPage({
         </div>
       </header>
       <section className="agent-thread" aria-live="polite">
+        {!conversation.messages.length && !busy && !error ? (
+          <div className="agent-chat-welcome">
+            <h2>和你的收藏聊聊</h2>
+            <p>找回读过的资料，串联相关主题，或预览一份整理建议。</p>
+            {configured ? (
+              <Button variant="secondary" onClick={() => onPromptChange("帮我概括收藏中的主要主题，并为每个主题推荐几条值得重读的资料。")}>梳理我的收藏</Button>
+            ) : (
+              <p>先连接你自己的 AI 服务。书签的修改和删除会在你确认后执行。</p>
+            )}
+          </div>
+        ) : null}
         {conversation.messages.map((message) => (
           <article
             key={message.id}

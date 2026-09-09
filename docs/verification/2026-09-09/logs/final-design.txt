@@ -1,0 +1,5 @@
+
+> bookmark-layer@0.6.0 check:design
+> tsx scripts/check-design-tokens.ts
+
+设计 token 检查通过：10 个 CSS 文件与全部 tsx 无硬编码回归。

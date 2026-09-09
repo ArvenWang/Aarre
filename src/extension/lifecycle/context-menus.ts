@@ -1,3 +1,4 @@
+import { openFloatingMenu } from "../floating/lifecycle";
 import {
   bookmarkPageMenuPresentation,
   bookmarkSnapshotMenuPresentation
@@ -8,13 +9,13 @@ import {
   isLoadedSnapshotTab,
   isSnapshotSensitiveUrl
 } from "../../lib/page-snapshot";
-import { putCoverSnapshot } from "../../lib/visuals";
+import { hashImageDataUrl, putCoverSnapshot } from "../../lib/visuals";
 import type {
   BookmarkSaveState,
   PendingSaveDraft,
   ResourceRecord
 } from "../../lib/types";
-import { hashText, isSupportedPageUrl } from "../../lib/url";
+import { isSupportedPageUrl } from "../../lib/url";
 import {
   CONTEXT_MENU_IMAGE_COVER_ID,
   CONTEXT_MENU_LINK_ID,
@@ -188,13 +189,12 @@ export function createContextMenuLifecycle<
     try {
       const draft = dependencies.buildPendingSaveDraft(info, tab);
       dependencies.rememberPendingSaveDraft(draft);
-      // 必须在右键用户手势仍有效时立即调用 sidePanel.open；持久化与打开
-      // 同步发起，随后等草稿落盘后再通知已存在的侧边栏实例。
+      // 持久化与打开来源页菜单同步发起，草稿落盘后通知现有菜单实例。
       const storeDraft = chrome.storage.session.set({
         [pendingSaveKey(draft.tabId)]: draft
       });
       const openPanel =
-        openPanelRequest || chrome.sidePanel.open({ tabId: draft.tabId });
+        openPanelRequest || chrome.tabs.get(draft.tabId).then((tab) => openFloatingMenu(tab));
       await storeDraft;
       await openPanel.catch((error) => {
         dependencies.flashActionBadge(
@@ -405,7 +405,7 @@ export function createContextMenuLifecycle<
         thumbnailDataUrl: gifDataUrl,
         coverUpdatedAt: new Date().toISOString(),
         coverOrigin: "user",
-        coverContentHash: await hashText(gifDataUrl)
+        coverContentHash: await hashImageDataUrl(gifDataUrl)
       });
       // 网页端卡片封面以页面快照为数据源，必须同步写入，
       // 否则网页端永远显示旧快照/兜底图。
@@ -418,7 +418,7 @@ export function createContextMenuLifecycle<
         height: gifHeight
       }, "user", {
         source: "user-image",
-        contentHash: await hashText(gifDataUrl)
+        contentHash: await hashImageDataUrl(gifDataUrl)
       });
       void chrome.runtime
         .sendMessage({
@@ -479,7 +479,7 @@ export function createContextMenuLifecycle<
         thumbnailDataUrl: dataUrl,
         coverUpdatedAt: new Date().toISOString(),
         coverOrigin: "user",
-        coverContentHash: await hashText(dataUrl)
+        coverContentHash: await hashImageDataUrl(dataUrl)
       });
       const snapshotAt = new Date().toISOString();
       await putCoverSnapshot(resource, {
@@ -490,7 +490,7 @@ export function createContextMenuLifecycle<
         height
       }, "user", {
         source: "user-image",
-        contentHash: await hashText(dataUrl)
+        contentHash: await hashImageDataUrl(dataUrl)
       });
       void chrome.runtime
         .sendMessage({

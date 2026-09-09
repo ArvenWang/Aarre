@@ -1,0 +1,11 @@
+file:///Users/nefish/Desktop/Coding/Aarre/scripts/audit-controls.mjs:322
+if (!selectedScenes.length) throw new Error("没有匹配到审计场景，不能报告通过。");
+                                  ^
+
+Error: 没有匹配到审计场景，不能报告通过。
+    at file:///Users/nefish/Desktop/Coding/Aarre/scripts/audit-controls.mjs:322:35
+    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+
+Node.js v22.22.2

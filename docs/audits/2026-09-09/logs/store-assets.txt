@@ -1,0 +1,5 @@
+
+> bookmark-layer@0.5.73 verify:store-assets
+> node scripts/verify-store-assets.mjs
+
+商店素材验证通过：5 张 JPEG 尺寸正确，视频 35.63 秒、1280×800、H.264/AAC。

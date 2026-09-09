@@ -1,5 +1,6 @@
+import { ManagerUtilities } from "./components/ManagerUtilities";
 import { Button } from "@/ui/components/ui/button";
-import { TabsSubtle, TabsSubtleItem } from "@/ui/components/ui/tabs-subtle";
+import { Tabs } from "@heroui/react/tabs";
 import {
   useCallback,
   useEffect,
@@ -534,7 +535,7 @@ export function ManagerApp() {
         );
         break;
       case "topics":
-        viewContent = <TopicsView dashboard={dashboard} />;
+        viewContent = <TopicsView dashboard={dashboard} resources={libraryResults.map((item) => item.resource)} onOpenResource={(url) => void openResource(url)} />;
         break;
       case "resurface":
         viewContent = (
@@ -583,6 +584,7 @@ export function ManagerApp() {
   return (
     <>
       <main className="manager-shell">
+      <Tabs selectedKey={view} onSelectionChange={(key) => selectView(String(key) as typeof view)} className="aarre-tabs">
       <header className="manager-header">
         <div className="manager-topbar">
           <div className="manager-brand">
@@ -591,17 +593,10 @@ export function ManagerApp() {
             </div>
             <strong>Aarre</strong>
           </div>
+          <ManagerUtilities appState={appState} onStateChange={setAppState} onRestored={() => { void loadResources(); void loadDerivedData(); }} />
         </div>
 
-        <TabsSubtle
-          selectedIndex={VALID_VIEWS.indexOf(view)}
-          onSelect={(index) => {
-            const nextView = VALID_VIEWS[index];
-            if (nextView) selectView(nextView);
-          }}
-          className="manager-view-tabs"
-          aria-label="收藏管理功能"
-        >
+        <Tabs.List className="manager-view-tabs aarre-tabs-list" aria-label="收藏管理功能">
           {(
             [
               ["library", "收藏库", libraryResults.length],
@@ -615,13 +610,9 @@ export function ManagerApp() {
               ["resurface", "重新发现", dashboard?.resurfacing.length || 0],
             ] as const
           ).map(([value, label, count], index) => (
-            <TabsSubtleItem
-              key={value}
-              label={`${label} ${count}`}
-              index={index}
-            />
+            <Tabs.Tab key={value} id={value} className="aarre-tab">{label}<span className="manager-tab-count">{count}</span></Tabs.Tab>
           ))}
-        </TabsSubtle>
+        </Tabs.List>
 
         <Button
           type="button"
@@ -662,9 +653,10 @@ export function ManagerApp() {
         </div>
       ) : null}
 
-        <div className="manager-view" data-view={view}>
-          {viewContent}
-        </div>
+        {VALID_VIEWS.map((id) => <Tabs.Panel key={id} id={id} className="manager-view aarre-tab-panel" data-view={id}>
+          {view === id ? viewContent : null}
+        </Tabs.Panel>)}
+      </Tabs>
       </main>
       <FloatingScrollbar />
     </>

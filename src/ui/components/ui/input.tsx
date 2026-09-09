@@ -4,6 +4,8 @@ import {
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from "react";
+import { Input as HeroInput } from "@heroui/react/input";
+import { TextArea as HeroTextarea } from "@heroui/react/textarea";
 import { cn } from "@/lib/utils";
 
 // Form fields focus by darkening their own border. An accent ring around the
@@ -16,7 +18,7 @@ const FluidInput = forwardRef<
   HTMLInputElement,
   InputHTMLAttributes<HTMLInputElement>
 >(({ className, type, ...props }, ref) => (
-  <input
+  <HeroInput
     ref={ref}
     type={type}
     className={cn(controlClassName, "fluid-input", className)}
@@ -30,7 +32,7 @@ const FluidTextarea = forwardRef<
   HTMLTextAreaElement,
   TextareaHTMLAttributes<HTMLTextAreaElement>
 >(({ className, ...props }, ref) => (
-  <textarea
+  <HeroTextarea
     ref={ref}
     className={cn(controlClassName, "fluid-textarea", className)}
     {...props}

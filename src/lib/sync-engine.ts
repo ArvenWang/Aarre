@@ -1,3 +1,5 @@
+import { archiveRestoreActive } from "./archive-guard";
+import { getCloudSyncSettings } from "./cloud-settings";
 import { getAuthState } from "./auth";
 import { restoreCloudAssets, syncCloudAssets } from "./cloud-assets";
 import { processOutbox, pullCloudResources } from "./cloud";
@@ -22,6 +24,7 @@ export interface SyncStatus {
   lastSyncedAt: string | null;
   error: string | null;
   nextRetryAt: string | null;
+  retryAfterAt?: string;
 }
 
 const EMPTY_STATUS: SyncStatus = {
@@ -51,6 +54,7 @@ function normalizeStatus(value: unknown): SyncStatus {
     lastSyncedAt: typeof stored.lastSyncedAt === "string" ? stored.lastSyncedAt : null,
     error,
     nextRetryAt: typeof stored.nextRetryAt === "string" ? stored.nextRetryAt : null,
+    ...(typeof stored.retryAfterAt === "string" ? { retryAfterAt: stored.retryAfterAt } : {}),
   };
 }
 
@@ -75,7 +79,7 @@ interface SyncEngineDependencies {
   pullResources(): Promise<unknown>;
   pullEntities(): Promise<unknown>;
   countOutbox(): Promise<number>;
-  pushOutboxBatch(): Promise<{ attempted: number; synced: number; failed: number }>;
+  pushOutboxBatch(options?: { force?: boolean }): Promise<{ attempted: number; synced: number; failed: number }>;
   pushEntities(
     onProgress: (processed: number, total: number) => Promise<void>
   ): Promise<{ synced: number; total: number }>;
@@ -111,14 +115,19 @@ export function createSyncEngine(dependencies: SyncEngineDependencies): SyncEngi
       total,
       error: null,
       nextRetryAt: null,
+      retryAfterAt: undefined,
       ...overrides,
     });
   };
 
-  const run = async () => {
+  const run = async (reason: string) => {
     const previous = await dependencies.readStatus();
     const retryAt = previous.nextRetryAt ? Date.parse(previous.nextRetryAt) : 0;
-    if (previous.phase === "error" && retryAt > dependencies.now()) return;
+    const manual = reason === "manual";
+    if (manual && previous.retryAfterAt && Date.parse(previous.retryAfterAt) > dependencies.now()) {
+      throw new Error("服务器暂时限制同步频率，请在显示的重试时间后继续。");
+    }
+    if (!manual && previous.phase === "error" && retryAt > dependencies.now()) return;
     if (!await dependencies.isReady()) {
       await status("paused", 0, 0);
       return;
@@ -134,14 +143,20 @@ export function createSyncEngine(dependencies: SyncEngineDependencies): SyncEngi
       await status("pushing", 0, outboxTotal);
       let pushed = 0;
       for (let batch = 0; batch < 100; batch += 1) {
-        const result = await dependencies.pushOutboxBatch();
+        if (!await dependencies.isReady()) { await status("paused", 0, 0); return; }
+        const result = await dependencies.pushOutboxBatch({ force: manual });
         if (!result.attempted) break;
-        pushed += result.synced + result.failed;
+        pushed += result.synced;
         await status("pushing", Math.min(pushed, outboxTotal), outboxTotal);
+        if (result.failed) throw new Error(`${result.failed} 项收藏上传失败，已保留待同步内容，可重试。`);
       }
+      const remainingOutbox = await dependencies.countOutbox();
+      if (remainingOutbox) throw new Error(`仍有 ${remainingOutbox} 项收藏等待同步，可点击立即同步继续。`);
+      if (!await dependencies.isReady()) { await status("paused", 0, 0); return; }
       const entityResult = await dependencies.pushEntities(async (processed, total) => {
         await status("pushing", outboxTotal + processed, outboxTotal + total);
       });
+      if (entityResult.synced < entityResult.total) throw new Error("部分云端数据尚未写入，已保留待同步状态。");
       await status(
         "pushing",
         outboxTotal + entityResult.total,
@@ -150,35 +165,42 @@ export function createSyncEngine(dependencies: SyncEngineDependencies): SyncEngi
 
       await status("assets-up", 0, 0);
       for (let batch = 0; batch < 100; batch += 1) {
+        if (!await dependencies.isReady()) { await status("paused", 0, 0); return; }
         const result = await dependencies.uploadAssets();
         await status("assets-up", result.processed, result.total);
         if (!result.remaining) break;
+        if (batch === 99) throw new Error("图片上传尚未完成，可继续同步。");
       }
 
       await status("assets-down", 0, 0);
       for (let batch = 0; batch < 100; batch += 1) {
+        if (!await dependencies.isReady()) { await status("paused", 0, 0); return; }
         const result = await dependencies.downloadAssets();
         await status("assets-down", result.processed, result.total);
         if (!result.remaining) break;
+        if (batch === 99) throw new Error("图片恢复尚未完成，可继续同步。");
       }
+      if (!await dependencies.isReady()) { await status("paused", 0, 0); return; }
       failureCount = 0;
       const completedAt = new Date(dependencies.now()).toISOString();
       await status("idle", 0, 0, { lastSyncedAt: completedAt });
     } catch (caught) {
-      const delay = BACKOFF_MS[Math.min(failureCount, BACKOFF_MS.length - 1)];
+      const retryAfterMs = Number((caught as { retryAfterMs?: number })?.retryAfterMs) || 0;
+      const delay = Math.max(BACKOFF_MS[Math.min(failureCount, BACKOFF_MS.length - 1)], retryAfterMs);
       failureCount += 1;
       const message = caught instanceof Error ? caught.message : "云端同步失败。";
       await status("error", 0, 0, {
         error: message,
         nextRetryAt: new Date(dependencies.now() + delay).toISOString(),
+        retryAfterAt: retryAfterMs ? new Date(dependencies.now() + retryAfterMs).toISOString() : undefined,
       });
       throw caught;
     }
   };
 
-  const sync = (_reason = "manual") => {
+  const sync = (reason = "manual") => {
     if (running) return running;
-    running = run().finally(() => { running = null; });
+    running = run(reason).finally(() => { running = null; });
     return running;
   };
 
@@ -201,7 +223,7 @@ export function createSyncEngine(dependencies: SyncEngineDependencies): SyncEngi
 const defaultEngine = createSyncEngine({
   async isReady() {
     const auth = await getAuthState();
-    return auth.configured && auth.signedIn && auth.accountMatches === true;
+    return !await archiveRestoreActive() && auth.configured && auth.signedIn && auth.accountMatches === true && (await getCloudSyncSettings()).enabled;
   },
   pullResources: pullCloudResources,
   pullEntities: () => restoreDurableCloudState({ skipCloudScope: true }),

@@ -1,0 +1,196 @@
+{
+  "scope": "Ego DEV host harness, 309 bookmark fixture; final input event to matching DOM update includes 140ms debounce. Screen paint is a separate measurement.",
+  "hardware": "Apple M1 Pro / 32GB / macOS 15.6.1",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+  "samples": [
+    {
+      "query": "GitHub",
+      "domMs": 464.5999999642372,
+      "characters": 23
+    },
+    {
+      "query": "Figma",
+      "domMs": 158.30000001192093,
+      "characters": 22
+    },
+    {
+      "query": "Anthropic",
+      "domMs": 164.80000001192093,
+      "characters": 32
+    },
+    {
+      "query": "YouTube",
+      "domMs": 166.10000002384186,
+      "characters": 23
+    },
+    {
+      "query": "MDN",
+      "domMs": 163.9000000357628,
+      "characters": 43
+    },
+    {
+      "query": "GitHub",
+      "domMs": 169.30000001192093,
+      "characters": 23
+    },
+    {
+      "query": "Figma",
+      "domMs": 166,
+      "characters": 22
+    },
+    {
+      "query": "Anthropic",
+      "domMs": 176.39999997615814,
+      "characters": 32
+    },
+    {
+      "query": "YouTube",
+      "domMs": 170.4000000357628,
+      "characters": 23
+    },
+    {
+      "query": "MDN",
+      "domMs": 162.80000001192093,
+      "characters": 43
+    },
+    {
+      "query": "GitHub",
+      "domMs": 161.89999997615814,
+      "characters": 23
+    },
+    {
+      "query": "Figma",
+      "domMs": 167.5999999642372,
+      "characters": 22
+    },
+    {
+      "query": "Anthropic",
+      "domMs": 164.30000001192093,
+      "characters": 32
+    },
+    {
+      "query": "YouTube",
+      "domMs": 171.80000001192093,
+      "characters": 23
+    },
+    {
+      "query": "MDN",
+      "domMs": 168.29999995231628,
+      "characters": 43
+    },
+    {
+      "query": "GitHub",
+      "domMs": 161.60000002384186,
+      "characters": 23
+    },
+    {
+      "query": "Figma",
+      "domMs": 157.69999998807907,
+      "characters": 22
+    },
+    {
+      "query": "Anthropic",
+      "domMs": 171,
+      "characters": 32
+    },
+    {
+      "query": "YouTube",
+      "domMs": 167.89999997615814,
+      "characters": 23
+    },
+    {
+      "query": "MDN",
+      "domMs": 166.0999999642372,
+      "characters": 43
+    }
+  ],
+  "p95DomMs": 176.39999997615814,
+  "paintExperiment": {
+    "scope": "Ego DEV host harness; 309 bookmark fixture; LAST input event to next animation frame with matching local results, including 140ms debounce, excludes automated typing duration; no network",
+    "hardware": "Apple M1 Pro, 32GB RAM, macOS 15.6.1",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+    "samples": [
+      {
+        "query": "GitHub",
+        "ms": 425.19999998807907,
+        "typingMs": 0,
+        "characters": 23
+      },
+      {
+        "query": "Figma",
+        "ms": 960.3000000119209,
+        "typingMs": 0,
+        "characters": 22
+      },
+      {
+        "query": "Anthropic",
+        "ms": 970.6000000238419,
+        "typingMs": 0,
+        "characters": 32
+      },
+      {
+        "query": "YouTube",
+        "ms": 964.5,
+        "typingMs": 0,
+        "characters": 23
+      },
+      {
+        "query": "MDN",
+        "ms": 160.19999998807907,
+        "typingMs": 0,
+        "characters": 43
+      },
+      {
+        "query": "GitHub",
+        "ms": 852.1000000238419,
+        "typingMs": 0,
+        "characters": 23
+      },
+      {
+        "query": "Figma",
+        "ms": 193.89999997615814,
+        "typingMs": 0,
+        "characters": 22
+      },
+      {
+        "query": "Anthropic",
+        "ms": 162.5,
+        "typingMs": 0,
+        "characters": 32
+      },
+      {
+        "query": "YouTube",
+        "ms": 912.3000000119209,
+        "typingMs": 0,
+        "characters": 23
+      },
+      {
+        "query": "MDN",
+        "ms": 184.9000000357628,
+        "typingMs": 0,
+        "characters": 43
+      }
+    ],
+    "p95Ms": 970.6000000238419
+  },
+  "diagnostics": {
+    "topVisibility": "visible",
+    "frameVisibility": "visible",
+    "focus": true,
+    "samples": [
+      {
+        "timerMs": 142.4000000357628,
+        "frameMs": 848.5
+      },
+      {
+        "timerMs": 142.29999995231628,
+        "frameMs": 858.1000000238419
+      },
+      {
+        "timerMs": 142.69999998807907,
+        "frameMs": 866.8000000119209
+      }
+    ]
+  },
+  "verdict": "DOM timing and paint timing are separate. Earlier displayed-frame experiment exceeded 200ms. Installed Chrome paint performance remains open; no claimed full performance pass."
+}

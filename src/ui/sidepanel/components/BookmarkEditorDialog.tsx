@@ -1,3 +1,4 @@
+import { AppModal } from "@/ui/components/ui/modal";
 import { Button } from "@/ui/components/ui/button";
 import { bookmarkMatchLocation } from "../utils";
 import type { useBookmarkEditor } from "../hooks/use-bookmark-editor";
@@ -23,7 +24,7 @@ export function BookmarkEditorDialog({
   refresh,
 }: BookmarkEditorDialogProps) {
   const {
-    editor, setEditor, dialogRef, editBookmarkId, editParentId, setEditParentId,
+    editor, setEditor, editBookmarkId, editParentId, setEditParentId,
     editTitle, setEditTitle, editUrl, setEditUrl, editTags, setEditTags,
     editTagInput, setEditTagInput, setEditTagsChanged, capture, note, setNote,
     folderId, setFolderId, folders, folderSuggestions, bookmarkSaveState,
@@ -40,19 +41,9 @@ export function BookmarkEditorDialog({
   };
 
   return (
-    <div
-      className="native-dialog-backdrop"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !busy) close();
-      }}
-    >
-      <section
-        ref={dialogRef}
-        className={`native-dialog ${editor.kind === "bookmark" && editor.node.url ? "bookmark-detail-dialog" : ""}`}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="native-dialog-title"
-      >
+    <AppModal onClose={close} busy={Boolean(busy)} onEscape={confirmDeleteId ? () => setConfirmDeleteId("") : undefined} labelledBy="native-dialog-title"
+      backdropClassName="native-dialog-backdrop"
+      className={`native-dialog ${editor.kind === "bookmark" && editor.node.url ? "bookmark-detail-dialog" : ""}`}>
         <div className="native-dialog-heading">
           <div>
             <h2 id="native-dialog-title">
@@ -67,6 +58,7 @@ export function BookmarkEditorDialog({
           </Button>
         </div>
 
+        <div className="native-dialog-scroll">
         {editor.kind === "save" && busy === "capture" ? (
           <div className="empty-state dialog-loading">正在读取当前页面…</div>
         ) : (
@@ -214,6 +206,10 @@ export function BookmarkEditorDialog({
               </>
             ) : null}
 
+          </>
+        )}
+        </div>
+        {!(editor.kind === "save" && busy === "capture") && (
             <div className="native-dialog-actions">
               {editor.kind === "bookmark" && !editor.node.folderType && confirmDeleteId === (editBookmarkId || editor.node.id) ? (
                 <div className="delete-confirmation" role="group" aria-label="确认删除">
@@ -221,7 +217,7 @@ export function BookmarkEditorDialog({
                     <TrashIcon aria-hidden="true" />
                     <span>
                       {editorModel.locations.length > 1 ? "只删除当前选中的收藏位置？" : "确认从 Chrome 删除？"}
-                      <small>{editorModel.locations.length > 1 ? "其他位置与 Aarre 智能信息保留" : "30 天内可在侧边栏设置撤销"}</small>
+                      <small>{editorModel.locations.length > 1 ? "其他位置与 Aarre 智能信息保留" : "30 天内可在设置的最近动作中撤销"}</small>
                     </span>
                   </p>
                   <div>
@@ -256,9 +252,7 @@ export function BookmarkEditorDialog({
                 </>
               )}
             </div>
-          </>
         )}
-      </section>
-    </div>
+    </AppModal>
   );
 }

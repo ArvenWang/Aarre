@@ -14,6 +14,7 @@ function requireCloudConfiguration(): void {
 }
 
 interface CloudSession {
+  refreshOperationId?: string;
   accessToken: string;
   refreshToken: string;
   accessExpiresAt: string;
@@ -157,32 +158,40 @@ async function fetchJson<T>(path: string, init: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
-async function refreshSession(session: CloudSession): Promise<CloudSession> {
+async function refreshSession(session: CloudSession, force = false): Promise<CloudSession> {
   // A request can receive a late 401 after another request has already
   // rotated the token. Re-read storage before spending the one-time refresh
   // token; otherwise the late request would look like a replay to the server.
   const latest = await readSession();
   if (!latest) throw new Error("请重新登录 Aarre 云端。");
   if (latest.refreshToken !== session.refreshToken) return latest;
-  if (Date.parse(latest.accessExpiresAt) > Date.now() + 30_000) return latest;
+  if (!force && Date.parse(latest.accessExpiresAt) > Date.now() + 30_000) return latest;
 
-  if (!refreshPromise) {
+  if (!refreshPromise || refreshPromise.refreshToken !== latest.refreshToken) {
     const refreshToken = latest.refreshToken;
-    const promise = fetchJson<Omit<CloudSession, "profile" | "userId">>(
+    const operationId = latest.refreshOperationId || crypto.randomUUID();
+    const promise = saveSession({ ...latest, refreshOperationId: operationId }).then(() => fetchJson<Omit<CloudSession, "profile" | "userId">>(
       "/v1/auth/refresh",
       {
         method: "POST",
-        body: JSON.stringify({ refreshToken })
+        body: JSON.stringify({ refreshToken }),
+        headers: { "idempotency-key": operationId }
       }
-    )
+    ))
       .then((tokens) =>
-        saveSession({
-          ...latest,
-          ...tokens
+        readSession().then((current) => {
+          if (!current || current.refreshToken !== refreshToken) {
+            if (current && current.userId === latest.userId) return current;
+            throw new Error("登录账号已变化，已忽略之前的刷新结果。");
+          }
+          return saveSession({ ...latest, ...tokens, refreshOperationId: undefined });
         })
       )
       .catch(async (error) => {
-        await chrome.storage.local.remove(CLOUD_SESSION_KEY);
+        const current = await readSession();
+        if (current?.refreshToken === refreshToken && [401, 403].includes(Number(error?.status))) {
+          await chrome.storage.local.remove(CLOUD_SESSION_KEY);
+        }
         throw error;
       })
       .finally(() => {
@@ -197,16 +206,20 @@ async function readRotatedSession(
   session: CloudSession
 ): Promise<CloudSession | null> {
   const latest = await readSession();
+  if (latest && latest.userId !== session.userId) throw new Error("云端账号已变化，请重新执行此操作。");
   return latest && latest.accessToken !== session.accessToken ? latest : null;
 }
 
 export async function cloudRequest<T>(
   path: string,
-  init: RequestInit = {}
+  init: RequestInit = {},
+  expectedUserId?: string
 ): Promise<T> {
   requireCloudConfiguration();
   let session = await readSession();
   if (!session) throw new Error("请先登录 Aarre 云端。");
+  const requestUserId = expectedUserId || session.userId;
+  if (session.userId !== requestUserId) throw new Error("云端账号已变化，请重新执行此操作。");
   if (Date.parse(session.accessExpiresAt) <= Date.now() + 30_000) {
     session = await refreshSession(session);
   }
@@ -223,9 +236,10 @@ export async function cloudRequest<T>(
   let refreshed = false;
   let rateLimitRetries = 0;
   while (true) {
+    if ((await readSession())?.userId !== requestUserId) throw new Error("云端账号已变化，请重新执行此操作。");
     const response = await send(session);
     if (response.status === 401 && !refreshed) {
-      session = (await readRotatedSession(session)) || await refreshSession(session);
+      session = (await readRotatedSession(session)) || await refreshSession(session, true);
       refreshed = true;
       continue;
     }
@@ -236,10 +250,13 @@ export async function cloudRequest<T>(
     }
     if (!response.ok) {
       throw Object.assign(new Error(await responseError(response)), {
-        status: response.status
+        status: response.status,
+        ...(response.status === 429 ? { retryAfterMs: retryAfterMilliseconds(response.headers) } : {})
       });
     }
-    return (await response.json()) as T;
+    const payload = await response.json();
+    if ((await readSession())?.userId !== requestUserId) throw new Error("云端账号已变化，已忽略上一个账号的响应。");
+    return payload as T;
   }
 }
 

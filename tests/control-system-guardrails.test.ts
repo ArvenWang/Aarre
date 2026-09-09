@@ -91,13 +91,15 @@ function rule(css: string, selector: string): string {
 describe("destructive actions are visibly destructive", () => {
   it("paints the confirm button with the negative token, not ink", async () => {
     const source = await readFile(buttonUrl, "utf8");
-    expect(source).toContain('"text-danger-foreground bg-danger');
+    const css = await readFile(new URL("../src/ui/heroui-theme.css", import.meta.url), "utf8");
+    expect(rule(css, ".aarre-button--danger")).toContain("--button-bg: var(--negative)");
     expect(source).not.toContain('danger: "text-foreground');
   });
 
   it("offers a quiet destructive entry point that is still red", async () => {
     const source = await readFile(buttonUrl, "utf8");
-    expect(source).toContain('"text-danger border border-danger/35 bg-transparent');
+    const css = await readFile(new URL("../src/ui/heroui-theme.css", import.meta.url), "utf8");
+    expect(rule(css, ".aarre-button--danger-quiet")).toContain("--button-fg: var(--negative)");
   });
 
   it("exposes danger variants on the shared Button component", async () => {
@@ -115,16 +117,16 @@ describe("destructive actions are visibly destructive", () => {
 });
 
 describe("cloud settings stay local-first", () => {
-  it("keeps legacy settings compatible without restoring the removed sync toggle or scope", async () => {
+  it("honors explicit consent and keeps complete backup as the sole scope", async () => {
     const source = await readFile(cloudHandlersUrl, "utf8");
     const handler = source.slice(
       source.indexOf("SAVE_CLOUD_SETTINGS:"),
       source.indexOf("GET_CLOUD_USAGE:")
     );
 
-    expect(handler).toContain("saveCloudSyncSettings({ enabled: true })");
+    expect(handler).toContain("saveCloudSyncSettings({ enabled: request.payload?.enabled === true })");
     expect(handler).toContain('requestSync("cloud-settings")');
-    expect(handler).not.toContain("request.payload");
+    expect(handler).toContain("request.payload");
     expect(handler).not.toContain("scope");
   });
 
@@ -149,9 +151,9 @@ describe("only one system paints a given control", () => {
       source.indexOf("variants: {")
     );
 
-    expect(base).toContain("appearance-none");
-    expect(base).toContain("border-0");
-    expect(base).toContain("shadow-none");
+    expect(source).toContain('from "@heroui/react/button"');
+    expect(source).toContain("<HeroButton");
+    expect(source).not.toContain("cva(");
   });
 
   it("lets the rounded bookmark row own its only hover surface", async () => {
@@ -282,7 +284,8 @@ describe("only one system paints a given control", () => {
 
     // The trim span is a plain inline box, so wrapping an icon plus a label in
     // it stacks them instead of laying them out along the button's flex row.
-    expect(label).toContain('typeof label === "string"');
+    expect(source).toContain('className="aarre-button-content"');
+    expect(source).not.toContain('data-slot="button-label"');
   });
 
   it("focuses form fields by darkening the border, never with an accent ring", async () => {
@@ -414,8 +417,8 @@ describe("focus is indicated exactly once", () => {
     expect(shape).not.toContain('container: "rounded-[var(--radius-lg)]"');
     // Highlights mount on a known row rect so they never spring from 0×0.
     // Pointer feedback is a fill only — no focus-ring stroke around the row.
-    expect(select).toContain("open && checkedRect");
-    expect(select).toContain("open && activeRect");
+    expect(select).toContain("<HeroSelect.Popover");
+    expect(select).toContain("<ListBox.Item");
     expect(select).not.toContain("focusRect");
     expect(select).not.toContain("border-[color:var(--focus-ring)]");
   });

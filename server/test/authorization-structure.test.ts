@@ -52,7 +52,7 @@ test("HTTP user-data routes authenticate before invoking services", async () => 
 test("quota checks lock only the account usage row", async () => {
   const sources = await Promise.all([
     readFile(resolve(process.cwd(), "src/sync.ts"), "utf8"),
-    readFile(resolve(process.cwd(), "src/assets.ts"), "utf8")
+    readFile(resolve(process.cwd(), "src/asset-upload.ts"), "utf8")
   ]);
   const combined = sources.join("\n");
   const quotaQueries = combined.match(

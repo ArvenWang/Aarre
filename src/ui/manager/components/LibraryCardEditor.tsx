@@ -1,3 +1,4 @@
+import { AppModal } from "@/ui/components/ui/modal";
 import { BookmarkEditorFields } from "../../components/BookmarkEditorFields";
 import { CloudConflictNotice } from "../../components/CloudConflictNotice";
 import {
@@ -263,24 +264,10 @@ export function LibraryCardEditor({
         </Button>
       </Tooltip>
 
-      {open
-        ? createPortal(
-            <div
-              className="library-card-editor-backdrop"
-              onMouseDown={(event) => {
-                if (event.target === event.currentTarget) closeEditor();
-              }}
-            >
-              <div
-                ref={dialogRef}
-                className="library-card-editor-dialog"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby={`library-editor-title-${resource.resourceKey}`}
-                aria-describedby={`library-editor-description-${resource.resourceKey}`}
-                tabIndex={-1}
-                onKeyDown={handleDialogKeyDown}
-              >
+      {open ? <AppModal onClose={closeEditor} busy={Boolean(action)} onEscape={confirmDelete ? () => setConfirmDelete(false) : undefined}
+        labelledBy={`library-editor-title-${resource.resourceKey}`}
+        describedBy={`library-editor-description-${resource.resourceKey}`}
+        className="library-card-editor-dialog" backdropClassName="library-card-editor-backdrop">
                 <header className="library-card-editor-heading">
                   <div>
                     <h2 id={`library-editor-title-${resource.resourceKey}`}>
@@ -432,11 +419,7 @@ export function LibraryCardEditor({
                     </footer>
                   )}
                 </form>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
+      </AppModal> : null}
     </>
   );
 }

@@ -1,0 +1,65 @@
+{
+  "date": "2026-09-09",
+  "environment": "Existing DEV fixtures in isolated Ego browser task space, not installed Chrome extension",
+  "desktopViewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "narrowViewport": {
+    "width": 420,
+    "height": 900
+  },
+  "sidepanel": {
+    "status": "startup error",
+    "message": "Cannot read properties of undefined (reading 'onActivated')"
+  },
+  "manager": {
+    "totalFixtureCards": 309,
+    "folderFilter": "设计赏析",
+    "filteredCards": 40,
+    "firstBeforeSort": "Sticker Forge — Interactive Sticker Maker",
+    "sort": "标题 A–Z",
+    "firstAfterSort": "60fps — UI/UX animation inspiration",
+    "narrowPageScrollWidth": 420,
+    "narrowCardWidth": 388,
+    "narrowCardLeft": 16,
+    "narrowTabsClientWidth": 396,
+    "narrowTabsScrollWidth": 491,
+    "narrowTabsOverflowX": "auto"
+  },
+  "editDialog": {
+    "narrowX": 8,
+    "narrowWidth": 404,
+    "narrowTop": 8,
+    "narrowHeight": 884,
+    "narrowClientHeight": 882,
+    "narrowScrollHeight": 977,
+    "initialFocus": "title input",
+    "closedVia": "close button"
+  },
+  "contrastSamples": [
+    {
+      "theme": "light",
+      "sample": "98 天前收藏",
+      "fontSizePx": 12,
+      "foreground": "#a0a5aa",
+      "background": "#ffffff",
+      "ratio": 2.4830837159668953
+    },
+    {
+      "theme": "dark",
+      "sample": "60fps.design 设计赏析",
+      "fontSizePx": 12,
+      "foreground": "#676d72",
+      "background": "#0f1113",
+      "ratio": 3.610387559598513
+    }
+  ],
+  "keyboardSample": {
+    "action": "Tab from library search input",
+    "destination": "搜索 button",
+    "focusVisible": true,
+    "ring": "1px neutral focus ring"
+  },
+  "scopeLimit": "No native Chrome mutations, production account sync, Provider billing, or COS writes were performed. Fixture filters/sort/search/edit-open/theme switches only."
+}

@@ -240,7 +240,7 @@ function OnboardingPage({
             </div>
             <p className="onboarding-privacy">
               用量取决于服务商、模型和网页长度，以服务商实际返回为准。内网、银行、支付和医疗站点不处理；新收藏或正常打开的缺图旧收藏会生成页面快照，已有截图最多每
-              7 天静默刷新一次，并且只保存在本机。
+              7 天静默刷新一次。截图默认保存在本机；另行开启完整云端备份后，允许的截图会加密上传。
             </p>
             {error ? (
               <div className="settings-notice" data-tone="error">

@@ -1,0 +1,57 @@
+{
+  "scope": "Superseded experiment: FIRST input event includes automated typing and clearing time, unsuitable for final-keystroke rendering latency",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+  "samples": [
+    {
+      "query": "GitHub",
+      "ms": 440.4000000357628,
+      "characters": 23
+    },
+    {
+      "query": "Figma",
+      "ms": 850.6999999880791,
+      "characters": 22
+    },
+    {
+      "query": "Anthropic",
+      "ms": 1131.300000011921,
+      "characters": 32
+    },
+    {
+      "query": "YouTube",
+      "ms": 1135.4000000357628,
+      "characters": 23
+    },
+    {
+      "query": "MDN",
+      "ms": 930.6999999880791,
+      "characters": 43
+    },
+    {
+      "query": "GitHub",
+      "ms": 1106.800000011921,
+      "characters": 23
+    },
+    {
+      "query": "Figma",
+      "ms": 966.8000000119209,
+      "characters": 22
+    },
+    {
+      "query": "Anthropic",
+      "ms": 967.2999999523163,
+      "characters": 32
+    },
+    {
+      "query": "YouTube",
+      "ms": 943.6000000238419,
+      "characters": 23
+    },
+    {
+      "query": "MDN",
+      "ms": 910.5,
+      "characters": 43
+    }
+  ],
+  "p95Ms": 1135.4000000357628
+}

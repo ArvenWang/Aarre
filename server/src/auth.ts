@@ -351,7 +351,7 @@ export class AuthService {
     return { userId: row.user_id, deviceId: row.device_id, familyId: row.family_id };
   }
 
-  async refresh(refreshToken: string): Promise<IssuedTokens> {
+  async refresh(refreshToken: string, operationId?: string): Promise<IssuedTokens> {
     const hash = tokenHash(refreshToken, this.config.TOKEN_PEPPER);
     const client = await this.database.connect();
     try {
@@ -364,9 +364,10 @@ export class AuthService {
         revoked_at: Date | null;
         expires_at: Date;
         family_revoked_at: Date | null;
+        replaced_by_hash: string | null;
       }>(
         `SELECT r.user_id, r.device_id, r.family_id, r.consumed_at,
-                r.revoked_at, r.expires_at, f.revoked_at AS family_revoked_at
+                r.revoked_at, r.expires_at, r.replaced_by_hash, f.revoked_at AS family_revoked_at
          FROM refresh_tokens r
          JOIN token_families f ON f.id = r.family_id
          WHERE r.token_hash = $1
@@ -375,6 +376,22 @@ export class AuthService {
       );
       const row = result.rows[0];
       if (!row) throw authError("Refresh token is invalid.", 401);
+      if (row.revoked_at || row.family_revoked_at || row.expires_at.getTime() <= Date.now()) {
+        throw authError("Refresh token has expired or was revoked.", 401);
+      }
+      if (row.consumed_at && operationId && row.replaced_by_hash) {
+        const recovery = await client.query<{ response_payload: Buffer }>(
+          `SELECT recovery.response_payload FROM refresh_recoveries recovery
+           JOIN refresh_tokens replacement ON replacement.token_hash = $3
+           WHERE recovery.token_hash = $1 AND recovery.operation_id = $2 AND recovery.expires_at > now()
+           AND replacement.consumed_at IS NULL AND replacement.revoked_at IS NULL AND replacement.expires_at > now()`,
+          [hash, operationId, row.replaced_by_hash]);
+        if (recovery.rows[0]) {
+          const issued = await this.encryption.decryptJson<IssuedTokens>(row.user_id, `refresh-recovery:${hash}:${operationId}`, recovery.rows[0].response_payload);
+          await client.query("COMMIT");
+          return issued;
+        }
+      }
       if (row.consumed_at) {
         await client.query(
           `UPDATE token_families
@@ -384,9 +401,6 @@ export class AuthService {
         );
         await client.query("COMMIT");
         throw authError("Refresh token replay was detected; this device must sign in again.", 401);
-      }
-      if (row.revoked_at || row.family_revoked_at || row.expires_at.getTime() <= Date.now()) {
-        throw authError("Refresh token has expired or was revoked.", 401);
       }
       await client.query("UPDATE refresh_tokens SET consumed_at = now() WHERE token_hash = $1", [hash]);
       const issued = await this.issueTokens(client, {
@@ -398,6 +412,11 @@ export class AuthService {
         "UPDATE refresh_tokens SET replaced_by_hash = $2 WHERE token_hash = $1",
         [hash, tokenHash(issued.refreshToken, this.config.TOKEN_PEPPER)]
       );
+      if (operationId) {
+        const encrypted = await this.encryption.encryptJson(row.user_id, `refresh-recovery:${hash}:${operationId}`, issued);
+        await client.query("DELETE FROM refresh_recoveries WHERE expires_at <= now()");
+        await client.query("INSERT INTO refresh_recoveries (token_hash, operation_id, response_payload) VALUES ($1,$2,$3)", [hash, operationId, encrypted]);
+      }
       await client.query("COMMIT");
       return issued;
     } catch (error) {

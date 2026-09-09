@@ -1,3 +1,4 @@
+import { cloudOwner } from "./cloud-owner";
 import { cloudRequest } from "./auth";
 import {
   getCloudSyncSettings,
@@ -268,6 +269,7 @@ async function prepareEntity(
 async function flushEntityBatch(
   state: SyncedState,
   pending: PreparedEntityMutation[],
+  owner: string | undefined,
   onProgress?: (processed: number, total: number) => void | Promise<void>
 ): Promise<number> {
   await onProgress?.(0, pending.length);
@@ -278,7 +280,7 @@ async function flushEntityBatch(
     try {
       const response = await cloudRequest<{ results: Array<{ revision: number }> }>(
         "/v1/sync/entities/batch",
-        { method: "PUT", body: JSON.stringify({ mutations: batch.map((item) => item.mutation) }) }
+        { method: "PUT", body: JSON.stringify({ mutations: batch.map((item) => item.mutation) }) }, owner
       );
       results = response.results;
     } catch (error) {
@@ -293,7 +295,7 @@ async function flushEntityBatch(
             cloudRequest<{ revision: number }>("/v1/sync/entities", {
               method: "PUT",
               body: JSON.stringify(item.mutation)
-            })
+            }, owner)
           )
         ));
         await onProgress?.(
@@ -592,6 +594,7 @@ async function currentProtectionBindings(
 export async function syncDurableCloudState(
   onProgress?: (processed: number, total: number) => void | Promise<void>
 ): Promise<{ synced: number; total: number }> {
+  const owner = await cloudOwner();
   const cloudSettings = await getCloudSyncSettings();
   const state = await readSyncedState();
   const pending: PreparedEntityMutation[] = [];
@@ -766,7 +769,7 @@ export async function syncDurableCloudState(
       }
     });
   }
-  const synced = await flushEntityBatch(state, pending, onProgress);
+  const synced = await flushEntityBatch(state, pending, owner, onProgress);
   await chrome.storage.local.set({
     [CLOUD_STATE_KEY]: state,
     [CLOUD_PROTECTION_BINDINGS_KEY]: bindings,
@@ -894,8 +897,8 @@ export async function restoreDurableCloudState(
       !options.skipCloudScope
     ) {
       // 产品只保留完整备份：恢复云端设置时只恢复开关，范围恒为 complete。
-      await saveCloudSyncSettings({ enabled: true });
-      restored += 1;
+      // Backup consent belongs to this account on this device; remote settings cannot grant it.
+      continue;
     } else if (entity.entityType === "setting-theme") {
       const setting = entity.payload as { mode?: "light" | "dark" };
       if (setting.mode) {

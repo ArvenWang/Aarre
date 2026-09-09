@@ -1,3 +1,4 @@
+import { AppModal } from "@/ui/components/ui/modal";
 import { Button } from "@/ui/components/ui/button";
 import {
   FluidInput,
@@ -37,13 +38,6 @@ const TERMINAL_STATES: SnapshotBackfillState[] = [
   "failed",
 ];
 
-function focusableElements(container: HTMLElement): HTMLElement[] {
-  return Array.from(
-    container.querySelectorAll<HTMLElement>(
-      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-    ),
-  ).filter((element) => !element.hasAttribute("hidden"));
-}
 
 function isActiveState(state: SnapshotBackfillState): boolean {
   return ACTIVE_STATES.includes(state);
@@ -240,31 +234,6 @@ export function SnapshotBackfillControl({
     window.requestAnimationFrame(() => triggerRef.current?.focus());
   }
 
-  function handleConfirmationKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (action) return;
-    if (event.key === "Escape") {
-      event.preventDefault();
-      closeConfirmation();
-      return;
-    }
-    if (event.key !== "Tab" || !dialogRef.current) return;
-    const focusable = focusableElements(dialogRef.current);
-    if (!focusable.length) {
-      event.preventDefault();
-      dialogRef.current.focus();
-      return;
-    }
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  }
-
   async function runAction(nextAction: Exclude<SnapshotBackfillAction, "">) {
     if (action) return;
     setAction(nextAction);
@@ -330,22 +299,8 @@ export function SnapshotBackfillControl({
         </Button>
 
         {confirmOpen ? (
-          <div
-            className="snapshot-backfill-backdrop"
-            onMouseDown={(event) => {
-              if (event.target === event.currentTarget) closeConfirmation();
-            }}
-          >
-            <div
-              ref={dialogRef}
-              className="snapshot-backfill-dialog"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="snapshot-backfill-title"
-              aria-describedby="snapshot-backfill-description"
-              tabIndex={-1}
-              onKeyDown={handleConfirmationKeyDown}
-            >
+          <AppModal onClose={closeConfirmation} busy={Boolean(action)} labelledBy="snapshot-backfill-title"
+            describedBy="snapshot-backfill-description" className="snapshot-backfill-dialog" backdropClassName="snapshot-backfill-backdrop">
               <header>
                 <div>
                   <h2 id="snapshot-backfill-title">批量补齐缺失封面</h2>
@@ -369,7 +324,7 @@ export function SnapshotBackfillControl({
                   将在后台依次打开约 {effectiveMissingCount} 项缺少封面的网页，加载稳定后截图，可随时暂停或取消。
                 </p>
                 <p className="snapshot-backfill-privacy">
-                  仅在本机截图，不调用 AI，不上传网页或截图。
+                  在本机截图，不调用 AI。如已开启完整备份，截图会随收藏同步。
                 </p>
                 {error ? (
                   <p className="snapshot-backfill-error" role="alert">
@@ -399,8 +354,7 @@ export function SnapshotBackfillControl({
                   {action === "start" ? "正在启动…" : "开始补拍"}
                 </Button>
               </footer>
-            </div>
-          </div>
+          </AppModal>
         ) : null}
       </>
     );

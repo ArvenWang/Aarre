@@ -32,6 +32,7 @@ export function createCloudHandlers({ getAppState }: CloudHandlerDependencies) {
 
   const handlers: Record<string, Handler> = {
     SYNC_NOW: async () => {
+      if (!(await getCloudSyncSettings()).enabled) throw new Error("请先开启完整备份，再开始同步。");
       await sync("manual");
       return { synced: 0, failed: 0, resources: await getLocalResources() };
     },
@@ -48,8 +49,8 @@ export function createCloudHandlers({ getAppState }: CloudHandlerDependencies) {
       return getAppState();
     },
     GET_CLOUD_SETTINGS: async () => getCloudSyncSettings(),
-    SAVE_CLOUD_SETTINGS: async () => {
-      const next = await saveCloudSyncSettings({ enabled: true });
+    SAVE_CLOUD_SETTINGS: async (request) => {
+      const next = await saveCloudSyncSettings({ enabled: request.payload?.enabled === true });
       requestSync("cloud-settings");
       return next;
     },

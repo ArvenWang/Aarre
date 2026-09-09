@@ -1,4 +1,6 @@
-import { Suspense, lazy, useCallback, useState } from "react";
+import { FloatingShell } from "../floating/FloatingShell";
+import { FLOATING_VIEW_EVENT } from "../floating/bridge";
+import { Suspense, lazy, useCallback, useEffect, useState, type ReactNode } from "react";
 import { sendExtensionRequest } from "../../lib/messages";
 import type { ListCoverStyle } from "../../lib/display-settings";
 import { restartOnboarding } from "../../lib/onboarding";
@@ -20,15 +22,21 @@ const AgentHistoryPage = lazy(() => import("./pages/AgentHistoryPage"));
 const OnboardingPage = lazy(() => import("./pages/OnboardingPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 
-export function SidePanelApp() {
+export function SidePanelApp({ surface = "sidebar" }: { surface?: "sidebar" | "floating" } = {}) {
   const [organizationNoticeBusy, setOrganizationNoticeBusy] = useState(false);
   const [listCoverStyle, setListCoverStyle] = useState<ListCoverStyle>("site");
   const [publicFaviconFallback, setPublicFaviconFallback] = useState(true);
   const [pageSnapshotsEnabled, setPageSnapshotsEnabled] = useState(true);
   const [onboardingVisible, setOnboardingVisible] = useState<boolean>(() =>
-    localStorage.getItem("aarre:onboarding-done") !== "1"
+    new URLSearchParams(location.search).has("onboarding") || localStorage.getItem("aarre:onboarding-done") !== "1"
   );
   const [panelView, setPanelView] = useState<SidePanelView>("library");
+  const [emptyConversation] = useState(() => ({ id: crypto.randomUUID(), title: "问问你的收藏", messages: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }));
+  useEffect(() => {
+    const handle = (event: Event) => { const view = (event as CustomEvent<string>).detail; if (["library", "chat", "settings", "history"].includes(view)) setPanelView(view as SidePanelView); };
+    window.addEventListener(FLOATING_VIEW_EVENT, handle);
+    return () => window.removeEventListener(FLOATING_VIEW_EVENT, handle);
+  }, []);
   const applyDisplaySettings = useCallback((settings: {
     listCoverStyle: ListCoverStyle;
     pageSnapshotsEnabled: boolean;
@@ -209,8 +217,14 @@ export function SidePanelApp() {
     submitAgentQuery(agentPrompt);
   }
 
+  const renderSurface = (children: ReactNode) => surface === "floating"
+    ? <FloatingShell view={panelView} onViewChange={setPanelView} onboarding={onboardingVisible}
+        busy={Boolean(busy)} onNewConversation={() => { setActiveConversation(null); setAgentPrompt(""); setPanelView("chat"); }}
+        onHistory={() => { void loadConversations(); setPanelView("history"); }}>{children}</FloatingShell>
+    : children;
+
   if (onboardingVisible) {
-    return (
+    return renderSurface(
       <Suspense fallback={null}>
         <OnboardingPage
           resourceCount={
@@ -221,6 +235,7 @@ export function SidePanelApp() {
             if (configured) setAiConfigured(true);
             localStorage.setItem("aarre:onboarding-done", "1");
             setOnboardingVisible(false);
+            const url = new URL(location.href); url.searchParams.delete("onboarding"); history.replaceState(null, "", url);
             void refresh();
           }}
         />
@@ -229,7 +244,7 @@ export function SidePanelApp() {
   }
 
   if (panelView === "settings") {
-    return (
+    return renderSurface(
       <Suspense fallback={null}>
         <SettingsPage
           appState={appState}
@@ -253,7 +268,7 @@ export function SidePanelApp() {
   }
 
   if (panelView === "history") {
-    return (
+    return renderSurface(
       <Suspense fallback={null}>
         <AgentHistoryPage
           conversations={conversations}
@@ -270,11 +285,11 @@ export function SidePanelApp() {
     );
   }
 
-  if (panelView === "chat" && activeConversation) {
-    return (
+  if (panelView === "chat") {
+    return renderSurface(
       <Suspense fallback={null}>
         <AgentChatPage
-        conversation={activeConversation}
+        conversation={activeConversation || emptyConversation}
         resourceByUrl={resourceByUrl}
         siteBrandByHost={siteBrandByHost}
         prompt={agentPrompt}
@@ -309,8 +324,9 @@ export function SidePanelApp() {
     );
   }
 
-  return (
+  return renderSurface(
     <HomePage
+      floating={surface === "floating"}
       header={{
         appState,
         hasSnapshot: Boolean(snapshot),

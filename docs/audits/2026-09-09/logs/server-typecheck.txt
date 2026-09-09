@@ -1,0 +1,4 @@
+
+> @aarre/sync-api@0.1.14 typecheck
+> tsc -p tsconfig.json --noEmit
+

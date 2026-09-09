@@ -43,6 +43,8 @@ export function extractPage(
   const pageUrl = options.pageUrl;
   const clone = document.cloneNode(true) as Document;
 
+  clone.querySelectorAll("aarre-floating-host, [data-aarre-ui]").forEach((node) => node.remove());
+  const cleanFallback = normalizeText(clone.querySelector("main, article")?.textContent || clone.body?.textContent || "");
   clone
     .querySelectorAll(
       "script, style, noscript, template, form, input, textarea, select, button, nav, footer, [aria-hidden='true']"
@@ -96,9 +98,7 @@ export function extractPage(
   );
 
   const fallbackContent = normalizeText(
-    document.querySelector("main, article")?.textContent ||
-      document.body?.textContent ||
-      ""
+    cleanFallback
   );
   const content = normalizeText(readable?.textContent || fallbackContent).slice(
     0,

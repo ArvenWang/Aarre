@@ -12,7 +12,7 @@ function event<T extends (...args: any[]) => void>() {
 describe("agent stream port", () => {
   it("is initiated by UI, emits deltas, and cancels when disconnected", async () => {
     const onConnect = event<(port: any) => void>();
-    vi.stubGlobal("chrome", { runtime: { onConnect } });
+    vi.stubGlobal("chrome", { runtime: { onConnect, id: "test", getURL: (path: string) => `chrome-extension://test/${path}` } });
     const run = vi.fn(async (_query, _history, _requestId, onDelta) => {
       onDelta("A");
       onDelta("B");
@@ -23,7 +23,7 @@ describe("agent stream port", () => {
     const onMessage = event<(message: unknown) => void>();
     const onDisconnect = event<() => void>();
     const postMessage = vi.fn();
-    const port = { name: "agent-stream", onMessage, onDisconnect, postMessage };
+    const port = { name: "agent-stream", sender: { id: "test", url: "chrome-extension://test/floating-test.html" }, onMessage, onDisconnect, postMessage };
 
     onConnect.emit(port);
     onMessage.emit({ type: "start", query: "hello", requestId: "request-1", history: [] });
@@ -36,13 +36,13 @@ describe("agent stream port", () => {
 
   it("immediately cancels the active request when the UI port closes", () => {
     const onConnect = event<(port: any) => void>();
-    vi.stubGlobal("chrome", { runtime: { onConnect } });
+    vi.stubGlobal("chrome", { runtime: { onConnect, id: "test", getURL: (path: string) => `chrome-extension://test/${path}` } });
     const run = vi.fn(() => new Promise(() => undefined));
     const cancel = vi.fn(() => true);
     registerAgentStream(run, cancel);
     const onMessage = event<(message: unknown) => void>();
     const onDisconnect = event<() => void>();
-    onConnect.emit({ name: "agent-stream", onMessage, onDisconnect, postMessage: vi.fn() });
+    onConnect.emit({ name: "agent-stream", sender: { id: "test", url: "chrome-extension://test/floating-test.html" }, onMessage, onDisconnect, postMessage: vi.fn() });
     onMessage.emit({ type: "start", query: "hello", requestId: "active-request" });
 
     onDisconnect.emit();

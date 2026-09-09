@@ -1,5 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { openFloatingMenu } from "../src/extension/floating/lifecycle";
+vi.mock("../src/extension/floating/lifecycle", () => ({ openFloatingMenu: vi.fn().mockResolvedValue(undefined) }));
 import { createContextMenuLifecycle } from "../src/extension/lifecycle/context-menus";
 import { CONTEXT_MENU_PAGE_ID } from "../src/extension/lifecycle/context-menu-core";
 import { registerUiEvents } from "../src/extension/lifecycle/ui-events";
@@ -8,6 +10,7 @@ import type { PendingSaveDraft } from "../src/lib/types";
 describe("context-menu side panel opening", () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
+    vi.mocked(openFloatingMenu).mockReset().mockResolvedValue(undefined);
   });
 
   it("opens during the original context-menu gesture before storage finishes", async () => {
@@ -15,10 +18,11 @@ describe("context-menu side panel opening", () => {
     const storageWrite = new Promise<void>((resolve) => {
       finishStorage = resolve;
     });
-    const open = vi.fn().mockResolvedValue(undefined);
+    const open = vi.mocked(openFloatingMenu);
     const sendMessage = vi.fn().mockResolvedValue(undefined);
     vi.stubGlobal("chrome", {
       storage: { session: { set: vi.fn(() => storageWrite) } },
+      tabs: { get: async (id: number) => ({ id, url: "https://example.com/article" }) },
       sidePanel: { open },
       runtime: { sendMessage },
       contextMenus: {
@@ -62,7 +66,7 @@ describe("context-menu side panel opening", () => {
       { id: 7, url: draft.url } as chrome.tabs.Tab
     );
 
-    expect(open).toHaveBeenCalledWith({ tabId: 7 });
+    await vi.waitFor(() => expect(open).toHaveBeenCalledWith(expect.objectContaining({ id: 7 })));
     expect(sendMessage).not.toHaveBeenCalled();
 
     finishStorage();
@@ -79,7 +83,7 @@ describe("context-menu side panel opening", () => {
       info: chrome.contextMenus.OnClickData,
       tab?: chrome.tabs.Tab
     ) => void;
-    const open = vi.fn(() => {
+    const open = vi.mocked(openFloatingMenu).mockImplementation(() => {
       order.push("open");
       return Promise.resolve();
     });
@@ -123,7 +127,7 @@ describe("context-menu side panel opening", () => {
     );
 
     expect(order).toEqual(["open", "handle-save"]);
-    expect(open).toHaveBeenCalledWith({ tabId: 9 });
+    expect(open).toHaveBeenCalledWith(expect.objectContaining({ id: 9 }));
   });
 
   it("keeps only the non-gesture work on the lazy background path", async () => {

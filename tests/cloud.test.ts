@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CLOUD_SYNC_SETTINGS_KEY,
   defaultCloudSyncSettings,
-  getCloudSyncSettings
+  getCloudSyncSettings,
+  saveCloudSyncSettings
 } from "../src/lib/cloud-settings";
 import { retryAfterMilliseconds } from "../src/lib/auth";
 import {
@@ -31,7 +32,7 @@ beforeEach(() => {
   vi.stubGlobal("chrome", {
     storage: {
       local: {
-        get: async (key: string) => ({ [key]: values[key] }),
+        get: async (keys: string | string[]) => Object.fromEntries((Array.isArray(keys) ? keys : [keys]).map((key) => [key, values[key]])),
         set: async (next: Record<string, unknown>) => Object.assign(values, next)
       }
     }
@@ -120,9 +121,9 @@ describe("cloud privacy contract", () => {
     ).toBe(true);
   });
 
-  it("migrates cloud settings to login-implies-sync with complete backup", async () => {
-    expect(defaultCloudSyncSettings()).toEqual({ enabled: true, scope: "complete", updatedAt: "" });
-    await expect(getCloudSyncSettings()).resolves.toEqual({ enabled: true, scope: "complete", updatedAt: "" });
+  it("keeps a fresh install local until explicit consent", async () => {
+    expect(defaultCloudSyncSettings()).toEqual({ enabled: false, scope: "complete", updatedAt: "" });
+    await expect(getCloudSyncSettings()).resolves.toEqual({ enabled: false, scope: "complete", updatedAt: "" });
   });
 
   it("maps asset kinds to the same identity keys the uploader uses", () => {
@@ -190,22 +191,16 @@ describe("cloud privacy contract", () => {
     });
   });
 
-  it("migrates a legacy text-only setting to a complete backup", async () => {
-    values[CLOUD_SYNC_SETTINGS_KEY] = {
-      enabled: true,
-      scope: "text",
-      updatedAt: "2026-08-01T00:00:00.000Z"
-    };
-    await expect(getCloudSyncSettings()).resolves.toEqual({
-      enabled: true,
-      scope: "complete",
-      updatedAt: "2026-08-01T00:00:00.000Z"
-    });
-    expect(values[CLOUD_SYNC_SETTINGS_KEY]).toEqual({
-      enabled: true,
-      scope: "complete",
-      updatedAt: "2026-08-01T00:00:00.000Z"
-    });
+  it("does not expand legacy consent and binds new consent to the active account", async () => {
+    values[CLOUD_SYNC_SETTINGS_KEY] = { enabled: true, scope: "text", updatedAt: "2026-08-01T00:00:00.000Z" };
+    values["aarre:cloud-session:v1"] = { userId: "account-a" };
+    expect((await getCloudSyncSettings()).enabled).toBe(false);
+    await saveCloudSyncSettings({ enabled: true });
+    expect((await getCloudSyncSettings()).enabled).toBe(true);
+    values["aarre:cloud-session:v1"] = { userId: "account-b" };
+    expect((await getCloudSyncSettings()).enabled).toBe(false);
+    await saveCloudSyncSettings({ enabled: false });
+    expect((await getCloudSyncSettings()).enabled).toBe(false);
   });
 
   it("honors Retry-After while bounding malformed or excessive delays", () => {

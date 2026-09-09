@@ -1,4 +1,5 @@
 import { hardenCloudTokenStorage } from "../../lib/auth";
+import { clearCloudResourceTracking } from "../../lib/cloud-resource-store";
 import {
   ensureVisualCleanupAlarm,
   ensurePeriodicSyncAlarm,
@@ -22,7 +23,6 @@ export function runBackgroundStartupMaintenance(): void {
 
 interface InstallDependencies {
   ensurePinnedSiteBrandIcons: DeferredAction;
-  configureActionSidePanelBehavior: DeferredAction;
   registerContextMenus: DeferredAction;
   refreshContextMenu: DeferredAction;
   importNativeBookmarks(): Promise<ImportResult>;
@@ -40,7 +40,6 @@ interface InstallDependencies {
 export function registerInstallLifecycle(dependencies: InstallDependencies): void {
   const {
     ensurePinnedSiteBrandIcons,
-    configureActionSidePanelBehavior,
     registerContextMenus,
     refreshContextMenu,
     importNativeBookmarks,
@@ -55,15 +54,17 @@ export function registerInstallLifecycle(dependencies: InstallDependencies): voi
     recoverSnapshotBackfill
   } = dependencies;
 
-  chrome.runtime.onInstalled.addListener(() => {
+  chrome.runtime.onInstalled.addListener((details) => {
     void ensurePinnedSiteBrandIcons().catch(() => undefined);
     void chrome.storage.local.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
-    void configureActionSidePanelBehavior();
     void ensurePeriodicSyncAlarm();
     void ensureVisualCleanupAlarm();
     void scheduleVisualMigration();
     void registerContextMenus();
-    void importNativeBookmarks()
+    // Old releases could advance a cursor before committing data. An upgrade
+    // deliberately bootstraps again without clearing the user's local library.
+    void (details.reason === "update" ? clearCloudResourceTracking() : Promise.resolve())
+      .then(() => importNativeBookmarks())
       .then(async () => {
         await queueIndexedResourcesUntilVisit();
         const current = await activeTab();

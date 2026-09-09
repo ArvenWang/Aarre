@@ -6,6 +6,8 @@
 //   npm run dev            # in another terminal
 //   node scripts/audit-controls.mjs
 import { chromium } from "playwright";
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 
 const BASE = process.env.SHOOT_BASE ?? "http://localhost:5173";
 const THEME = process.env.SHOOT_THEME ?? "light";
@@ -316,34 +318,49 @@ const scenes = [
 ];
 
 const wanted = process.argv.slice(2);
+const selectedScenes = scenes.filter(([name]) => !wanted.length || wanted.some((term) => name.includes(term)));
+if (!selectedScenes.length) throw new Error("没有匹配到审计场景，不能报告通过。");
 const browser = await chromium.launch(CHANNEL ? { channel: CHANNEL } : {});
 let total = 0;
-for (const [name, path, viewport, drive] of scenes) {
-  if (wanted.length && !wanted.some((term) => name.includes(term))) continue;
+const results = [];
+try {
+for (const [name, path, viewport, drive] of selectedScenes) {
   const context = await browser.newContext({ viewport, colorScheme: THEME });
   await context.addInitScript(
     (theme) => window.localStorage.setItem("aarre:theme", theme),
     THEME,
   );
   const page = await context.newPage();
-  await page.goto(`${BASE}/${path}`, { waitUntil: "networkidle" });
-  await page.waitForTimeout(900);
   console.log(`\n▶ ${name} (${THEME})`);
   try {
+    await page.goto(`${BASE}/${path}`, { waitUntil: "networkidle" });
+    await page.waitForSelector("button");
     await drive(page);
+    const findings = [
+      ...(await page.evaluate(audit)),
+      ...(await auditHover(page, context)),
+    ];
+    total += findings.length;
+    results.push({ name, path, viewport, theme: THEME, status: findings.length ? "failed" : "passed", findings });
+    if (!findings.length) console.log("  没有发现控件问题");
+    for (const finding of findings) console.log(`  · ${finding}`);
   } catch (error) {
-    console.log(`  ✗ 无法进入该状态：${error.message.split("\n")[0]}`);
+    const message = error instanceof Error ? error.message.split("\n")[0] : String(error);
+    results.push({ name, path, viewport, theme: THEME, status: "blocked", error: message });
+    console.log(`  ✗ 无法完成该状态：${message}`);
+  } finally {
     await context.close();
-    continue;
   }
-  const findings = [
-    ...(await page.evaluate(audit)),
-    ...(await auditHover(page, context)),
-  ];
-  total += findings.length;
-  if (!findings.length) console.log("  没有发现控件问题");
-  for (const finding of findings) console.log(`  · ${finding}`);
-  await context.close();
 }
-await browser.close();
-console.log(`\n合计 ${total} 项`);
+} finally {
+  await browser.close();
+}
+const passed = results.filter((item) => item.status === "passed").length;
+const blocked = results.filter((item) => item.status === "blocked").length;
+const report = { expected: selectedScenes.length, passed, blocked, findings: total, results };
+if (process.env.AUDIT_REPORT) {
+  await mkdir(dirname(process.env.AUDIT_REPORT), { recursive: true });
+  await writeFile(process.env.AUDIT_REPORT, JSON.stringify(report, null, 2));
+}
+console.log(`\n场景 ${passed}/${selectedScenes.length} 通过，${blocked} 阻塞，${total} 项问题`);
+if (passed !== selectedScenes.length) process.exitCode = 1;

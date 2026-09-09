@@ -1,0 +1,199 @@
+{
+  "scope": "Computed browser theme tokens, solid information surfaces and danger buttons; does not claim every pixel of imagery or every browser state was numerically sampled",
+  "threshold": 4.5,
+  "minimum": 4.586319204534115,
+  "samples": [
+    {
+      "theme": "light",
+      "foreground": "--ink",
+      "background": "--bg",
+      "ratio": 17.613725296648717
+    },
+    {
+      "theme": "light",
+      "foreground": "--ink",
+      "background": "--surface",
+      "ratio": 17.613725296648717
+    },
+    {
+      "theme": "light",
+      "foreground": "--ink",
+      "background": "--surface-sunken",
+      "ratio": 16.27833854856497
+    },
+    {
+      "theme": "light",
+      "foreground": "--ink-muted",
+      "background": "--bg",
+      "ratio": 6.300742380097569
+    },
+    {
+      "theme": "light",
+      "foreground": "--ink-muted",
+      "background": "--surface",
+      "ratio": 6.300742380097569
+    },
+    {
+      "theme": "light",
+      "foreground": "--ink-muted",
+      "background": "--surface-sunken",
+      "ratio": 5.823050822192279
+    },
+    {
+      "theme": "light",
+      "foreground": "--ink-faint",
+      "background": "--bg",
+      "ratio": 4.962555997370491
+    },
+    {
+      "theme": "light",
+      "foreground": "--ink-faint",
+      "background": "--surface",
+      "ratio": 4.962555997370491
+    },
+    {
+      "theme": "light",
+      "foreground": "--ink-faint",
+      "background": "--surface-sunken",
+      "ratio": 4.586319204534115
+    },
+    {
+      "theme": "light",
+      "foreground": "--positive",
+      "background": "--bg",
+      "ratio": 5.150241446434653
+    },
+    {
+      "theme": "light",
+      "foreground": "--positive",
+      "background": "--surface",
+      "ratio": 5.150241446434653
+    },
+    {
+      "theme": "light",
+      "foreground": "--positive",
+      "background": "--surface-sunken",
+      "ratio": 4.759775258211025
+    },
+    {
+      "theme": "light",
+      "foreground": "--negative",
+      "background": "--bg",
+      "ratio": 5.665974079454018
+    },
+    {
+      "theme": "light",
+      "foreground": "--negative",
+      "background": "--surface",
+      "ratio": 5.665974079454018
+    },
+    {
+      "theme": "light",
+      "foreground": "--negative",
+      "background": "--surface-sunken",
+      "ratio": 5.236407558274736
+    },
+    {
+      "theme": "light",
+      "foreground": "--danger-ink",
+      "background": "--negative",
+      "ratio": 5.665974079454018
+    },
+    {
+      "theme": "dark",
+      "foreground": "--ink",
+      "background": "--bg",
+      "ratio": 16.56159516289156
+    },
+    {
+      "theme": "dark",
+      "foreground": "--ink",
+      "background": "--surface",
+      "ratio": 15.569802981721761
+    },
+    {
+      "theme": "dark",
+      "foreground": "--ink",
+      "background": "--surface-sunken",
+      "ratio": 14.325761859646752
+    },
+    {
+      "theme": "dark",
+      "foreground": "--ink-muted",
+      "background": "--bg",
+      "ratio": 9.126936873889983
+    },
+    {
+      "theme": "dark",
+      "foreground": "--ink-muted",
+      "background": "--surface",
+      "ratio": 8.580369677884814
+    },
+    {
+      "theme": "dark",
+      "foreground": "--ink-muted",
+      "background": "--surface-sunken",
+      "ratio": 7.894790500394555
+    },
+    {
+      "theme": "dark",
+      "foreground": "--ink-faint",
+      "background": "--bg",
+      "ratio": 6.6332931105836055
+    },
+    {
+      "theme": "dark",
+      "foreground": "--ink-faint",
+      "background": "--surface",
+      "ratio": 6.236057930169035
+    },
+    {
+      "theme": "dark",
+      "foreground": "--ink-faint",
+      "background": "--surface-sunken",
+      "ratio": 5.737791348769149
+    },
+    {
+      "theme": "dark",
+      "foreground": "--positive",
+      "background": "--bg",
+      "ratio": 8.684660220142884
+    },
+    {
+      "theme": "dark",
+      "foreground": "--positive",
+      "background": "--surface",
+      "ratio": 8.164578789716815
+    },
+    {
+      "theme": "dark",
+      "foreground": "--positive",
+      "background": "--surface-sunken",
+      "ratio": 7.512221674424281
+    },
+    {
+      "theme": "dark",
+      "foreground": "--negative",
+      "background": "--bg",
+      "ratio": 6.321600820282042
+    },
+    {
+      "theme": "dark",
+      "foreground": "--negative",
+      "background": "--surface",
+      "ratio": 5.943031352524466
+    },
+    {
+      "theme": "dark",
+      "foreground": "--negative",
+      "background": "--surface-sunken",
+      "ratio": 5.468177855598334
+    },
+    {
+      "theme": "dark",
+      "foreground": "--danger-ink",
+      "background": "--negative",
+      "ratio": 6.321600820282042
+    }
+  ]
+}

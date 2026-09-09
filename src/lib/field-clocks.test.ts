@@ -84,6 +84,12 @@ describe("deriveFieldClocks", () => {
 });
 
 describe("mergeResourceByFieldClocks", () => {
+  it("applies a newer explicit note/tag clear and preserves a newer local clear", () => {
+    const old = resource({ userNote: "old", tags: ["tag"], fieldUpdatedAt: { userNote: EARLY, tags: EARLY } });
+    const cleared = resource({ userNote: "", tags: [], fieldClears: ["userNote", "tags"], fieldUpdatedAt: { userNote: LATE, tags: LATE }, updatedAt: LATE });
+    expect(mergeResourceByFieldClocks(old, cleared).record).toMatchObject({ userNote: "", tags: [] });
+    expect(mergeResourceByFieldClocks(cleared, old).record).toMatchObject({ userNote: "", tags: [] });
+  });
   it("fills in fields the local device is missing", () => {
     const local = resource({ tags: ["local-tag"] });
     const remote = resource({ summary: "cloud summary", tags: [] });

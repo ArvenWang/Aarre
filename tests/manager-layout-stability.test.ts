@@ -145,7 +145,7 @@ describe("manager layout stability", () => {
     expect(topbarRule).not.toContain("border-bottom");
     expect(tabsRule).not.toContain("border-bottom");
     expect(headerMarkup).toContain('className="manager-topbar"');
-    expect(headerMarkup).toContain('className="manager-view-tabs"');
+    expect(headerMarkup).toContain('className="manager-view-tabs aarre-tabs-list"');
   });
 
   it("keeps the editor visually open and aligns non-action proposal marks", async () => {

@@ -1,0 +1,86 @@
+{
+  "format": "aarre-data-export",
+  "schemaVersion": 2,
+  "exportedAt": "2026-09-09T07:59:59.953Z",
+  "appVersion": "0.6.0",
+  "privacy": {
+    "includesApiKeys": false,
+    "includesCloudTokens": false,
+    "includesLocalPageSnapshots": true
+  },
+  "data": {
+    "bookmarks": [
+      {
+        "id": "0",
+        "title": "",
+        "children": [
+          {
+            "id": "1",
+            "title": "QA source folder",
+            "children": [
+              {
+                "id": "2",
+                "title": "QA article",
+                "url": "https://example.com/qa"
+              },
+              {
+                "id": "3",
+                "title": "QA duplicate occurrence",
+                "url": "https://example.com/qa"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "resources": [
+      {
+        "resourceKey": "qa-archive-resource",
+        "canonicalUrl": "https://example.com/qa",
+        "url": "https://example.com/qa",
+        "title": "QA article",
+        "userNote": "QA fixture: archive preview, not user data",
+        "summary": "",
+        "tags": [],
+        "topics": [],
+        "contentExcerpt": "",
+        "contentHash": "",
+        "selectedText": "",
+        "author": "",
+        "siteName": "",
+        "language": "",
+        "imageUrl": "",
+        "faviconUrl": "",
+        "nativeBookmarkIds": [
+          "2",
+          "3"
+        ],
+        "nativeFolderPath": [],
+        "aiStatus": "not_requested",
+        "syncStatus": "local",
+        "createdAt": "2026-09-09T07:59:59.950Z",
+        "updatedAt": "2026-09-09T00:00:00.000Z"
+      }
+    ],
+    "pageSnapshots": [],
+    "siteBrands": [],
+    "visuals": [],
+    "conversations": [],
+    "display": {
+      "listCoverStyle": "site",
+      "publicFaviconFallback": true,
+      "pageSnapshotsEnabled": true,
+      "scanCostLimitCny": 10,
+      "snapshotExcludedHosts": []
+    },
+    "protection": {
+      "resourceKeys": [],
+      "folderIds": []
+    }
+  },
+  "integrity": {
+    "algorithm": "SHA-256",
+    "payload": "9e71ced214afcbe9063344febcee62800f9166a130c9c2b5ee7ba073702b0ca4",
+    "images": {}
+  }
+}

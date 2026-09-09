@@ -1,3 +1,4 @@
+import { AppModal } from "@/ui/components/ui/modal";
 import { Button } from "@/ui/components/ui/button";
 import type { LibraryScanEstimate } from "../../../../lib/types";
 
@@ -16,20 +17,8 @@ export function LibraryScanConfirmDialog({
 }: LibraryScanConfirmDialogProps) {
   if (!estimate) return null;
   return (
-    <div
-      className="settings-scan-dialog-backdrop"
-      role="presentation"
-      onClick={() => {
-        if (!action) onClose();
-      }}
-    >
-      <div
-        className="settings-scan-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="scan-confirm-title"
-        onClick={(event) => event.stopPropagation()}
-      >
+    <AppModal onClose={onClose} busy={Boolean(action)} labelledBy="scan-confirm-title"
+      className="settings-scan-dialog" backdropClassName="settings-scan-dialog-backdrop">
         <h2 id="scan-confirm-title">开始前确认</h2>
         <p>
           {estimate.aiResourceCount} 条将调用 {estimate.providerName} {estimate.model}，已完成的不会重复。
@@ -72,7 +61,6 @@ export function LibraryScanConfirmDialog({
                 : "无需扫描"}
           </Button>
         </div>
-      </div>
-    </div>
+    </AppModal>
   );
 }

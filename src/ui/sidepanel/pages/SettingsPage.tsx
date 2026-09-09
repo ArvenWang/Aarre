@@ -1,3 +1,4 @@
+import { FloatingSettingsSection } from "../../floating/FloatingSettingsSection";
 import { useEffect, useRef, useState } from "react";
 import "../../sidepanel-lazy.css";
 import { Button } from "@/ui/components/ui/button";
@@ -158,7 +159,7 @@ function SettingsPage({
       onAppStateChange(state);
       setCloudFeedback({
         tone: "success",
-        message: "账号已连接。云端恢复与同步会在后台继续，你可以继续使用侧边栏。",
+        message: "账号已连接。开启完整备份后，才会开始云端恢复与同步。",
       });
     } catch (caught) {
       setCloudFeedback({
@@ -325,6 +326,7 @@ function SettingsPage({
       </header>
 
       <section className="settings-page-content">
+        <FloatingSettingsSection />
         {settingsPage === "main" ? (
           <>
 
@@ -392,6 +394,10 @@ function SettingsPage({
                 <Button variant="tertiary" size="sm" type="button" onClick={onRestartOnboarding}>
                   重新查看
                 </Button>
+              </div>
+              <div className="settings-link-row">
+                <strong>本地备份与恢复</strong>
+                <Button variant="tertiary" size="sm" asChild><a href={chrome.runtime.getURL("manager.html?archive=1")} target="_blank" rel="noreferrer">打开</a></Button>
               </div>
               <div className="settings-link-row">
                 <strong>隐私与数据</strong>

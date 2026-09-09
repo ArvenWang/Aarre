@@ -715,3 +715,55 @@ test("account deletion revokes tokens and physically removes the user after asse
   const users = await database.query("SELECT 1 FROM users WHERE id = $1", [owner.userId]);
   assert.equal(users.rowCount, 0);
 });
+
+test("refresh retries recover the same encrypted response and retain replay protection", async () => {
+  const owner = await signedInAccount();
+  const operationId = randomUUID();
+  const first = await auth.refresh(owner.issued.refreshToken, operationId);
+  const retried = await auth.refresh(owner.issued.refreshToken, operationId);
+  assert.deepEqual(retried, first);
+  assert.ok(await auth.authenticateAccessToken(first.accessToken));
+  const stored = await database.query<{ response_payload: Buffer }>("SELECT response_payload FROM refresh_recoveries");
+  assert.ok(!stored.rows[0].response_payload.includes(Buffer.from(first.refreshToken)));
+  await assert.rejects(() => auth.refresh(owner.issued.refreshToken, randomUUID()), /replay/);
+  await assert.rejects(() => auth.refresh(owner.issued.refreshToken, operationId), /revoked/);
+});
+
+test("same-slot cover replacement stays invisible until verified and rejects a stale completion", async () => {
+  const owner = await signedInAccount();
+  const assetId = randomUUID();
+  const create = async (digest: string, bytes: number, baseRevision: number) => assets.createUpload(owner.account, {
+    assetId, operationId: randomUUID(), resourceKey: "e".repeat(64), kind: "cover",
+    sha256: digest.repeat(64), byteSize: bytes, mimeType: "image/webp", baseRevision,
+    capturedAt: new Date().toISOString(),
+  });
+  const uploaded = (upload: Record<string, unknown>, digest: string, bytes: number) => {
+    objectStore.metadata.set(new URL(String(upload.uploadUrl)).pathname.slice(1), {
+      sha256: digest.repeat(64), byteSize: bytes, serverSideEncryption: "AES256", versionId: "v",
+    });
+  };
+  const complete = (upload: Record<string, unknown>, operationId = randomUUID()) => assets.completeUpload(owner.account, assetId, {
+    uploadId: upload.uploadId, operationId,
+  });
+  const initial = await create("a", 100, 0);
+  uploaded(initial, "a", 100);
+  await complete(initial);
+  const replacement = await create("b", 120, 1);
+  const stale = await create("c", 150, 1);
+  assert.equal((await assets.list(owner.account))[0].sha256, "a".repeat(64));
+  await assert.rejects(() => complete(replacement), /missing fake object/);
+  assert.equal((await assets.list(owner.account))[0].sha256, "a".repeat(64));
+  uploaded(replacement, "b", 120);
+  uploaded(stale, "c", 150);
+  const operationId = randomUUID();
+  const result = await complete(replacement, operationId);
+  assert.deepEqual(await complete(replacement, operationId), result);
+  await assert.rejects(() => complete(stale), /changed during upload/);
+  assert.equal((await assets.list(owner.account))[0].sha256, "b".repeat(64));
+  const usage = await database.query<{ asset_bytes: string; asset_count: string }>("SELECT asset_bytes, asset_count FROM account_usage WHERE user_id=$1", [owner.userId]);
+  assert.equal(Number(usage.rows[0].asset_bytes), 120);
+  assert.equal(Number(usage.rows[0].asset_count), 1);
+  await database.query("UPDATE asset_uploads SET expires_at=now()-interval '1 second'");
+  await assets.processDeleteJobs();
+  assert.equal((await assets.list(owner.account))[0].sha256, "b".repeat(64));
+});

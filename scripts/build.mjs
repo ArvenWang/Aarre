@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import { loadEnv } from "vite";
 import { minify } from "terser";
+import { poolRuntimeStrings } from "./pool-runtime-strings.mjs";
 
 const buildEnvironment = {
   ...loadEnv("production", process.cwd(), ""),
@@ -72,7 +73,9 @@ const compressedBackground = await minify(backgroundSource, {
 if (!compressedBackground.code) {
   throw new Error("后台 Service Worker 压缩没有生成有效产物。");
 }
-await writeFile(backgroundPath, compressedBackground.code);
+const pooledBackground = await poolRuntimeStrings(compressedBackground.code);
+await writeFile(backgroundPath, pooledBackground.code);
+console.log(`MV3 worker: ${Buffer.byteLength(pooledBackground.code)} bytes, ${pooledBackground.sharedStrings} shared string values; public property names preserved.`);
 
 run("esbuild", [
   "src/content/capture.ts",
@@ -82,4 +85,22 @@ run("esbuild", [
   "--outfile=dist/content-capture.js"
 ]);
 
+run("esbuild", ["src/extension/floating/host.ts", "--bundle", "--format=iife", "--minify", "--target=chrome134", "--outfile=dist/floating-host.js"]);
+
+// Expose only the iframe entry and its actual dependency graph to source pages.
+const graph = JSON.parse(await readFile(new URL("../dist/.vite/manifest.json", import.meta.url), "utf8"));
+const accessible = new Set(["floating.html"]);
+const visited = new Set();
+function visit(key) {
+  if (visited.has(key) || !graph[key]) return;
+  visited.add(key);
+  const chunk = graph[key];
+  accessible.add(chunk.file);
+  for (const asset of [...(chunk.css || []), ...(chunk.assets || [])]) accessible.add(asset);
+  for (const dependency of [...(chunk.imports || []), ...(chunk.dynamicImports || [])]) visit(dependency);
+}
+visit("floating.html");
+const extensionManifest = JSON.parse(await readFile(new URL("../dist/manifest.json", import.meta.url), "utf8"));
+extensionManifest.web_accessible_resources = [{ resources: [...accessible].sort(), matches: ["http://*/*", "https://*/*"] }];
+await writeFile(new URL("../dist/manifest.json", import.meta.url), JSON.stringify(extensionManifest, null, 2) + "\n");
 run("node", ["scripts/check-built-javascript.mjs"]);

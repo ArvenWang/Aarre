@@ -1,7 +1,6 @@
 import type { AgentChatMessage, AgentConversation } from "./types";
 
 const CONVERSATIONS_KEY = "aarre:agent-conversations";
-const MAX_CONVERSATIONS = 50;
 const MAX_MESSAGES_PER_CONVERSATION = 60;
 
 const VALID_MESSAGE_STATUSES = new Set([
@@ -46,8 +45,7 @@ export async function getAgentConversations(): Promise<
   if (!Array.isArray(stored)) return [];
   return stored
     .filter(isConversation)
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .slice(0, MAX_CONVERSATIONS);
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 export async function saveAgentConversation(
@@ -75,7 +73,7 @@ export async function saveAgentConversation(
     [CONVERSATIONS_KEY]: [
       normalized,
       ...current.filter((item) => item.id !== normalized.id)
-    ].slice(0, MAX_CONVERSATIONS)
+    ]
   });
   return normalized;
 }
