@@ -1,6 +1,6 @@
 # Aarre 项目进展
 
-最后更新：2026-09-09（悬浮交互与质量整改已实施，本地验收完成；正在封装交付物）
+最后更新：2026-09-09（悬浮交互与质量整改、本地验收、交付物封装校验均已完成；安装态与真实外部服务验收仍开放）
 
 ## 当前进展 · 0.6.0
 
@@ -24,7 +24,7 @@
 
 ### 验证情况
 
-- 根 `npm run check`：**95 文件 / 509 项通过**，Node、设计约束、TypeScript、构建通过。最后减少动态效果样式和打包清单收尾后，设计检查及构建再次通过。
+- 根 `npm run check`：**95 文件 / 509 项通过**，Node、设计约束、TypeScript、构建通过。正式打包在全部源码收尾并提交后重新执行完整检查和构建，再次通过。
 - 服务端独立本地 PostgreSQL `aarre_audit_20260909`：**27/27 通过**，构建通过；对象存储仍为测试替身。
 - 悬浮身份/几何/截图专项 25 项、archive 8 项、图片原子恢复 5 项、独立流客户端 4 项、worker 压缩等价性 3 项包含在上述总数中，不能重复相加。
 - 后台文件 **298,658 bytes**，低于 330,000-byte 硬门；保持单文件 MV3，无 eval/动态 import。iframe 资源引用全部存在；生产 JS 不含 DEV 验收 fixture。
@@ -44,9 +44,10 @@
 
 ### 交付记录
 
-- 预定产物：`outputs/Bookmark-Layer-0.6.0-unpacked`、`outputs/Bookmark-Layer-0.6.0.zip`、`outputs/Bookmark-Layer-0.6.0-source.zip` 与 `outputs/Bookmark-Layer-0.6.0-build.json`。
-- 正式打包器要求干净提交、不覆盖已有版本；构建清单记录源码提交、时间、版本及所有文件 SHA-256。当前封装动作随后执行，结果在本节补齐。
-- [图集与验收清单](docs/verification/2026-09-09/index.html)、[完整证据记录](docs/verification/2026-09-09/README.md) 已完成。除最后封装与交付记录外，当前没有未完的本地实施文件；不要重新执行整套 M01～M07。
+- **正式交付已完成：** `outputs/Bookmark-Layer-0.6.0-unpacked`、`outputs/Bookmark-Layer-0.6.0.zip`（1,600,024 bytes）、`outputs/Bookmark-Layer-0.6.0-source.zip`（33,872,531 bytes）与 `outputs/Bookmark-Layer-0.6.0-build.json`。构建时间为北京时间 2026-09-09 16:48:45，封装时间为 16:48:48。
+- **提交身份：** 产物和源码包均对应干净提交 `3aca7aa9915fcd0d46f1f1f2c97c93f4cad5fba9`（`feat: add floating UI and reliable recovery (0.6.0)`）。随后仅补充本进展文件的交付记录，不改变已经封装的产品源码或覆盖现有版本产物。
+- **产物校验：** 正式打包重跑完整检查（509 项通过）与构建；两份 ZIP 完整性、命名与 Manifest 版本一致，构建清单的 **95 个文件条目**均核对大小和 SHA-256，源码包提交身份相符，iframe 公开资源无缺失，后台仍为 298,658 bytes。派生校验结果为 `outputs/Bookmark-Layer-0.6.0-verification.json`，打包完整日志为 `outputs/Bookmark-Layer-0.6.0-checks.txt`。
+- [图集与验收清单](docs/verification/2026-09-09/index.html)、[完整证据记录](docs/verification/2026-09-09/README.md) 已完成。本地开发预览保留在 `http://127.0.0.1:5173`；它不能替代从上述解压目录加载扩展后的验收。当前没有占用中的实施文件或未完成的本地封装工作；不要重新执行整套 M01～M07，下一步按上方外部验收逐项核对。
 
 继续保留既定产品决定：原生字段归 Chrome，智能层归 Aarre；完整备份为唯一云端范围；不恢复旧 Supabase 方案、透明 surface、毛玻璃吸顶条、设置页封面风格切换或常驻提示条。
 
