@@ -53,7 +53,13 @@
 5. 缩窄菜单、打开完整收藏库，再检查设置、备份、编辑和封面补齐确认窗口。
 6. 使用真实长回答核对宽表格/代码。真实 Provider、云端和原生 Chrome 写操作仍属于独立验收；服务端本轮没有部署。
 
-最终检查与交付身份以根目录 `AGENT_PROGRESS.md` 和 `outputs/Bookmark-Layer-0.6.1-build.json` 为准。
+## 完整检查与交付
+
+- 正式打包从干净提交 `d09373638e3f5d27b459663a0a5672b949acd108` 执行：**97 文件 / 518 项测试通过**，Node、设计约束、TypeScript、构建及生产 JavaScript 语法检查通过。
+- 0.6.1 解压目录、扩展 ZIP、源码 ZIP 与构建清单已生成；**96 个文件条目**的大小/SHA-256 独立核对一致，版本和源码包提交身份一致，iframe 公开资源无缺失。
+- 图集 **56/56 张图片加载成功**；最终 51 张图的哈希仍与逐图审核记录一致。图集保留在本地浏览器，检查脚本没有写入真实 Chrome 收藏或调用外部 AI。
+- [解压加载目录](../../../outputs/Bookmark-Layer-0.6.1-unpacked)、[扩展 ZIP](../../../outputs/Bookmark-Layer-0.6.1.zip)、[完整检查日志](../../../outputs/Bookmark-Layer-0.6.1-checks.txt)、[独立校验结果](../../../outputs/Bookmark-Layer-0.6.1-verification.json)。
+- 本说明和 `AGENT_PROGRESS.md` 的交付记录在封装后另行提交；产品源码和现有版本产物不再改写。最终身份见 `outputs/Bookmark-Layer-0.6.1-build.json`。
 
 ## 验收环境的修正
 
