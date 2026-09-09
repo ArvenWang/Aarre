@@ -48,7 +48,11 @@
 
 ## 交付验证
 
-完整检查、正式封装和独立哈希校验在源代码及当前视觉证据收尾后执行，最终结果统一补记在本节和根 `AGENT_PROGRESS.md`。0.6.1 已封装产物不覆盖，0.6.2 单独交付。
+- 干净提交 `b4b033d3cbd2e10f0a1464be1975d1139d741f54` 执行 `npm run package:artifacts`：**99 文件 / 524 项通过**，Node、设计约束、TypeScript、构建与生产 JavaScript 语法检查通过。旧文字按钮约束已改为检查当前图标按钮的可访问名称，原业务处理器检查保留。
+- 北京时间 2026-09-09 20:33:46 构建，20:33:49 封装。扩展 ZIP 1,611,275 bytes，源码 ZIP 42,621,368 bytes。0.6.0 / 0.6.1 已封装产物不覆盖，0.6.2 单独交付。
+- `npm run verify:artifacts` 通过；独立脚本 `verify-package.mjs` 核对构建清单 97 项的字节数 / SHA-256、95 个解压文件与扩展 ZIP、源码 ZIP 与提交的完整 `git archive`，全部一致。公开 iframe 资源无缺失；后台 298,658 bytes，低于 330,000-byte 硬门。
+- [解压加载目录](../../../outputs/Bookmark-Layer-0.6.2-unpacked)、[扩展 ZIP](../../../outputs/Bookmark-Layer-0.6.2.zip)、[源码 ZIP](../../../outputs/Bookmark-Layer-0.6.2-source.zip)、[构建清单](../../../outputs/Bookmark-Layer-0.6.2-build.json)、[独立校验记录](../../../outputs/Bookmark-Layer-0.6.2-verification.json)、[完整检查日志](../../../outputs/Bookmark-Layer-0.6.2-checks.txt)。产品源码封装后未再修改，后续提交仅补交付记录。
+- 本轮本地实施、逐图检查、实际浏览器回放与封装已完成；下一步是用户在电脑端按图集验证安装态和真实服务。
 
 实际 Chrome 安装态、真实 Provider、原生书签写操作与云端服务是独立验收边界。后台本轮未部署；没有推送、合并或商店发布。电脑端验证请从 0.6.2 解压目录更新扩展并刷新普通网页。
 
