@@ -102,7 +102,6 @@ function AgentHistoryPage({
           <div className="agent-history-empty">
             <HistoryIcon />
             <strong>还没有历史会话</strong>
-            <p>在 AI 页面开始对话后，会话会保存在这里。</p>
           </div>
         )}
       </ScrollSurface>

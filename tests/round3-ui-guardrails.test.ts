@@ -54,7 +54,7 @@ describe("Round 3 UI root-cause guardrails", () => {
     const source = rule(css, ".agent-markdown .agent-inline-source");
     const thumbnail = rule(css, ".agent-inline-source-thumbnail");
 
-    expect(tokens).toContain("--agent-markdown-leading: 2.2");
+    expect(tokens).toContain("--agent-markdown-leading: 1.8");
     expect(markdown).toContain("line-height: var(--agent-markdown-leading)");
     expect(source).toContain(
       "padding: var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-1)",

@@ -54,14 +54,14 @@
 .fluid-control:where(:not([type="checkbox"]):not([type="radio"]):not([type="file"])) {
   min-height: var(--control-h-md);
   padding: 8px 12px;
-  border-radius: var(--shape-input-radius, var(--radius-md));
+  border-radius: var(--radius-control);
   line-height: 1.35;
 }
 
 .fluid-textarea {
   min-height: 88px;
   padding: 10px 12px;
-  border-radius: var(--shape-input-radius, var(--radius-md));
+  border-radius: var(--radius-control);
   resize: vertical;
   line-height: 1.5;
 }
@@ -76,7 +76,7 @@
 .fluid-control[type="file"] {
   min-height: var(--control-h-md);
   padding: 7px 10px;
-  border-radius: var(--shape-input-radius, var(--radius-md));
+  border-radius: var(--radius-control);
 }
 
 .select-content-viewport {

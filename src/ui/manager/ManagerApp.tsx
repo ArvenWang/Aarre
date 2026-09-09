@@ -596,7 +596,23 @@ export function ManagerApp() {
             </div>
             <strong>Aarre</strong>
           </div>
-          <ManagerUtilityActions onOpen={setOpenedUtility} />
+          <ManagerUtilityActions onOpen={setOpenedUtility} themeControl={<Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="manager-theme-button"
+          aria-label={
+            themeMode === "dark" ? "切换到日间模式" : "切换到夜间模式"
+          }
+          title={themeMode === "dark" ? "切换到日间模式" : "切换到夜间模式"}
+          onClick={toggleTheme}
+        >
+          {themeMode === "dark" ? (
+            <MoonIcon aria-hidden="true" />
+          ) : (
+            <SunIcon aria-hidden="true" />
+          )}
+        </Button>} />
         </div>
 
         <Tabs.List ref={tabViewportRef} className="manager-view-tabs aarre-tabs-list" aria-label="收藏管理功能">
@@ -618,23 +634,7 @@ export function ManagerApp() {
         </Tabs.List>
         <FloatingScrollbars viewportRef={tabViewportRef} label="收藏库导航" />
 
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="manager-theme-button"
-          aria-label={
-            themeMode === "dark" ? "切换到日间模式" : "切换到夜间模式"
-          }
-          title={themeMode === "dark" ? "切换到日间模式" : "切换到夜间模式"}
-          onClick={toggleTheme}
-        >
-          {themeMode === "dark" ? (
-            <MoonIcon aria-hidden="true" />
-          ) : (
-            <SunIcon aria-hidden="true" />
-          )}
-        </Button>
+
       </header>
 
       <h1 className="visually-hidden">{`Aarre · ${VIEW_LABELS[view]}`}</h1>

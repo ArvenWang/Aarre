@@ -17,6 +17,7 @@ import { ArrowLeftIcon, CloseIcon } from "../../components/Icons";
 import { SiteThumbnail } from "../../components/SiteThumbnail";
 import { AgentComposer } from "../components/AgentComposer";
 import { AgentThinkingSteps } from "../components/AgentThinkingSteps";
+import { ChevronDown, SquarePen } from "lucide-react";
 import { resourceForUrl, siteBrandForUrl } from "../bookmark-link";
 import { hostFromUrl } from "../utils";
 
@@ -84,6 +85,7 @@ function agentActionCardTitle(actions: BookmarkAgentActionProposal[]): string {
 }
 
 interface AgentChatPageProps {
+  embedded?: boolean;
   conversation: AgentConversation;
   resourceByUrl: Map<string, ResourceRecord>;
   siteBrandByHost: Map<string, SiteBrandRecord>;
@@ -108,6 +110,7 @@ interface AgentChatPageProps {
 }
 
 function AgentChatPage({
+  embedded = false,
   conversation,
   resourceByUrl,
   siteBrandByHost,
@@ -143,7 +146,7 @@ function AgentChatPage({
 
   return (
     <main className="native-panel agent-chat-panel">
-      <header className="agent-page-header">
+      {!embedded && <header className="agent-page-header">
         <Button
           type="button"
           variant="ghost"
@@ -158,9 +161,9 @@ function AgentChatPage({
         <div>
           <h1>收藏对话</h1>
         </div>
-      </header>
+      </header>}
       <ScrollSurface as="section" className="agent-thread" aria-live="polite">
-        {!conversation.messages.length && !busy && !error ? (
+        {!embedded && !conversation.messages.length && !busy && !error ? (
           <div className="agent-chat-welcome">
             <h2>和你的收藏聊聊</h2>
             <p>找回读过的资料，串联相关主题，或预览一份整理建议。</p>
@@ -179,7 +182,7 @@ function AgentChatPage({
             data-status={message.status || "complete"}
           >
             <div className="agent-message-copy">
-              {message.status === "sending" ? (
+              {message.status === "sending" && !message.content.trim() ? (
                 <AgentThinkingSteps
                   progress={message.progress}
                   thinking={message.thinking}
@@ -260,11 +263,11 @@ function AgentChatPage({
                     {message.actions.some(
                       (action) => action.status === "pending",
                     )
-                      ? `命中 ${
+                      ? `待确认 ${
                           message.actions.filter(
                             (action) => action.status === "pending",
                           ).length
-                        } 条`
+                        } 项`
                       : `${message.actions.length} 项`}
                   </small>
                 </header>
@@ -274,11 +277,12 @@ function AgentChatPage({
                     key={group.label || "default"}
                   >
                     <summary>
-                      <span>{group.label || "其他操作"}</span>
+                      <span>{group.label || (group.actions.length === 1 ? group.actions[0].label : "查看操作明细")}</span>
                       <strong>{group.actions.length} 项</strong>
                       {group.actions.some((action) => action.destructive) ? (
                         <span aria-label="包含删除操作">⚠</span>
                       ) : null}
+                      <ChevronDown size={14} className="agent-action-chevron" aria-hidden="true" />
                     </summary>
                     <ul>
                       {group.actions.map((action) => (
@@ -381,11 +385,13 @@ function AgentChatPage({
                   <Button
                     type="button"
                     variant="ghost"
-                    size="sm"
+                    size="icon-sm"
+                    aria-label="编辑问题并重发"
+                    title="编辑问题并重发"
                     disabled={busy}
                     onClick={() => onEditQuestion(message.id)}
                   >
-                    编辑并重发
+                    <SquarePen size={14} aria-hidden="true" />
                   </Button>
                 ) : (
                   <Fragment>
@@ -421,7 +427,7 @@ function AgentChatPage({
         ) : null}
         <div ref={endRef} />
       </ScrollSurface>
-      <AgentComposer
+      {!embedded && <AgentComposer
         value={prompt}
         busy={busy}
         configured={configured}
@@ -430,7 +436,7 @@ function AgentChatPage({
         onSubmit={onSubmit}
         onCancel={onCancel}
         onConfigure={onConfigure}
-      />
+      />}
     </main>
   );
 }

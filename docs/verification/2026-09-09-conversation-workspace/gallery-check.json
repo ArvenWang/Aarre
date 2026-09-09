@@ -1,0 +1,28 @@
+{
+  "current": [
+    {
+      "width": 1150,
+      "pageWidth": 1135,
+      "images": 61,
+      "loaded": 61,
+      "openDetails": 0,
+      "oldImages": 0,
+      "title": "Aarre 0.6.2 · 单一对话工作区"
+    },
+    {
+      "width": 420,
+      "pageWidth": 405,
+      "images": 61,
+      "loaded": 61,
+      "openDetails": 0,
+      "oldImages": 0,
+      "title": "Aarre 0.6.2 · 单一对话工作区"
+    }
+  ],
+  "historical": {
+    "title": "历史存档 · Aarre 0.6.1",
+    "openDetails": 0,
+    "hasNewLink": true,
+    "notice": "当前交付已更新为 0.6.2\n\n这一页是上一轮的历史记录，用户已要求修订。新版本按 14 条批注重整为一个工作区和常驻输入框。\n\n打开 0.6.2 最新界面与验证结果 →\n展开 0.6.1 历史记录（包含修复前的旧图）"
+  }
+}

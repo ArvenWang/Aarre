@@ -27,6 +27,7 @@ import type {
 import type { CloudStorageUsage } from "../../../lib/cloud-settings";
 
 interface SettingsPageProps {
+  onAiConfiguredChange?: (configured: boolean) => void;
   appState: AppState | null;
   publicFaviconFallback: boolean;
   onPublicFaviconFallbackChange: (enabled: boolean) => void;
@@ -36,6 +37,7 @@ interface SettingsPageProps {
 }
 
 function SettingsPage({
+  onAiConfiguredChange,
   appState,
   publicFaviconFallback,
   onPublicFaviconFallbackChange,
@@ -133,6 +135,7 @@ function SettingsPage({
         },
       });
       setSettings(next);
+      onAiConfiguredChange?.(next.apiKeyConfigured);
       setProvider(next.provider);
       setModel(next.model);
       setApiKey("");
@@ -302,7 +305,7 @@ function SettingsPage({
 
   return (
     <main className="native-panel native-settings-panel">
-      <header className="settings-page-header">
+      <header className="settings-page-header" data-subpage={settingsPage === "more"}>
         <Button
           ref={backButtonRef}
           type="button"
@@ -327,20 +330,8 @@ function SettingsPage({
       </header>
 
       <ScrollSurface as="section" className="settings-page-content">
-        <FloatingSettingsSection />
         {settingsPage === "main" ? (
           <>
-
-            <AccountCloudSection
-              appState={appState}
-              action={action}
-              status={syncStatus}
-              usage={cloudUsage}
-              feedback={cloudFeedback}
-              onLogin={() => void handleLogin()}
-              onSignOut={() => void handleSignOut()}
-              onSync={() => void handleSyncNow()}
-            />
 
             <AiServiceSection
               settings={settings}
@@ -365,6 +356,19 @@ function SettingsPage({
               onPublicFaviconFallbackChange={(enabled) =>
                 void handlePublicFaviconFallback(enabled)
               }
+            />
+
+            <FloatingSettingsSection />
+
+            <AccountCloudSection
+              appState={appState}
+              action={action}
+              status={syncStatus}
+              usage={cloudUsage}
+              feedback={cloudFeedback}
+              onLogin={() => void handleLogin()}
+              onSignOut={() => void handleSignOut()}
+              onSync={() => void handleSyncNow()}
             />
 
             <LibraryScanSection

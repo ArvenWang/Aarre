@@ -1,0 +1,19 @@
+{
+  "history": {
+    "count": 21,
+    "width": 294,
+    "scrollWidth": 294,
+    "height": 558,
+    "scrollHeight": 2178,
+    "bars": 1,
+    "dialogBottom": 628
+  },
+  "composer": {
+    "pageWidth": 320,
+    "height": 112,
+    "scrollHeight": 420,
+    "bottom": 628,
+    "barCount": 1
+  },
+  "fixture": "20 added local QA history records, no external services"
+}

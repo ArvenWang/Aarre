@@ -1,0 +1,110 @@
+{
+  "method": "Actual theme button; visible images decoded. Early programmatic capture kept only in logs, not accepted.",
+  "results": [
+    {
+      "theme": "dark",
+      "width": 1280,
+      "pageWidth": 1280,
+      "images": [
+        {
+          "src": "http://127.0.0.1:5173/src/assets/covers/ai-automation-v1.webp",
+          "complete": true,
+          "naturalWidth": 384,
+          "displayHeight": 203.5
+        },
+        {
+          "src": "http://127.0.0.1:5173/src/assets/covers/place-map-v1.webp",
+          "complete": true,
+          "naturalWidth": 384,
+          "displayHeight": 203.5
+        },
+        {
+          "src": "http://127.0.0.1:5173/src/assets/covers/health-medical-v2.webp",
+          "complete": true,
+          "naturalWidth": 384,
+          "displayHeight": 203.5
+        },
+        {
+          "src": "http://127.0.0.1:5173/src/assets/covers/code-repository-v1.webp",
+          "complete": true,
+          "naturalWidth": 384,
+          "displayHeight": 203.5
+        },
+        {
+          "src": "http://127.0.0.1:5173/src/assets/covers/documentation-api-v3.webp",
+          "complete": true,
+          "naturalWidth": 384,
+          "displayHeight": 203.5
+        },
+        {
+          "src": "http://127.0.0.1:5173/src/assets/covers/shopping-products-v2.webp",
+          "complete": true,
+          "naturalWidth": 384,
+          "displayHeight": 203.5
+        },
+        {
+          "src": "http://127.0.0.1:5173/src/assets/covers/design-creation-v1.webp",
+          "complete": true,
+          "naturalWidth": 384,
+          "displayHeight": 203.5
+        },
+        {
+          "src": "http://127.0.0.1:5173/src/assets/covers/video-v2.webp",
+          "complete": true,
+          "naturalWidth": 384,
+          "displayHeight": 203.5
+        },
+        {
+          "src": "http://127.0.0.1:5173/src/assets/covers/web-tool-v1.webp",
+          "complete": true,
+          "naturalWidth": 384,
+          "displayHeight": 203.5
+        },
+        {
+          "src": "http://127.0.0.1:5173/src/assets/covers/food-cooking-v1.webp",
+          "complete": true,
+          "naturalWidth": 384,
+          "displayHeight": 203.5
+        },
+        {
+          "src": "http://127.0.0.1:5173/src/assets/covers/finance-investing-v3.webp",
+          "complete": true,
+          "naturalWidth": 384,
+          "displayHeight": 203.5
+        },
+        {
+          "src": "http://127.0.0.1:5173/src/assets/covers/work-productivity-v1.webp",
+          "complete": true,
+          "naturalWidth": 384,
+          "displayHeight": 203.5
+        }
+      ]
+    },
+    {
+      "theme": "dark",
+      "width": 420,
+      "pageWidth": 420,
+      "images": [
+        {
+          "src": "http://127.0.0.1:5173/src/assets/covers/ai-automation-v1.webp",
+          "complete": true,
+          "naturalWidth": 384,
+          "displayHeight": 277
+        }
+      ]
+    },
+    {
+      "theme": "dark",
+      "width": 320,
+      "pageWidth": 320,
+      "images": [
+        {
+          "src": "http://127.0.0.1:5173/src/assets/covers/ai-automation-v1.webp",
+          "complete": true,
+          "naturalWidth": 384,
+          "displayHeight": 202
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+// Ego Browser, same task space. Current host + iframe UI; DEV transport only.
+const fs=await import('node:fs/promises'),p=(await taskSpace(8)).page('p1');
+const out='/Users/nefish/Desktop/Coding/Aarre/docs/verification/2026-09-09-conversation-workspace/';
+const results={boundary:'Current host and UI source with controlled browser transport. Not installed Chrome.',scenes:[]};
+const viewport=async(w,h)=>p.cdp('Emulation.setDeviceMetricsOverride',{width:w,height:h,deviceScaleFactor:1,mobile:false});
+const measure=async name=>p.evaluate(name=>{
+ const f=window.__aarreHarness.frame,d=f.document,b=e=>e.getBoundingClientRect().toJSON();
+ return{name,viewport:{width:innerWidth,height:innerHeight},pageWidth:document.documentElement.scrollWidth,frame:b(f.frameElement),frameViewport:{width:f.innerWidth,height:f.innerHeight},frameScrollWidth:d.documentElement.scrollWidth,composer:b(d.querySelector('.agent-composer')),tabs:d.querySelectorAll('[role=tab]').length,draft:d.querySelector('#bookmark-agent-prompt').value,active:d.activeElement?.id,theme:d.documentElement.dataset.theme};
+},name);
+const shot=async name=>{await p.evaluate(async()=>{const d=window.__aarreHarness.frame.document;await d.fonts.ready;await Promise.race([Promise.allSettled(d.getAnimations().filter(a=>a.playState==='running'&&a.effect?.getTiming().iterations!==Infinity).map(a=>a.finished)),new Promise(r=>setTimeout(r,1000))]);});await p.screenshot({path:out+'final/'+name+'.png'});results.scenes.push(await measure(name));};
+const theme=async mode=>{
+ if(await p.evaluate(m=>window.__aarreHarness.frame.document.documentElement.dataset.theme===m,mode))return;
+ await p.click('button[aria-label="更多操作"]');await p.click('[role=menuitem]:has-text("设置")');
+ await p.waitForFunction(()=>!!window.__aarreHarness.frame.document.querySelector('input[aria-label="深色模式"]'),undefined,{timeout:30000});
+ if(await p.evaluate(m=>window.__aarreHarness.frame.document.querySelector('input[aria-label="深色模式"]').checked!==(m==='dark'),mode))await p.click('.aarre-switch:has(input[aria-label="深色模式"])');
+ await p.click('button[aria-label="关闭窗口"]');
+ await p.waitForFunction(()=>!window.__aarreHarness.frame.document.querySelector('[role=dialog]'),undefined,{timeout:10000});
+};
+await viewport(1280,900);await p.goto('http://127.0.0.1:5173/docs/verification/2026-09-09-conversation-workspace/host-harness.html',{waitUntil:'domcontentloaded',timeout:30000});
+console.log(await p.snapshot());
+await p.click('loc=role:button[name="打开 Aarre 菜单"]');
+await p.waitForFunction(()=>!!window.__aarreHarness.frame?.document.querySelector('#bookmark-agent-prompt'),undefined,{timeout:30000});
+if(await p.evaluate(()=>!!window.__aarreHarness.frame.document.querySelector('.native-dialog')))await p.click('.native-dialog button[aria-label="关闭"]');
+await p.fill('#bookmark-agent-prompt','');await theme('light');await shot('host-desktop-light');
+await p.fill('#bookmark-agent-prompt','帮我整理收藏里的设计资料');
+await p.evaluate(()=>{window.__aarreHostQA={frame:window.__aarreHarness.frame,composer:window.__aarreHarness.frame.document.querySelector('#bookmark-agent-prompt'),width:document.documentElement.scrollWidth};});
+await p.click('button[aria-label="收起菜单"]');
+console.log(await p.snapshot());
+await p.click('loc=role:button[name="打开 Aarre 菜单"]');
+console.log(await p.snapshot());
+await p.waitForFunction(()=>window.__aarreHarness.frame.document.activeElement?.id==='bookmark-agent-prompt',undefined,{timeout:30000});
+results.reopen=await p.evaluate(()=>({sameFrame:window.__aarreHostQA.frame===window.__aarreHarness.frame,sameComposer:window.__aarreHostQA.composer===window.__aarreHarness.frame.document.querySelector('#bookmark-agent-prompt'),draft:window.__aarreHostQA.composer.value,active:window.__aarreHarness.frame.document.activeElement.id,pageWidthBefore:window.__aarreHostQA.width,pageWidthAfter:document.documentElement.scrollWidth}));
+await theme('dark');await shot('host-desktop-dark');
+await theme('light');await viewport(420,760);await shot('host-420-light');
+results.transportEvents=await p.evaluate(()=>window.__aarreHarness.events);
+await fs.writeFile(out+'host-runtime.json',JSON.stringify(results,null,2)+'\n');
+console.log(results);
+if(!results.reopen.sameFrame||!results.reopen.sameComposer||results.reopen.draft!=='帮我整理收藏里的设计资料'||results.reopen.pageWidthBefore!==results.reopen.pageWidthAfter)throw Error('Host reopen continuity failed');
+for(const s of results.scenes)if(s.frame.x<0||s.frame.y<0||s.frame.right>s.viewport.width||s.frame.bottom>s.viewport.height||s.frameScrollWidth>s.frameViewport.width||s.tabs)throw Error('Host geometry failed: '+s.name);
+console.log(await p.snapshot());

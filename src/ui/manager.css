@@ -102,7 +102,7 @@ html.manager-page[data-theme="light"] .manager-shell {
   gap: var(--sp-2);
   flex: 1 1 420px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-control);
   background: var(--surface);
   transition:
     border-color var(--dur-fast) var(--ease),
@@ -159,7 +159,7 @@ html.manager-page[data-theme="light"] .manager-shell {
   padding-block: 0;
   padding-inline: var(--sp-4);
   align-self: center;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-control);
 }
 
 .library-search-clear {
@@ -318,7 +318,7 @@ html.manager-page[data-theme="light"] .manager-shell {
 }
 
 .library-tabs {
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-control);
 }
 
 .library-tabs button,
@@ -337,7 +337,7 @@ html.manager-page[data-theme="light"] .manager-shell {
 }
 
 .library-tabs button {
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-inset-control);
 }
 
 .library-tabs button:hover:not([data-active="true"]),
@@ -363,11 +363,11 @@ html.manager-page[data-theme="light"] .manager-shell {
 }
 
 .report-period-tabs {
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-control);
 }
 
 .report-period-tabs button {
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-inset-control);
 }
 
 .library-tabs button span {
@@ -378,7 +378,7 @@ html.manager-page[data-theme="light"] .manager-shell {
 .library-tab-button > [data-slot="button-content"] {
   min-width: 0;
   padding: 0;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-control);
   background: transparent;
 }
 
@@ -485,7 +485,7 @@ html.manager-page[data-theme="light"] .manager-shell {
   flex: 0 0 auto;
   white-space: nowrap;
   border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-control);
   color: var(--ink-muted);
   background: var(--surface);
   font-size: var(--fs-control);
@@ -850,7 +850,7 @@ html.manager-page[data-theme="light"] .manager-shell {
 }
 
 .library-card-link:focus-visible::after {
-  outline: 2px solid var(--focus-ring);
+  outline: 1px solid var(--focus-ring);
   outline-offset: 3px;
   border-radius: var(--radius-lg);
 }
@@ -1830,8 +1830,8 @@ html.manager-page[data-theme="light"] .manager-shell {
     gap: 0 var(--sp-3);
   }
 
-  .manager-topbar { grid-column: 1; grid-row: 1; min-width: 0; }
-  .manager-theme-button { grid-column: 2; grid-row: 1; align-self: center; }
+  .manager-topbar { grid-column: 1 / -1; grid-row: 1; min-width: 0; justify-content:space-between; }
+  .manager-utilities { margin-left:auto; }
   .manager-view-tabs { grid-column: 1 / -1; grid-row: 2; width: 100%; }
 
   .manager-topbar,
@@ -2021,10 +2021,7 @@ html.manager-page[data-theme="light"] .manager-shell {
     padding-left: var(--sp-4);
   }
 
-  .library-card-editor-confirm > div {
-    align-items: stretch;
-    flex-direction: column;
-  }
+
 }
 
 @media (hover: none) {
@@ -2046,3 +2043,8 @@ html.manager-page[data-theme="light"] .manager-shell {
     opacity: 1;
   }
 }
+
+.library-card-editor-confirm { flex-direction:column; align-items:stretch; gap:var(--sp-3); }
+.library-card-editor-confirm > div { width:100%; flex-direction:row; justify-content:flex-end; }
+.library-card-editor-confirm p { align-items:flex-start; line-height:1.5; }
+.library-card-editor-confirm p svg { margin-top:2px; }

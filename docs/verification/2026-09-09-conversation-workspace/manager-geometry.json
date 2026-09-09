@@ -1,0 +1,2785 @@
+[
+  {
+    "name": "manager-1280-light",
+    "width": 1280,
+    "pageWidth": 1280,
+    "dialogs": 0,
+    "themeGroup": {
+      "x": 140.4765625,
+      "y": 14,
+      "width": 114,
+      "height": 36,
+      "top": 14,
+      "right": 254.4765625,
+      "bottom": 50,
+      "left": 140.4765625
+    },
+    "footerButtons": [],
+    "controls": [
+      {
+        "class": "library-search",
+        "height": 46,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "6px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "input input--primary fluid-control w-full border border-[color:var(--line)] bg-[color:var(--surface)] text-[color:var(--ink)] outline-none transition-[border-color,background-color] duration-150 placeholder:text-[color:var(--ink-faint)] focus:border-[color:var(--line-strong)] focus-visible:border-[color:var(--line-strong)] fluid-input",
+        "height": 36,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "0px",
+        "paddingRight": "0px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "0px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "library-tabs",
+        "height": 44,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "4px",
+        "paddingRight": "4px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 36,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 36,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 36,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "button button--md button--ghost aarre-button aarre-button--ghost aarre-button--md text-button snapshot-backfill-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      }
+    ],
+    "scrollers": []
+  },
+  {
+    "name": "manager-1280-dark",
+    "width": 1280,
+    "pageWidth": 1280,
+    "dialogs": 0,
+    "themeGroup": {
+      "x": 140.4765625,
+      "y": 14,
+      "width": 114,
+      "height": 36,
+      "top": 14,
+      "right": 254.4765625,
+      "bottom": 50,
+      "left": 140.4765625
+    },
+    "footerButtons": [],
+    "controls": [
+      {
+        "class": "library-search",
+        "height": 46,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "6px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "input input--primary fluid-control w-full border border-[color:var(--line)] bg-[color:var(--surface)] text-[color:var(--ink)] outline-none transition-[border-color,background-color] duration-150 placeholder:text-[color:var(--ink-faint)] focus:border-[color:var(--line-strong)] focus-visible:border-[color:var(--line-strong)] fluid-input",
+        "height": 36,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "0px",
+        "paddingRight": "0px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "0px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "library-tabs",
+        "height": 44,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "4px",
+        "paddingRight": "4px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 36,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 36,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 36,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "button button--md button--ghost aarre-button aarre-button--ghost aarre-button--md text-button snapshot-backfill-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      }
+    ],
+    "scrollers": []
+  },
+  {
+    "name": "manager-420-light",
+    "width": 420,
+    "pageWidth": 420,
+    "dialogs": 0,
+    "themeGroup": {
+      "x": 290,
+      "y": 8,
+      "width": 114,
+      "height": 36,
+      "top": 8,
+      "right": 404,
+      "bottom": 44,
+      "left": 290
+    },
+    "footerButtons": [],
+    "controls": [
+      {
+        "class": "library-search",
+        "height": 54,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "6px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "input input--primary fluid-control w-full border border-[color:var(--line)] bg-[color:var(--surface)] text-[color:var(--ink)] outline-none transition-[border-color,background-color] duration-150 placeholder:text-[color:var(--ink-faint)] focus:border-[color:var(--line-strong)] focus-visible:border-[color:var(--line-strong)] fluid-input",
+        "height": 36,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "0px",
+        "paddingRight": "0px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "0px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "library-tabs",
+        "height": 52,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "4px",
+        "paddingRight": "4px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "button button--md button--ghost aarre-button aarre-button--ghost aarre-button--md text-button snapshot-backfill-trigger",
+        "height": 44,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      }
+    ],
+    "scrollers": [
+      {
+        "class": "tabs__list manager-view-tabs aarre-tabs-list",
+        "width": 388,
+        "scrollWidth": 465,
+        "native": "none",
+        "bars": 1
+      }
+    ]
+  },
+  {
+    "name": "manager-420-dark",
+    "width": 420,
+    "pageWidth": 420,
+    "dialogs": 0,
+    "themeGroup": {
+      "x": 290,
+      "y": 8,
+      "width": 114,
+      "height": 36,
+      "top": 8,
+      "right": 404,
+      "bottom": 44,
+      "left": 290
+    },
+    "footerButtons": [],
+    "controls": [
+      {
+        "class": "library-search",
+        "height": 54,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "6px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "input input--primary fluid-control w-full border border-[color:var(--line)] bg-[color:var(--surface)] text-[color:var(--ink)] outline-none transition-[border-color,background-color] duration-150 placeholder:text-[color:var(--ink-faint)] focus:border-[color:var(--line-strong)] focus-visible:border-[color:var(--line-strong)] fluid-input",
+        "height": 36,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "0px",
+        "paddingRight": "0px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "0px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "library-tabs",
+        "height": 52,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "4px",
+        "paddingRight": "4px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "button button--md button--ghost aarre-button aarre-button--ghost aarre-button--md text-button snapshot-backfill-trigger",
+        "height": 44,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      }
+    ],
+    "scrollers": [
+      {
+        "class": "tabs__list manager-view-tabs aarre-tabs-list",
+        "width": 388,
+        "scrollWidth": 465,
+        "native": "none",
+        "bars": 1
+      }
+    ]
+  },
+  {
+    "name": "manager-320-light",
+    "width": 320,
+    "pageWidth": 320,
+    "dialogs": 0,
+    "themeGroup": {
+      "x": 190,
+      "y": 8,
+      "width": 114,
+      "height": 36,
+      "top": 8,
+      "right": 304,
+      "bottom": 44,
+      "left": 190
+    },
+    "footerButtons": [],
+    "controls": [
+      {
+        "class": "library-search",
+        "height": 54,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "6px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "input input--primary fluid-control w-full border border-[color:var(--line)] bg-[color:var(--surface)] text-[color:var(--ink)] outline-none transition-[border-color,background-color] duration-150 placeholder:text-[color:var(--ink-faint)] focus:border-[color:var(--line-strong)] focus-visible:border-[color:var(--line-strong)] fluid-input",
+        "height": 36,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "0px",
+        "paddingRight": "0px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "0px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "library-tabs",
+        "height": 52,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "4px",
+        "paddingRight": "4px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "button button--md button--ghost aarre-button aarre-button--ghost aarre-button--md text-button snapshot-backfill-trigger",
+        "height": 44,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      }
+    ],
+    "scrollers": [
+      {
+        "class": "tabs__list manager-view-tabs aarre-tabs-list",
+        "width": 288,
+        "scrollWidth": 465,
+        "native": "none",
+        "bars": 1
+      }
+    ]
+  },
+  {
+    "name": "manager-320-dark",
+    "width": 320,
+    "pageWidth": 320,
+    "dialogs": 0,
+    "themeGroup": {
+      "x": 190,
+      "y": 8,
+      "width": 114,
+      "height": 36,
+      "top": 8,
+      "right": 304,
+      "bottom": 44,
+      "left": 190
+    },
+    "footerButtons": [],
+    "controls": [
+      {
+        "class": "library-search",
+        "height": 54,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "6px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "input input--primary fluid-control w-full border border-[color:var(--line)] bg-[color:var(--surface)] text-[color:var(--ink)] outline-none transition-[border-color,background-color] duration-150 placeholder:text-[color:var(--ink-faint)] focus:border-[color:var(--line-strong)] focus-visible:border-[color:var(--line-strong)] fluid-input",
+        "height": 36,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "0px",
+        "paddingRight": "0px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "0px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "library-tabs",
+        "height": 52,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "4px",
+        "paddingRight": "4px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "button button--md button--ghost aarre-button aarre-button--ghost aarre-button--md text-button snapshot-backfill-trigger",
+        "height": 44,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      }
+    ],
+    "scrollers": [
+      {
+        "class": "tabs__list manager-view-tabs aarre-tabs-list",
+        "width": 288,
+        "scrollWidth": 465,
+        "native": "none",
+        "bars": 1
+      }
+    ]
+  },
+  {
+    "name": "manager-organize-light",
+    "width": 1280,
+    "pageWidth": 1280,
+    "dialogs": 0,
+    "themeGroup": {
+      "x": 140.4765625,
+      "y": 14,
+      "width": 114,
+      "height": 36,
+      "top": 14,
+      "right": 254.4765625,
+      "bottom": 50,
+      "left": 140.4765625
+    },
+    "footerButtons": [],
+    "controls": [],
+    "scrollers": []
+  },
+  {
+    "name": "manager-report-light",
+    "width": 1280,
+    "pageWidth": 1280,
+    "dialogs": 0,
+    "themeGroup": {
+      "x": 140.4765625,
+      "y": 14,
+      "width": 114,
+      "height": 36,
+      "top": 14,
+      "right": 254.4765625,
+      "bottom": 50,
+      "left": 140.4765625
+    },
+    "footerButtons": [],
+    "controls": [],
+    "scrollers": []
+  },
+  {
+    "name": "manager-report-dark",
+    "width": 1280,
+    "pageWidth": 1280,
+    "dialogs": 0,
+    "themeGroup": {
+      "x": 140.4765625,
+      "y": 14,
+      "width": 114,
+      "height": 36,
+      "top": 14,
+      "right": 254.4765625,
+      "bottom": 50,
+      "left": 140.4765625
+    },
+    "footerButtons": [],
+    "controls": [],
+    "scrollers": []
+  },
+  {
+    "name": "manager-topics-light",
+    "width": 1280,
+    "pageWidth": 1280,
+    "dialogs": 0,
+    "themeGroup": {
+      "x": 140.4765625,
+      "y": 14,
+      "width": 114,
+      "height": 36,
+      "top": 14,
+      "right": 254.4765625,
+      "bottom": 50,
+      "left": 140.4765625
+    },
+    "footerButtons": [],
+    "controls": [],
+    "scrollers": []
+  },
+  {
+    "name": "manager-resurface-light",
+    "width": 1280,
+    "pageWidth": 1280,
+    "dialogs": 0,
+    "themeGroup": {
+      "x": 140.4765625,
+      "y": 14,
+      "width": 114,
+      "height": 36,
+      "top": 14,
+      "right": 254.4765625,
+      "bottom": 50,
+      "left": 140.4765625
+    },
+    "footerButtons": [],
+    "controls": [],
+    "scrollers": []
+  },
+  {
+    "name": "manager-search-focus-light",
+    "width": 420,
+    "pageWidth": 420,
+    "dialogs": 0,
+    "themeGroup": {
+      "x": 290,
+      "y": 8,
+      "width": 114,
+      "height": 36,
+      "top": 8,
+      "right": 404,
+      "bottom": 44,
+      "left": 290
+    },
+    "footerButtons": [],
+    "controls": [
+      {
+        "class": "library-search",
+        "height": 54,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "6px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "input input--primary fluid-control w-full border border-[color:var(--line)] bg-[color:var(--surface)] text-[color:var(--ink)] outline-none transition-[border-color,background-color] duration-150 placeholder:text-[color:var(--ink-faint)] focus:border-[color:var(--line-strong)] focus-visible:border-[color:var(--line-strong)] fluid-input",
+        "height": 36,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "0px",
+        "paddingRight": "0px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "0px",
+        "outlineOffset": "-1px",
+        "arrowInset": null
+      },
+      {
+        "class": "library-tabs",
+        "height": 52,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "4px",
+        "paddingRight": "4px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "button button--md button--ghost aarre-button aarre-button--ghost aarre-button--md text-button snapshot-backfill-trigger",
+        "height": 44,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      }
+    ],
+    "scrollers": [
+      {
+        "class": "tabs__list manager-view-tabs aarre-tabs-list",
+        "width": 388,
+        "scrollWidth": 465,
+        "native": "none",
+        "bars": 1
+      }
+    ]
+  },
+  {
+    "name": "manager-filter-light",
+    "width": 420,
+    "pageWidth": 420,
+    "dialogs": 1,
+    "themeGroup": {
+      "x": 290,
+      "y": 8,
+      "width": 114,
+      "height": 36,
+      "top": 8,
+      "right": 404,
+      "bottom": 44,
+      "left": 290
+    },
+    "footerButtons": [],
+    "controls": [
+      {
+        "class": "library-search",
+        "height": 54,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "6px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "input input--primary fluid-control w-full border border-[color:var(--line)] bg-[color:var(--surface)] text-[color:var(--ink)] outline-none transition-[border-color,background-color] duration-150 placeholder:text-[color:var(--ink-faint)] focus:border-[color:var(--line-strong)] focus-visible:border-[color:var(--line-strong)] fluid-input",
+        "height": 36,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "0px",
+        "paddingRight": "0px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "0px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "library-tabs",
+        "height": 52,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "4px",
+        "paddingRight": "4px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "button button--md button--ghost aarre-button aarre-button--ghost aarre-button--md text-button snapshot-backfill-trigger",
+        "height": 44,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      }
+    ],
+    "scrollers": [
+      {
+        "class": "tabs__list manager-view-tabs aarre-tabs-list",
+        "width": 388,
+        "scrollWidth": 465,
+        "native": "none",
+        "bars": 1
+      },
+      {
+        "class": "aarre-select-viewport",
+        "width": 370,
+        "scrollWidth": 370,
+        "native": "none",
+        "bars": 1
+      }
+    ]
+  },
+  {
+    "name": "manager-cover-dialog-light",
+    "width": 420,
+    "pageWidth": 420,
+    "dialogs": 1,
+    "themeGroup": {
+      "x": 290,
+      "y": 8,
+      "width": 114,
+      "height": 36,
+      "top": 8,
+      "right": 404,
+      "bottom": 44,
+      "left": 290
+    },
+    "footerButtons": [],
+    "controls": [
+      {
+        "class": "library-search",
+        "height": 54,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "6px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "input input--primary fluid-control w-full border border-[color:var(--line)] bg-[color:var(--surface)] text-[color:var(--ink)] outline-none transition-[border-color,background-color] duration-150 placeholder:text-[color:var(--ink-faint)] focus:border-[color:var(--line-strong)] focus-visible:border-[color:var(--line-strong)] fluid-input",
+        "height": 36,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "0px",
+        "paddingRight": "0px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "0px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "library-tabs",
+        "height": 52,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "4px",
+        "paddingRight": "4px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "button button--md button--ghost aarre-button aarre-button--ghost aarre-button--md text-button snapshot-backfill-trigger",
+        "height": 44,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      }
+    ],
+    "scrollers": [
+      {
+        "class": "tabs__list manager-view-tabs aarre-tabs-list",
+        "width": 388,
+        "scrollWidth": 465,
+        "native": "none",
+        "bars": 1
+      }
+    ]
+  },
+  {
+    "name": "manager-settings-light",
+    "width": 420,
+    "pageWidth": 420,
+    "dialogs": 1,
+    "themeGroup": {
+      "x": 290,
+      "y": 8,
+      "width": 114,
+      "height": 36,
+      "top": 8,
+      "right": 404,
+      "bottom": 44,
+      "left": 290
+    },
+    "footerButtons": [],
+    "controls": [
+      {
+        "class": "library-search",
+        "height": 54,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "6px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "input input--primary fluid-control w-full border border-[color:var(--line)] bg-[color:var(--surface)] text-[color:var(--ink)] outline-none transition-[border-color,background-color] duration-150 placeholder:text-[color:var(--ink-faint)] focus:border-[color:var(--line-strong)] focus-visible:border-[color:var(--line-strong)] fluid-input",
+        "height": 36,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "0px",
+        "paddingRight": "0px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "0px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "library-tabs",
+        "height": 52,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "4px",
+        "paddingRight": "4px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "button button--md button--ghost aarre-button aarre-button--ghost aarre-button--md text-button snapshot-backfill-trigger",
+        "height": 44,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "select__trigger aarre-select-trigger settings-model-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "12px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      }
+    ],
+    "scrollers": [
+      {
+        "class": "tabs__list manager-view-tabs aarre-tabs-list",
+        "width": 388,
+        "scrollWidth": 465,
+        "native": "none",
+        "bars": 1
+      },
+      {
+        "class": "modal__dialog modal__dialog--scroll-inside modal__dialog--lg manager-utility-dialog",
+        "width": 394,
+        "scrollWidth": 394,
+        "native": "none",
+        "bars": 1
+      }
+    ]
+  },
+  {
+    "name": "manager-settings-dark",
+    "width": 420,
+    "pageWidth": 420,
+    "dialogs": 1,
+    "themeGroup": {
+      "x": 290,
+      "y": 8,
+      "width": 114,
+      "height": 36,
+      "top": 8,
+      "right": 404,
+      "bottom": 44,
+      "left": 290
+    },
+    "footerButtons": [],
+    "controls": [
+      {
+        "class": "library-search",
+        "height": 54,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "6px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "input input--primary fluid-control w-full border border-[color:var(--line)] bg-[color:var(--surface)] text-[color:var(--ink)] outline-none transition-[border-color,background-color] duration-150 placeholder:text-[color:var(--ink-faint)] focus:border-[color:var(--line-strong)] focus-visible:border-[color:var(--line-strong)] fluid-input",
+        "height": 36,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "0px",
+        "paddingRight": "0px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "0px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "library-tabs",
+        "height": 52,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "4px",
+        "paddingRight": "4px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "button button--md button--ghost aarre-button aarre-button--ghost aarre-button--md text-button snapshot-backfill-trigger",
+        "height": 44,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "select__trigger aarre-select-trigger settings-model-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "12px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      }
+    ],
+    "scrollers": [
+      {
+        "class": "tabs__list manager-view-tabs aarre-tabs-list",
+        "width": 388,
+        "scrollWidth": 465,
+        "native": "none",
+        "bars": 1
+      },
+      {
+        "class": "modal__dialog modal__dialog--scroll-inside modal__dialog--lg manager-utility-dialog",
+        "width": 394,
+        "scrollWidth": 394,
+        "native": "none",
+        "bars": 1
+      }
+    ]
+  },
+  {
+    "name": "manager-editor-dark",
+    "width": 420,
+    "pageWidth": 420,
+    "dialogs": 1,
+    "themeGroup": {
+      "x": 290,
+      "y": 8,
+      "width": 114,
+      "height": 36,
+      "top": 8,
+      "right": 404,
+      "bottom": 44,
+      "left": 290
+    },
+    "footer": {
+      "x": 9,
+      "y": 731,
+      "width": 402,
+      "height": 76,
+      "top": 731,
+      "right": 411,
+      "bottom": 807,
+      "left": 9
+    },
+    "footerButtons": [
+      {
+        "text": "删除",
+        "box": {
+          "x": 25,
+          "y": 749,
+          "width": 50,
+          "height": 32,
+          "top": 749,
+          "right": 75,
+          "bottom": 781,
+          "left": 25
+        }
+      },
+      {
+        "text": "取消",
+        "box": {
+          "x": 261,
+          "y": 747,
+          "width": 50,
+          "height": 36,
+          "top": 747,
+          "right": 311,
+          "bottom": 783,
+          "left": 261
+        }
+      },
+      {
+        "text": "保存修改",
+        "box": {
+          "x": 319,
+          "y": 747,
+          "width": 76,
+          "height": 36,
+          "top": 747,
+          "right": 395,
+          "bottom": 783,
+          "left": 319
+        }
+      }
+    ],
+    "controls": [
+      {
+        "class": "library-search",
+        "height": 54,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "6px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "input input--primary fluid-control w-full border border-[color:var(--line)] bg-[color:var(--surface)] text-[color:var(--ink)] outline-none transition-[border-color,background-color] duration-150 placeholder:text-[color:var(--ink-faint)] focus:border-[color:var(--line-strong)] focus-visible:border-[color:var(--line-strong)] fluid-input",
+        "height": 36,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "0px",
+        "paddingRight": "0px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "0px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "library-tabs",
+        "height": 52,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "4px",
+        "paddingRight": "4px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "button button--md button--ghost aarre-button aarre-button--ghost aarre-button--md text-button snapshot-backfill-trigger",
+        "height": 44,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "input input--primary fluid-control w-full border border-[color:var(--line)] bg-[color:var(--surface)] text-[color:var(--ink)] outline-none transition-[border-color,background-color] duration-150 placeholder:text-[color:var(--ink-faint)] focus:border-[color:var(--line-strong)] focus-visible:border-[color:var(--line-strong)] fluid-input",
+        "height": 40.09375,
+        "font": "13px",
+        "radius": "12px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "1px",
+        "outlineOffset": "-1px",
+        "arrowInset": null
+      },
+      {
+        "class": "select__trigger aarre-select-trigger editor-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "12px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      }
+    ],
+    "scrollers": [
+      {
+        "class": "tabs__list manager-view-tabs aarre-tabs-list",
+        "width": 388,
+        "scrollWidth": 465,
+        "native": "none",
+        "bars": 1
+      },
+      {
+        "class": "library-card-editor-body",
+        "width": 402,
+        "scrollWidth": 402,
+        "native": "none",
+        "bars": 1
+      }
+    ]
+  },
+  {
+    "name": "manager-editor-light",
+    "width": 420,
+    "pageWidth": 420,
+    "dialogs": 1,
+    "themeGroup": {
+      "x": 290,
+      "y": 8,
+      "width": 114,
+      "height": 36,
+      "top": 8,
+      "right": 404,
+      "bottom": 44,
+      "left": 290
+    },
+    "footer": {
+      "x": 9,
+      "y": 731,
+      "width": 402,
+      "height": 76,
+      "top": 731,
+      "right": 411,
+      "bottom": 807,
+      "left": 9
+    },
+    "footerButtons": [
+      {
+        "text": "删除",
+        "box": {
+          "x": 25,
+          "y": 749,
+          "width": 50,
+          "height": 32,
+          "top": 749,
+          "right": 75,
+          "bottom": 781,
+          "left": 25
+        }
+      },
+      {
+        "text": "取消",
+        "box": {
+          "x": 261,
+          "y": 747,
+          "width": 50,
+          "height": 36,
+          "top": 747,
+          "right": 311,
+          "bottom": 783,
+          "left": 261
+        }
+      },
+      {
+        "text": "保存修改",
+        "box": {
+          "x": 319,
+          "y": 747,
+          "width": 76,
+          "height": 36,
+          "top": 747,
+          "right": 395,
+          "bottom": 783,
+          "left": 319
+        }
+      }
+    ],
+    "controls": [
+      {
+        "class": "library-search",
+        "height": 54,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "6px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "input input--primary fluid-control w-full border border-[color:var(--line)] bg-[color:var(--surface)] text-[color:var(--ink)] outline-none transition-[border-color,background-color] duration-150 placeholder:text-[color:var(--ink-faint)] focus:border-[color:var(--line-strong)] focus-visible:border-[color:var(--line-strong)] fluid-input",
+        "height": 36,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "0px",
+        "paddingRight": "0px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "0px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "library-tabs",
+        "height": 52,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "4px",
+        "paddingRight": "4px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "button button--md button--ghost aarre-button aarre-button--ghost aarre-button--md text-button snapshot-backfill-trigger",
+        "height": 44,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "input input--primary fluid-control w-full border border-[color:var(--line)] bg-[color:var(--surface)] text-[color:var(--ink)] outline-none transition-[border-color,background-color] duration-150 placeholder:text-[color:var(--ink-faint)] focus:border-[color:var(--line-strong)] focus-visible:border-[color:var(--line-strong)] fluid-input",
+        "height": 40.09375,
+        "font": "13px",
+        "radius": "12px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "1px",
+        "outlineOffset": "-1px",
+        "arrowInset": null
+      },
+      {
+        "class": "select__trigger aarre-select-trigger editor-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "12px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      }
+    ],
+    "scrollers": [
+      {
+        "class": "tabs__list manager-view-tabs aarre-tabs-list",
+        "width": 388,
+        "scrollWidth": 465,
+        "native": "none",
+        "bars": 1
+      },
+      {
+        "class": "library-card-editor-body",
+        "width": 402,
+        "scrollWidth": 402,
+        "native": "none",
+        "bars": 1
+      }
+    ]
+  },
+  {
+    "name": "manager-delete-420-light",
+    "width": 420,
+    "pageWidth": 420,
+    "dialogs": 1,
+    "themeGroup": {
+      "x": 290,
+      "y": 8,
+      "width": 114,
+      "height": 36,
+      "top": 8,
+      "right": 404,
+      "bottom": 44,
+      "left": 290
+    },
+    "footer": {
+      "x": 9,
+      "y": 681.5,
+      "width": 402,
+      "height": 125.5,
+      "top": 681.5,
+      "right": 411,
+      "bottom": 807,
+      "left": 9
+    },
+    "footerButtons": [
+      {
+        "text": "取消",
+        "box": {
+          "x": 261,
+          "y": 747,
+          "width": 50,
+          "height": 36,
+          "top": 747,
+          "right": 311,
+          "bottom": 783,
+          "left": 261
+        }
+      },
+      {
+        "text": "确认删除",
+        "box": {
+          "x": 319,
+          "y": 747,
+          "width": 76,
+          "height": 36,
+          "top": 747,
+          "right": 395,
+          "bottom": 783,
+          "left": 319
+        }
+      }
+    ],
+    "controls": [
+      {
+        "class": "library-search",
+        "height": 54,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "6px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "input input--primary fluid-control w-full border border-[color:var(--line)] bg-[color:var(--surface)] text-[color:var(--ink)] outline-none transition-[border-color,background-color] duration-150 placeholder:text-[color:var(--ink-faint)] focus:border-[color:var(--line-strong)] focus-visible:border-[color:var(--line-strong)] fluid-input",
+        "height": 36,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "0px",
+        "paddingRight": "0px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "0px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "library-tabs",
+        "height": 52,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "4px",
+        "paddingRight": "4px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "button button--md button--ghost aarre-button aarre-button--ghost aarre-button--md text-button snapshot-backfill-trigger",
+        "height": 44,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "select__trigger aarre-select-trigger editor-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "12px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      }
+    ],
+    "scrollers": [
+      {
+        "class": "tabs__list manager-view-tabs aarre-tabs-list",
+        "width": 388,
+        "scrollWidth": 465,
+        "native": "none",
+        "bars": 1
+      },
+      {
+        "class": "library-card-editor-body",
+        "width": 402,
+        "scrollWidth": 402,
+        "native": "none",
+        "bars": 1
+      }
+    ]
+  },
+  {
+    "name": "manager-delete-320-dark",
+    "width": 320,
+    "pageWidth": 320,
+    "dialogs": 1,
+    "themeGroup": {
+      "x": 190,
+      "y": 8,
+      "width": 114,
+      "height": 36,
+      "top": 8,
+      "right": 304,
+      "bottom": 44,
+      "left": 190
+    },
+    "footer": {
+      "x": 9,
+      "y": 501.5,
+      "width": 302,
+      "height": 125.5,
+      "top": 501.5,
+      "right": 311,
+      "bottom": 627,
+      "left": 9
+    },
+    "footerButtons": [
+      {
+        "text": "取消",
+        "box": {
+          "x": 161,
+          "y": 567,
+          "width": 50,
+          "height": 36,
+          "top": 567,
+          "right": 211,
+          "bottom": 603,
+          "left": 161
+        }
+      },
+      {
+        "text": "确认删除",
+        "box": {
+          "x": 219,
+          "y": 567,
+          "width": 76,
+          "height": 36,
+          "top": 567,
+          "right": 295,
+          "bottom": 603,
+          "left": 219
+        }
+      }
+    ],
+    "controls": [
+      {
+        "class": "library-search",
+        "height": 54,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "6px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "input input--primary fluid-control w-full border border-[color:var(--line)] bg-[color:var(--surface)] text-[color:var(--ink)] outline-none transition-[border-color,background-color] duration-150 placeholder:text-[color:var(--ink-faint)] focus:border-[color:var(--line-strong)] focus-visible:border-[color:var(--line-strong)] fluid-input",
+        "height": 36,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "0px",
+        "paddingRight": "0px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "0px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "library-tabs",
+        "height": 52,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "4px",
+        "paddingRight": "4px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "button button--md button--ghost aarre-button aarre-button--ghost aarre-button--md text-button snapshot-backfill-trigger",
+        "height": 44,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "select__trigger aarre-select-trigger editor-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "12px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      }
+    ],
+    "scrollers": [
+      {
+        "class": "tabs__list manager-view-tabs aarre-tabs-list",
+        "width": 288,
+        "scrollWidth": 465,
+        "native": "none",
+        "bars": 1
+      },
+      {
+        "class": "library-card-editor-body",
+        "width": 302,
+        "scrollWidth": 302,
+        "native": "none",
+        "bars": 1
+      }
+    ]
+  },
+  {
+    "name": "manager-delete-320-light",
+    "width": 320,
+    "pageWidth": 320,
+    "dialogs": 1,
+    "themeGroup": {
+      "x": 190,
+      "y": 8,
+      "width": 114,
+      "height": 36,
+      "top": 8,
+      "right": 304,
+      "bottom": 44,
+      "left": 190
+    },
+    "footer": {
+      "x": 9,
+      "y": 501.5,
+      "width": 302,
+      "height": 125.5,
+      "top": 501.5,
+      "right": 311,
+      "bottom": 627,
+      "left": 9
+    },
+    "footerButtons": [
+      {
+        "text": "取消",
+        "box": {
+          "x": 161,
+          "y": 567,
+          "width": 50,
+          "height": 36,
+          "top": 567,
+          "right": 211,
+          "bottom": 603,
+          "left": 161
+        }
+      },
+      {
+        "text": "确认删除",
+        "box": {
+          "x": 219,
+          "y": 567,
+          "width": 76,
+          "height": 36,
+          "top": 567,
+          "right": 295,
+          "bottom": 603,
+          "left": 219
+        }
+      }
+    ],
+    "controls": [
+      {
+        "class": "library-search",
+        "height": 54,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "6px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "input input--primary fluid-control w-full border border-[color:var(--line)] bg-[color:var(--surface)] text-[color:var(--ink)] outline-none transition-[border-color,background-color] duration-150 placeholder:text-[color:var(--ink-faint)] focus:border-[color:var(--line-strong)] focus-visible:border-[color:var(--line-strong)] fluid-input",
+        "height": 36,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "0px",
+        "paddingRight": "0px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "0px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "library-tabs",
+        "height": 52,
+        "font": "15px",
+        "radius": "8px",
+        "paddingLeft": "4px",
+        "paddingRight": "4px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "button button--sm button--ghost aarre-button aarre-button--ghost aarre-button--sm library-tab-button",
+        "height": 44,
+        "font": "13px",
+        "radius": "4px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "0px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "select__trigger aarre-select-trigger library-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      },
+      {
+        "class": "button button--md button--ghost aarre-button aarre-button--ghost aarre-button--md text-button snapshot-backfill-trigger",
+        "height": 44,
+        "font": "13px",
+        "radius": "8px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": null
+      },
+      {
+        "class": "select__trigger aarre-select-trigger editor-select-trigger",
+        "height": 40,
+        "font": "13px",
+        "radius": "12px",
+        "paddingLeft": "12px",
+        "paddingRight": "12px",
+        "border": "1px",
+        "shadow": "none",
+        "outline": "3px",
+        "outlineOffset": "0px",
+        "arrowInset": 12
+      }
+    ],
+    "scrollers": [
+      {
+        "class": "tabs__list manager-view-tabs aarre-tabs-list",
+        "width": 288,
+        "scrollWidth": 465,
+        "native": "none",
+        "bars": 1
+      },
+      {
+        "class": "library-card-editor-body",
+        "width": 302,
+        "scrollWidth": 302,
+        "native": "none",
+        "bars": 1
+      }
+    ]
+  }
+]

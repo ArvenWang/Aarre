@@ -31,7 +31,7 @@ async function start() {
       if (event.source !== parent || event.origin !== parentOrigin || event.data?.session !== nonce) return;
       if (event.data.type === "FLOAT_VIEW") {
         window.dispatchEvent(new CustomEvent(FLOATING_VIEW_EVENT, { detail: event.data.view }));
-        if (event.data.focus) requestAnimationFrame(() => document.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus());
+        if (event.data.focus) requestAnimationFrame(() => (document.querySelector<HTMLElement>('[role="dialog"] button') || document.querySelector<HTMLElement>('#bookmark-agent-prompt'))?.focus({ preventScroll: true }));
       }
     });
     window.addEventListener("keydown", (event) => {

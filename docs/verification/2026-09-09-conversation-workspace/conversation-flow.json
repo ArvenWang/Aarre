@@ -1,0 +1,230 @@
+{
+  "fixture": "DEV local QA transport; real composer, chat hook, persistence and UI. No external AI request.",
+  "steps": [
+    {
+      "step": "submit",
+      "sameComposer": true,
+      "tabs": 0,
+      "stop": true,
+      "queries": [
+        "帮我找找收藏里的设计资料，并给出整理建议"
+      ]
+    },
+    {
+      "step": "response",
+      "sameComposer": true,
+      "enabled": true
+    },
+    {
+      "step": "geometry",
+      "theme": "light",
+      "width": 400,
+      "pageWidth": 400,
+      "threadWidth": 400,
+      "threadScrollWidth": 400,
+      "composer": {
+        "x": 12,
+        "y": 506,
+        "width": 376,
+        "height": 122,
+        "top": 506,
+        "right": 388,
+        "bottom": 628,
+        "left": 12
+      },
+      "blocks": [
+        {
+          "width": 368,
+          "scrollWidth": 708,
+          "left": 0
+        },
+        {
+          "width": 368,
+          "scrollWidth": 1108,
+          "left": 0
+        }
+      ]
+    },
+    {
+      "step": "geometry",
+      "theme": "dark",
+      "width": 400,
+      "pageWidth": 400,
+      "threadWidth": 400,
+      "threadScrollWidth": 400,
+      "composer": {
+        "x": 12,
+        "y": 506,
+        "width": 376,
+        "height": 122,
+        "top": 506,
+        "right": 388,
+        "bottom": 628,
+        "left": 12
+      },
+      "blocks": [
+        {
+          "width": 368,
+          "scrollWidth": 708,
+          "left": 0
+        },
+        {
+          "width": 368,
+          "scrollWidth": 1108,
+          "left": 0
+        }
+      ]
+    },
+    {
+      "step": "geometry",
+      "theme": "light",
+      "width": 320,
+      "pageWidth": 320,
+      "threadWidth": 320,
+      "threadScrollWidth": 320,
+      "composer": {
+        "x": 12,
+        "y": 506,
+        "width": 296,
+        "height": 122,
+        "top": 506,
+        "right": 308,
+        "bottom": 628,
+        "left": 12
+      },
+      "blocks": [
+        {
+          "width": 288,
+          "scrollWidth": 708,
+          "left": 0
+        },
+        {
+          "width": 288,
+          "scrollWidth": 1108,
+          "left": 0
+        }
+      ]
+    },
+    {
+      "step": "geometry",
+      "theme": "dark",
+      "width": 320,
+      "pageWidth": 320,
+      "threadWidth": 320,
+      "threadScrollWidth": 320,
+      "composer": {
+        "x": 12,
+        "y": 506,
+        "width": 296,
+        "height": 122,
+        "top": 506,
+        "right": 308,
+        "bottom": 628,
+        "left": 12
+      },
+      "blocks": [
+        {
+          "width": 288,
+          "scrollWidth": 708,
+          "left": 0
+        },
+        {
+          "width": 288,
+          "scrollWidth": 1108,
+          "left": 0
+        }
+      ]
+    },
+    {
+      "step": "geometry",
+      "theme": "light",
+      "width": 560,
+      "pageWidth": 560,
+      "threadWidth": 560,
+      "threadScrollWidth": 560,
+      "composer": {
+        "x": 12,
+        "y": 506,
+        "width": 536,
+        "height": 122,
+        "top": 506,
+        "right": 548,
+        "bottom": 628,
+        "left": 12
+      },
+      "blocks": [
+        {
+          "width": 528,
+          "scrollWidth": 708,
+          "left": 0
+        },
+        {
+          "width": 528,
+          "scrollWidth": 1108,
+          "left": 0
+        }
+      ]
+    },
+    {
+      "step": "geometry",
+      "theme": "dark",
+      "width": 560,
+      "pageWidth": 560,
+      "threadWidth": 560,
+      "threadScrollWidth": 560,
+      "composer": {
+        "x": 12,
+        "y": 506,
+        "width": 536,
+        "height": 122,
+        "top": 506,
+        "right": 548,
+        "bottom": 628,
+        "left": 12
+      },
+      "blocks": [
+        {
+          "width": 528,
+          "scrollWidth": 708,
+          "left": 0
+        },
+        {
+          "width": 528,
+          "scrollWidth": 1108,
+          "left": 0
+        }
+      ]
+    },
+    {
+      "step": "table-end",
+      "left": 419.5,
+      "composerBottom": 628
+    },
+    {
+      "step": "back-to-library",
+      "draft": "继续按用途分类",
+      "sameComposer": true
+    },
+    {
+      "step": "follow-up",
+      "historyMessages": 2
+    },
+    {
+      "step": "stop",
+      "cancelRequest": true,
+      "lateTextVisible": false
+    },
+    {
+      "step": "history-open",
+      "dialogs": 0,
+      "conversation": true,
+      "composer": true
+    },
+    {
+      "step": "new-conversation",
+      "draft": "",
+      "sameComposer": true,
+      "chat": false
+    }
+  ]
+}

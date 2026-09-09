@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useState, type ReactNode } from "react";
 import { Archive, Settings, X } from "lucide-react";
 import { Button } from "@/ui/components/ui/button";
 import { AppModal } from "@/ui/components/ui/modal";
@@ -7,8 +7,9 @@ import type { AppState } from "../../../lib/types";
 import { restartOnboarding } from "../../../lib/onboarding";
 const SettingsPage = lazy(() => import("../../sidepanel/pages/SettingsPage"));
 export type ManagerUtility = "archive" | "settings";
-export function ManagerUtilityActions({ onOpen }: { onOpen: (kind: ManagerUtility) => void }) {
+export function ManagerUtilityActions({ onOpen, themeControl }: { onOpen: (kind: ManagerUtility) => void; themeControl?: ReactNode }) {
   return <div className="manager-utilities">
+    {themeControl}
     <Button variant="ghost" size="icon" aria-label="本地备份与恢复" onClick={() => onOpen("archive")}><Archive size={18}/></Button>
     <Button variant="ghost" size="icon" aria-label="收藏库设置" onClick={() => onOpen("settings")}><Settings size={18}/></Button>
   </div>;

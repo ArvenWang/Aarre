@@ -136,7 +136,12 @@ function startHost() {
   const escape = (event: KeyboardEvent) => { if (opened && event.key === "Escape" && !event.isComposing && !event.defaultPrevented) { close(true); event.preventDefault(); } };
   const receive = (event: MessageEvent) => {
     if (!iframe || !info || event.source !== iframe.contentWindow || event.origin !== chrome.runtime.getURL("").replace(/\/$/, "") || event.data?.session !== info.nonce) return;
-    if (event.data.type === "FLOAT_READY") { ready = true; clearTimeout(loadTimeout); loading.hidden = true; send({ type: "FLOAT_VIEW", view, focus: opened }); if (opened) iframe.focus(); }
+    if (event.data.type === "FLOAT_READY") {
+      // A late successful load recovers the existing frame. Do not discard its
+      // conversation on the next open just because the timeout fired earlier.
+      ready = true; needsRetry = false; clearTimeout(loadTimeout); loading.hidden = true;
+      send({ type: "FLOAT_VIEW", view, focus: opened }); if (opened) iframe.focus();
+    }
     if (event.data.type === "FLOAT_CURRENT_VIEW" && ["library", "chat", "settings", "history"].includes(event.data.view)) view = event.data.view;
     if (event.data.type === "FLOAT_CLOSE") close(true);
     if (event.data.type === "FLOAT_HIDE") { close(); forced = false; host.dataset.hidden = "true"; previousFocus?.focus({ preventScroll: true }); }

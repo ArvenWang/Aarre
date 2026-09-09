@@ -320,7 +320,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   padding: var(--sp-2) var(--sp-4);
   transform: translateX(-50%);
   border: 0;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-control);
   color: var(--scrim-ink);
   background: var(--scrim);
   box-shadow: var(--shadow-float);
@@ -889,13 +889,12 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 .agent-composer {
   min-width: 0;
   margin: 0 var(--sp-3) var(--sp-3);
-  padding: calc(var(--sp-3) + 2px) var(--sp-3) var(--sp-3)
-    calc(var(--sp-3) + 2px);
+  padding: var(--sp-3);
   display: flex;
   flex-direction: column;
   gap: var(--agent-content-gap);
   border: 1px solid var(--line);
-  border-radius: var(--radius-shell);
+  border-radius: var(--radius-module);
   background: var(--surface);
   box-shadow: var(--shadow-composer);
   transition:
@@ -913,7 +912,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 
 .agent-composer textarea {
   width: 100%;
-  min-height: 48px;
+  min-height: 56px;
   max-height: 112px;
   padding: 0;
   resize: none;
@@ -934,7 +933,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   min-height: var(--control-h-sm);
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
 }
 
 .agent-send-button {
@@ -945,7 +944,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: 50%;
+  border-radius: var(--radius-control);
   color: var(--bg);
   background: var(--ink);
   transition:
@@ -983,49 +982,13 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   background: color-mix(in srgb, var(--ink) 86%, var(--bg));
 }
 
-.agent-composer-setup {
-  height: var(--control-h-touch);
-  min-height: var(--control-h-touch);
-  max-height: var(--control-h-touch);
-  padding: 0;
-}
-
-.agent-composer-setup > button {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  padding: var(--sp-2) var(--sp-3);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-2);
-  border: 0;
-  border-radius: inherit;
-  color: var(--ink);
-  background: transparent;
-  text-align: left;
-}
-
-.agent-composer-setup strong,
-.agent-composer-setup small {
-  display: block;
-}
-
-.agent-composer-setup strong {
-  font-size: var(--fs-small);
-  font-weight: var(--fw-strong);
-}
-
-.agent-composer-setup small {
-  margin-top: var(--sp-1);
-  color: var(--ink-muted);
-  font-size: var(--fs-caption);
-}
-
-.agent-composer-setup svg {
-  width: 14px;
-  height: 14px;
-}
+ .agent-composer-context { min-width:0; color:var(--ink-muted); font-size:var(--fs-caption); }
+.agent-composer-context .aarre-button { padding-inline:0; font-size:var(--fs-caption); }
+.agent-composer-actions { display:flex; align-items:center; gap:var(--sp-2); }
+.agent-connect-action { font-size:var(--fs-caption); padding-inline:var(--sp-2); }
+.agent-composer .fluid-textarea-frame { flex:0 0 auto; }
+.agent-composer .fluid-textarea { box-shadow:none; border:0; border-radius:0; background:transparent; }
+.agent-composer .fluid-textarea:focus, .agent-composer .fluid-textarea:focus-visible { box-shadow:none; outline:0; border:0; background:transparent; }
 
 .native-dialog-backdrop {
   position: fixed;
@@ -1481,9 +1444,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   font-size: var(--fs-caption);
 }
 
-/* Locked to one control row so switching into the delete confirmation cannot
-   change the dialog height. Both states are the same single flex row: a left
-   slot and a right button group. */
+/* The footer stays visible; confirmation has a readable message and action row. */
 .native-dialog-actions {
   min-height: var(--control-h-lg);
   margin-top: var(--sp-5);
@@ -1500,11 +1461,16 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   gap: var(--sp-2);
 }
 
+.native-dialog-actions > .editor-delete-action {
+  margin-right: auto;
+}
+
 .delete-confirmation {
+  flex-direction: column;
   width: 100%;
   min-height: var(--control-h-lg);
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: space-between;
   gap: var(--sp-3);
 }
@@ -1513,15 +1479,16 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   min-width: 0;
   margin: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--sp-2);
   color: var(--negative);
   font-size: var(--fs-caption);
   font-weight: var(--fw-medium);
-  line-height: 1.3;
+  line-height: 1.5;
 }
 
 .delete-confirmation p svg {
+  margin-top: calc(var(--sp-1) / 2);
   width: 16px;
   height: 16px;
   flex: 0 0 auto;
@@ -1535,6 +1502,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 }
 
 .delete-confirmation > div {
+  width: 100%;
   display: flex;
   flex: 0 0 auto;
   justify-content: flex-end;

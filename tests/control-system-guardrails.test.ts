@@ -389,7 +389,7 @@ describe("focus is indicated exactly once", () => {
     const css = await readFile(baseCssUrl, "utf8");
 
     expect(rule(css, "button:focus-visible,\na:focus-visible")).toContain(
-      "outline: 2px solid var(--focus-ring)"
+      "outline: 1px solid var(--focus-ring)"
     );
     expect(rule(css, 'button[data-slot="button"]:focus-visible')).toContain(
       "outline: 0"
@@ -499,15 +499,16 @@ describe("the AI section explains itself through its own labels", () => {
 });
 
 describe("delete confirmation does not move the card", () => {
-  it("locks the confirmation row to one control height", async () => {
+  it("keeps confirmation copy above its full-width action row", async () => {
     const css = (await Promise.all([readFile(sidepanelCssUrl, "utf8"), readFile(sidepanelLazyCssUrl, "utf8")])).join("\n");
     const confirmation = rule(css, ".delete-confirmation");
 
     expect(confirmation).toContain("min-height: var(--control-h-lg)");
-    expect(confirmation).toContain("align-items: center");
+    expect(confirmation).toContain("align-items: stretch");
+    expect(confirmation).toContain("flex-direction: column");
   });
 
-  it("keeps the normal action row at the same height as the confirm row", async () => {
+  it("preserves a control-height baseline for the normal action row", async () => {
     const css = (await Promise.all([readFile(sidepanelCssUrl, "utf8"), readFile(sidepanelLazyCssUrl, "utf8")])).join("\n");
     const actions = rule(css, ".native-dialog-actions");
 

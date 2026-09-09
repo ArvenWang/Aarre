@@ -28,7 +28,7 @@
 
   --radius-xs: 2px;
   --radius-sm: 8px;
-  --radius-md: 14px;
+  --radius-md: 12px;
   --radius-lg: 20px;
   --radius-xl: 30px;
 
@@ -40,14 +40,15 @@
 
   /* Semantic shape ladder. Use these names at component boundaries so an
      outer shell never accidentally shares its radius with an inset control:
-     shell (20) > module (14) > control (8). The inset token is geometric and
+     shell (20) > module (12) > control (8). The inset token is geometric and
      is reserved for a child painted inside a 4px padded track. */
   --radius-shell: var(--radius-lg);
   --radius-module: var(--radius-md);
   --radius-control: var(--radius-sm);
   --radius-inset-module: var(--radius-nested-md);
+  --radius-inset-control: calc(var(--radius-control) - var(--sp-1));
   --radius-compact: var(--radius-xs);
-  --radius-chip: var(--radius-md);
+  --radius-chip: var(--radius-control);
   --radius-pill: 999px;
 
   /* Scrims and shadows mix from a fixed dark ink rather than from --ink, which
@@ -137,7 +138,7 @@
   --agent-content-gap: var(--sp-2);
   /* Inline bookmark sources include a 16px site mark plus their border. Keep
      prose leading roomy enough that cited and uncited lines share one rhythm. */
-  --agent-markdown-leading: 2.2;
+  --agent-markdown-leading: 1.8;
 
   /* Shared dense-row interaction: transparent at rest, surfaced on intent. */
   --row-surface: transparent;
