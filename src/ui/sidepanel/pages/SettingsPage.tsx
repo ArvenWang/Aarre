@@ -1,3 +1,4 @@
+import { ScrollSurface } from "@/ui/components/ui/scroll-area";
 import { FloatingSettingsSection } from "../../floating/FloatingSettingsSection";
 import { useEffect, useRef, useState } from "react";
 import "../../sidepanel-lazy.css";
@@ -325,7 +326,7 @@ function SettingsPage({
         </div>
       </header>
 
-      <section className="settings-page-content">
+      <ScrollSurface as="section" className="settings-page-content">
         <FloatingSettingsSection />
         {settingsPage === "main" ? (
           <>
@@ -416,7 +417,7 @@ function SettingsPage({
             onUndo={(batchId) => void handleUndoBatch(batchId)}
           />
         )}
-      </section>
+      </ScrollSurface>
 
       <LibraryScanConfirmDialog
         estimate={scanEstimate}

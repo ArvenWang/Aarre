@@ -1,3 +1,4 @@
+import { ScrollSurface } from "@/ui/components/ui/scroll-area";
 import { AppModal } from "@/ui/components/ui/modal";
 import { Button } from "@/ui/components/ui/button";
 import { bookmarkMatchLocation } from "../utils";
@@ -58,7 +59,7 @@ export function BookmarkEditorDialog({
           </Button>
         </div>
 
-        <div className="native-dialog-scroll">
+        <ScrollSurface as="div" className="native-dialog-scroll">
         {editor.kind === "save" && busy === "capture" ? (
           <div className="empty-state dialog-loading">正在读取当前页面…</div>
         ) : (
@@ -208,7 +209,7 @@ export function BookmarkEditorDialog({
 
           </>
         )}
-        </div>
+        </ScrollSurface>
         {!(editor.kind === "save" && busy === "capture") && (
             <div className="native-dialog-actions">
               {editor.kind === "bookmark" && !editor.node.folderType && confirmDeleteId === (editBookmarkId || editor.node.id) ? (

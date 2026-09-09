@@ -2,7 +2,6 @@ import { Button } from "@/ui/components/ui/button";
 import {
   FluidInput,
   FluidTextarea,
-  FluidSelect,
 } from "@/ui/components/ui/input";
 import type { LibraryInsights } from "../../../lib/types";
 import { ResourceLink } from "../components/ResourceLink";

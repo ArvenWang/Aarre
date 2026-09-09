@@ -1,9 +1,9 @@
+import { ScrollSurface } from "@/ui/components/ui/scroll-area";
 import { AppModal } from "@/ui/components/ui/modal";
 import { Button } from "@/ui/components/ui/button";
 import {
   FluidInput,
   FluidTextarea,
-  FluidSelect,
 } from "@/ui/components/ui/input";
 import {
   useCallback,
@@ -372,7 +372,7 @@ export function SnapshotBackfillControl({
   const canDismiss = isTerminalState(currentStatus.state);
 
   return (
-    <section
+    <ScrollSurface as="section"
       className="snapshot-backfill-status"
       data-state={currentStatus.state}
       aria-label="封面批量补拍进度"
@@ -465,6 +465,6 @@ export function SnapshotBackfillControl({
           </Button>
         ) : null}
       </div>
-    </section>
+    </ScrollSurface>
   );
 }

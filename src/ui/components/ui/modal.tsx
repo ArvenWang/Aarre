@@ -1,5 +1,6 @@
 import { Modal } from "@heroui/react/modal";
 import { useEffect, useRef, type ReactNode } from "react";
+import { FloatingScrollbars } from "./scroll-area";
 interface Props {
   onEscape?: () => void;
   children: ReactNode; onClose: () => void; busy?: boolean;
@@ -7,7 +8,8 @@ interface Props {
 }
 /** HeroUI owns focus containment, focus return, outside dismissal and Escape ordering. */
 export function AppModal({ children, onClose, busy, className, backdropClassName, labelledBy, describedBy, onEscape }: Props) {
-  const dialog = useRef<HTMLDivElement>(null);
+  const dialog = useRef<HTMLSpanElement>(null);
+  const scrollRef = useRef<HTMLElement>(null);
   useEffect(() => {
     if (!onEscape) return;
     const escape = (event: KeyboardEvent) => {
@@ -20,10 +22,10 @@ export function AppModal({ children, onClose, busy, className, backdropClassName
   return <Modal.Backdrop isOpen isDismissable={!busy} isKeyboardDismissDisabled={busy || Boolean(onEscape)} onOpenChange={(open) => { if (!open && !busy) onClose(); }}
     className={`aarre-modal-backdrop ${backdropClassName || ""}`}>
     <Modal.Container className="aarre-modal-container" size="lg" scroll="inside">
-      <Modal.Dialog className={className} aria-labelledby={labelledBy} aria-describedby={describedBy}>
-        <div ref={dialog} className="aarre-modal-content">
+      <Modal.Dialog data-scroll-viewport="" className={className} aria-labelledby={labelledBy} aria-describedby={describedBy}>
+        <span hidden aria-hidden="true" ref={node => { dialog.current = node; scrollRef.current = node?.closest('[role="dialog"]') as HTMLElement | null; }} />
         {children}
-        </div>
+        <FloatingScrollbars viewportRef={scrollRef} label="对话框" />
       </Modal.Dialog>
     </Modal.Container>
   </Modal.Backdrop>;

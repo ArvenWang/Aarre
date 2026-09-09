@@ -1,0 +1,1174 @@
+[
+  {
+    "name": "menu-320-light",
+    "viewport": {
+      "w": 320,
+      "h": 640
+    },
+    "pageWidth": 320,
+    "controls": [
+      {
+        "label": "打开完整收藏库",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "收起菜单",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "收藏当前网页",
+        "h": 36,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "新建文件夹",
+        "h": 36,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "搜索 Chrome 书签",
+        "h": 36,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      }
+    ],
+    "scrollers": [
+      {
+        "class": "native-content",
+        "id": "bookmark-list",
+        "native": "none",
+        "barCount": 1
+      }
+    ]
+  },
+  {
+    "name": "menu-400-light",
+    "viewport": {
+      "w": 400,
+      "h": 640
+    },
+    "pageWidth": 400,
+    "controls": [
+      {
+        "label": "打开完整收藏库",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "收起菜单",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "收藏当前网页",
+        "h": 36,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "新建文件夹",
+        "h": 36,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "搜索 Chrome 书签",
+        "h": 36,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      }
+    ],
+    "scrollers": [
+      {
+        "class": "native-content",
+        "id": "bookmark-list",
+        "native": "none",
+        "barCount": 1
+      }
+    ]
+  },
+  {
+    "name": "menu-560-light",
+    "viewport": {
+      "w": 560,
+      "h": 640
+    },
+    "pageWidth": 560,
+    "controls": [
+      {
+        "label": "打开完整收藏库",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "收起菜单",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "收藏当前网页",
+        "h": 36,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "新建文件夹",
+        "h": 36,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "搜索 Chrome 书签",
+        "h": 36,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      }
+    ],
+    "scrollers": [
+      {
+        "class": "native-content",
+        "id": "bookmark-list",
+        "native": "none",
+        "barCount": 1
+      }
+    ]
+  },
+  {
+    "name": "menu-dark",
+    "viewport": {
+      "w": 400,
+      "h": 640
+    },
+    "pageWidth": 400,
+    "controls": [
+      {
+        "label": "打开完整收藏库",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "收起菜单",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "收藏当前网页",
+        "h": 36,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "新建文件夹",
+        "h": 36,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "搜索 Chrome 书签",
+        "h": 36,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      }
+    ],
+    "scrollers": [
+      {
+        "class": "native-content",
+        "id": "bookmark-list",
+        "native": "none",
+        "barCount": 1
+      }
+    ]
+  },
+  {
+    "name": "settings-dark",
+    "viewport": {
+      "w": 400,
+      "h": 640
+    },
+    "pageWidth": 400,
+    "controls": [
+      {
+        "label": "打开完整收藏库",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "收起菜单",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "重置位置和大小",
+        "h": 32,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "选择 AI 服务和模型",
+        "h": 40,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": 12,
+        "valueFont": "13px"
+      },
+      {
+        "label": "",
+        "h": 40,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "验证并保存",
+        "h": 32,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      }
+    ],
+    "scrollers": [
+      {
+        "class": "settings-page-content",
+        "id": "scroll-_r_19t_",
+        "native": "none",
+        "barCount": 1
+      }
+    ]
+  },
+  {
+    "name": "select-dark",
+    "viewport": {
+      "w": 400,
+      "h": 640
+    },
+    "pageWidth": 400,
+    "controls": [
+      {
+        "label": "打开完整收藏库",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "收起菜单",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "重置位置和大小",
+        "h": 32,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "选择 AI 服务和模型",
+        "h": 40,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": 12,
+        "valueFont": "13px"
+      },
+      {
+        "label": "",
+        "h": 40,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "验证并保存",
+        "h": 32,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      }
+    ],
+    "scrollers": [
+      {
+        "class": "settings-page-content",
+        "id": "scroll-_r_19t_",
+        "native": "none",
+        "barCount": 1
+      }
+    ]
+  },
+  {
+    "name": "select-light",
+    "viewport": {
+      "w": 400,
+      "h": 640
+    },
+    "pageWidth": 400,
+    "controls": [
+      {
+        "label": "打开完整收藏库",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "收起菜单",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "重置位置和大小",
+        "h": 32,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "选择 AI 服务和模型",
+        "h": 40,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": 12,
+        "valueFont": "13px"
+      },
+      {
+        "label": "",
+        "h": 40,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "验证并保存",
+        "h": 32,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      }
+    ],
+    "scrollers": [
+      {
+        "class": "settings-page-content",
+        "id": "scroll-_r_19t_",
+        "native": "none",
+        "barCount": 1
+      }
+    ]
+  },
+  {
+    "name": "ai-empty-light",
+    "viewport": {
+      "w": 400,
+      "h": 640
+    },
+    "pageWidth": 400,
+    "controls": [
+      {
+        "label": "新会话",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "历史会话",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "打开完整收藏库",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "收起菜单",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "连接 AI 服务",
+        "h": 42,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      }
+    ],
+    "scrollers": []
+  },
+  {
+    "name": "editor-320-light",
+    "viewport": {
+      "w": 320,
+      "h": 640
+    },
+    "pageWidth": 320,
+    "controls": [
+      {
+        "label": "打开完整收藏库",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "收起菜单",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "收藏当前网页",
+        "h": 36,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "新建文件夹",
+        "h": 36,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "搜索 Chrome 书签",
+        "h": 36,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "关闭",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "",
+        "h": 40,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "",
+        "h": 40,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "选择文件夹",
+        "h": 40,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": 12,
+        "valueFont": "13px"
+      },
+      {
+        "label": "移除标签 AI 与自动化",
+        "h": 18,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "移除标签 缺省封面",
+        "h": 18,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "移除标签 视觉评审",
+        "h": 18,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "添加标签",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "删除",
+        "h": 32,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "取消",
+        "h": 36,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "保存修改",
+        "h": 36,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      }
+    ],
+    "scrollers": [
+      {
+        "class": "native-content",
+        "id": "bookmark-list",
+        "native": "none",
+        "barCount": 1
+      },
+      {
+        "class": "native-dialog-scroll",
+        "id": "scroll-_r_2jr_",
+        "native": "none",
+        "barCount": 1
+      }
+    ]
+  },
+  {
+    "name": "folder-320-light",
+    "viewport": {
+      "w": 320,
+      "h": 640
+    },
+    "pageWidth": 320,
+    "controls": [
+      {
+        "label": "打开完整收藏库",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "收起菜单",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "收藏当前网页",
+        "h": 36,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "新建文件夹",
+        "h": 36,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "搜索 Chrome 书签",
+        "h": 36,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "关闭",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "",
+        "h": 40,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "",
+        "h": 40,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "选择文件夹",
+        "h": 40,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": 12,
+        "valueFont": "13px"
+      },
+      {
+        "label": "移除标签 AI 与自动化",
+        "h": 18,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "移除标签 缺省封面",
+        "h": 18,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "移除标签 视觉评审",
+        "h": 18,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "添加标签",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "删除",
+        "h": 32,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "取消",
+        "h": 36,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "保存修改",
+        "h": 36,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      }
+    ],
+    "scrollers": [
+      {
+        "class": "native-content",
+        "id": "bookmark-list",
+        "native": "none",
+        "barCount": 1
+      },
+      {
+        "class": "native-dialog-scroll",
+        "id": "scroll-_r_2jr_",
+        "native": "none",
+        "barCount": 1
+      }
+    ]
+  },
+  {
+    "name": "editor-note-320-light",
+    "viewport": {
+      "w": 320,
+      "h": 640
+    },
+    "pageWidth": 320,
+    "controls": [
+      {
+        "label": "打开完整收藏库",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "收起菜单",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "收藏当前网页",
+        "h": 36,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "新建文件夹",
+        "h": 36,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "搜索 Chrome 书签",
+        "h": 36,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "关闭",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "选择文件夹",
+        "h": 40,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": 12,
+        "valueFont": "13px"
+      },
+      {
+        "label": "移除标签 AI 与自动化",
+        "h": 18,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "移除标签 缺省封面",
+        "h": 18,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "移除标签 视觉评审",
+        "h": 18,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "添加标签",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "删除",
+        "h": 32,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "取消",
+        "h": 36,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "保存修改",
+        "h": 36,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      }
+    ],
+    "scrollers": [
+      {
+        "class": "native-content",
+        "id": "bookmark-list",
+        "native": "none",
+        "barCount": 1
+      },
+      {
+        "class": "native-dialog-scroll",
+        "id": "scroll-_r_2jr_",
+        "native": "none",
+        "barCount": 1
+      },
+      {
+        "class": "textarea textarea--primary fluid-control w-full border border-[color:var(--line)] bg-[color:var(--surface)] text-[color:var(--ink)] outline-none transition-[border-color,background-color] duration-150 placeholder:text-[color:var(--ink-faint)] focus:border-[color:var(--line-strong)] focus-visible:border-[color:var(--line-strong)] fluid-textarea",
+        "id": "scroll-_r_2jq_",
+        "native": "none",
+        "barCount": 1
+      }
+    ]
+  },
+  {
+    "name": "editor-note-320-dark",
+    "viewport": {
+      "w": 320,
+      "h": 640
+    },
+    "pageWidth": 320,
+    "controls": [
+      {
+        "label": "打开完整收藏库",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "收起菜单",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "收藏当前网页",
+        "h": 36,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "新建文件夹",
+        "h": 36,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "搜索 Chrome 书签",
+        "h": 36,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "关闭",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "选择文件夹",
+        "h": 40,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": 12,
+        "valueFont": "13px"
+      },
+      {
+        "label": "移除标签 AI 与自动化",
+        "h": 18,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "移除标签 缺省封面",
+        "h": 18,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "移除标签 视觉评审",
+        "h": 18,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "添加标签",
+        "h": 32,
+        "font": "13px",
+        "left": "0px",
+        "right": "0px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "删除",
+        "h": 32,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "取消",
+        "h": 36,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      },
+      {
+        "label": "保存修改",
+        "h": 36,
+        "font": "13px",
+        "left": "12px",
+        "right": "12px",
+        "arrowInset": null,
+        "valueFont": null
+      }
+    ],
+    "scrollers": [
+      {
+        "class": "native-content",
+        "id": "bookmark-list",
+        "native": "none",
+        "barCount": 1
+      },
+      {
+        "class": "native-dialog-scroll",
+        "id": "scroll-_r_2jr_",
+        "native": "none",
+        "barCount": 1
+      },
+      {
+        "class": "textarea textarea--primary fluid-control w-full border border-[color:var(--line)] bg-[color:var(--surface)] text-[color:var(--ink)] outline-none transition-[border-color,background-color] duration-150 placeholder:text-[color:var(--ink-faint)] focus:border-[color:var(--line-strong)] focus-visible:border-[color:var(--line-strong)] fluid-textarea",
+        "id": "scroll-_r_2jq_",
+        "native": "none",
+        "barCount": 1
+      }
+    ]
+  }
+]

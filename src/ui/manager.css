@@ -18,49 +18,6 @@ html.manager-page[data-theme="light"] .manager-shell {
   background: var(--page-bg-light);
 }
 
-.manager-floating-scrollbar {
-  position: fixed;
-  inset-block: var(--scrollbar-inset);
-  right: var(--scrollbar-inset);
-  z-index: 20;
-  width: var(--scrollbar-thumb-size);
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity var(--dur-base) var(--ease);
-}
-
-.manager-floating-scrollbar[data-overflow="true"][data-visible="true"],
-.manager-floating-scrollbar[data-dragging="true"] {
-  opacity: 1;
-}
-
-.manager-floating-scrollbar-thumb {
-  position: absolute;
-  inset: 0 0 auto;
-  height: var(--manager-scrollbar-thumb-height, var(--scrollbar-thumb-min));
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: var(--scrollbar-thumb-color);
-  cursor: grab;
-  pointer-events: auto;
-  touch-action: none;
-  user-select: none;
-  transform: translate3d(0, var(--manager-scrollbar-thumb-offset, 0px), 0);
-  transition: background-color var(--dur-fast) var(--ease);
-}
-
-.manager-floating-scrollbar-thumb:hover,
-.manager-floating-scrollbar-thumb:focus-visible {
-  background: var(--scrollbar-thumb-color-hover);
-}
-
-.manager-floating-scrollbar-thumb:active,
-.manager-floating-scrollbar[data-dragging="true"]
-  .manager-floating-scrollbar-thumb {
-  cursor: grabbing;
-  background: var(--scrollbar-thumb-color-hover);
-}
-
 .manager-shell {
   min-height: 100vh;
   padding-bottom: var(--sp-8);
@@ -88,6 +45,7 @@ html.manager-page[data-theme="light"] .manager-shell {
 }
 
 .manager-header {
+  position: relative;
   min-height: 64px;
   display: flex;
   align-items: stretch;
@@ -503,12 +461,12 @@ html.manager-page[data-theme="light"] .manager-shell {
 .library-select-control .library-select-trigger {
   width: 100%;
   min-height: var(--control-h-lg);
-  padding-left: var(--sp-5);
-  font-size: var(--fs-small);
+  padding-inline: var(--control-inset);
+  font-size: var(--fs-control);
 }
 
 .library-select-content [role="option"] {
-  padding-left: var(--sp-5);
+  padding-inline: var(--control-inset);
 }
 
 .library-select-content .bg-active {
@@ -530,7 +488,7 @@ html.manager-page[data-theme="light"] .manager-shell {
   border-radius: var(--radius-pill);
   color: var(--ink-muted);
   background: var(--surface);
-  font-size: var(--fs-caption);
+  font-size: var(--fs-control);
 }
 
 .snapshot-backfill-trigger:hover {
@@ -942,9 +900,11 @@ html.manager-page[data-theme="light"] .manager-shell {
   font-size: var(--fs-caption);
 }
 
-/* Full-bleed cool-dark tint. Copy can grow past the cover; overflow scrolls
-   inside the mask with no visible scrollbar, so masonry height stays fixed. */
+/* Cover copy scrolls inside its mask without changing masonry height.
+   The shared floating thumb uses a light color over the dark cover scrim. */
 .library-card-extra {
+  --scrollbar-thumb-color: color-mix(in srgb, var(--scrim-ink) 68%, transparent);
+  --scrollbar-thumb-color-hover: var(--scrim-ink);
   position: absolute;
   inset: 0;
   z-index: 1;
@@ -1687,10 +1647,9 @@ html.manager-page[data-theme="light"] .manager-shell {
 }
 
 .library-card-editor-heading {
-  position: sticky;
-  top: 0;
+  flex: 0 0 auto;
   z-index: 1;
-  padding: var(--sp-5) var(--sp-6);
+  padding: var(--sp-5) var(--sp-6) var(--sp-4);
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -1740,17 +1699,34 @@ html.manager-page[data-theme="light"] .manager-shell {
 }
 
 .library-card-editor-dialog form {
-  padding: var(--sp-5) var(--sp-6) var(--sp-6);
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.library-card-editor-body {
+  position: relative;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-1) var(--sp-6);
+}
+
+.library-card-editor-body > .library-card-editor-grid {
+  margin-top: 0;
 }
 
 
-/* Both states occupy the same single control row, so entering the delete
-   confirmation cannot resize the dialog. */
+/* Both action states stay outside the scrolling fields. A narrow confirmation
+   can use more height without pushing the actions below the viewport. */
 .library-card-editor-actions,
 .library-card-editor-confirm {
+  flex: 0 0 auto;
   min-height: var(--control-h-lg);
-  margin-top: var(--sp-6);
-  padding-top: var(--sp-4);
+  margin: 0;
+  padding: var(--sp-4) var(--sp-6) var(--sp-5);
 }
 
 .library-card-editor-actions,
@@ -1849,8 +1825,14 @@ html.manager-page[data-theme="light"] .manager-shell {
   }
 
   .manager-header {
-    display: block;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0 var(--sp-3);
   }
+
+  .manager-topbar { grid-column: 1; grid-row: 1; min-width: 0; }
+  .manager-theme-button { grid-column: 2; grid-row: 1; align-self: center; }
+  .manager-view-tabs { grid-column: 1 / -1; grid-row: 2; width: 100%; }
 
   .manager-topbar,
   .manager-view-tabs button {
@@ -1937,7 +1919,7 @@ html.manager-page[data-theme="light"] .manager-shell {
     align-self: flex-start;
     min-height: var(--control-h-touch);
     margin: 0;
-    padding: 0;
+    padding: 0 var(--control-inset);
   }
 
   .snapshot-backfill-status {
@@ -2032,23 +2014,11 @@ html.manager-page[data-theme="light"] .manager-shell {
   }
 
   .library-card-editor-heading,
-  .library-card-editor-dialog form {
+  .library-card-editor-body,
+  .library-card-editor-actions,
+  .library-card-editor-confirm {
     padding-right: var(--sp-4);
     padding-left: var(--sp-4);
-  }
-
-  .library-card-editor-actions {
-    align-items: stretch;
-    flex-direction: column-reverse;
-  }
-
-  .library-card-editor-actions > div,
-  .library-card-editor-actions > [data-slot="button"] {
-    width: 100%;
-  }
-
-  .library-card-editor-actions > div [data-slot="button"] {
-    flex: 1;
   }
 
   .library-card-editor-confirm > div {

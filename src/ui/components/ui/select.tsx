@@ -1,8 +1,9 @@
-import { Children, Fragment, isValidElement, type ComponentProps, type HTMLAttributes, type ReactElement, type ReactNode } from "react";
+import { Children, Fragment, isValidElement, useRef, type ComponentProps, type HTMLAttributes, type ReactElement, type ReactNode } from "react";
 import { Select as HeroSelect } from "@heroui/react/select";
 import { ListBox } from "@heroui/react/list-box";
 import type { IconComponent } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
+import { FloatingScrollbars } from "./scroll-area";
 interface SelectProps { children: ReactNode; value?: string; defaultValue?: string; onValueChange?: (value: string) => void; disabled?: boolean; name?: string; required?: boolean }
 interface SelectTriggerProps extends HTMLAttributes<HTMLButtonElement> { icon?: IconComponent; placeholder?: string; error?: string; variant?: "bordered" | "borderless" }
 interface SelectContentProps { children: ReactNode; className?: string }
@@ -32,14 +33,24 @@ export function Select({ children, value, defaultValue, onValueChange, disabled,
     <HeroSelect.Trigger {...(triggerProps as ComponentProps<typeof HeroSelect.Trigger>)} className={cn("aarre-select-trigger", variant === "borderless" && "aarre-select-borderless", className)}>
       {Icon && <Icon size={16} aria-hidden="true" />}<HeroSelect.Value /><HeroSelect.Indicator />
     </HeroSelect.Trigger>
-    <HeroSelect.Popover className={cn("aarre-select-popover", content?.className)} offset={6}>
+    <SelectPopover className={cn("aarre-select-popover", content?.className)}>
       <ListBox aria-label={triggerProps["aria-label"] || placeholder}>
         {items.map(({ props }) => <ListBox.Item key={props.value} id={props.value} textValue={typeof props.children === "string" ? props.children : props.value}
           isDisabled={props.disabled} className={cn("aarre-select-item", props.className)}>
           {props.icon && <props.icon size={16} aria-hidden="true" />}<span>{props.children}</span><ListBox.ItemIndicator />
         </ListBox.Item>)}
       </ListBox>
-    </HeroSelect.Popover>
+    </SelectPopover>
   </HeroSelect>;
+}
+// This component mounts with the portal, so the scrollbar observes a live viewport.
+function SelectPopover({ children, className }: { children: ReactNode; className: string }) {
+  return <HeroSelect.Popover className={className} offset={6}>
+    <SelectViewport>{children}</SelectViewport>
+  </HeroSelect.Popover>;
+}
+function SelectViewport({ children }: { children: ReactNode }) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  return <div className="aarre-select-viewport" ref={viewportRef}>{children}<FloatingScrollbars viewportRef={viewportRef} label="选项" /></div>;
 }
 export type { SelectProps, SelectTriggerProps, SelectContentProps, SelectItemProps };

@@ -1,3 +1,4 @@
+import { ScrollSurface } from "@/ui/components/ui/scroll-area";
 import React, { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/ui/components/ui/button";
 import { FluidInput } from "@/ui/components/ui/input";
@@ -175,7 +176,7 @@ function FolderSelect({
         <ChevronDownIcon />
       </Button>
       {open ? (
-        <div
+        <ScrollSurface as="div"
           id={listboxId}
           className="folder-select-popover"
           role="listbox"
@@ -242,7 +243,7 @@ function FolderSelect({
               </Button>
             )}
           </div>
-        </div>
+        </ScrollSurface>
       ) : null}
     </div>
   );

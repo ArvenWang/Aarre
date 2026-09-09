@@ -438,36 +438,6 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   }
 }
 
-.native-scroll-thumb {
-  position: absolute;
-  top: 0;
-  right: var(--sp-2);
-  z-index: 8;
-  width: 5px;
-  border-radius: var(--radius-sm);
-  opacity: 0;
-  touch-action: none;
-  cursor: grab;
-  pointer-events: none;
-  background: color-mix(in srgb, var(--ink) 32%, transparent);
-  transition:
-    opacity var(--dur-base) var(--ease),
-    background-color var(--dur-fast) var(--ease);
-}
-
-.native-scroll-thumb[data-visible="true"] {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.native-scroll-thumb:hover {
-  background: color-mix(in srgb, var(--ink) 46%, transparent);
-}
-
-.native-scroll-thumb:active {
-  cursor: grabbing;
-}
-
 .bookmark-tree-level,
 .bookmark-node {
   position: relative;
@@ -941,7 +911,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   border-color: color-mix(in srgb, var(--ink) 28%, transparent);
 }
 
-.agent-composer > textarea {
+.agent-composer textarea {
   width: 100%;
   min-height: 48px;
   max-height: 112px;
@@ -956,7 +926,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   line-height: 1.5;
 }
 
-.agent-composer > textarea::placeholder {
+.agent-composer textarea::placeholder {
   color: var(--ink-faint);
 }
 
@@ -1014,9 +984,9 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 }
 
 .agent-composer-setup {
-  height: 66px;
-  min-height: 66px;
-  max-height: 66px;
+  height: var(--control-h-touch);
+  min-height: var(--control-h-touch);
+  max-height: var(--control-h-touch);
   padding: 0;
 }
 
@@ -1131,16 +1101,14 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
   min-height: 180px;
 }
 
-.native-field,
-.settings-field {
+.native-field {
   position: relative;
   margin-top: var(--sp-4);
   display: grid;
   gap: var(--sp-2);
 }
 
-.native-field > span,
-.settings-field > span {
+.native-field > span {
   color: var(--ink-muted);
   font-size: var(--fs-caption);
   font-weight: var(--fw-medium);
@@ -1148,8 +1116,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 
 .native-field input,
 .native-field select,
-.native-field textarea,
-.settings-field input {
+.native-field textarea {
   width: 100%;
   min-height: var(--control-h-lg);
   padding: var(--sp-2) var(--sp-3);
@@ -1171,8 +1138,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 
 .native-field input:hover,
 .native-field select:hover,
-.native-field textarea:hover,
-.settings-field input:hover {
+.native-field textarea:hover {
   border-color: color-mix(in srgb, var(--ink) 18%, transparent);
   background: color-mix(
     in srgb,
@@ -1183,8 +1149,7 @@ main.native-panel:has(> .search-box):has(> .organization-notice-banner):has(
 
 .native-field input:focus,
 .native-field select:focus,
-.native-field textarea:focus,
-.settings-field input:focus {
+.native-field textarea:focus {
   border-color: color-mix(in srgb, var(--ink) 28%, transparent);
   background: var(--surface);
 }

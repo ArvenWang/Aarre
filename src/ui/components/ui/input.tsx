@@ -1,12 +1,13 @@
 import {
   forwardRef,
+  useRef,
   type InputHTMLAttributes,
-  type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from "react";
 import { Input as HeroInput } from "@heroui/react/input";
 import { TextArea as HeroTextarea } from "@heroui/react/textarea";
 import { cn } from "@/lib/utils";
+import { FloatingScrollbars } from "./scroll-area";
 
 // Form fields focus by darkening their own border. An accent ring around the
 // field reads as a green selection frame and is not used here — that token
@@ -31,27 +32,18 @@ FluidInput.displayName = "FluidInput";
 const FluidTextarea = forwardRef<
   HTMLTextAreaElement,
   TextareaHTMLAttributes<HTMLTextAreaElement>
->(({ className, ...props }, ref) => (
+>(({ className, ...props }, ref) => {
+  const viewportRef = useRef<HTMLTextAreaElement>(null);
+  return <div className="fluid-textarea-frame">
   <HeroTextarea
-    ref={ref}
+    ref={node => { viewportRef.current = node; if (typeof ref === "function") ref(node); else if (ref) ref.current = node; }}
     className={cn(controlClassName, "fluid-textarea", className)}
     {...props}
   />
-));
+  <FloatingScrollbars viewportRef={viewportRef} label={props["aria-label"] || "文本"} />
+  </div>;
+});
 
 FluidTextarea.displayName = "FluidTextarea";
 
-const FluidSelect = forwardRef<
-  HTMLSelectElement,
-  SelectHTMLAttributes<HTMLSelectElement>
->(({ className, ...props }, ref) => (
-  <select
-    ref={ref}
-    className={cn(controlClassName, "fluid-select", className)}
-    {...props}
-  />
-));
-
-FluidSelect.displayName = "FluidSelect";
-
-export { FluidInput, FluidTextarea, FluidSelect };
+export { FluidInput, FluidTextarea };

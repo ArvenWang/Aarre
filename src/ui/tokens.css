@@ -79,6 +79,10 @@
   --control-h-lg: 40px;
   /* Coarse-pointer minimum, not a visual size. */
   --control-h-touch: 44px;
+  --fs-control: 13px;
+  --fs-control-lg: 14px;
+  --control-inset: var(--sp-3);
+  --control-gap: var(--sp-2);
   --toggle-track-w: 40px;
   --toggle-track-h: 24px;
   --toggle-thumb: 18px;
@@ -155,21 +159,23 @@
 
   /* The manager page uses a floating thumb instead of a browser-owned track.
      Geometry stays tokenized so the overlay never changes document width. */
-  --scrollbar-inset: var(--sp-2);
-  --scrollbar-thumb-min: 32px;
-  --scrollbar-thumb-size: 6px;
-  --scrollbar-thumb-color: color-mix(in srgb, var(--ink) 36%, transparent);
+  --scrollbar-inset: 6px;
+  --scrollbar-thumb-min: 30px;
+  --scrollbar-thumb-size: 5px;
+  --scrollbar-hit-size: 12px;
+  --scrollbar-edge: 3px;
+  --scrollbar-thumb-color: color-mix(in srgb, var(--ink) 48%, transparent);
   --scrollbar-thumb-color-hover: color-mix(
     in srgb,
-    var(--ink) 54%,
+    var(--ink) 64%,
     transparent
   );
 }
 
 [data-density="compact"] {
-  --fs-caption: 11px;
-  --fs-small: 12px;
-  --fs-body: 13px;
+  --fs-caption: 12px;
+  --fs-small: 13px;
+  --fs-body: 14px;
   --fs-lead: 15px;
   --fs-h3: 17px;
   --fs-h2: 20px;

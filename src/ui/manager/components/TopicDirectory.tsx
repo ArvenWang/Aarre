@@ -1,3 +1,4 @@
+import { ScrollArea } from "@/ui/components/ui/scroll-area";
 import { useMemo, useState } from "react";
 import { ChevronDown, Search } from "lucide-react";
 import { Button } from "@/ui/components/ui/button";
@@ -15,7 +16,7 @@ export function TopicDirectory({ graph, resources, onOpenResource }: { graph: To
       const open = expanded === node.id, panelId=`topic-collection-${index}`;
       return <div className="topic-directory-item" key={node.id}>
         <Button variant="ghost" className="topic-directory-trigger" aria-expanded={open} aria-controls={panelId} onClick={() => setExpanded(open ? null : node.id)}><strong>{node.label}</strong><span>{matches.length} 条</span><ChevronDown size={16}/></Button>
-        <div id={panelId} hidden={!open} className="topic-directory-results"><ul>{matches.map((resource) => <li key={resource.resourceKey}><ResourceLink url={resource.url} onOpenResource={onOpenResource}>{resource.title || resource.url}</ResourceLink><small>{resource.siteName || new URL(resource.url).hostname}</small></li>)}</ul>{!matches.length && <p>此主题的收藏正在更新，请刷新收藏库。</p>}</div>
+        <div id={panelId} hidden={!open} className="topic-directory-results"><ScrollArea className="topic-directory-scroll" label="主题收藏"><ul>{matches.map((resource) => <li key={resource.resourceKey}><ResourceLink url={resource.url} onOpenResource={onOpenResource}>{resource.title || resource.url}</ResourceLink><small>{resource.siteName || new URL(resource.url).hostname}</small></li>)}</ul></ScrollArea>{!matches.length && <p>此主题的收藏正在更新，请刷新收藏库。</p>}</div>
       </div>;
     })}</div>
   </section>;

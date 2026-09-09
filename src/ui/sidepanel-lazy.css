@@ -51,6 +51,18 @@
   padding: var(--sp-1) var(--sp-4) var(--sp-5);
 }
 
+/* Settings is also loaded by the full library, without sidepanel.css. */
+.settings-field { position: relative; margin-top: var(--sp-4); display: grid; gap: var(--sp-2); }
+.settings-field > span { color: var(--ink-muted); font-size: var(--fs-caption); font-weight: var(--fw-medium); }
+.settings-field input {
+  width: 100%; min-height: var(--control-h-lg); padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--line-strong); border-radius: var(--radius-md); outline: 0;
+  color: var(--ink); background: var(--surface); font-size: var(--fs-small);
+  transition: border-color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
+}
+.settings-field input:hover { border-color: color-mix(in srgb, var(--ink) 18%, transparent); background: color-mix(in srgb, var(--surface) 96%, var(--surface-sunken)); }
+.settings-field input:focus { border-color: color-mix(in srgb, var(--ink) 28%, transparent); background: var(--surface); }
+
 .agent-chat-welcome { padding: var(--sp-5) var(--sp-1); }
 .agent-chat-welcome h2 { margin: 0 0 var(--sp-3); font-size: var(--fs-h3); font-weight: var(--fw-strong); color: var(--ink); }
 .agent-chat-welcome p { margin: 0 0 var(--sp-4); font-size: var(--fs-body); line-height: 1.7; color: var(--ink-muted); }
@@ -91,7 +103,7 @@
   width: 100%;
   min-width: 0;
   padding-block: var(--sp-5);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 0;
 }
 
 .settings-section:last-child {
@@ -153,7 +165,7 @@
 }
 
 .settings-model-select-content {
-  min-width: var(--radix-select-trigger-width);
+  min-width: var(--trigger-width);
 }
 
 .settings-toggle-row {
@@ -634,8 +646,10 @@
 }
 
 .agent-message {
+  min-width: 0;
   margin-bottom: var(--sp-4);
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--agent-content-gap);
   animation: agent-message-in var(--dur-base) var(--ease) both;
 }
@@ -645,6 +659,7 @@
 }
 
 .agent-message-copy {
+  min-width: 0;
   width: fit-content;
   max-width: 92%;
   padding: var(--sp-3);
@@ -874,9 +889,10 @@
 }
 
 .agent-markdown pre {
-  margin: var(--sp-2) 0;
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
   padding: var(--sp-2);
-  overflow-x: auto;
   border-radius: var(--radius-sm);
   background: var(--surface-sunken);
 }
@@ -926,11 +942,16 @@
 }
 
 .agent-markdown table {
-  display: block;
-  width: 100%;
-  overflow-x: auto;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
   font-size: var(--fs-caption);
+}
+
+.markdown-scroll-frame {
+  flex: none;
+  margin-block: var(--sp-2);
+  border-radius: var(--radius-sm);
 }
 
 .agent-markdown th,
@@ -1182,7 +1203,7 @@
 .agent-history-list > .bookmark-row {
   height: auto;
   min-height: var(--control-h-touch);
-  padding: var(--sp-2);
+  padding: var(--sp-2) 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -1192,7 +1213,7 @@
 .agent-history-open {
   width: 100%;
   min-width: 0;
-  padding: var(--sp-2) var(--sp-3);
+  padding: var(--sp-2) 0;
   display: block;
   border: 0;
   color: var(--ink);

@@ -1,0 +1,340 @@
+[
+  {
+    "name": "manager-library-light",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "pageWidth": 1440,
+    "scrollers": [],
+    "selects": [
+      {
+        "label": "按 Chrome 书签文件夹筛选",
+        "font": "13px",
+        "height": 40,
+        "arrowInset": 12
+      },
+      {
+        "label": "收藏排序方式",
+        "font": "13px",
+        "height": 40,
+        "arrowInset": 12
+      }
+    ]
+  },
+  {
+    "name": "manager-library-dark",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "pageWidth": 1440,
+    "scrollers": [],
+    "selects": [
+      {
+        "label": "按 Chrome 书签文件夹筛选",
+        "font": "13px",
+        "height": 40,
+        "arrowInset": 12
+      },
+      {
+        "label": "收藏排序方式",
+        "font": "13px",
+        "height": 40,
+        "arrowInset": 12
+      }
+    ]
+  },
+  {
+    "name": "manager-organize-light",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "pageWidth": 1440,
+    "scrollers": [],
+    "selects": []
+  },
+  {
+    "name": "manager-organize-dark",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "pageWidth": 1440,
+    "scrollers": [],
+    "selects": []
+  },
+  {
+    "name": "manager-report-light",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "pageWidth": 1440,
+    "scrollers": [],
+    "selects": []
+  },
+  {
+    "name": "manager-report-dark",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "pageWidth": 1440,
+    "scrollers": [],
+    "selects": []
+  },
+  {
+    "name": "manager-topics-light",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "pageWidth": 1440,
+    "scrollers": [],
+    "selects": []
+  },
+  {
+    "name": "manager-topics-dark",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "pageWidth": 1440,
+    "scrollers": [],
+    "selects": []
+  },
+  {
+    "name": "manager-resurface-light",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "pageWidth": 1440,
+    "scrollers": [],
+    "selects": []
+  },
+  {
+    "name": "manager-resurface-dark",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "pageWidth": 1440,
+    "scrollers": [],
+    "selects": []
+  },
+  {
+    "name": "manager-420-light",
+    "viewport": {
+      "width": 420,
+      "height": 820
+    },
+    "pageWidth": 420,
+    "scrollers": [
+      {
+        "class": "tabs__list manager-view-tabs aarre-tabs-list",
+        "id": "react-aria4720255543-_r_6_",
+        "width": 388,
+        "scrollWidth": 465,
+        "height": 52,
+        "scrollHeight": 52,
+        "native": "none",
+        "bars": 1
+      }
+    ],
+    "selects": [
+      {
+        "label": "按 Chrome 书签文件夹筛选",
+        "font": "13px",
+        "height": 40,
+        "arrowInset": 12
+      },
+      {
+        "label": "收藏排序方式",
+        "font": "13px",
+        "height": 40,
+        "arrowInset": 12
+      }
+    ]
+  },
+  {
+    "name": "manager-filter-420-light",
+    "viewport": {
+      "width": 420,
+      "height": 820
+    },
+    "pageWidth": 420,
+    "scrollers": [
+      {
+        "class": "tabs__list manager-view-tabs aarre-tabs-list",
+        "id": "react-aria4720255543-_r_6_",
+        "width": 388,
+        "scrollWidth": 465,
+        "height": 52,
+        "scrollHeight": 52,
+        "native": "none",
+        "bars": 1
+      },
+      {
+        "class": "aarre-select-viewport",
+        "id": "scroll-_r_3gb_",
+        "width": 370,
+        "scrollWidth": 370,
+        "height": 318,
+        "scrollHeight": 324,
+        "native": "none",
+        "bars": 1
+      }
+    ],
+    "selects": [
+      {
+        "label": "按 Chrome 书签文件夹筛选",
+        "font": "13px",
+        "height": 40,
+        "arrowInset": 12
+      },
+      {
+        "label": "收藏排序方式",
+        "font": "13px",
+        "height": 40,
+        "arrowInset": 12
+      }
+    ]
+  },
+  {
+    "name": "manager-settings-420-light",
+    "viewport": {
+      "width": 420,
+      "height": 820
+    },
+    "pageWidth": 420,
+    "scrollers": [
+      {
+        "class": "tabs__list manager-view-tabs aarre-tabs-list",
+        "id": "react-aria4720255543-_r_6_",
+        "width": 388,
+        "scrollWidth": 465,
+        "height": 52,
+        "scrollHeight": 52,
+        "native": "none",
+        "bars": 1
+      },
+      {
+        "class": "modal__dialog modal__dialog--scroll-inside modal__dialog--lg manager-utility-dialog",
+        "id": "scroll-_r_3gi_",
+        "width": 394,
+        "scrollWidth": 394,
+        "height": 794,
+        "scrollHeight": 1231,
+        "native": "none",
+        "bars": 1
+      }
+    ],
+    "selects": [
+      {
+        "label": "按 Chrome 书签文件夹筛选",
+        "font": "13px",
+        "height": 40,
+        "arrowInset": 12
+      },
+      {
+        "label": "收藏排序方式",
+        "font": "13px",
+        "height": 40,
+        "arrowInset": 12
+      },
+      {
+        "label": "选择 AI 服务和模型",
+        "font": "13px",
+        "height": 40,
+        "arrowInset": 12
+      }
+    ]
+  },
+  {
+    "name": "manager-settings-420-dark",
+    "viewport": {
+      "width": 420,
+      "height": 820
+    },
+    "pageWidth": 420,
+    "scrollers": [
+      {
+        "class": "tabs__list manager-view-tabs aarre-tabs-list",
+        "id": "react-aria4720255543-_r_6_",
+        "width": 388,
+        "scrollWidth": 465,
+        "height": 52,
+        "scrollHeight": 52,
+        "native": "none",
+        "bars": 1
+      },
+      {
+        "class": "modal__dialog modal__dialog--scroll-inside modal__dialog--lg manager-utility-dialog",
+        "id": "scroll-_r_3gi_",
+        "width": 394,
+        "scrollWidth": 394,
+        "height": 794,
+        "scrollHeight": 1231,
+        "native": "none",
+        "bars": 1
+      }
+    ],
+    "selects": [
+      {
+        "label": "按 Chrome 书签文件夹筛选",
+        "font": "13px",
+        "height": 40,
+        "arrowInset": 12
+      },
+      {
+        "label": "收藏排序方式",
+        "font": "13px",
+        "height": 40,
+        "arrowInset": 12
+      },
+      {
+        "label": "选择 AI 服务和模型",
+        "font": "13px",
+        "height": 40,
+        "arrowInset": 12
+      }
+    ]
+  },
+  {
+    "name": "manager-nav-320-dark",
+    "viewport": {
+      "width": 320,
+      "height": 640
+    },
+    "pageWidth": 320,
+    "scrollers": [
+      {
+        "class": "tabs__list manager-view-tabs aarre-tabs-list",
+        "id": "react-aria4720255543-_r_6_",
+        "width": 288,
+        "scrollWidth": 465,
+        "height": 52,
+        "scrollHeight": 52,
+        "native": "none",
+        "bars": 1
+      }
+    ],
+    "selects": [
+      {
+        "label": "按 Chrome 书签文件夹筛选",
+        "font": "13px",
+        "height": 40,
+        "arrowInset": 12
+      },
+      {
+        "label": "收藏排序方式",
+        "font": "13px",
+        "height": 40,
+        "arrowInset": 12
+      }
+    ]
+  }
+]

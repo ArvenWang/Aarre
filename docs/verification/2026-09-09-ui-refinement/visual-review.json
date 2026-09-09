@@ -1,0 +1,416 @@
+{
+  "version": "0.6.1",
+  "reviewedAt": "2026-09-09T10:35:39.641Z",
+  "count": 51,
+  "scope": "Actual local DEV browser rendering with explicit QA data; not installed Chrome or external-service acceptance",
+  "entries": [
+    {
+      "path": "final/ai-empty-dark.png",
+      "bytes": 29437,
+      "sha256": "a1b431f21c981981702664a9f51af59faa3e3ee522d7bf0128ec878e0071b38f",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "文字层级、组件留白、内容边界与主题对比清楚"
+    },
+    {
+      "path": "final/ai-empty-light.png",
+      "bytes": 30091,
+      "sha256": "3b092f3c1bbbb51209ba8776a5ad1297114da086eb37c153cabefd1abb37cb26",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "文字层级、组件留白、内容边界与主题对比清楚"
+    },
+    {
+      "path": "final/ai-long-320-light.png",
+      "bytes": 49358,
+      "sha256": "617ec2ab3f9a0ecf7c2b1a5a92ad99878b6b2e9318bdfc1152f1adef8d0a4139",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "正文收缩换行；宽表格及代码各自横向滚动"
+    },
+    {
+      "path": "final/ai-long-dark.png",
+      "bytes": 58515,
+      "sha256": "085f45384cdcbaa2de07e57bc6bc7a4c9feb0b093e807b3d10dd304b8c3195d1",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "正文收缩换行；宽表格及代码各自横向滚动"
+    },
+    {
+      "path": "final/ai-long-light.png",
+      "bytes": 58354,
+      "sha256": "2b58ddfcbb1990ccb6d3fe3dd20d2164eeabdf89be683dc9c1b27f64ffd6333a",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "正文收缩换行；宽表格及代码各自横向滚动"
+    },
+    {
+      "path": "final/ai-table-scroll-dark.png",
+      "bytes": 62821,
+      "sha256": "12874b877b410aa526f4f635c5f5e3af677358e9f6669865d3db53ebad8d1d65",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "正文收缩换行；宽表格及代码各自横向滚动"
+    },
+    {
+      "path": "final/archive-320-dark.png",
+      "bytes": 44178,
+      "sha256": "2cff96b52075d2d869bd2e26a7543b4498462377a6b291448ae7413a6f726028",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "窗口单实例、清晰的取消与确认操作、留白完整"
+    },
+    {
+      "path": "final/archive-320-light.png",
+      "bytes": 45502,
+      "sha256": "fe76163817f51c6f368b091a0ea87d58f3128a08df1e240fc19e369eb319861e",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "窗口单实例、清晰的取消与确认操作、留白完整"
+    },
+    {
+      "path": "final/editor-320-light.png",
+      "bytes": 36293,
+      "sha256": "1a1dffc7335e43afbff4ecb3eda2704d193dfd0b8e435832cb34a2478342f446",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "窄窗字段、箭头留白、长备注和底部操作可达"
+    },
+    {
+      "path": "final/editor-note-320-dark.png",
+      "bytes": 52489,
+      "sha256": "878fef63b599cf91524456cdbc78b47665f9f991891532cdddca47b4f12668d2",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "窄窗字段、箭头留白、长备注和底部操作可达"
+    },
+    {
+      "path": "final/editor-note-320-light.png",
+      "bytes": 52643,
+      "sha256": "e250f91669f5811e08e1f17855a9ed44a1c719b88e5643eca619c1c35aa51483",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "窄窗字段、箭头留白、长备注和底部操作可达"
+    },
+    {
+      "path": "final/folder-320-light.png",
+      "bytes": 34327,
+      "sha256": "4dd91127ad6e641e6a1ce74780ad347bd3c9d0f81522969e4e9232e5064e33bf",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "窄窗字段、箭头留白、长备注和底部操作可达"
+    },
+    {
+      "path": "final/history-dark.png",
+      "bytes": 75711,
+      "sha256": "6dd167b94b5b66f4020929f1ebadf288533e871d1d94d22825fe0c14e2bbf473",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "首段摘要、标题换行与删除操作对齐"
+    },
+    {
+      "path": "final/history-light.png",
+      "bytes": 77702,
+      "sha256": "ff85abab08a7c55d0ae0f9311292ebd5e17574a081219a81a1818bead00c5010",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "首段摘要、标题换行与删除操作对齐"
+    },
+    {
+      "path": "final/manager-420-light.png",
+      "bytes": 51709,
+      "sha256": "18ee3f48027a43c92cec2d9072fef3715c200898aa824be847b735465ca8ede2",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "功能页层级、搜索与导航、窄窗边界和明暗主题"
+    },
+    {
+      "path": "final/manager-delete-320-dark.png",
+      "bytes": 38657,
+      "sha256": "18f8df83c939f9b3f91294eeda587286c5caa8d9a35ff5c6b86f76b39c094b3c",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "固定标题和操作区；20px 首字段间距；窄窗确认无越界"
+    },
+    {
+      "path": "final/manager-delete-420-light.png",
+      "bytes": 55063,
+      "sha256": "a70de4f15e2b99b393ccf84eb2767835cf559de3370bad909c146faea43702a0",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "固定标题和操作区；20px 首字段间距；窄窗确认无越界"
+    },
+    {
+      "path": "final/manager-editor-420-dark.png",
+      "bytes": 53150,
+      "sha256": "009d923042c0c4e3acca9b18a7a515c743cc649d7729e485188d2c33687d3a1d",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "固定标题和操作区；20px 首字段间距；窄窗确认无越界"
+    },
+    {
+      "path": "final/manager-editor-420-light.png",
+      "bytes": 55313,
+      "sha256": "7487da379b3dc00abae03101c606d762a902010d05e125dd50af7ec4f5e5db04",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "固定标题和操作区；20px 首字段间距；窄窗确认无越界"
+    },
+    {
+      "path": "final/manager-filter-420-light.png",
+      "bytes": 57610,
+      "sha256": "f773fb3bf651ed6070919ce13a0d97af31102d31ce23168d7fe625821aa109d1",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "功能页层级、搜索与导航、窄窗边界和明暗主题"
+    },
+    {
+      "path": "final/manager-library-dark.png",
+      "bytes": 230217,
+      "sha256": "2f385d6d76dfef1ec5eaa5923c94aebf002810a7f0a9a70eb569d78c708a030b",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "功能页层级、搜索与导航、窄窗边界和明暗主题"
+    },
+    {
+      "path": "final/manager-library-light.png",
+      "bytes": 229738,
+      "sha256": "1be16fc57c0c927f28f15f42ff749062a4e7997433190d8f303262d749161424",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "功能页层级、搜索与导航、窄窗边界和明暗主题"
+    },
+    {
+      "path": "final/manager-nav-320-dark.png",
+      "bytes": 37092,
+      "sha256": "9e4000f5737c4c272a182ec3a14944b88f04624381490dbeef6aba9de2ae1fb7",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "功能页层级、搜索与导航、窄窗边界和明暗主题"
+    },
+    {
+      "path": "final/manager-organize-dark.png",
+      "bytes": 95447,
+      "sha256": "26165aeca2e24e55148c549bcdf83ce3e08f340b5312e5d682b46191150b20aa",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "功能页层级、搜索与导航、窄窗边界和明暗主题"
+    },
+    {
+      "path": "final/manager-organize-light.png",
+      "bytes": 95760,
+      "sha256": "0bfffd1bfc581904b965e13ec9f732b661ba23eb4955b9f0091a20e5eff783b8",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "功能页层级、搜索与导航、窄窗边界和明暗主题"
+    },
+    {
+      "path": "final/manager-report-dark.png",
+      "bytes": 80042,
+      "sha256": "dce39c69879e7935c9a4a59287dcd81f67359aa11b3e0ade238ec77b4afe2a11",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "功能页层级、搜索与导航、窄窗边界和明暗主题"
+    },
+    {
+      "path": "final/manager-report-light.png",
+      "bytes": 80147,
+      "sha256": "b4097e283c33128e480bd0edcc94d529d9dc1f4cbbd480ae24cfd960dff0c8e3",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "功能页层级、搜索与导航、窄窗边界和明暗主题"
+    },
+    {
+      "path": "final/manager-resurface-dark.png",
+      "bytes": 87741,
+      "sha256": "7e577dd62dc10db86f7bd4cd876d252e0f916070901d07e0b206b7bfbaac4f86",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "功能页层级、搜索与导航、窄窗边界和明暗主题"
+    },
+    {
+      "path": "final/manager-resurface-light.png",
+      "bytes": 87831,
+      "sha256": "fdfd7e2fe074893c05b6e693dc22634d48163137f1d5bb989c46a4422ed26e36",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "功能页层级、搜索与导航、窄窗边界和明暗主题"
+    },
+    {
+      "path": "final/manager-settings-420-dark.png",
+      "bytes": 51575,
+      "sha256": "38d7b1232b759fae686ef60d5db565c2a7fea9173904f41d8b82458b0b0bd515",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "标签位于字段上方，8px 间隔，字段完整宽度"
+    },
+    {
+      "path": "final/manager-settings-420-light.png",
+      "bytes": 54631,
+      "sha256": "9d55e792f624175509ac82064c20c518142c661d23cead4d4fab925279c53286",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "标签位于字段上方，8px 间隔，字段完整宽度"
+    },
+    {
+      "path": "final/manager-topics-dark.png",
+      "bytes": 178077,
+      "sha256": "a0e83dd8fe8cf3e6c7658fd4a7fc6206e0a26b8f1776263dc9405335f53a721f",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "功能页层级、搜索与导航、窄窗边界和明暗主题"
+    },
+    {
+      "path": "final/manager-topics-light.png",
+      "bytes": 203946,
+      "sha256": "83c9eeeee287910dda58c89772d76ee20c6f4533c983226ea81cabd1e22bbf0f",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "功能页层级、搜索与导航、窄窗边界和明暗主题"
+    },
+    {
+      "path": "final/menu-320-light.png",
+      "bytes": 48947,
+      "sha256": "6923d7a3386cf25a9a3944d654bbe0601d430859a37d3e949a5bc415b8d8091c",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "文字层级、组件留白、内容边界与主题对比清楚"
+    },
+    {
+      "path": "final/menu-400-light.png",
+      "bytes": 50186,
+      "sha256": "17a07fa2541015be2580d29d3312e7f985c599e0cc78cb8e858d88aa1c41cebc",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "文字层级、组件留白、内容边界与主题对比清楚"
+    },
+    {
+      "path": "final/menu-560-light.png",
+      "bytes": 51628,
+      "sha256": "ee77e1c7cbf4b6c1afc8eb2c450f925cf96811beb3d29b34b7bc1d5dbd2d6c70",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "文字层级、组件留白、内容边界与主题对比清楚"
+    },
+    {
+      "path": "final/menu-dark.png",
+      "bytes": 51255,
+      "sha256": "4204e989ae92d75068c5bd30609483f84def8d011383b1e008de9062497155ea",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "文字层级、组件留白、内容边界与主题对比清楚"
+    },
+    {
+      "path": "final/menu-scroll-drag.png",
+      "bytes": 49986,
+      "sha256": "798ac7a15335f4bb9a44c48c5af4b963d19dcd6371851eef648bb9d76eaf44eb",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "实际拖动、渐隐和闲置三态；细条无底轨且不挤正文"
+    },
+    {
+      "path": "final/menu-scroll-fading.png",
+      "bytes": 49930,
+      "sha256": "36d881509c5dc565640855f17c86bfc27ea0272a1a3d6bfcd11f93d943f61093",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "实际拖动、渐隐和闲置三态；细条无底轨且不挤正文"
+    },
+    {
+      "path": "final/menu-scroll-idle.png",
+      "bytes": 49805,
+      "sha256": "5896936f7c6a5232aa42f400bd7dff66f6433ef6498e8c010af911a053bba5c2",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "实际拖动、渐隐和闲置三态；细条无底轨且不挤正文"
+    },
+    {
+      "path": "final/onboarding-320-light.png",
+      "bytes": 46997,
+      "sha256": "340f73f8ad04289a5fdc48d69cd0cbf91c30cb53d1df6cc21a10fd949ee65ab1",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "文字层级、组件留白、内容边界与主题对比清楚"
+    },
+    {
+      "path": "final/onboarding-provider-320-dark.png",
+      "bytes": 35950,
+      "sha256": "2ef98085f658027497e7033123007a0ab83008cc4b114a0f465ad910a1161724",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "文字层级、组件留白、内容边界与主题对比清楚"
+    },
+    {
+      "path": "final/onboarding-provider-320-light.png",
+      "bytes": 41293,
+      "sha256": "46f64719d5fe9b3a1cebb4f27e575e3e84cb409f541fcf81a9f0b867d58ccad3",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "文字层级、组件留白、内容边界与主题对比清楚"
+    },
+    {
+      "path": "final/privacy-end-dark.png",
+      "bytes": 84733,
+      "sha256": "e48601e8919718a87f57527fa0e1c999975e092aeeef16f9ee110777bf464d4b",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "文字层级、组件留白、内容边界与主题对比清楚"
+    },
+    {
+      "path": "final/privacy-light.png",
+      "bytes": 61632,
+      "sha256": "6d0438731f82205e376432c54c4cae5435a6fdb5f6a29889f1ffdb633ef48835",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "文字层级、组件留白、内容边界与主题对比清楚"
+    },
+    {
+      "path": "final/select-dark.png",
+      "bytes": 42736,
+      "sha256": "492801946eaa59de79ceea926432b402a8d336c0c6a8186e66bd3bc0f353e178",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "控件与文字比例、箭头 12px 内边距、共享明暗主题"
+    },
+    {
+      "path": "final/select-light.png",
+      "bytes": 44688,
+      "sha256": "8150b7c08d7d6000a3c9fea499bfbae980ed6a07782ac839abe96f6cb57ecae9",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "控件与文字比例、箭头 12px 内边距、共享明暗主题"
+    },
+    {
+      "path": "final/settings-dark.png",
+      "bytes": 38848,
+      "sha256": "08794ab9bbf280dff315fefe75c45d351a276d5ff93d406d3db7dcb4ae4dba47",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "控件与文字比例、箭头 12px 内边距、共享明暗主题"
+    },
+    {
+      "path": "final/settings-light.png",
+      "bytes": 38685,
+      "sha256": "b7eb90b02857ec6f51380119fd9633687e7eeeefbd51392514cdf7225c2bf9fb",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "控件与文字比例、箭头 12px 内边距、共享明暗主题"
+    },
+    {
+      "path": "final/snapshot-confirm-420-dark.png",
+      "bytes": 64334,
+      "sha256": "72288cee06c22e4dba81c27ce3560423dfa5aed998e241e43e669b0bf0de124c",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "窗口单实例、清晰的取消与确认操作、留白完整"
+    },
+    {
+      "path": "final/snapshot-confirm-420-light.png",
+      "bytes": 65675,
+      "sha256": "ac223c7fb5e70f657c06c381642e27963ee063418cbb56754659afad7ca766e4",
+      "reviewed": true,
+      "method": "image tool inspection of actual browser rendering",
+      "note": "窗口单实例、清晰的取消与确认操作、留白完整"
+    }
+  ]
+}

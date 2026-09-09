@@ -43,6 +43,7 @@ async function start() {
     window.addEventListener(THEME_CHANGE_EVENT, () => postToFloatingHost({ type: "FLOAT_THEME", theme: document.documentElement.dataset.theme }));
   }
   initializeTheme();
+  document.documentElement.dataset.density = "compact";
   const [{ SidePanelApp }, { SidePanelErrorBoundary }] = await Promise.all([import("../sidepanel/SidePanelApp"), import("../sidepanel/error-boundary")]);
   const root = createRoot(document.getElementById("root")!);
   root.render(<StrictMode><SidePanelErrorBoundary><SidePanelApp surface="floating" /></SidePanelErrorBoundary></StrictMode>);

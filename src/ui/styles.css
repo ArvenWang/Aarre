@@ -2,6 +2,7 @@
 @import "./base.css";
 @import "./editor-fields.css";
 @import "./heroui-theme.css";
+@import "./scroll-area.css";
 
 :root {
   --background: var(--bg);
@@ -50,8 +51,7 @@
   --shadow-surface-8: 0 36px 76px color-mix(in srgb, var(--shade) 32%, transparent);
 }
 
-.fluid-control:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
-.fluid-select {
+.fluid-control:where(:not([type="checkbox"]):not([type="radio"]):not([type="file"])) {
   min-height: var(--control-h-md);
   padding: 8px 12px;
   border-radius: var(--shape-input-radius, var(--radius-md));

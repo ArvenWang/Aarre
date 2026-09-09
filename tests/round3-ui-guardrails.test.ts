@@ -31,17 +31,18 @@ describe("Round 3 UI root-cause guardrails", () => {
   });
 
   it("renders cited bookmark links inline without nesting block cards in paragraphs", async () => {
-    const [page, css] = await Promise.all([
+    const [page, css, markdown] = await Promise.all([
       readFile(agentPageUrl, "utf8"),
       readFile(agentCssUrl, "utf8"),
+      readFile(new URL("../src/ui/sidepanel/components/AgentMarkdown.tsx", import.meta.url), "utf8"),
     ]);
-    expect(page).toContain('className="agent-inline-source"');
-    expect(page).toContain("bookmarkSourceForUrl(sources, href)");
+    expect(markdown).toContain('className="agent-inline-source"');
+    expect(markdown).toContain("bookmarkSourceForUrl(sources, href)");
     expect(page).toContain("sources={message.sources}");
     expect(page).toContain("uncitedSources(message.content, message.sources)");
     expect(page).toContain("其他相关收藏");
     expect(css).toContain(".agent-markdown .agent-inline-source");
-    expect(page).not.toContain('<div className="agent-inline-source"');
+    expect(markdown).not.toContain('<div className="agent-inline-source"');
   });
 
   it("gives Markdown prose enough leading for bookmark chips without shrinking them", async () => {

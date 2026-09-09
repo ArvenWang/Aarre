@@ -1,3 +1,4 @@
+import { FloatingScrollbars } from "@/ui/components/ui/scroll-area";
 import { useEffect, type ComponentProps, type RefObject } from "react";
 import { Button } from "@/ui/components/ui/button";
 import type { ListCoverStyle } from "../../../lib/display-settings";
@@ -43,16 +44,7 @@ interface LibraryModel {
   onMove: (id: string, parentId: string, index?: number) => Promise<void>;
 }
 
-interface ScrollModel {
-  scrollable: boolean;
-  visible: boolean;
-  height: number;
-  offset: number;
-  atEnd: boolean;
-  onPointerDown: ComponentProps<"div">["onPointerDown"];
-  onPointerMove: ComponentProps<"div">["onPointerMove"];
-  onPointerEnd: ComponentProps<"div">["onPointerUp"];
-}
+interface ScrollModel { atEnd: boolean; }
 
 interface HomePageProps {
   floating?: boolean;
@@ -85,7 +77,6 @@ export default function HomePage({
   agent,
   editor,
 }: HomePageProps) {
-  const content = library.contentRef.current;
 
   useEffect(() => {
     if (!status.notice) return;
@@ -173,23 +164,7 @@ export default function HomePage({
             )
           ) : <div className="empty-state">正在读取 Chrome 书签…</div>}
         </section>
-        {scroll.scrollable ? (
-          <div
-            className="native-scroll-thumb"
-            data-visible={scroll.visible}
-            style={{ height: `${scroll.height}px`, transform: `translateY(${scroll.offset}px)` }}
-            role="scrollbar"
-            aria-controls="bookmark-list"
-            aria-orientation="vertical"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={content ? Math.round((content.scrollTop / Math.max(1, content.scrollHeight - content.clientHeight)) * 100) : 0}
-            onPointerDown={scroll.onPointerDown}
-            onPointerMove={scroll.onPointerMove}
-            onPointerUp={scroll.onPointerEnd}
-            onPointerCancel={scroll.onPointerEnd}
-          />
-        ) : null}
+        <FloatingScrollbars viewportRef={library.contentRef} label="Chrome 书签" />
       </div>
       {status.notice && !status.error ? (
         <div className="native-notice" role="status">

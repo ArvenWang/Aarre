@@ -1,7 +1,7 @@
+import { ScrollSurface } from "@/ui/components/ui/scroll-area";
 import {
   FluidInput,
   FluidTextarea,
-  FluidSelect,
 } from "@/ui/components/ui/input";
 import {
   Fragment,
@@ -397,7 +397,7 @@ export function LibraryView({
                     {/* Detail lives over the artwork rather than below it, so
                           revealing it cannot change the card's height and shift
                           the cards below it in the same masonry column. */}
-                    <div
+                    <ScrollSurface as="div"
                       className="library-card-extra"
                       aria-hidden="true"
                       onClick={(event) => {
@@ -417,7 +417,7 @@ export function LibraryView({
                       }}
                     >
                       <p>{highlightMatches(summary, query)}</p>
-                    </div>
+                    </ScrollSurface>
                   </div>
                 </div>
 

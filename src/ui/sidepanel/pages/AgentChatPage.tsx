@@ -1,10 +1,9 @@
+import { ScrollSurface } from "@/ui/components/ui/scroll-area";
 import React, { Fragment, useEffect, useRef } from "react";
 import "../../sidepanel-lazy.css";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { AgentMarkdown } from "../components/AgentMarkdown";
 import { Button } from "@/ui/components/ui/button";
 import { Checkbox } from "@/ui/components/ui/checkbox";
-import { registrableHost } from "../../../lib/cover-registry";
 import { canonicalizeUrl } from "../../../lib/url";
 import { currentSiteBrandImageUrl } from "../../../lib/thumbnail";
 import type {
@@ -18,59 +17,10 @@ import { ArrowLeftIcon, CloseIcon } from "../../components/Icons";
 import { SiteThumbnail } from "../../components/SiteThumbnail";
 import { AgentComposer } from "../components/AgentComposer";
 import { AgentThinkingSteps } from "../components/AgentThinkingSteps";
-import { bookmarkSourceForUrl } from "../bookmark-link";
+import { resourceForUrl, siteBrandForUrl } from "../bookmark-link";
 import { hostFromUrl } from "../utils";
 
-export function AgentMarkdown({
-  content,
-  resourceByUrl,
-  siteBrandByHost,
-  sources,
-}: {
-  content: string;
-  resourceByUrl: Map<string, ResourceRecord>;
-  siteBrandByHost: Map<string, SiteBrandRecord>;
-  sources?: BookmarkAgentSource[];
-}) {
-  return (
-    <div className="agent-markdown">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
-            const resource = href ? resourceForUrl(resourceByUrl, href) : undefined;
-            const source = href ? bookmarkSourceForUrl(sources, href) : undefined;
-            const bookmarkUrl = resource?.url || source?.url;
-            if (!bookmarkUrl) {
-              return <a href={href} target="_blank" rel="noreferrer noopener">{children}</a>;
-            }
-            const bookmarkTitle = resource?.title || source?.title || bookmarkUrl;
-            return (
-              <a className="agent-inline-source" href={bookmarkUrl} target="_blank" rel="noreferrer noopener" title={bookmarkTitle}>
-                <SiteThumbnail
-                  url={bookmarkUrl}
-                  imageUrl={resource?.thumbnailDataUrl}
-                  brandImageUrl={
-                    currentSiteBrandImageUrl(
-                      siteBrandForUrl(siteBrandByHost, bookmarkUrl),
-                    ) || source?.faviconUrl
-                  }
-                  categoryCoverId={resource?.categoryCoverId}
-                  forceSiteBrand
-                  label={resource?.siteName || source?.siteName || bookmarkTitle}
-                  className="agent-inline-source-thumbnail"
-                />
-                <span>{children}</span>
-              </a>
-            );
-          }
-        }}
-      >
-        {content}
-      </ReactMarkdown>
-    </div>
-  );
-}
+export { AgentMarkdown } from "../components/AgentMarkdown";
 
 function sourceIsCited(content: string, source: BookmarkAgentSource): boolean {
   if (content.includes(source.url)) return true;
@@ -92,18 +42,6 @@ function uncitedSources(
   return (sources || []).filter((source) => !sourceIsCited(content, source));
 }
 
-function resourceForUrl(resourceByUrl: Map<string, ResourceRecord>, url: string) {
-  const direct = resourceByUrl.get(url);
-  if (direct) return direct;
-  try { return resourceByUrl.get(canonicalizeUrl(url)); } catch { return undefined; }
-}
-
-function siteBrandForUrl(siteBrandByHost: Map<string, SiteBrandRecord>, input: string) {
-  try {
-    const host = new URL(input).hostname.toLocaleLowerCase();
-    return siteBrandByHost.get(host) || siteBrandByHost.get(registrableHost(host));
-  } catch { return undefined; }
-}
 function conversationDate(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
@@ -221,7 +159,7 @@ function AgentChatPage({
           <h1>收藏对话</h1>
         </div>
       </header>
-      <section className="agent-thread" aria-live="polite">
+      <ScrollSurface as="section" className="agent-thread" aria-live="polite">
         {!conversation.messages.length && !busy && !error ? (
           <div className="agent-chat-welcome">
             <h2>和你的收藏聊聊</h2>
@@ -482,7 +420,7 @@ function AgentChatPage({
           </div>
         ) : null}
         <div ref={endRef} />
-      </section>
+      </ScrollSurface>
       <AgentComposer
         value={prompt}
         busy={busy}

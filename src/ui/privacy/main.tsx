@@ -1,3 +1,4 @@
+import { DocumentScrollbar } from "@/ui/components/ui/scroll-area";
 import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Button } from "@/ui/components/ui/button";
@@ -176,5 +177,6 @@ function PrivacyPage() {
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <PrivacyPage />
+    <DocumentScrollbar />
   </StrictMode>,
 );

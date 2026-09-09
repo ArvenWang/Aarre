@@ -4,7 +4,7 @@ import { Suspense, lazy, useCallback, useEffect, useState, type ReactNode } from
 import { sendExtensionRequest } from "../../lib/messages";
 import type { ListCoverStyle } from "../../lib/display-settings";
 import { restartOnboarding } from "../../lib/onboarding";
-import { useScrollThumb } from "./hooks/use-scroll-thumb";
+import { useScrollBoundary } from "./hooks/use-scroll-boundary";
 import { useBookmarkPreview } from "./hooks/use-bookmark-preview";
 import { useAgentChat, type SidePanelView } from "./hooks/use-agent-chat";
 import { useBookmarks } from "./hooks/use-bookmarks";
@@ -131,15 +131,7 @@ export function SidePanelApp({ surface = "sidebar" }: { surface?: "sidebar" | "f
     deleteEditorNode,
   } = editorController;
   usePendingSave({ activeTabId: appState?.activeTab?.id, startSave, setError });
-  const {
-    contentRef,
-    thumb: scrollThumb,
-    sync: syncScrollThumb,
-    reveal: revealScrollThumb,
-    onPointerDown: handleScrollThumbPointerDown,
-    onPointerMove: handleScrollThumbPointerMove,
-    onPointerEnd: handleScrollThumbPointerEnd,
-  } = useScrollThumb(panelView);
+  const { contentRef, atEnd, sync: syncScrollBoundary } = useScrollBoundary(panelView);
 
   const {
     expanded,
@@ -165,7 +157,7 @@ export function SidePanelApp({ surface = "sidebar" }: { surface?: "sidebar" | "f
     siteBrands,
     removedNodeIds,
     contentRef,
-    syncScrollThumb,
+    syncScrollThumb: syncScrollBoundary,
     refresh,
     setError,
   });
@@ -205,8 +197,8 @@ export function SidePanelApp({ surface = "sidebar" }: { surface?: "sidebar" | "f
     expanded,
     setExpanded,
     contentRef,
-    syncScrollThumb,
-    revealScrollThumb,
+    syncScrollThumb: syncScrollBoundary,
+    revealScrollThumb: syncScrollBoundary,
     loadConversations,
     setError,
   });
@@ -396,12 +388,7 @@ export function SidePanelApp({ surface = "sidebar" }: { surface?: "sidebar" | "f
         onDragEnd: () => setDraggedId(""),
         onMove: moveNode,
       }}
-      scroll={{
-        ...scrollThumb,
-        onPointerDown: handleScrollThumbPointerDown,
-        onPointerMove: handleScrollThumbPointerMove,
-        onPointerEnd: handleScrollThumbPointerEnd,
-      }}
+      scroll={{ atEnd }}
       preview={{ snapshot: previewSnapshot, hidden: Boolean(editor), placement: bookmarkPreview }}
       agent={aiConfigured ? {
         value: agentPrompt,

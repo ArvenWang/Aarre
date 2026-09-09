@@ -5,6 +5,10 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // Saving visual evidence must not reload the app being inspected.
+  server: {
+    watch: { ignored: ["**/docs/verification/**", "**/outputs/**"] },
+  },
   resolve: {
     alias: {
       "@": resolve(__dirname, "src")

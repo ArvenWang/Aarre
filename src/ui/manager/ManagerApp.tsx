@@ -1,4 +1,5 @@
-import { ManagerUtilities } from "./components/ManagerUtilities";
+import { FloatingScrollbars } from "@/ui/components/ui/scroll-area";
+import { ManagerUtilities, ManagerUtilityActions, type ManagerUtility } from "./components/ManagerUtilities";
 import { Button } from "@/ui/components/ui/button";
 import { Tabs } from "@heroui/react/tabs";
 import {
@@ -92,6 +93,8 @@ function initialLocationState(): {
 }
 
 export function ManagerApp() {
+  const tabViewportRef = useRef<HTMLDivElement>(null);
+  const [openedUtility, setOpenedUtility] = useState<ManagerUtility | null>(() => new URLSearchParams(location.search).has("archive") ? "archive" : new URLSearchParams(location.search).has("settings") ? "settings" : null);
   const initial = useMemo(initialLocationState, []);
   const [themeMode, setThemeMode] = useState<ThemeMode>(() =>
     initializeTheme(),
@@ -593,10 +596,10 @@ export function ManagerApp() {
             </div>
             <strong>Aarre</strong>
           </div>
-          <ManagerUtilities appState={appState} onStateChange={setAppState} onRestored={() => { void loadResources(); void loadDerivedData(); }} />
+          <ManagerUtilityActions onOpen={setOpenedUtility} />
         </div>
 
-        <Tabs.List className="manager-view-tabs aarre-tabs-list" aria-label="收藏管理功能">
+        <Tabs.List ref={tabViewportRef} className="manager-view-tabs aarre-tabs-list" aria-label="收藏管理功能">
           {(
             [
               ["library", "收藏库", libraryResults.length],
@@ -613,6 +616,7 @@ export function ManagerApp() {
             <Tabs.Tab key={value} id={value} className="aarre-tab">{label}<span className="manager-tab-count">{count}</span></Tabs.Tab>
           ))}
         </Tabs.List>
+        <FloatingScrollbars viewportRef={tabViewportRef} label="收藏库导航" />
 
         <Button
           type="button"
@@ -657,6 +661,7 @@ export function ManagerApp() {
           {view === id ? viewContent : null}
         </Tabs.Panel>)}
       </Tabs>
+      <ManagerUtilities opened={openedUtility} onClose={() => setOpenedUtility(null)} appState={appState} onStateChange={setAppState} onRestored={() => { void loadResources(); void loadDerivedData(); }} />
       </main>
       <FloatingScrollbar />
     </>

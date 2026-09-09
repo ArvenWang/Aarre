@@ -40,7 +40,7 @@ function AgentComposer({
       <div className="agent-composer agent-composer-setup">
         <Button type="button" variant="ghost" onClick={onConfigure}>
           <span>
-            <strong>配置 AI 后可以直接问你的收藏</strong>
+            <strong>连接 AI 服务</strong>
           </span>
           <ChevronRightIcon />
         </Button>

@@ -9,6 +9,7 @@ import { SidePanelErrorBoundary } from "./error-boundary";
 
 async function bootstrap(): Promise<void> {
   initializeTheme();
+  document.documentElement.dataset.density = "compact";
   if (
     import.meta.env.DEV &&
     new URLSearchParams(window.location.search).get("preview") !== "0"

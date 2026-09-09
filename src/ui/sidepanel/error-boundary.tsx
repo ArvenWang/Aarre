@@ -8,7 +8,7 @@ export class SidePanelErrorBoundary extends Component<
 
   static getDerivedStateFromError(error: unknown) {
     return {
-      message: error instanceof Error ? error.message : "侧边栏暂时无法打开",
+      message: error instanceof Error ? error.message : "收藏菜单暂时无法打开",
     };
   }
 

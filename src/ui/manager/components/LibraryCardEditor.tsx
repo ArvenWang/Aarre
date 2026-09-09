@@ -1,4 +1,5 @@
 import { AppModal } from "@/ui/components/ui/modal";
+import { ScrollSurface } from "@/ui/components/ui/scroll-area";
 import { BookmarkEditorFields } from "../../components/BookmarkEditorFields";
 import { CloudConflictNotice } from "../../components/CloudConflictNotice";
 import {
@@ -234,7 +235,7 @@ export function LibraryCardEditor({
       onChanged(
         hasOtherLocations
           ? "已删除所选收藏位置，其余位置仍然保留。"
-          : "收藏已删除，可在侧边栏设置的“最近的更改”中恢复。",
+          : "收藏已删除，可在设置的“最近的更改”中恢复。",
         {
           resourceKey: resource.resourceKey,
           kind: hasOtherLocations ? "location-removed" : "removed",
@@ -294,6 +295,7 @@ export function LibraryCardEditor({
                 </header>
 
                 <form onSubmit={(event) => void save(event)}>
+                  <ScrollSurface className="library-card-editor-body" label="收藏编辑内容">
                   <CloudConflictNotice
                     resourceKey={resource.resourceKey}
                     currentUserNote={userNote}
@@ -338,6 +340,7 @@ export function LibraryCardEditor({
                       {error}
                     </p>
                   ) : null}
+                  </ScrollSurface>
 
                   {confirmDelete ? (
                     <div
@@ -354,7 +357,7 @@ export function LibraryCardEditor({
                           <small>
                             {hasOtherLocations
                               ? "其他位置与 Aarre 智能信息保留"
-                              : "30 天内可在侧边栏设置撤销"}
+                              : "30 天内可在设置撤销"}
                           </small>
                         </span>
                       </p>

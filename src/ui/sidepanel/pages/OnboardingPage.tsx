@@ -1,3 +1,4 @@
+import { ScrollSurface } from "@/ui/components/ui/scroll-area";
 import { useState } from "react";
 import "../../sidepanel-lazy.css";
 import { Button } from "@/ui/components/ui/button";
@@ -84,7 +85,7 @@ function OnboardingPage({
   }
 
   return (
-    <main className="native-panel onboarding-panel">
+    <ScrollSurface as="main" className="native-panel onboarding-panel">
       <header>
         <span className="eyebrow">AARRE · {step + 1}/3</span>
         <Button
@@ -270,7 +271,7 @@ function OnboardingPage({
           </>
         )}
       </section>
-    </main>
+    </ScrollSurface>
   );
 }
 

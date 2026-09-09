@@ -1,0 +1,40 @@
+{
+  "fixture": "DEV local QA conversation, no provider request",
+  "table": [
+    {
+      "class": "agent-thread",
+      "id": "scroll-_r_1bf_",
+      "width": 384,
+      "scrollWidth": 384,
+      "height": 452,
+      "scrollHeight": 1255,
+      "left": 0,
+      "bars": 1
+    },
+    {
+      "class": "scroll-area-viewport",
+      "id": "scroll-_r_1b9_",
+      "width": 352,
+      "scrollWidth": 708,
+      "height": 107,
+      "scrollHeight": 107,
+      "left": 355.5,
+      "bars": 1
+    },
+    {
+      "class": "scroll-area-viewport",
+      "id": "scroll-_r_1ba_",
+      "width": 352,
+      "scrollWidth": 1134,
+      "height": 45,
+      "scrollHeight": 45,
+      "left": 0,
+      "bars": 1
+    }
+  ],
+  "narrow": {
+    "pageWidth": 320,
+    "threadWidth": 304,
+    "threadScrollWidth": 304
+  }
+}
