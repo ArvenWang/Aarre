@@ -11,6 +11,7 @@ import {
 } from "../../lib/bookmark-enhancement";
 import { isLoadedSnapshotTab, isPageSnapshotStale } from "../../lib/page-snapshot";
 import { readImmediateSnapshotTarget } from "../snapshots/target-store";
+import { isSaveAiPending } from "./save-ai-preparation";
 import type { ResourceRecord } from "../../lib/types";
 
 const USER_PROTECTION_MESSAGE = "这条收藏受用户保护，不会读取或发送页面内容。";
@@ -126,6 +127,7 @@ async function coordinateActiveBookmarkedPage(
   }
 
   if (!enhancementTriggerAllowsRenderedAi(effectiveTrigger)) return;
+  if (isSaveAiPending(resource.resourceKey)) return;
   if (!needsAi) return;
   if (privacyBlocked) {
     await upsertLocalResource({

@@ -18,6 +18,7 @@ import type {
 } from "../../../lib/types";
 import { canonicalizeUrl } from "../../../lib/url";
 import { captureFromDraft, emptyCapture } from "../utils";
+import { useSaveAiPreview } from "./use-save-ai-preview";
 
 export type EditorState =
   | { kind: "bookmark"; node: NativeBookmarkNode; resourceKey?: string }
@@ -77,6 +78,7 @@ export function useBookmarkEditor({
   const [confirmDeleteId, setConfirmDeleteId] = useState("");
   const [removedNodeIds, setRemovedNodeIds] = useState<string[]>([]);
   const dialogRef = useRef<HTMLElement | null>(null);
+  const saveAi = useSaveAiPreview(editor?.kind === "save" && busy !== "capture", capture, captureSourceTabId);
   useEffect(() => {
     writeDraft("bookmark-editor", editor ? { editor, editBookmarkId, editParentId, editTitle, editUrl, editTags, editTagInput, editTagsChanged, capture, captureSourceTabId, note, folderId, folders, folderSuggestions, bookmarkSaveState, saveDisposition, selectedBookmarkId, captureWarning } : null);
   }, [editor, editBookmarkId, editParentId, editTitle, editUrl, editTags, editTagInput, editTagsChanged, capture, captureSourceTabId, note, folderId, folders, folderSuggestions, bookmarkSaveState, saveDisposition, selectedBookmarkId, captureWarning]);
@@ -161,7 +163,7 @@ export function useBookmarkEditor({
         setCaptureWarning("这是链接收藏。保存后打开该网页，可继续补充正文摘要和 AI 标签。");
       } else {
         try {
-          const page = await sendExtensionRequest({ type: "CAPTURE_ACTIVE_PAGE", tabId: draft?.tabId });
+          const page = await sendExtensionRequest({ type: "CAPTURE_ACTIVE_PAGE", tabId: draft?.tabId || appState.activeTab?.id });
           const merged = draft ? { ...page, selectedText: draft.selectedText || page.selectedText } : page;
           setCapture(merged);
           setEditTitle(initialMatch?.title || draft?.title || merged.title);
@@ -249,6 +251,7 @@ export function useBookmarkEditor({
           payload: {
             capture, ...(typeof captureSourceTabId === "number" ? { sourceTabId: captureSourceTabId } : {}),
             title: editTitle, userNote: note, folderId, requestAi: true,
+            ...(saveAi.requestId ? { aiPreparationId: saveAi.requestId } : {}),
             ...(saveDisposition === "reuse" && selectedBookmarkId ? { existingBookmarkId: selectedBookmarkId } : {}),
             ...(saveDisposition === "new" && bookmarkSaveState?.status !== "none" ? { createSeparate: true } : {}),
             ...(saveDisposition === "reuse" && bookmarkSaveState?.matches.find((match) => match.id === selectedBookmarkId)?.matchKind === "canonical" ? { confirmedCanonicalReuse: true } : {}),
@@ -284,7 +287,7 @@ export function useBookmarkEditor({
   return {
     editor, setEditor, dialogRef, editBookmarkId, editParentId, setEditParentId, editTitle, setEditTitle,
     editUrl, setEditUrl, editTags, setEditTags, editTagInput, setEditTagInput, setEditTagsChanged,
-    capture, note, setNote, folderId, setFolderId, folders, folderSuggestions,
+    capture, note, setNote, folderId, setFolderId, folders, folderSuggestions, saveAi,
     bookmarkSaveState, saveDisposition, setSaveDisposition, selectedBookmarkId,
     setSelectedBookmarkId, captureWarning, confirmDeleteId, setConfirmDeleteId,
     removedNodeIds, currentSaved: Boolean(currentPageSaveState && currentPageSaveState.status !== "none"),

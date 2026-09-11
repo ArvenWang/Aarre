@@ -389,3 +389,14 @@ describe("parseJsonObject strict parsing", () => {
     expect(() => parseJsonObject('{"answer":"line1\nline2"}')).toThrow();
   });
 });
+
+it('keeps the caller cancellation attached after response headers until JSON body finishes', async()=>{
+  const controller=new AbortController();let reading=false;
+  vi.stubGlobal('fetch',vi.fn(async(_url,init:RequestInit)=>({
+    ok:true,
+    json:()=>{reading=true;return new Promise((_resolve,reject)=>{init.signal!.addEventListener('abort',()=>reject(init.signal!.reason),{once:true});});},
+  })));
+  const request=enrichResourceLocally(resource,capture,controller.signal);
+  const result=expect(request).rejects.toThrow('AI 请求已停止');
+  await vi.waitFor(()=>expect(reading).toBe(true));controller.abort();await result;
+});

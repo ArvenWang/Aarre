@@ -1,0 +1,587 @@
+[
+  {
+    "name": "save-ai-ready-light",
+    "viewport": {
+      "width": 880,
+      "height": 740
+    },
+    "theme": "light",
+    "panel": {
+      "x": 505,
+      "y": 61.5,
+      "width": 360,
+      "height": 617,
+      "top": 61.5,
+      "right": 865,
+      "bottom": 678.5,
+      "left": 505
+    },
+    "frame": {
+      "width": 360,
+      "height": 617
+    },
+    "body": {
+      "x": 0,
+      "y": 49,
+      "width": 360,
+      "height": 507,
+      "top": 49,
+      "right": 360,
+      "bottom": 556,
+      "left": 0,
+      "scrollHeight": 507,
+      "scrollWidth": 360,
+      "clientHeight": 507,
+      "clientWidth": 360,
+      "scrollTop": 0
+    },
+    "content": {
+      "x": 16,
+      "y": 61,
+      "width": 328,
+      "height": 478.96875,
+      "top": 61,
+      "right": 344,
+      "bottom": 539.96875,
+      "left": 16
+    },
+    "footer": {
+      "x": 0,
+      "y": 556,
+      "width": 360,
+      "height": 61,
+      "top": 556,
+      "right": 360,
+      "bottom": 617,
+      "left": 0
+    },
+    "warning": null,
+    "horizontalOverflow": [],
+    "headerMargin": "0px",
+    "footerMargin": "0px",
+    "footerPadding": "12px 16px",
+    "title": "侧边栏设计评审",
+    "note": "",
+    "resizeHidden": true
+  },
+  {
+    "name": "save-ai-ready-dark",
+    "viewport": {
+      "width": 880,
+      "height": 740
+    },
+    "theme": "dark",
+    "panel": {
+      "x": 505,
+      "y": 61.5,
+      "width": 360,
+      "height": 617,
+      "top": 61.5,
+      "right": 865,
+      "bottom": 678.5,
+      "left": 505
+    },
+    "frame": {
+      "width": 360,
+      "height": 617
+    },
+    "body": {
+      "x": 0,
+      "y": 49,
+      "width": 360,
+      "height": 507,
+      "top": 49,
+      "right": 360,
+      "bottom": 556,
+      "left": 0,
+      "scrollHeight": 507,
+      "scrollWidth": 360,
+      "clientHeight": 507,
+      "clientWidth": 360,
+      "scrollTop": 0
+    },
+    "content": {
+      "x": 16,
+      "y": 61,
+      "width": 328,
+      "height": 478.96875,
+      "top": 61,
+      "right": 344,
+      "bottom": 539.96875,
+      "left": 16
+    },
+    "footer": {
+      "x": 0,
+      "y": 556,
+      "width": 360,
+      "height": 61,
+      "top": 556,
+      "right": 360,
+      "bottom": 617,
+      "left": 0
+    },
+    "warning": null,
+    "horizontalOverflow": [],
+    "headerMargin": "0px",
+    "footerMargin": "0px",
+    "footerPadding": "12px 16px",
+    "title": "侧边栏设计评审",
+    "note": "",
+    "resizeHidden": true
+  },
+  {
+    "name": "save-ai-ready-narrow",
+    "viewport": {
+      "width": 320,
+      "height": 740
+    },
+    "theme": "light",
+    "panel": {
+      "x": 0,
+      "y": 50,
+      "width": 305,
+      "height": 640,
+      "top": 50,
+      "right": 305,
+      "bottom": 690,
+      "left": 0
+    },
+    "frame": {
+      "width": 305,
+      "height": 640
+    },
+    "body": {
+      "x": 0,
+      "y": 49,
+      "width": 305,
+      "height": 530,
+      "top": 49,
+      "right": 305,
+      "bottom": 579,
+      "left": 0,
+      "scrollHeight": 549,
+      "scrollWidth": 305,
+      "clientHeight": 530,
+      "clientWidth": 305,
+      "scrollTop": 0
+    },
+    "content": {
+      "x": 16,
+      "y": 61,
+      "width": 273,
+      "height": 520.765625,
+      "top": 61,
+      "right": 289,
+      "bottom": 581.765625,
+      "left": 16
+    },
+    "footer": {
+      "x": 0,
+      "y": 579,
+      "width": 305,
+      "height": 61,
+      "top": 579,
+      "right": 305,
+      "bottom": 640,
+      "left": 0
+    },
+    "warning": null,
+    "horizontalOverflow": [],
+    "headerMargin": "0px",
+    "footerMargin": "0px",
+    "footerPadding": "12px 16px",
+    "title": "侧边栏设计评审",
+    "note": "",
+    "resizeHidden": true
+  },
+  {
+    "name": "save-ai-ready-short",
+    "viewport": {
+      "width": 420,
+      "height": 380
+    },
+    "theme": "light",
+    "panel": {
+      "x": 45,
+      "y": 12,
+      "width": 360,
+      "height": 356,
+      "top": 12,
+      "right": 405,
+      "bottom": 368,
+      "left": 45
+    },
+    "frame": {
+      "width": 360,
+      "height": 356
+    },
+    "body": {
+      "x": 0,
+      "y": 49,
+      "width": 360,
+      "height": 246,
+      "top": 49,
+      "right": 360,
+      "bottom": 295,
+      "left": 0,
+      "scrollHeight": 507,
+      "scrollWidth": 360,
+      "clientHeight": 246,
+      "clientWidth": 360,
+      "scrollTop": 0
+    },
+    "content": {
+      "x": 16,
+      "y": 61,
+      "width": 328,
+      "height": 478.96875,
+      "top": 61,
+      "right": 344,
+      "bottom": 539.96875,
+      "left": 16
+    },
+    "footer": {
+      "x": 0,
+      "y": 295,
+      "width": 360,
+      "height": 61,
+      "top": 295,
+      "right": 360,
+      "bottom": 356,
+      "left": 0
+    },
+    "warning": null,
+    "horizontalOverflow": [],
+    "headerMargin": "0px",
+    "footerMargin": "0px",
+    "footerPadding": "12px 16px",
+    "title": "侧边栏设计评审",
+    "note": "",
+    "resizeHidden": true
+  },
+  {
+    "name": "save-ai-short-bottom",
+    "viewport": {
+      "width": 420,
+      "height": 380
+    },
+    "theme": "light",
+    "panel": {
+      "x": 45,
+      "y": 12,
+      "width": 360,
+      "height": 356,
+      "top": 12,
+      "right": 405,
+      "bottom": 368,
+      "left": 45
+    },
+    "frame": {
+      "width": 360,
+      "height": 356
+    },
+    "body": {
+      "x": 0,
+      "y": 49,
+      "width": 360,
+      "height": 246,
+      "top": 49,
+      "right": 360,
+      "bottom": 295,
+      "left": 0,
+      "scrollHeight": 507,
+      "scrollWidth": 360,
+      "clientHeight": 246,
+      "clientWidth": 360,
+      "scrollTop": 261
+    },
+    "content": {
+      "x": 16,
+      "y": -200,
+      "width": 328,
+      "height": 478.96875,
+      "top": -200,
+      "right": 344,
+      "bottom": 278.96875,
+      "left": 16
+    },
+    "footer": {
+      "x": 0,
+      "y": 295,
+      "width": 360,
+      "height": 61,
+      "top": 295,
+      "right": 360,
+      "bottom": 356,
+      "left": 0
+    },
+    "warning": null,
+    "horizontalOverflow": [],
+    "headerMargin": "0px",
+    "footerMargin": "0px",
+    "footerPadding": "12px 16px",
+    "title": "侧边栏设计评审",
+    "note": "",
+    "resizeHidden": true
+  },
+  {
+    "name": "save-ai-failed",
+    "viewport": {
+      "width": 880,
+      "height": 740
+    },
+    "theme": "light",
+    "panel": {
+      "x": 505,
+      "y": 98,
+      "width": 360,
+      "height": 544,
+      "top": 98,
+      "right": 865,
+      "bottom": 642,
+      "left": 505
+    },
+    "frame": {
+      "width": 360,
+      "height": 544
+    },
+    "body": {
+      "x": 0,
+      "y": 49,
+      "width": 360,
+      "height": 434,
+      "top": 49,
+      "right": 360,
+      "bottom": 483,
+      "left": 0,
+      "scrollHeight": 434,
+      "scrollWidth": 360,
+      "clientHeight": 434,
+      "clientWidth": 360,
+      "scrollTop": 0
+    },
+    "content": {
+      "x": 16,
+      "y": 61,
+      "width": 328,
+      "height": 405.578125,
+      "top": 61,
+      "right": 344,
+      "bottom": 466.578125,
+      "left": 16
+    },
+    "footer": {
+      "x": 0,
+      "y": 483,
+      "width": 360,
+      "height": 61,
+      "top": 483,
+      "right": 360,
+      "bottom": 544,
+      "left": 0
+    },
+    "warning": null,
+    "horizontalOverflow": [],
+    "headerMargin": "0px",
+    "footerMargin": "0px",
+    "footerPadding": "12px 16px",
+    "title": "侧边栏设计评审",
+    "note": "",
+    "resizeHidden": true
+  },
+  {
+    "name": "save-ai-loading",
+    "viewport": {
+      "width": 880,
+      "height": 740
+    },
+    "theme": "light",
+    "panel": {
+      "x": 505,
+      "y": 104,
+      "width": 360,
+      "height": 532,
+      "top": 104,
+      "right": 865,
+      "bottom": 636,
+      "left": 505
+    },
+    "frame": {
+      "width": 360,
+      "height": 532
+    },
+    "body": {
+      "x": 0,
+      "y": 49,
+      "width": 360,
+      "height": 422,
+      "top": 49,
+      "right": 360,
+      "bottom": 471,
+      "left": 0,
+      "scrollHeight": 422,
+      "scrollWidth": 360,
+      "clientHeight": 422,
+      "clientWidth": 360,
+      "scrollTop": 0
+    },
+    "content": {
+      "x": 16,
+      "y": 61,
+      "width": 328,
+      "height": 393.578125,
+      "top": 61,
+      "right": 344,
+      "bottom": 454.578125,
+      "left": 16
+    },
+    "footer": {
+      "x": 0,
+      "y": 471,
+      "width": 360,
+      "height": 61,
+      "top": 471,
+      "right": 360,
+      "bottom": 532,
+      "left": 0
+    },
+    "warning": null,
+    "horizontalOverflow": [],
+    "headerMargin": "0px",
+    "footerMargin": "0px",
+    "footerPadding": "12px 16px",
+    "title": "侧边栏设计评审",
+    "note": "",
+    "resizeHidden": true
+  },
+  {
+    "name": "save-ai-protected",
+    "viewport": {
+      "width": 880,
+      "height": 740
+    },
+    "theme": "light",
+    "panel": {
+      "x": 505,
+      "y": 104,
+      "width": 360,
+      "height": 532,
+      "top": 104,
+      "right": 865,
+      "bottom": 636,
+      "left": 505
+    },
+    "frame": {
+      "width": 360,
+      "height": 532
+    },
+    "body": {
+      "x": 0,
+      "y": 49,
+      "width": 360,
+      "height": 422,
+      "top": 49,
+      "right": 360,
+      "bottom": 471,
+      "left": 0,
+      "scrollHeight": 422,
+      "scrollWidth": 360,
+      "clientHeight": 422,
+      "clientWidth": 360,
+      "scrollTop": 0
+    },
+    "content": {
+      "x": 16,
+      "y": 61,
+      "width": 328,
+      "height": 393.578125,
+      "top": 61,
+      "right": 344,
+      "bottom": 454.578125,
+      "left": 16
+    },
+    "footer": {
+      "x": 0,
+      "y": 471,
+      "width": 360,
+      "height": 61,
+      "top": 471,
+      "right": 360,
+      "bottom": 532,
+      "left": 0
+    },
+    "warning": null,
+    "horizontalOverflow": [],
+    "headerMargin": "0px",
+    "footerMargin": "0px",
+    "footerPadding": "12px 16px",
+    "title": "侧边栏设计评审",
+    "note": "",
+    "resizeHidden": true
+  },
+  {
+    "name": "save-unconfigured",
+    "viewport": {
+      "width": 880,
+      "height": 740
+    },
+    "theme": "light",
+    "panel": {
+      "x": 505,
+      "y": 94.5,
+      "width": 360,
+      "height": 551,
+      "top": 94.5,
+      "right": 865,
+      "bottom": 645.5,
+      "left": 505
+    },
+    "frame": {
+      "width": 360,
+      "height": 551
+    },
+    "body": {
+      "x": 0,
+      "y": 49,
+      "width": 360,
+      "height": 441,
+      "top": 49,
+      "right": 360,
+      "bottom": 490,
+      "left": 0,
+      "scrollHeight": 441,
+      "scrollWidth": 360,
+      "clientHeight": 441,
+      "clientWidth": 360,
+      "scrollTop": 0
+    },
+    "content": {
+      "x": 16,
+      "y": 61,
+      "width": 328,
+      "height": 413.375,
+      "top": 61,
+      "right": 344,
+      "bottom": 474.375,
+      "left": 16
+    },
+    "footer": {
+      "x": 0,
+      "y": 490,
+      "width": 360,
+      "height": 61,
+      "top": 490,
+      "right": 360,
+      "bottom": 551,
+      "left": 0
+    },
+    "warning": null,
+    "horizontalOverflow": [],
+    "headerMargin": "0px",
+    "footerMargin": "0px",
+    "footerPadding": "12px 16px",
+    "title": "侧边栏设计评审",
+    "note": "",
+    "resizeHidden": true
+  }
+]

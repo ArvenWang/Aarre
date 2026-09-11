@@ -1,0 +1,50 @@
+[
+  {
+    "class": "dock-surface",
+    "rect": {
+      "x": 828,
+      "y": 320,
+      "width": 52,
+      "height": 100,
+      "top": 320,
+      "right": 880,
+      "bottom": 420,
+      "left": 828
+    },
+    "radius": "28px 0px 0px 28px",
+    "background": "rgba(22, 24, 27, 0.76)",
+    "blur": "blur(16px) saturate(1.3)"
+  },
+  {
+    "class": "bar-toggle",
+    "rect": {
+      "x": 832,
+      "y": 324,
+      "width": 44,
+      "height": 44,
+      "top": 324,
+      "right": 876,
+      "bottom": 368,
+      "left": 832
+    },
+    "radius": "20px",
+    "background": "rgba(0, 0, 0, 0)",
+    "blur": "none"
+  },
+  {
+    "class": "bar-save",
+    "rect": {
+      "x": 832,
+      "y": 372,
+      "width": 44,
+      "height": 44,
+      "top": 372,
+      "right": 876,
+      "bottom": 416,
+      "left": 832
+    },
+    "radius": "20px",
+    "background": "rgb(36, 40, 44)",
+    "blur": "none"
+  }
+]

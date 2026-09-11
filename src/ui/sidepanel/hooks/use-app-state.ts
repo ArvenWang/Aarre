@@ -133,7 +133,7 @@ export function useAppState(
   useEffect(() => {
     const eventSource = typeof chrome !== "undefined" ? chrome.runtime?.onMessage : undefined;
     const handleScanUpdate = (message: { type?: string; status?: AppState["libraryScan"] }) => {
-      if (message.type !== "LIBRARY_SCAN_UPDATED" || !message.status) return;
+      if (message.type !== "BOOKMARK_AI_UPDATED" && (message.type !== "LIBRARY_SCAN_UPDATED" || !message.status)) return;
       void sendExtensionRequest({ type: "GET_LOCAL_RESOURCES" })
         .then(async (nextResources) => {
           const nextSiteBrands = await sendExtensionRequest({ type: "GET_SITE_BRANDS" });
@@ -142,7 +142,7 @@ export function useAppState(
           setSiteBrands(nextSiteBrands);
           setAppState((current) => current ? {
             ...current,
-            libraryScan: message.status!,
+            libraryScan: message.status || current.libraryScan,
             aiReadyResourceCount: safeResources.filter((resource) => !needsAiEnrichment(resource)).length,
           } : current);
         })

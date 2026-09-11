@@ -44,6 +44,7 @@ export function createMessageHandlers(
     GET_FOLDERS: async () => actions.getFolderOptions(),
     GET_FOLDER_SUGGESTIONS: async (request) => actions.getFolderSuggestions(request.capture),
     SAVE_BOOKMARK: async (request) => actions.saveBookmark(request.payload),
+    PREPARE_BOOKMARK_AI: async (request) => actions.prepareBookmarkAi(request.payload),
     ASK_BOOKMARK_AGENT: async (request) => actions.askAgent(request.query, request.history, request.requestId),
     CANCEL_BOOKMARK_AGENT: async (request) => {
       actions.cancelAgent(request.requestId);

@@ -431,6 +431,7 @@ bookmarkSaveHandlers = createBookmarkSaveHandlers({
 });
 const {
   syncPendingIfReady,
+  prepareBookmarkAi,
   saveBookmark
 } = bookmarkSaveHandlers;
 
@@ -624,6 +625,7 @@ const handlers = createMessageHandlers(requestHandlers, {
   navigate,
   getFolderOptions,
   getFolderSuggestions,
+  prepareBookmarkAi,
   saveBookmark,
   askAgent,
   cancelAgent,
@@ -695,6 +697,7 @@ chrome.runtime.onMessage.addListener(
       if (source) {
         if (request.type === "CAPTURE_ACTIVE_PAGE" || request.type === "GET_PENDING_SAVE") scoped = { ...request, tabId: source.id };
         if (request.type === "SAVE_BOOKMARK") scoped = { ...request, payload: { ...request.payload, sourceTabId: source.id } };
+        if (request.type === "PREPARE_BOOKMARK_AI") scoped = { ...request, payload: { ...request.payload, sourceTabId: source.id } };
         if (request.type === "NAVIGATE") scoped = { ...request, payload: { ...request.payload, sourceTabId: source.id } };
       }
       const data = await handler(scoped, sender) as any;

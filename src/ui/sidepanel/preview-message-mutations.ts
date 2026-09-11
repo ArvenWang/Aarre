@@ -13,6 +13,8 @@ import { movePreviewNode, removePreviewNode } from "./preview-state";
 
 export async function handlePreviewMutationMessage(request: PreviewRequest, previewStorage: Record<string, unknown>) {
   switch (request.type) {
+          case "PREPARE_BOOKMARK_AI":
+            return { ok: true, data: { status: "unconfigured", message: "开发预览未连接 AI 服务。可先保存收藏。" } };
           case "MOVE_NATIVE_BOOKMARK": {
             const id = request.payload?.id || "";
             const parentId = request.payload?.parentId || "";

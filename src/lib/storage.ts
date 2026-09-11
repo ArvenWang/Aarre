@@ -697,6 +697,30 @@ export async function deleteLocalResource(resourceKey: string): Promise<void> {
   await db.delete("resources", resourceKey);
 }
 
+/** Read and patch in one transaction so async AI completion cannot replace
+ * fields edited by another extension view between reading and writing. */
+export async function patchLocalResource(
+  resourceKey: string,
+  patch: (current: ResourceRecord) => ResourceRecord | null,
+): Promise<ResourceRecord | null> {
+  const db = await database();
+  const transaction = db.transaction("resources", "readwrite");
+  const stored = await transaction.store.get(resourceKey);
+  const previous = stored ? normalizeResourceRecord(stored) : undefined;
+  const patched = previous ? patch(previous) : null;
+  if (!patched || !previous) { await transaction.done; return null; }
+  const next = normalizeResourceRecord(patched);
+  const fieldClears = new Set(next.fieldClears || previous.fieldClears || []);
+  for (const field of ["userNote", "tags"] as const) {
+    if (next[field].length) fieldClears.delete(field);
+    else if (previous[field].length) fieldClears.add(field);
+  }
+  const updated = { ...next, fieldClears: [...fieldClears], fieldUpdatedAt: deriveFieldClocks(previous, next) };
+  await transaction.store.put(updated);
+  await transaction.done;
+  return updated;
+}
+
 export async function mergeLocalResources(
   incoming: ResourceRecord[]
 ): Promise<ResourceRecord[]> {

@@ -353,10 +353,22 @@ export interface SaveBookmarkInput {
   userNote: string;
   folderId: string;
   requestAi: true;
+  /** 后台生成的临时分析请求；只复用与此页面及来源匹配的结果。 */
+  aiPreparationId?: string;
   existingBookmarkId?: string;
   createSeparate?: boolean;
   confirmedCanonicalReuse?: boolean;
 }
+
+export interface PrepareBookmarkAiInput {
+  requestId: string;
+  capture: PageCapture;
+  sourceTabId?: number;
+}
+
+export type BookmarkAiPreview =
+  | { status: "ready"; summary: string; tags: string[]; reused?: boolean }
+  | { status: "unconfigured" | "protected" | "no_content" | "failed"; message: string };
 
 export interface SaveBookmarkResult {
   resource: ResourceRecord;

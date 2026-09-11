@@ -11,6 +11,7 @@ import { ArrowLeftIcon, ChevronDownIcon, CloseIcon, TrashIcon } from "../../comp
 import { ProtectionControl } from "../../components/ProtectionControl";
 import { FolderSelect } from "./FolderSelect";
 import { SaveFormBody } from "../../floating/SaveFormBody";
+import { SaveAiPreview } from "./SaveAiPreview";
 
 function sourceLabel(url: string) {
   try { const source = new URL(url); return source.host || source.protocol.replace(":", ""); }
@@ -38,7 +39,7 @@ export function BookmarkEditorDialog({
     editor, setEditor, editBookmarkId, editParentId, setEditParentId,
     editTitle, setEditTitle, editUrl, setEditUrl, editTags, setEditTags,
     editTagInput, setEditTagInput, setEditTagsChanged, capture, note, setNote,
-    folderId, setFolderId, folders, folderSuggestions, bookmarkSaveState,
+    folderId, setFolderId, folders, folderSuggestions, bookmarkSaveState, saveAi,
     saveDisposition, setSaveDisposition, selectedBookmarkId,
     setSelectedBookmarkId, captureWarning, confirmDeleteId, setConfirmDeleteId,
     selectedSaveMatch, editorResource, editorModel, selectedEditorLocation,
@@ -214,6 +215,7 @@ export function BookmarkEditorDialog({
                     </div>
                   ) : null}
                 </div>
+                <SaveAiPreview preview={saveAi.preview} onRetry={saveAi.retry} />
                 <label className="native-field">
                   <span>备注</span>
                   <FluidTextarea value={note} onChange={(event) => setNote(event.target.value)} rows={presentation === "page" ? 2 : 3} maxLength={2_000} placeholder="可选。记录你保存它的原因。" />

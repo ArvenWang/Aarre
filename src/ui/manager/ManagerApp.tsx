@@ -199,6 +199,15 @@ export function ManagerApp() {
   }, [view]);
 
   useEffect(() => {
+    const eventSource = typeof chrome !== "undefined" ? chrome.runtime?.onMessage : undefined;
+    const onAiUpdate = (message: { type?: string }) => {
+      if (message.type === "BOOKMARK_AI_UPDATED") void loadResources().catch(() => undefined);
+    };
+    eventSource?.addListener(onAiUpdate);
+    return () => eventSource?.removeListener(onAiUpdate);
+  }, [loadResources]);
+
+  useEffect(() => {
     if (!notice) return;
     const timer = window.setTimeout(() => setNotice(""), 4_000);
     return () => window.clearTimeout(timer);

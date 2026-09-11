@@ -30,6 +30,8 @@ import type {
   SnapshotBackfillStatus,
   SaveBookmarkInput,
   SaveBookmarkResult,
+  PrepareBookmarkAiInput,
+  BookmarkAiPreview,
   SearchResult,
   SiteBrandRecord,
   UpdateBookmarkDetailsInput,
@@ -66,6 +68,7 @@ export type ExtensionRequest =
   | { type: "CAPTURE_ACTIVE_PAGE"; tabId?: number }
   | { type: "GET_FOLDER_SUGGESTIONS"; capture: PageCapture }
   | { type: "SAVE_BOOKMARK"; payload: SaveBookmarkInput }
+  | { type: "PREPARE_BOOKMARK_AI"; payload: PrepareBookmarkAiInput }
   | {
       type: "ASK_BOOKMARK_AGENT";
       query: string;
@@ -191,6 +194,7 @@ export type ResponseDataByRequest = {
   CAPTURE_ACTIVE_PAGE: PageCapture;
   GET_FOLDER_SUGGESTIONS: FolderSuggestion[];
   SAVE_BOOKMARK: SaveBookmarkResult;
+  PREPARE_BOOKMARK_AI: BookmarkAiPreview;
   ASK_BOOKMARK_AGENT: BookmarkAgentResponse;
   CANCEL_BOOKMARK_AGENT: { cancelled: true };
   EXECUTE_BOOKMARK_AGENT_ACTIONS: {

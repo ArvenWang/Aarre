@@ -9,6 +9,7 @@ import {
   getLocalResource,
   getLocalResources,
   getPageSnapshot,
+  patchLocalResource,
   removeOutboxItem
 } from "../../lib/storage";
 import { getProtectionSettings, buildProtectionPolicy, isResourceUserProtected } from "../../lib/protection";
@@ -19,6 +20,7 @@ import { needsAiEnrichment, preservedAiRetrievalFields } from "../../lib/ai-fiel
 import { getAiRuntimeSettings } from "../../lib/settings";
 import { categoryCoverForResource } from "../../lib/cover-registry";
 import { isSnapshotSensitiveUrl } from "../../lib/page-snapshot";
+import { applyPreparedAi, createSaveAiPreparation, holdSaveAi, type PreparedSaveAi } from "../coordinators/save-ai-preparation";
 import type {
   BookmarkEnhancementPart,
   SnapshotEnhancementProgress
@@ -95,6 +97,27 @@ export function createBookmarkSaveHandlers(dependencies: BookmarkSaveDependencie
   } = dependencies;
   const now = () => new Date().toISOString();
   const SAVED_PAGE_SNAPSHOT_DELAY_MS = 250;
+  const preparations = createSaveAiPreparation(dependencies);
+
+  async function finishPreparedAi(prepared: PreparedSaveAi, resourceKey: string, contentHash: string) {
+    const result = await prepared.done;
+    const context = await getPrivacyProtectionContext();
+    const updated = await patchLocalResource(resourceKey, latest => {
+      if (!latest.nativeBookmarkIds.length || latest.deletedAt || latest.contentHash !== contentHash || !needsAiEnrichment(latest) || resourceProtectionState(latest, context).protected) return null;
+      const next = result.status === "ready" && prepared.resource
+        ? applyPreparedAi(latest, prepared.resource)
+        : { ...latest, aiStatus: "failed" as const, updatedAt: now() };
+      return { ...next, categoryCoverId: categoryCoverForResource(next) };
+    });
+    if (!updated) return;
+    void chrome.runtime?.sendMessage({ type: "BOOKMARK_AI_UPDATED", resourceKey }).catch(() => undefined);
+    const auth = await getAuthState();
+    if (auth.signedIn && auth.accountMatches === true) {
+      await enqueueOutbox(updated, "");
+      requestSync("save-ai-complete", 3_000);
+    }
+    await processBookmarkEnhancements();
+  }
 async function findOrCreateNativeBookmark(
   input: SaveBookmarkInput, preserveExisting = false
 ): Promise<{ bookmark: chrome.bookmarks.BookmarkTreeNode; created: boolean }> {
@@ -274,6 +297,10 @@ async function syncPendingIfReady(): Promise<{ synced: number; failed: number }>
 async function saveBookmark(
   input: SaveBookmarkInput, options: { deferEnrichment?: boolean } = {}
 ): Promise<SaveBookmarkResult> {
+  const prepared = await preparations.lookup({ requestId: input.aiPreparationId, capture: input.capture, sourceTabId: input.sourceTabId });
+  const releaseAi = prepared ? holdSaveAi(prepared.resourceKey) : () => undefined;
+  let completion: Promise<void> | undefined;
+  try {
   const auth = await getAuthState();
   const sourceTab =
     typeof input.sourceTabId === "number"
@@ -387,6 +414,7 @@ async function saveBookmark(
     .catch(() => undefined);
 
   let aiWarning: string | undefined;
+  let continuePreparedAi = false;
   const hasTrustworthyRenderedContent =
     sourceTab !== null &&
     sourceTab.incognito !== true &&
@@ -410,6 +438,12 @@ async function saveBookmark(
       enhancementBlockMessage: blockMessage,
       updatedAt: now()
     };
+  } else if (needsAi && prepared) {
+    if (prepared.result?.status === "ready" && prepared.resource) resource = applyPreparedAi(resource, prepared.resource);
+    else if (prepared.result && prepared.result.status !== "ready") {
+      aiWarning = `收藏已保存。${prepared.result.message}`;
+      resource = { ...resource, aiStatus: prepared.result.status === "failed" ? "failed" : "pending" };
+    } else continuePreparedAi = true;
   } else if (needsAi && !options.deferEnrichment) {
       const aiSettings = await getAiRuntimeSettings();
       if (aiSettings.apiKey && hasTrustworthyRenderedContent) {
@@ -470,7 +504,7 @@ async function saveBookmark(
         ? input.capture.content
         : ""
     );
-    if (options.deferEnrichment) requestSync("quick-save", 3_000);
+    if (options.deferEnrichment || prepared) requestSync("quick-save", 3_000);
     else synced = await tryImmediateSync(queued);
   }
 
@@ -515,6 +549,9 @@ async function saveBookmark(
     void processBookmarkEnhancements();
   }
 
+  if (continuePreparedAi && prepared) {
+    completion = finishPreparedAi(prepared, resourceKey, contentHash);
+  }
   return {
     resource: synced,
     nativeBookmarkCreated: created,
@@ -522,11 +559,16 @@ async function saveBookmark(
     aiWarning,
     enhancementPending: pendingEnhancements.length > 0
   };
+  } finally {
+    if (completion) void completion.catch(() => undefined).finally(releaseAi);
+    else releaseAi();
+  }
 }
 
   return {
     countPendingCloudResources,
     syncPendingIfReady,
+    prepareBookmarkAi: preparations.prepare,
     saveBookmark
   };
 }

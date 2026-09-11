@@ -250,3 +250,41 @@ it("shows a failed save inside the page and retries with the same reviewed field
   await waitFor(() => !document.querySelector('.floating-save-page'));
   expect(attempts).toHaveLength(2); expect(attempts[1]).toEqual(attempts[0]);
 });
+
+it('starts AI on opening the save form, stays editable while pending, and carries the same preparation into save', async () => {
+  const runtime = chrome.runtime as unknown as { sendMessage: (request: Record<string, unknown>) => Promise<unknown> };
+  const original=runtime.sendMessage; let analysis:Record<string,any>|undefined; let saved:Record<string,any>|undefined;
+  let resolve!:(value:unknown)=>void;
+  runtime.sendMessage=async request=>{
+    if(request.type==='PREPARE_BOOKMARK_AI'){analysis=request;return new Promise(r=>{resolve=r;});}
+    if(request.type==='SAVE_BOOKMARK'){saved=request;return {ok:true,data:{enhancementPending:true}};}
+    return original(request);
+  };
+  await mount();await act(async()=>requestFloatingSave(crypto.randomUUID()));
+  await waitFor(()=>Boolean(analysis));
+  expect(document.querySelector('.save-ai-preview')?.textContent).toContain('正在 AI 增强');
+  expect(saved).toBeUndefined();
+  await editField('.floating-save-page textarea','AI 期间填写的备注');
+  const save=Array.from(document.querySelectorAll<HTMLButtonElement>('.native-dialog-actions button')).find(b=>b.textContent==='添加到 Chrome')!;
+  expect(save.disabled).toBe(false);await act(async()=>save.click());await waitFor(()=>Boolean(saved));
+  expect(saved?.payload).toMatchObject({userNote:'AI 期间填写的备注',aiPreparationId:analysis?.payload.requestId});
+  await waitFor(()=>!document.querySelector('.floating-save-page'));
+  await act(async()=>resolve({ok:true,data:{status:'ready',summary:'旧表单的结果',tags:['旧结果']}}));
+  expect(document.body.textContent).not.toContain('旧表单的结果');
+});
+
+it('shows completed AI without changing the reviewed fields and ignores results from a closed form', async()=>{
+  const runtime=chrome.runtime as unknown as {sendMessage:(request:Record<string,unknown>)=>Promise<unknown>};
+  const original=runtime.sendMessage;const answers:Array<(value:unknown)=>void>=[];
+  runtime.sendMessage=async request=>request.type==='PREPARE_BOOKMARK_AI'?new Promise(r=>answers.push(r)):original(request);
+  await mount();await act(async()=>requestFloatingSave(crypto.randomUUID()));await waitFor(()=>answers.length===1);
+  await click('button[aria-label="返回菜单"]');await waitFor(()=>!document.querySelector('.floating-save-page'));
+  await act(async()=>requestFloatingSave(crypto.randomUUID()));await waitFor(()=>answers.length===2);
+  await editField('.floating-save-page input','新表单名称');await editField('.floating-save-page textarea','新表单备注');
+  await act(async()=>answers[0]({ok:true,data:{status:'ready',summary:'不应混入的旧摘要',tags:['旧标签']}}));
+  expect(document.body.textContent).not.toContain('不应混入的旧摘要');
+  await act(async()=>answers[1]({ok:true,data:{status:'ready',summary:'当前页面的摘要',tags:['新标签']}}));
+  expect(document.querySelector('.save-ai-preview')?.textContent).toContain('当前页面的摘要');
+  expect(document.querySelector<HTMLInputElement>('.floating-save-page input')?.value).toBe('新表单名称');
+  expect(document.querySelector<HTMLTextAreaElement>('.floating-save-page textarea')?.value).toBe('新表单备注');
+});

@@ -3,15 +3,15 @@ export const hostStyles = `
 :host([data-hidden="true"]), :host([data-capturing="true"]) { visibility:hidden !important; }
 * { box-sizing:border-box; }
 [hidden] { display:none !important; }
-.dock-surface { position:fixed; background:var(--dock-bg); border:1px solid var(--dock-line); border-right:0; border-radius:14px 0 0 14px; box-shadow:0 5px 24px #0f11131c,0 1px 4px #0f111312; transform-origin:top left; }
+.dock-surface { position:fixed; background:var(--dock-bg); border:1px solid var(--dock-line); border-right:0; border-radius:28px 0 0 28px; box-shadow:0 5px 24px #0f11131c,0 1px 4px #0f111312; transform-origin:top left; }
 :host([data-open="true"]) .dock-surface { box-shadow:0 12px 48px #0f111329,0 2px 8px #0f11130f; }
 .bar { position:fixed; display:grid; grid-template-rows:repeat(2,minmax(0,1fr)); padding:4px; gap:4px; pointer-events:auto; }
-.bar button { display:grid; place-items:center; width:44px; height:44px; aspect-ratio:1; min-height:0; max-width:100%; padding:0; border:0; border-radius:9px; background:transparent; color:var(--dock-ink); cursor:pointer; outline:none; transition:background 120ms,color 120ms; }
+.bar button { display:grid; place-items:center; width:44px; height:44px; aspect-ratio:1; min-height:0; max-width:100%; padding:0; border:0; border-radius:20px; background:transparent; color:var(--dock-ink); cursor:pointer; outline:none; transition:background 120ms,color 120ms; }
 .bar button:hover { background:var(--dock-hover); }
 .bar button:focus-visible { outline:1px solid var(--dock-accent); outline-offset:-2px; }
 .bar button:disabled { cursor:wait; opacity:.55; }
 .bar svg { width:20px; height:20px; pointer-events:none; }
-.panel { position:fixed; border-radius:14px 0 0 14px; overflow:hidden; background:var(--dock-bg); color:var(--dock-ink); pointer-events:none; opacity:0; transform:translateX(12px); }
+.panel { position:fixed; border-radius:28px 0 0 28px; overflow:hidden; background:var(--dock-bg); color:var(--dock-ink); pointer-events:none; opacity:0; transform:translateX(12px); }
 :host([data-open="true"]) .panel { pointer-events:auto; opacity:1; transform:none; }
 iframe { display:block; width:100%; height:100%; border:0; background:inherit; color-scheme:inherit; }
 .resize { position:absolute; left:0; top:0; bottom:0; width:8px; cursor:ew-resize; touch-action:none; pointer-events:auto; outline:none; }
