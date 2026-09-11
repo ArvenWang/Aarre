@@ -24,3 +24,9 @@ export function acceptFloatingSave(requestId: string) {
   acceptedSaveRequest = requestId;
   postToFloatingHost({ type: "FLOAT_SAVE_ACCEPTED", requestId });
 }
+
+export function deferFloatingSave(requestId: string) {
+  if (pendingSaveRequest !== requestId) return;
+  pendingSaveRequest = null; acceptedSaveRequest = requestId;
+  postToFloatingHost({ type: "FLOAT_SAVE_DEFERRED", requestId });
+}

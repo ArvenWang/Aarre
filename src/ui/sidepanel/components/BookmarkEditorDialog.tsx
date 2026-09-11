@@ -7,10 +7,11 @@ import { visibleFolderPath } from "../../../lib/folder-options";
 import { BookmarkEditorFields } from "../../components/BookmarkEditorFields";
 import { CloudConflictNotice } from "../../components/CloudConflictNotice";
 import { FluidInput, FluidTextarea } from "@/ui/components/ui/input";
-import { ArrowLeftIcon, ChevronDownIcon, CloseIcon, TrashIcon } from "../../components/Icons";
+import { ChevronDownIcon, CloseIcon, TrashIcon } from "../../components/Icons";
 import { ProtectionControl } from "../../components/ProtectionControl";
 import { FolderSelect } from "./FolderSelect";
 import { SaveFormBody } from "../../floating/SaveFormBody";
+import { getFloatingContext, postToFloatingHost } from "../../floating/bridge";
 import { SaveAiPreview } from "./SaveAiPreview";
 
 function sourceLabel(url: string) {
@@ -48,6 +49,10 @@ export function BookmarkEditorDialog({
   if (!editor) return null;
 
   const close = () => {
+    if (presentation === "page" && getFloatingContext()) {
+      document.documentElement.dataset.floatingClosing = "true";
+      postToFloatingHost({ type: "FLOAT_CLOSE", resetSave: true });
+    }
     setEditor(null);
     setConfirmDeleteId("");
   };
@@ -58,7 +63,6 @@ export function BookmarkEditorDialog({
       className={`native-dialog ${presentation === "page" ? "floating-save-page" : ""} ${editor.kind === "bookmark" && editor.node.url ? "bookmark-detail-dialog" : ""}`}>
         <div className="native-dialog-heading">
           <div className="native-dialog-title-line">
-            {presentation === "page" && <Button variant="ghost" size="icon-sm" onClick={close} disabled={Boolean(busy)} aria-label="返回菜单"><ArrowLeftIcon /></Button>}
             <h2 id="native-dialog-title">
               {editor.kind === "save"
                 ? !bookmarkSaveState || bookmarkSaveState.status === "none" ? "添加到收藏" : "管理此收藏"
@@ -66,9 +70,9 @@ export function BookmarkEditorDialog({
                   : editor.node.url ? "编辑收藏" : "编辑文件夹"}
             </h2>
           </div>
-          {presentation !== "page" && <Button variant="ghost" size="icon-sm" className="dialog-close" onClick={close} disabled={Boolean(busy)} aria-label="关闭">
+          <Button variant="ghost" size="icon-sm" className="dialog-close" onClick={close} disabled={Boolean(busy)} aria-label="关闭">
             <CloseIcon />
-          </Button>}
+          </Button>
         </div>
 
         <ScrollSurface as="div" className="native-dialog-scroll">

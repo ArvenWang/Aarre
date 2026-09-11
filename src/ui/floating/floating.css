@@ -62,3 +62,6 @@ html, body, #root { height:100%; min-height:0; overflow:hidden; }
 .save-source a:hover { color:var(--ink); text-decoration:underline; text-underline-offset:3px; }
 
 .floating-save-page .save-page-error { margin:0; color:var(--negative); font-size:var(--fs-small); overflow-wrap:anywhere; }
+
+/* Keep the dismissed form from exposing the workspace during host collapse. */
+html[data-floating-closing="true"] body { visibility:hidden; }

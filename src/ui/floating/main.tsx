@@ -27,14 +27,16 @@ async function start() {
     setFloatingContext({ tabId: source.id, nonce, source, parentOrigin });
   }
   const verifiedContext = getFloatingContext();
+  if (verifiedContext && params.get("save")) requestFloatingSave(params.get("save")!);
   if (verifiedContext) {
     const { parentOrigin, nonce } = verifiedContext;
     window.addEventListener("message", (event) => {
       if (event.source !== parent || event.origin !== parentOrigin || event.data?.session !== nonce) return;
       if (event.data.type === "FLOAT_VIEW") {
+        delete document.documentElement.dataset.floatingClosing;
         window.dispatchEvent(new CustomEvent(FLOATING_VIEW_EVENT, { detail: event.data.view }));
         if (typeof event.data.saveRequestId === "string") requestFloatingSave(event.data.saveRequestId);
-        if (event.data.focus) requestAnimationFrame(() => (document.querySelector<HTMLElement>('[role="dialog"] button') || document.querySelector<HTMLElement>('#bookmark-agent-prompt'))?.focus({ preventScroll: true }));
+        if (event.data.focus) requestAnimationFrame(() => (document.querySelector<HTMLElement>('[role="dialog"] input, [role="dialog"] textarea') || document.querySelector<HTMLElement>('#bookmark-agent-prompt'))?.focus({ preventScroll: true }));
       }
     });
     window.addEventListener("keydown", (event) => {

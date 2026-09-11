@@ -189,3 +189,76 @@ it("rejects untrusted and malformed layout requests, bounds oversized content, a
   expect(panel.style.width).toBe("360px"); expect(panel.style.height).toBe("640px");
   expect(currentFrame()).toBe(frame);
 });
+
+it("covers cold and warm content until the save form has committed without hiding its rendering context", async () => {
+  await clickSave(); const frame = currentFrame();
+  expect(new URL(frame.src).searchParams.get("save")).toEqual(expect.any(String));
+  ready(frame);
+  expect(shadow.querySelector<HTMLElement>(".loading")!.hidden).toBe(false);
+  expect(shadow.querySelector<HTMLElement>(".loading")!.hidden).toBe(false);
+  hostMessage(frame, { type: "FLOAT_SAVE_ACCEPTED", requestId: latestView(frame).saveRequestId });
+  expect(frame.style.visibility).toBe("visible");
+  const panelBeforeClose = shadow.querySelector<HTMLElement>(".panel")!.style.cssText;
+  hostMessage(frame, { type: "FLOAT_CLOSE", resetSave: true });
+  expect(shadow.querySelector<HTMLElement>(".panel")!.style.cssText).toBe(panelBeforeClose);
+  expect(shadow.host.getAttribute("data-open")).toBe("false");
+  expect(shadow.querySelector<HTMLElement>(".loading")!.hidden).toBe(false);
+  await clickSave();
+  expect(currentFrame()).toBe(frame); expect(shadow.querySelector<HTMLElement>(".loading")!.hidden).toBe(false);
+  hostMessage(frame, { type: "FLOAT_SAVE_ACCEPTED", requestId: latestView(frame).saveRequestId });
+  expect(frame.style.visibility).toBe("visible");
+});
+it("replaces an invalidated same-version host and leaves exactly one working launcher", async () => {
+  const oldHost = shadow.host;
+  vi.mocked(chrome.runtime.onMessage.removeListener).mockImplementationOnce(() => { throw new Error("Extension context invalidated"); });
+  vi.resetModules(); await import("../src/extension/floating/host"); await vi.advanceTimersByTimeAsync(0);
+  expect(document.querySelectorAll("aarre-floating-host")).toHaveLength(1);
+  expect(oldHost.isConnected).toBe(false);
+  await toggle(); expect(currentFrame()).toBeTruthy();
+});
+it("updates the collapsed star label and saved state from actual host metadata", async () => {
+  (vi.mocked(chrome.runtime.sendMessage) as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true, data: {
+    tabId: 7, documentId: "host-document", nonce, enabled: true, saved: true, position: { width: 400 },
+  } });
+  const listener = vi.mocked(chrome.runtime.onMessage.addListener).mock.calls[0][0];
+  listener({ type: "FLOAT_REFRESH" }, {}, vi.fn()); await vi.advanceTimersByTimeAsync(0);
+  expect(shadow.querySelector<HTMLElement>(".bar-save")!.dataset.saved).toBe("true");
+  expect(shadow.querySelector(".bar-save")!.getAttribute("aria-label")).toBe("管理当前网页收藏");
+});
+
+it("retires a host from an earlier isolated world even when its window global is gone", async () => {
+  const previous = shadow.host;
+  delete window.__aarreFloatingHost; // Chrome reload creates a new isolated world.
+  vi.resetModules(); await import("../src/extension/floating/host"); await vi.advanceTimersByTimeAsync(0);
+  expect(previous.isConnected).toBe(false);
+  expect(document.querySelectorAll('[data-aarre-ui="floating-host"]')).toHaveLength(1);
+});
+it("neutralizes a legacy observer without letting it resurrect an interactive bar", async () => {
+  const legacy = document.createElement("aarre-floating-host"); legacy.dataset.aarreUi = "floating-host";
+  legacy.dataset.hidden = "false"; legacy.setAttribute("popover", "manual"); document.documentElement.append(legacy);
+  const observer = new MutationObserver(() => { if (!legacy.isConnected) document.documentElement.append(legacy); });
+  observer.observe(document, { childList: true, subtree: true });
+  vi.resetModules(); await import("../src/extension/floating/host"); await vi.advanceTimersByTimeAsync(0);
+  expect(document.querySelectorAll('[data-aarre-ui="floating-host"]')).toHaveLength(1);
+  expect(legacy.dataset.aarreUi).toBe("retired-floating-host");
+  expect(legacy.dataset.hidden).toBe("true"); expect(legacy.inert).toBe(true); expect(legacy.hasAttribute("popover")).toBe(false);
+  observer.disconnect(); legacy.remove();
+});
+it("reconnects an open menu when a restored document receives a new session", async () => {
+  await toggle(); const previous = currentFrame(); ready(previous);
+  (vi.mocked(chrome.runtime.sendMessage) as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, data: {
+    tabId: 7, documentId: "host-document", nonce: "restored-session", enabled: true, position: { width: 400 },
+  } });
+  window.dispatchEvent(new Event("pageshow")); await vi.advanceTimersByTimeAsync(0);
+  expect(currentFrame()).not.toBe(previous);
+  expect(new URL(currentFrame().src).searchParams.get("session")).toBe("restored-session");
+  expect(shadow.host.getAttribute("data-open")).toBe("true");
+});
+it("reveals an existing operation when a save intent is deferred instead of trapping it behind loading", async () => {
+  await clickSave(); const frame = currentFrame(); ready(frame);
+  hostMessage(frame, { type: "FLOAT_SAVE_DEFERRED", requestId: latestView(frame).saveRequestId });
+  expect(shadow.querySelector<HTMLElement>(".loading")!.hidden).toBe(true);
+  expect(shadow.querySelector<HTMLElement>(".panel")!.style.width).toBe("400px");
+  await vi.advanceTimersByTimeAsync(16_000);
+  expect(shadow.textContent).not.toContain("菜单未能打开");
+});

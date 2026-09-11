@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SidePanelApp } from "../src/ui/sidepanel/SidePanelApp";
 import { installSidePanelPreview } from "../src/ui/sidepanel/preview";
-import { requestFloatingSave, acceptFloatingSave, getFloatingSaveRequest } from "../src/ui/floating/bridge";
+import { requestFloatingSave, acceptFloatingSave, getFloatingSaveRequest, setFloatingContext } from "../src/ui/floating/bridge";
 import { previewMutable } from "../src/ui/sidepanel/preview-state";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -156,6 +156,12 @@ async function editField(selector: string, text: string) {
 }
 
 it("opens a cold star request as a full save form, keeps repeated intent drafts, and cancels without a write", async () => {
+  setFloatingContext({ tabId: 1, nonce: "ui-close-test", parentOrigin: location.origin,
+    source: { id: 1, url: "https://example.com/design-review", title: "Test", faviconUrl: "", supported: true } });
+  const committed: boolean[] = [];
+  const post = vi.spyOn(window.parent, "postMessage").mockImplementation(message => {
+    if (message.type === "FLOAT_SAVE_ACCEPTED") committed.push(Boolean(document.querySelector(".floating-save-page")));
+  });
   const id = crypto.randomUUID(); requestFloatingSave(id);
   await mount();
   await waitFor(() => Boolean(document.querySelector('.floating-save-page .save-source')));
@@ -167,8 +173,12 @@ it("opens a cold star request as a full save form, keeps repeated intent drafts,
   expect(document.querySelectorAll('.floating-save-page')).toHaveLength(1);
   expect(document.querySelector<HTMLInputElement>('.floating-save-page input')?.value).toBe('保留这个收藏草稿');
   expect(document.querySelector<HTMLTextAreaElement>('.floating-save-page textarea')?.value).toBe('稍后再保存的备注');
-  await click('button[aria-label="返回菜单"]');
+  expect(committed.length).toBeGreaterThan(0); expect(committed.every(Boolean)).toBe(true);
+  expect(document.querySelector('button[aria-label="返回菜单"]')).toBeNull();
+  await click('button[aria-label="关闭"]');
   await waitFor(() => !document.querySelector('.floating-save-page'));
+  expect(post).toHaveBeenCalledWith({ type: "FLOAT_CLOSE", resetSave: true, session: "ui-close-test" }, location.origin);
+  post.mockRestore();
   expect(requests.some(request => request.type === 'SAVE_BOOKMARK')).toBe(false);
 });
 
@@ -278,7 +288,7 @@ it('shows completed AI without changing the reviewed fields and ignores results 
   const original=runtime.sendMessage;const answers:Array<(value:unknown)=>void>=[];
   runtime.sendMessage=async request=>request.type==='PREPARE_BOOKMARK_AI'?new Promise(r=>answers.push(r)):original(request);
   await mount();await act(async()=>requestFloatingSave(crypto.randomUUID()));await waitFor(()=>answers.length===1);
-  await click('button[aria-label="返回菜单"]');await waitFor(()=>!document.querySelector('.floating-save-page'));
+  await click('button[aria-label="关闭"]');await waitFor(()=>!document.querySelector('.floating-save-page'));
   await act(async()=>requestFloatingSave(crypto.randomUUID()));await waitFor(()=>answers.length===2);
   await editField('.floating-save-page input','新表单名称');await editField('.floating-save-page textarea','新表单备注');
   await act(async()=>answers[0]({ok:true,data:{status:'ready',summary:'不应混入的旧摘要',tags:['旧标签']}}));

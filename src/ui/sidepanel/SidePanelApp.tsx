@@ -141,6 +141,7 @@ export function SidePanelApp({ surface = "sidebar" }: { surface?: "sidebar" | "f
   useFloatingSave({
     enabled: surface === "floating", ready: Boolean(appState?.activeTab), busy: Boolean(busy), editorKind: editor?.kind,
     onOpen: () => { setOnboardingVisible(false); setUtilityView(null); void startSave(); },
+    onDeferred: () => setNotice("请先完成当前操作，再添加收藏。正在编辑的内容已保留。"),
   });
   const { contentRef, atEnd, sync: syncScrollBoundary } = useScrollBoundary(panelView);
 

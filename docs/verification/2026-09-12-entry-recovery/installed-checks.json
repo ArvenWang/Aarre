@@ -1,0 +1,26 @@
+{
+  "version": "0.6.8",
+  "surface": "Native Chrome, installed unpacked extension; no CDP attachment to its iframe",
+  "loadedFrom": "/Users/nefish/Desktop/Coding/Aarre/dist",
+  "permissionsObserved": "在所有网站上",
+  "checks": {
+    "automaticNewPageEntry": true,
+    "navigationEntry": true,
+    "directSaveForm": true,
+    "cancelClosesMenu": true,
+    "closeButtonClosesMenu": true,
+    "noBackArrow": true,
+    "upgradeRetiresLegacyHost": true,
+    "sameVersionReloadRecovers": true,
+    "pageInputRetainedAcrossReload": true,
+    "savedSolidStarAfterNativeBookmark": true,
+    "outlineAfterNativeRemoval": true,
+    "unsentComposerDraftRetainedAfterNavigation": true
+  },
+  "testBookmark": "http://127.0.0.1:4179/native-probe.html",
+  "testBookmarkRemoved": true,
+  "testComposerDraftCleared": true,
+  "realAiRequestThisRound": false,
+  "aiOnLocalPage": "Skipped by existing privacy protection",
+  "finalSealedBuildReload": "pending"
+}

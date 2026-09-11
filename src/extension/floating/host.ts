@@ -1,11 +1,26 @@
 import { defaultFloatingPosition, floatingRects, floatingSaveRect, floatingWidth, SAVE_PANEL_INITIAL_HEIGHT, type FloatingPosition, type Viewport } from "../../lib/floating-geometry";
 import { hostStyles } from "./host-styles";
 
-interface HostInfo { tabId: number; documentId: string; nonce: string; enabled: boolean; position: FloatingPosition; theme?: string }
+interface HostInfo { tabId: number; documentId: string; nonce: string; enabled: boolean; position: FloatingPosition; theme?: string; saved?: boolean }
 declare global { interface Window { __aarreFloatingHost?: { version: string; destroy(): void } } }
 const version = chrome.runtime.getManifest().version;
-if (window.top === window && window.__aarreFloatingHost?.version !== version) {
-  window.__aarreFloatingHost?.destroy(); startHost();
+if (window.top === window) {
+  // The background injects only after a failed health check. Version equality
+  // does not prove liveness after reloading an unpacked extension.
+  try { window.__aarreFloatingHost?.destroy(); } catch { /* Old runtime is invalidated. */ }
+  document.querySelectorAll<HTMLElement>('aarre-floating-host[data-aarre-ui="floating-host"]').forEach(node => {
+    // DOM events cross the old/new isolated-world boundary; window globals do
+    // not. Retire the old observer before it can reattach its disconnected UI.
+    node.dispatchEvent(new Event("aarre-floating-retire"));
+    if (!node.isConnected) return;
+    // Compatibility with <=0.6.7, which has no retirement listener. Keep the
+    // inert node connected so its legacy observer cannot resurrect the bar.
+    node.dataset.aarreUi = "retired-floating-host";
+    node.dataset.hidden = "true"; node.inert = true; node.setAttribute("aria-hidden", "true");
+    try { if (node.matches(":popover-open")) node.hidePopover(); } catch { /* Old top layer may already be gone. */ }
+    node.removeAttribute("popover");
+  });
+  startHost();
 }
 function startHost() {
   const host = document.createElement("aarre-floating-host");
@@ -48,7 +63,9 @@ function startHost() {
     const measured = surface.getBoundingClientRect();
     const from = measured.width ? measured : surfaceRect;
     surfaceAnimation?.cancel(); surfaceAnimation = undefined;
-    rectStyle(surface, target); rectStyle(bar, rects.bar); rectStyle(panel, menu);
+    rectStyle(surface, target); rectStyle(bar, rects.bar);
+    // Keep the outgoing compact form at its current size during collapse.
+    if (opened || panel.hidden) rectStyle(panel, menu);
     resize.hidden = saveHeight !== null;
     feedback.style.right = `${rects.bar.width + 12}px`; feedback.style.top = `${rects.bar.y}px`;
     resize.setAttribute("aria-valuenow", String(Math.round(rects.menu.width)));
@@ -77,6 +94,11 @@ function startHost() {
     const next = response.data as HostInfo;
     if (info && info.nonce !== next.nonce) { iframe?.remove(); iframe = null; ready = false; }
     info = next; position = next.position;
+    if (typeof next.saved === "boolean") {
+      quickSave.dataset.saved = String(next.saved);
+      quickSave.title = next.saved ? "管理此收藏" : "添加到收藏";
+      quickSave.setAttribute("aria-label", next.saved ? "管理当前网页收藏" : "添加当前网页到收藏");
+    }
     host.dataset.theme = next.theme === "dark" || (!next.theme && matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
     host.dataset.hidden = String(!next.enabled && !forced); mountHost();
     if (surfaceAnimation?.playState !== "running") layout();
@@ -84,11 +106,11 @@ function startHost() {
   const init = () => initPromise ||= initialize().finally(() => { initPromise = null; });
   function showLoadError(message: string) {
     clearTimeout(loadTimeout); needsRetry = true; ready = false; loading.hidden = false;
-    if (iframe) iframe.inert = true;
+    if (iframe) { iframe.inert = true; iframe.style.visibility = "visible"; }
     const title = document.createElement("strong"); title.textContent = "菜单未能打开";
     const detail = document.createElement("span"); detail.textContent = message;
     const retry = document.createElement("button"); retry.type = "button"; retry.textContent = "重新打开";
-    retry.addEventListener("click", () => { void open(view).catch(() => showLoadError("连接已失效，请刷新此网页后重试。")); });
+    retry.addEventListener("click", () => { void open(view).catch(() => showLoadError("连接暂时中断，请重新打开 Aarre。")); });
     loading.replaceChildren(title, detail, retry);
   }
   function revealPanel(show: boolean) {
@@ -113,19 +135,32 @@ function startHost() {
     // Opening takes precedence over passive launchers from other extensions.
     // Only reorder our own top-layer surface; never touch their DOM.
     try { if (host.matches(":popover-open")) host.hidePopover(); host.showPopover(); } catch { /* Fixed-position fallback. */ }
+    // Keep rendering active beneath the opaque loading surface.
+    if (pendingSaveRequest) {
+      loading.hidden = false; loading.innerHTML = "<strong>添加到收藏</strong><span>正在读取当前页面…</span>";
+      if (iframe) { iframe.inert = true; iframe.style.visibility = "visible"; }
+    }
     opened = true; revealPanel(true); panel.inert = false; bar.hidden = true; toggle.setAttribute("aria-expanded", "true");
     if (!iframe) {
-      ready = false; loading.hidden = false; loading.innerHTML = "<strong>Aarre</strong><span>正在打开收藏…</span>";
+      ready = false; loading.hidden = false; loading.innerHTML = pendingSaveRequest ? "<strong>添加到收藏</strong><span>正在读取当前页面…</span>" : "<strong>Aarre</strong><span>正在打开收藏…</span>";
       iframe = document.createElement("iframe"); iframe.title = "Aarre 收藏菜单"; iframe.inert = true;
       const frameUrl = new URL(chrome.runtime.getURL("floating.html")); frameUrl.searchParams.set("tab", String(info.tabId)); frameUrl.searchParams.set("session", info.nonce);
+      if (pendingSaveRequest) frameUrl.searchParams.set("save", pendingSaveRequest);
+      iframe.style.visibility = "visible";
       iframe.src = frameUrl.href; panel.prepend(iframe);
-      clearTimeout(loadTimeout); loadTimeout = setTimeout(() => { if (!ready) showLoadError("菜单加载超时，请重新打开。若仍无法打开，请刷新此网页。"); }, 15_000);
+    }
+    if (!ready || pendingSaveRequest) {
+      clearTimeout(loadTimeout);
+      loadTimeout = setTimeout(() => { if (!ready || pendingSaveRequest) showLoadError("菜单连接超时，请重新打开。"); }, 15_000);
     }
     layout(true);
-    if (ready) { showView(); iframe.focus(); }
+    if (ready) {
+      if (!pendingSaveRequest) { loading.hidden = true; iframe.style.visibility = "visible"; iframe.inert = false; }
+      showView(); iframe.focus();
+    }
   }
   function close(focus = false) {
-    generation++; opening = false; opened = false; panel.inert = true; bar.hidden = false; revealPanel(false);
+    generation++; clearTimeout(loadTimeout); opening = false; opened = false; panel.inert = true; bar.hidden = false; revealPanel(false);
     toggle.setAttribute("aria-expanded", "false"); send({ type: "FLOAT_VISIBILITY", visible: false }); layout(true);
     clearTimeout(closeTimer);
     closeTimer = setTimeout(() => { if (!opened) panel.hidden = true; }, matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 210);
@@ -139,9 +174,9 @@ function startHost() {
   quickSave.addEventListener("click", () => {
     pendingSaveRequest ||= crypto.randomUUID();
     saveHeight ??= SAVE_PANEL_INITIAL_HEIGHT;
-    void open(view).catch(() => showQuickFeedback("连接已失效，请刷新此网页后重试。", true));
+    void open(view).catch(() => showQuickFeedback("连接暂时中断，请重新打开 Aarre。", true));
   });
-  toggle.addEventListener("click", () => { if (opened || opening) close(true); else void open(view).catch(() => showQuickFeedback("连接已失效，请刷新此网页后重试。", true)); });
+  toggle.addEventListener("click", () => { if (opened || opening) close(true); else void open(view).catch(() => showQuickFeedback("连接暂时中断，请重新打开 Aarre。", true)); });
   let drag: { id: number; x: number; width: number } | null = null;
   resize.addEventListener("pointerdown", (event) => {
     if (event.button !== 0 || saveHeight !== null) return; event.preventDefault();
@@ -164,10 +199,19 @@ function startHost() {
   const receive = (event: MessageEvent) => {
     if (!iframe || !info || event.source !== iframe.contentWindow || event.origin !== chrome.runtime.getURL("").replace(/\/$/, "") || event.data?.session !== info.nonce) return;
     if (event.data.type === "FLOAT_READY") {
-      ready = true; needsRetry = false; clearTimeout(loadTimeout); loading.hidden = true; iframe.inert = false;
+      ready = true; needsRetry = false; if (!pendingSaveRequest) clearTimeout(loadTimeout);
+      loading.hidden = !pendingSaveRequest; iframe.inert = Boolean(pendingSaveRequest);
+      iframe.style.visibility = "visible";
       showView(); if (opened) iframe.focus();
     }
-    if (event.data.type === "FLOAT_SAVE_ACCEPTED" && event.data.requestId === pendingSaveRequest) pendingSaveRequest = null;
+    if (event.data.type === "FLOAT_SAVE_ACCEPTED" && event.data.requestId === pendingSaveRequest) {
+      pendingSaveRequest = null; clearTimeout(loadTimeout);
+      if (ready) { loading.hidden = true; iframe.inert = false; iframe.style.visibility = "visible"; }
+    }
+    if (event.data.type === "FLOAT_SAVE_DEFERRED" && event.data.requestId === pendingSaveRequest) {
+      pendingSaveRequest = null; saveHeight = null; clearTimeout(loadTimeout);
+      loading.hidden = true; iframe.inert = false; layout();
+    }
     if (event.data.type === "FLOAT_SAVE_LAYOUT" && typeof event.data.height === "number" && Number.isFinite(event.data.height) && event.data.height > 0) {
       if (saveHeight !== event.data.height) { saveHeight = event.data.height; layout(); }
     }
@@ -176,17 +220,22 @@ function startHost() {
     }
     if (event.data.type === "FLOAT_LOAD_ERROR") showLoadError(typeof event.data.message === "string" ? event.data.message : "请重新打开菜单。");
     if (event.data.type === "FLOAT_CURRENT_VIEW" && ["library", "chat", "settings", "history"].includes(event.data.view)) view = event.data.view;
-    if (event.data.type === "FLOAT_CLOSE") close(true);
+    if (event.data.type === "FLOAT_CLOSE") {
+      if (event.data.resetSave) { pendingSaveRequest = null; saveHeight = null; loading.replaceChildren(); loading.hidden = false; }
+      close(true);
+    }
     if (event.data.type === "FLOAT_HIDE") { close(); forced = false; host.dataset.hidden = "true"; previousFocus?.focus({ preventScroll: true }); }
     if (event.data.type === "FLOAT_THEME" && ["light", "dark"].includes(event.data.theme)) host.dataset.theme = event.data.theme;
   };
+  const refresh = async () => { await init(); if (opened && !iframe) await open(view); };
   const runtimeListener = (message: Record<string, any>, sender: chrome.runtime.MessageSender, respond: (response: unknown) => void) => {
+    if (message.type === "FLOAT_PING") { void refresh().then(() => respond({ ok: !disposed, version }), () => respond({ ok: false, version })); return true; }
     if (message.type === "FLOAT_VERIFY_FRAME") {
       if (sender.id !== chrome.runtime.id || !iframe || !info || message.session !== info.nonce || typeof message.challenge !== "string") { respond({ ok: false }); return false; }
       send({ type: "FLOAT_IDENTITY_CHALLENGE", challenge: message.challenge }); respond({ ok: true }); return false;
     }
     if (message.type === "FLOAT_OPEN") { void open(message.view).then(() => respond({ ok: true }), () => respond({ ok: false })); return true; }
-    if (message.type === "FLOAT_REFRESH") { void init().then(() => respond({ ok: true }), () => respond({ ok: false })); return true; }
+    if (message.type === "FLOAT_REFRESH") { void refresh().then(() => respond({ ok: true }), () => respond({ ok: false })); return true; }
     if (message.type === "FLOAT_CAPTURE") {
       if (typeof message.lease !== "string") { respond({ ok: false }); return false; }
       clearTimeout(watchdog); if (message.hidden) captureLeases.add(message.lease); else captureLeases.delete(message.lease);
@@ -201,14 +250,15 @@ function startHost() {
   document.addEventListener("pointerdown", outside, true); document.addEventListener("keydown", escape); document.addEventListener("fullscreenchange", attach);
   window.addEventListener("message", receive); window.addEventListener("resize", attach);
   window.visualViewport?.addEventListener("resize", attach); window.visualViewport?.addEventListener("scroll", attach);
-  const pageshow = () => { void init().catch(() => undefined); }; window.addEventListener("pageshow", pageshow);
+  const pageshow = () => { void refresh().catch(() => undefined); }; window.addEventListener("pageshow", pageshow);
   chrome.runtime.onMessage.addListener(runtimeListener);
   window.__aarreFloatingHost = { version, destroy() {
     disposed = true; generation++; observer.disconnect(); surfaceAnimation?.cancel(); panelAnimation?.cancel(); clearTimeout(watchdog); clearTimeout(loadTimeout); clearTimeout(closeTimer); clearTimeout(feedbackTimer); host.remove();
-    chrome.runtime.onMessage.removeListener(runtimeListener);
+    try { chrome.runtime.onMessage.removeListener(runtimeListener); } catch { /* Extension reload invalidates old listeners. */ }
     document.removeEventListener("pointerdown", outside, true); document.removeEventListener("keydown", escape); document.removeEventListener("fullscreenchange", attach);
     window.removeEventListener("message", receive); window.removeEventListener("resize", attach); window.removeEventListener("pageshow", pageshow);
     window.visualViewport?.removeEventListener("resize", attach); window.visualViewport?.removeEventListener("scroll", attach);
   } };
+  host.addEventListener("aarre-floating-retire", window.__aarreFloatingHost.destroy, { once: true });
   void init().catch(() => { host.dataset.hidden = "true"; });
 }

@@ -1,5 +1,5 @@
 import { getFloatingSettings, saveFloatingSettings } from "../../lib/floating-settings";
-import { getOnboardingState } from "../../lib/onboarding";
+import { getBookmarkSaveState } from "../handlers/browser";
 import { isSupportedPageUrl } from "../../lib/url";
 import type { ActiveTabSummary } from "../../lib/types";
 
@@ -100,13 +100,13 @@ export async function handleFloatingHost(request: Record<string, any>, sender: c
   const parent = await chrome.webNavigation.getFrame({ tabId, frameId: 0 });
   if (!parent || parent.documentId !== sender.documentId) throw error();
   if (request.type === "FLOAT_HOST_INIT") {
-    const [settings, onboarding, theme] = await Promise.all([getFloatingSettings(), getOnboardingState(), chrome.storage.local.get("aarre:theme-sync:v1")]);
+    const [settings, saved, theme] = await Promise.all([getFloatingSettings(), getBookmarkSaveState(sender.url!).catch(() => null), chrome.storage.local.get("aarre:theme-sync:v1")]);
     let session = await readSession(tabId);
     if (!session || session.documentId !== sender.documentId || request.freshHost === true) {
       session = { tabId, documentId: sender.documentId, nonce: crypto.randomUUID() };
       await chrome.storage.session.set({ [key(tabId)]: session });
     }
-    return { ...session, enabled: onboarding.completed && settings.enabled && !settings.hiddenHosts.includes(new URL(sender.url!).hostname), position: settings.position, theme: theme["aarre:theme-sync:v1"] };
+    return { ...session, saved: saved ? saved.status !== "none" : undefined, enabled: settings.enabled && !settings.hiddenHosts.includes(new URL(sender.url!).hostname), position: settings.position, theme: theme["aarre:theme-sync:v1"] };
   }
   if (request.type === "FLOAT_POSITION") {
     const settings = await getFloatingSettings();

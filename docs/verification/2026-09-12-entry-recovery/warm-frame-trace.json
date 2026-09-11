@@ -1,0 +1,52 @@
+[
+  {
+    "time": 126958.69999992847,
+    "visible": false,
+    "form": false
+  },
+  {
+    "time": 126970.89999997616,
+    "visible": false,
+    "form": false
+  },
+  {
+    "time": 126987.5,
+    "visible": false,
+    "form": false
+  },
+  {
+    "time": 127004.5,
+    "visible": false,
+    "form": false
+  },
+  {
+    "time": 127064.09999990463,
+    "visible": false,
+    "form": false
+  },
+  {
+    "time": 127066.39999997616,
+    "visible": false,
+    "form": false
+  },
+  {
+    "time": 127518.39999997616,
+    "visible": false,
+    "form": true
+  },
+  {
+    "time": 127854.5,
+    "visible": true,
+    "form": true
+  },
+  {
+    "time": 127990,
+    "visible": true,
+    "form": true
+  },
+  {
+    "time": 128006.39999997616,
+    "visible": true,
+    "form": true
+  }
+]
