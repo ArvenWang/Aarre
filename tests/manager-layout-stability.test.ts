@@ -129,7 +129,7 @@ describe("manager layout stability", () => {
     expect(masonrySource).toContain("ResizeObserver");
   });
 
-  it("keeps brand and navigation in one header without a bottom rule", async () => {
+  it("keeps brand, navigation and utilities together in a vertically centered header", async () => {
     const [css, source] = await Promise.all([
       readFile(managerCssUrl, "utf8"),
       readFile(managerAppUrl, "utf8")
@@ -141,10 +141,11 @@ describe("manager layout stability", () => {
       /<header className="manager-header">[\s\S]*?<\/header>/
     )?.[0];
 
-    expect(headerRule).not.toContain("border-bottom");
+    expect(headerRule).toContain("align-items: center");
     expect(topbarRule).not.toContain("border-bottom");
     expect(tabsRule).not.toContain("border-bottom");
     expect(headerMarkup).toContain('className="manager-topbar"');
+    expect(headerMarkup).toContain("<ManagerUtilityActions");
     expect(headerMarkup).toContain('className="manager-view-tabs aarre-tabs-list"');
   });
 

@@ -46,7 +46,7 @@ it.each(["organize", "report", "resurface"])("redirects retired %s links to the 
   window.history.replaceState(null,"",`/manager.html?view=${view}&q=design`);
   const container=document.createElement("div");document.body.append(container);root=createRoot(container);
   await act(async()=>{root!.render(<ManagerApp/>);});
-  expect([...container.querySelectorAll('[role="tab"]')].map(el=>el.textContent)).toEqual(["收藏库0","主题图谱0"]);
+  expect([...container.querySelectorAll('[role="tab"]')].map(el=>el.textContent)).toEqual(["收藏库","主题图谱"]);
   expect(window.location.search).toBe("?q=design");
   expect(container.textContent).toContain("收藏内容");
 });
