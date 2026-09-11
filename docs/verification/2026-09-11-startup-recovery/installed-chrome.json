@@ -64,5 +64,14 @@
     "Windows",
     "Chrome 134 minimum-version profile",
     "Store release"
-  ]
+  ],
+  "sealedDelivery": {
+    "sourceCommit": "edba4d69822a64d581091b5bad47cd6c6cb2be43",
+    "distFilesIdenticalToUnpacked": 95,
+    "reloadedAfterPackaging": true,
+    "readyUiObservedWithinMs": 1245,
+    "loadingOrErrorVisible": false,
+    "composerEmpty": true,
+    "devtoolsClosed": true
+  }
 }
