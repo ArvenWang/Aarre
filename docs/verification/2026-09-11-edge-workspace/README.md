@@ -32,7 +32,7 @@
 - `settings-layout.json`：六组设置和窄窗边界。
 - `host-behavior.json`：草稿、iframe 保留、窗口约束、减少动态效果。
 - `morph-frame.json`：真实展开动画停在 70ms 的几何值。
-- `logs/check.txt`：完整检查，102 个文件、544 项通过（最终封装还会从干净提交重跑）。
+- `logs/check.txt`：完整检查，102 个文件、544 项通过（最终封装从干净提交重跑结果亦为 102 文件/544 项通过）。
 
 ## 电脑端验收
 
@@ -45,3 +45,13 @@
 ## 最终图集
 
 [31 张画面与勾选清单](index.html) 已在 1150px / 420px 窗口打开，31/31 图片加载正常，无横溢出。逐图审核与哈希见 `visual-review.json`。明暗主题截图等待字体、布局及过渡完成；70ms 动画图是专门保存的中间帧。最终 QA 回答样本为 `qa-conversation.json`，六组全文均为 717 字符，正文和每个可见块均无横溢出。这个样本通过开发预览历史列表进入正式会话界面，不请求 AI。
+
+## 0.6.4 本地交付
+
+- 干净源码提交：`ee057e01d758aa908b65820ca7686c48dc237d44`；源码树：`a178cffa54f5bb6461afff9d2cd98cfae7216f7d`。
+- 正式封装构建：`2026-09-11T07:17:40.017Z`；封装时间：`2026-09-11T07:17:44.372Z`。
+- [扩展 ZIP](../../../outputs/Bookmark-Layer-0.6.4.zip)、[解压目录](../../../outputs/Bookmark-Layer-0.6.4-unpacked)、[源码 ZIP](../../../outputs/Bookmark-Layer-0.6.4-source.zip)、[构建清单](../../../outputs/Bookmark-Layer-0.6.4-build.json)、[独立核对](../../../outputs/Bookmark-Layer-0.6.4-verification.json)、[正式完整检查日志](../../../outputs/Bookmark-Layer-0.6.4-checks.txt)。
+- `npm run package:artifacts` 从干净提交重跑全部检查：102 文件/544 项通过。扩展包 1,611,226 bytes，源码包 45,620,683 bytes；后台 300,901 bytes。
+- 97 项字节/SHA-256、95 个解压文件与 ZIP、当前 dist 全部一致；源码 ZIP 与对应提交 git archive 逐字节相符；公开 iframe 依赖均存在。`npm run verify:artifacts` 同时检查历史版本命名及 Manifest，无异常。
+- 安装态菜单/快捷收藏/原历史回答的验证与封装检查分别记录。正式封装前后菜单、宿主与收藏实现相同；最后补齐隐私页面“右侧快捷栏”的文字。未另开新 AI 对话或测试生产云同步，未推送或商店发布。
+- 本轮实施和本地交付已完成；下一步由用户按图集复核体验。后续文档提交只记录交付身份，历史版本及本版封装不覆盖。
