@@ -44,7 +44,11 @@
 
 ## 自动验证与封装
 
-实施阶段：设计约束与类型检查通过；5个针对性文件 / 61项测试通过。正式封装将从干净源码提交执行全量检查，结果回填于本节和统一进展文档。
+正式封装已完成：Node、设计约束、类型、105个文件 / **590项测试**、构建与所有JS语法通过。后台307,371 bytes，低于330,000上限。98个构建文件记录大小与SHA-256一致；96个dist/解压/ZIP文件完全相同；源码ZIP等于对应git archive。
+
+封装源码：`ef18f29d35de726e75f6945f331e92f9424b7c20`；源码树：`cc9f38066494b66dbc5577b516f7267ad8e1fd0e`。封装后再次在原生Chrome重载最终dist，验证单个可用入口、直接收藏和关闭收起；见[安装文件清单](installed-build-files.json)。后续提交只回填文档，不修改封装源码。
+
+交付：[扩展ZIP](../../../outputs/Bookmark-Layer-0.6.8.zip)（1,617,581 bytes）、[解压目录](../../../outputs/Bookmark-Layer-0.6.8-unpacked)、[源码ZIP](../../../outputs/Bookmark-Layer-0.6.8-source.zip)（49,917,790 bytes）、[独立验证](../../../outputs/Bookmark-Layer-0.6.8-verification.json)、[完整检查日志](../../../outputs/Bookmark-Layer-0.6.8-checks.txt)。旧产物均通过结构验证并保持不变。本轮没有遗留实现工作，专用浏览器页已关闭，只保留图集。
 
 ## 浏览器边界
 
