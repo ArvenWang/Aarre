@@ -13,5 +13,11 @@
   "workerRestart": "Controlled integration test; native UI observation did not inspect worker lifecycle",
   "productionKey": "Existing configured service; no key read or copied",
   "pendingSave": "Controlled integration test with deferred provider response",
-  "finalPackagedBuildReload": "pending"
+  "finalPackagedBuildReload": "Native Chrome reloaded 0.6.7 from dist after package completion",
+  "provider": "DeepSeek",
+  "model": "deepseek-v4-flash",
+  "providerVerifiedInNativeSettings": true,
+  "finalMenuLoaded": true,
+  "finalComposerAvailable": true,
+  "temporaryNativeChromeTabsClosed": true
 }
