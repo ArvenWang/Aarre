@@ -1,0 +1,68 @@
+{
+  "date": "2026-09-11",
+  "surface": "User installed Google Chrome on macOS, native UI and Service Worker console",
+  "extensionId": "ppjmhonejgpcdmjmcbbdjookgiagambm",
+  "loadedPath": "/Users/nefish/Desktop/Coding/Aarre/dist",
+  "sourcePage": "https://quaily.com/dingyi/p/363",
+  "before": {
+    "version": "0.6.2",
+    "outerFailure": "菜单未能打开 请检查扩展是否已更新",
+    "frameFailure": "此菜单已失效，请从当前网页重新打开 Aarre。",
+    "webNavigationIncludesExtensionFrame": false,
+    "getFrameByFrameId": null,
+    "getFrameByDocumentId": null,
+    "runtimeContextPresent": true,
+    "sessionBoundToFrame": false
+  },
+  "after": {
+    "version": "0.6.3",
+    "extensionFramePresent": true,
+    "sourceSessionBound": true,
+    "webNavigationIncludesExtensionFrame": false,
+    "readyUiObservedWithinMs": 1196,
+    "timingMeaning": "Upper-bound observation interval for native click plus accessibility snapshot; not a performance benchmark.",
+    "searchVisible": true,
+    "composerVisible": true,
+    "loadingOrErrorVisible": false,
+    "backgroundConsoleBeforeDiagnostic": {
+      "messages": 0,
+      "errors": 0,
+      "warnings": 0
+    }
+  },
+  "interactionChecks": [
+    {
+      "action": "Search existing Chrome bookmarks for Interfaces",
+      "result": "Interfaces › Cheat Sheet and other matching metadata results rendered; search then cleared."
+    },
+    {
+      "action": "Type a Chinese draft, close and reopen menu",
+      "result": "Draft preserved and composer focused."
+    },
+    {
+      "action": "Open More > Settings and close",
+      "result": "Actual settings loaded; draft still present afterwards. No settings changed."
+    },
+    {
+      "action": "Clean up verification draft",
+      "result": "Composer empty and send disabled; no question sent."
+    },
+    {
+      "action": "Reload final build, refresh public source page, open menu",
+      "result": "Real bookmark tree and composer visible within first 1196 ms observation."
+    }
+  ],
+  "visualReview": {
+    "method": "Native Chrome screenshots returned by mcp__cua_repl.getScreenshot and visually reviewed in this conversation",
+    "result": "No loading overlay; bookmark search, list, toolbar and persistent composer visible within menu.",
+    "storage": "Screenshots are in the conversation tool record; this report does not claim an exported image file."
+  },
+  "dataBoundary": "No bookmark add/delete/edit and no AI prompt sent for this verification; temporary draft was cleared. Session nonce, account, credentials and unrelated private tabs omitted.",
+  "notVerified": [
+    "Actual AI provider response",
+    "Cloud sync",
+    "Windows",
+    "Chrome 134 minimum-version profile",
+    "Store release"
+  ]
+}

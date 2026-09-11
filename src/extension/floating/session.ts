@@ -10,21 +10,68 @@ const error = () => new Error("此菜单已失效，请从当前网页重新打�
 async function readSession(tabId: number): Promise<HostSession | undefined> {
   return (await chrome.storage.session.get(key(tabId)))[key(tabId)] as HostSession | undefined;
 }
+
+interface FrameProof { sender: chrome.runtime.MessageSender; nonce: string; resolve(): void }
+const frameProofs = new Map<string, FrameProof>();
+
+// The top-page host delivers this challenge only to the iframe it owns. Its
+// reply arrives over runtime messaging, so the page cannot claim a document ID.
+export function proveFloatingFrame(request: { challenge?: unknown; nonce?: unknown }, sender: chrome.runtime.MessageSender): void {
+  const proof = typeof request.challenge === "string" ? frameProofs.get(request.challenge) : undefined;
+  if (!proof || request.nonce !== proof.nonce || sender.id !== chrome.runtime.id ||
+      sender.tab?.id !== proof.sender.tab?.id || sender.frameId !== proof.sender.frameId ||
+      sender.documentId !== proof.sender.documentId || sender.url !== proof.sender.url) throw error();
+  proof.resolve();
+}
+
+async function verifyOwnedFrame(session: HostSession, sender: chrome.runtime.MessageSender): Promise<void> {
+  const challenge = crypto.randomUUID();
+  let timer: ReturnType<typeof setTimeout>;
+  const proof = new Promise<void>((resolve) => {
+    frameProofs.set(challenge, { sender: { ...sender }, nonce: session.nonce, resolve });
+  });
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error("菜单连接超时，请重新打开。")), 5_000);
+  });
+  try {
+    await Promise.race([deadline, Promise.all([proof, Promise.resolve().then(async () => {
+      const response = await chrome.tabs.sendMessage(session.tabId, {
+        type: "FLOAT_VERIFY_FRAME", challenge, session: session.nonce,
+      }, { documentId: session.documentId, frameId: 0 });
+      if (!response?.ok) throw error();
+    })])]);
+  } finally {
+    clearTimeout(timer!);
+    frameProofs.delete(challenge);
+  }
+}
+
 export async function validateFloatingSender(sender: chrome.runtime.MessageSender, nonce?: string): Promise<HostSession> {
-  if (sender.id !== chrome.runtime.id || !sender.tab?.id || !sender.documentId) throw error();
+  if (sender.id !== chrome.runtime.id || !sender.tab?.id || !sender.documentId || !sender.frameId) throw error();
   const session = await readSession(sender.tab.id);
-  if (!session || (nonce && nonce !== session.nonce)) throw error();
-  const [parent, frames] = await Promise.all([
+  if (!session || (nonce !== undefined && nonce !== session.nonce)) throw error();
+  const [parent, contexts] = await Promise.all([
     chrome.webNavigation.getFrame({ tabId: session.tabId, frameId: 0 }),
-    chrome.webNavigation.getAllFrames({ tabId: session.tabId }),
+    // webNavigation omits extension-origin frames in real Chrome. runtime is
+    // the authoritative inventory of our extension's active documents.
+    chrome.runtime.getContexts({ contextTypes: ["TAB"], tabIds: [session.tabId], documentIds: [sender.documentId] }),
   ]);
   if (!parent || parent.documentId !== session.documentId) throw error();
-  const frame = frames?.find((item) => item.frameId === sender.frameId && item.documentId === sender.documentId);
-  if (!frame || frame.parentFrameId !== 0 || !sender.url?.startsWith(`${origin()}/floating.html?`)) throw error();
+  const frame = contexts.find((item) => item.frameId === sender.frameId && item.documentId === sender.documentId &&
+    item.tabId === session.tabId && item.documentOrigin === origin() && item.documentUrl === sender.url);
+  if (!frame || !sender.url?.startsWith(`${origin()}/floating.html?`)) throw error();
   const params = new URL(sender.url).searchParams;
   if (params.get("session") !== session.nonce || Number(params.get("tab")) !== session.tabId) throw error();
   if (session.frameDocumentId && (session.frameId !== sender.frameId || (!nonce && session.frameDocumentId !== sender.documentId))) throw error();
   if (!session.frameDocumentId || session.frameDocumentId !== sender.documentId) {
+    if (!nonce) throw error();
+    await verifyOwnedFrame(session, sender);
+    const [current, currentParent] = await Promise.all([
+      readSession(session.tabId), chrome.webNavigation.getFrame({ tabId: session.tabId, frameId: 0 }),
+    ]);
+    if (!current || current.nonce !== session.nonce || current.documentId !== session.documentId ||
+        currentParent?.documentId !== session.documentId ||
+        (current.frameId !== undefined && current.frameId !== sender.frameId)) throw error();
     session.frameDocumentId = sender.documentId;
     session.frameId = sender.frameId;
     await chrome.storage.session.set({ [key(session.tabId)]: session });

@@ -1,4 +1,4 @@
-import { authorizeUiMessage, handleFloatingHost, validateFloatingSender, floatingSource } from "./floating/session";
+import { authorizeUiMessage, handleFloatingHost, validateFloatingSender, floatingSource, proveFloatingFrame } from "./floating/session";
 import { registerFloatingLifecycle } from "./floating/lifecycle";
 import { requestSync } from "../lib/sync-request";
 
@@ -663,6 +663,13 @@ chrome.runtime.onMessage.addListener(
     sendResponse: (response: ExtensionResponse<unknown>) => void
   ) => {
     if (isOffscreenSiteIconRequest(request)) return false;
+    if ((request?.type as string) === "FLOAT_PROVE_FRAME") {
+      try {
+        proveFloatingFrame(request as unknown as { challenge: string; nonce: string }, sender);
+        sendResponse({ ok: true, data: null });
+      } catch (error) { sendResponse({ ok: false, error: errorMessage(error) }); }
+      return false;
+    }
     if (["FLOAT_HOST_INIT", "FLOAT_POSITION"].includes(request?.type as string)) {
       void handleFloatingHost(request, sender).then((data) => sendResponse({ ok: true, data }),
         (error) => sendResponse({ ok: false, error: errorMessage(error) }));

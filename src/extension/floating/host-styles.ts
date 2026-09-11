@@ -14,7 +14,7 @@ iframe { display:block; width:100%; height:100%; border:0; background:inherit; c
 .resize { position:absolute; right:0; top:0; width:18px; height:18px; cursor:nesw-resize; touch-action:none; pointer-events:auto; color:#68717a; border:0; background:transparent; padding:3px; }
 :host([data-edge="right"]) .resize { right:auto; left:0; cursor:nwse-resize; }
 .resize svg { transform:rotate(180deg); width:14px; height:14px; display:block; }
-.loading { position:absolute; inset:0; display:grid; place-content:center; gap:8px; text-align:center; background:inherit; color:inherit; font:13px/1.5 "Avenir Next","PingFang SC",sans-serif; }
+.loading { position:absolute; inset:0; display:grid; place-content:center; gap:8px; padding:20px; overflow-wrap:anywhere; text-align:center; background:inherit; color:inherit; font:13px/1.5 "Avenir Next","PingFang SC",sans-serif; }
 .loading[hidden] { display:none; }
 .loading button { font:inherit; padding:8px 16px; border:1px solid #9ba5ae; border-radius:8px; background:inherit; color:inherit; cursor:pointer; }
 .loading strong { font-size:18px; }

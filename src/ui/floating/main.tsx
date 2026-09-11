@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import { StrictMode } from "react";
 import { initializeTheme, THEME_CHANGE_EVENT } from "../../lib/theme";
 import { FLOATING_VIEW_EVENT, getFloatingContext, postToFloatingHost, setFloatingContext } from "./bridge";
+import { listenForFrameChallenge, reportFloatingStartupError } from "./startup";
 import "../styles-sidepanel.css";
 import "./floating.css";
 
@@ -17,7 +18,8 @@ async function start() {
     }
   } else {
     if (window.parent === window) throw new Error("请通过网页上的 Aarre 悬浮球打开菜单。");
-    const response = await chrome.runtime.sendMessage({ type: "FLOAT_CONNECT", nonce: params.get("session") });
+    const stopListening = listenForFrameChallenge(params.get("session") || "");
+    const response = await chrome.runtime.sendMessage({ type: "FLOAT_CONNECT", nonce: params.get("session") }).finally(stopListening);
     if (!response?.ok || !response.data?.source?.id) throw new Error(response?.error || "此菜单已失效，请重新打开。");
     const source = response.data.source;
     const nonce = params.get("session")!;
@@ -54,5 +56,5 @@ void start().catch((error) => {
   const title = document.createElement("strong"); title.textContent = "Aarre 菜单未能打开";
   const message = document.createElement("p"); message.textContent = error instanceof Error ? error.message : "请重新打开菜单。";
   root.className = "floating-recovery"; root.replaceChildren(title, message);
-  postToFloatingHost({ type: "FLOAT_READY" });
+  reportFloatingStartupError(message.textContent);
 });

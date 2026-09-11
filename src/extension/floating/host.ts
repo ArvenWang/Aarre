@@ -58,6 +58,14 @@ function startHost() {
     attach();
   }
   const init = () => initPromise ||= initialize().finally(() => { initPromise = null; });
+  function showLoadError(message: string) {
+    clearTimeout(loadTimeout); needsRetry = true; ready = false; loading.hidden = false;
+    const title = document.createElement("strong"); title.textContent = "菜单未能打开";
+    const detail = document.createElement("span"); detail.textContent = message;
+    const retry = document.createElement("button"); retry.type = "button"; retry.textContent = "重新打开";
+    retry.addEventListener("click", () => { void open(view).catch(() => showLoadError("连接已失效，请刷新此网页后重试。")); });
+    loading.replaceChildren(title, detail, retry);
+  }
   async function open(nextView = "library") {
     forced = true; view = nextView;
     if (needsRetry) { iframe?.remove(); iframe = null; info = null; ready = false; needsRetry = false; }
@@ -72,7 +80,8 @@ function startHost() {
       frameUrl.searchParams.set("tab", String(info.tabId)); frameUrl.searchParams.set("session", info.nonce);
       iframe.src = frameUrl.href;
       panel.prepend(iframe);
-      loadTimeout = setTimeout(() => { if (!ready) { needsRetry = true; loading.innerHTML = "<strong>菜单未能打开</strong><span>请检查扩展是否已更新</span>"; const retry = document.createElement("button"); retry.type = "button"; retry.textContent = "重新打开"; retry.addEventListener("click", () => { void open(view).catch(() => { loading.textContent = "连接已失效，请刷新此网页后重试。"; }); }); loading.append(retry); } }, 15_000);
+      clearTimeout(loadTimeout);
+      loadTimeout = setTimeout(() => { if (!ready) showLoadError("菜单加载超时，请重新打开。若仍无法打开，请刷新此网页。"); }, 15_000);
     }
     layout();
     if (ready) { send({ type: "FLOAT_VIEW", view, focus: true }); iframe.focus(); }
@@ -142,12 +151,20 @@ function startHost() {
       ready = true; needsRetry = false; clearTimeout(loadTimeout); loading.hidden = true;
       send({ type: "FLOAT_VIEW", view, focus: opened }); if (opened) iframe.focus();
     }
+    if (event.data.type === "FLOAT_LOAD_ERROR") showLoadError(typeof event.data.message === "string" ? event.data.message : "请重新打开菜单。");
     if (event.data.type === "FLOAT_CURRENT_VIEW" && ["library", "chat", "settings", "history"].includes(event.data.view)) view = event.data.view;
     if (event.data.type === "FLOAT_CLOSE") close(true);
     if (event.data.type === "FLOAT_HIDE") { close(); forced = false; host.dataset.hidden = "true"; previousFocus?.focus({ preventScroll: true }); }
     if (event.data.type === "FLOAT_THEME" && ["light", "dark"].includes(event.data.theme)) host.dataset.theme = event.data.theme;
   };
-  const runtimeListener = (message: Record<string, any>, _sender: chrome.runtime.MessageSender, respond: (response: unknown) => void) => {
+  const runtimeListener = (message: Record<string, any>, sender: chrome.runtime.MessageSender, respond: (response: unknown) => void) => {
+    if (message.type === "FLOAT_VERIFY_FRAME") {
+      if (sender.id !== chrome.runtime.id || !iframe || !info || message.session !== info.nonce || typeof message.challenge !== "string") {
+        respond({ ok: false }); return false;
+      }
+      send({ type: "FLOAT_IDENTITY_CHALLENGE", challenge: message.challenge });
+      respond({ ok: true }); return false;
+    }
     if (message.type === "FLOAT_OPEN") { void open(message.view).then(() => respond({ ok: true }), () => respond({ ok: false })); return true; }
     if (message.type === "FLOAT_REFRESH") { void init().then(() => respond({ ok: true }), () => respond({ ok: false })); return true; }
     if (message.type === "FLOAT_CAPTURE") {
