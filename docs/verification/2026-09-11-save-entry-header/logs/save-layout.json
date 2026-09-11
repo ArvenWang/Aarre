@@ -1,0 +1,194 @@
+[
+  {
+    "outerWidth": 1280,
+    "theme": "light",
+    "frameWidth": 400,
+    "scrollWidth": 400,
+    "form": [
+      {
+        "class": "modal__dialog modal__dialog--scroll-inside modal__dialog--lg native-dialog floating-save-page",
+        "clientWidth": 400,
+        "scrollWidth": 400,
+        "x": 0,
+        "y": 0,
+        "width": 400,
+        "height": 876,
+        "top": 0,
+        "right": 400,
+        "bottom": 876,
+        "left": 0
+      },
+      {
+        "class": "native-dialog-scroll",
+        "clientWidth": 400,
+        "scrollWidth": 400,
+        "x": 0,
+        "y": 57,
+        "width": 400,
+        "height": 754,
+        "top": 57,
+        "right": 400,
+        "bottom": 811,
+        "left": 0
+      },
+      {
+        "class": "native-dialog-actions",
+        "clientWidth": 400,
+        "scrollWidth": 400,
+        "x": 0,
+        "y": 811,
+        "width": 400,
+        "height": 65,
+        "top": 811,
+        "right": 400,
+        "bottom": 876,
+        "left": 0
+      }
+    ],
+    "note": "收藏表单的备注在调整窗口和切换主题后仍然保留。"
+  },
+  {
+    "outerWidth": 1280,
+    "theme": "dark",
+    "frameWidth": 400,
+    "scrollWidth": 400,
+    "form": [
+      {
+        "class": "modal__dialog modal__dialog--scroll-inside modal__dialog--lg native-dialog floating-save-page",
+        "clientWidth": 400,
+        "scrollWidth": 400,
+        "x": 0,
+        "y": 0,
+        "width": 400,
+        "height": 876,
+        "top": 0,
+        "right": 400,
+        "bottom": 876,
+        "left": 0
+      },
+      {
+        "class": "native-dialog-scroll",
+        "clientWidth": 400,
+        "scrollWidth": 400,
+        "x": 0,
+        "y": 57,
+        "width": 400,
+        "height": 754,
+        "top": 57,
+        "right": 400,
+        "bottom": 811,
+        "left": 0
+      },
+      {
+        "class": "native-dialog-actions",
+        "clientWidth": 400,
+        "scrollWidth": 400,
+        "x": 0,
+        "y": 811,
+        "width": 400,
+        "height": 65,
+        "top": 811,
+        "right": 400,
+        "bottom": 876,
+        "left": 0
+      }
+    ],
+    "note": "收藏表单的备注在调整窗口和切换主题后仍然保留。"
+  },
+  {
+    "outerWidth": 320,
+    "theme": "light",
+    "frameWidth": 305,
+    "scrollWidth": 305,
+    "form": [
+      {
+        "class": "modal__dialog modal__dialog--scroll-inside modal__dialog--lg native-dialog floating-save-page",
+        "clientWidth": 305,
+        "scrollWidth": 305,
+        "x": 0,
+        "y": 0,
+        "width": 305,
+        "height": 616,
+        "top": 0,
+        "right": 305,
+        "bottom": 616,
+        "left": 0
+      },
+      {
+        "class": "native-dialog-scroll",
+        "clientWidth": 305,
+        "scrollWidth": 305,
+        "x": 0,
+        "y": 57,
+        "width": 305,
+        "height": 494,
+        "top": 57,
+        "right": 305,
+        "bottom": 551,
+        "left": 0
+      },
+      {
+        "class": "native-dialog-actions",
+        "clientWidth": 305,
+        "scrollWidth": 305,
+        "x": 0,
+        "y": 551,
+        "width": 305,
+        "height": 65,
+        "top": 551,
+        "right": 305,
+        "bottom": 616,
+        "left": 0
+      }
+    ],
+    "note": "收藏表单的备注在调整窗口和切换主题后仍然保留。"
+  },
+  {
+    "outerWidth": 320,
+    "theme": "dark",
+    "frameWidth": 305,
+    "scrollWidth": 305,
+    "form": [
+      {
+        "class": "modal__dialog modal__dialog--scroll-inside modal__dialog--lg native-dialog floating-save-page",
+        "clientWidth": 305,
+        "scrollWidth": 305,
+        "x": 0,
+        "y": 0,
+        "width": 305,
+        "height": 616,
+        "top": 0,
+        "right": 305,
+        "bottom": 616,
+        "left": 0
+      },
+      {
+        "class": "native-dialog-scroll",
+        "clientWidth": 305,
+        "scrollWidth": 305,
+        "x": 0,
+        "y": 57,
+        "width": 305,
+        "height": 494,
+        "top": 57,
+        "right": 305,
+        "bottom": 551,
+        "left": 0
+      },
+      {
+        "class": "native-dialog-actions",
+        "clientWidth": 305,
+        "scrollWidth": 305,
+        "x": 0,
+        "y": 551,
+        "width": 305,
+        "height": 65,
+        "top": 551,
+        "right": 305,
+        "bottom": 616,
+        "left": 0
+      }
+    ],
+    "note": "收藏表单的备注在调整窗口和切换主题后仍然保留。"
+  }
+]

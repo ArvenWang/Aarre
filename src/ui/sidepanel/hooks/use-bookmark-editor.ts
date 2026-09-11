@@ -141,13 +141,14 @@ export function useBookmarkEditor({
     setSelectedBookmarkId("");
     try {
       const targetUrl = draft?.url || appState.activeTab?.url || "";
-      const [folderOptions, saveState] = await Promise.all([
+      const [folderOptions, saveState, currentResources] = await Promise.all([
         sendExtensionRequest({ type: "GET_FOLDERS" }),
         sendExtensionRequest({ type: "GET_BOOKMARK_SAVE_STATE", url: targetUrl }),
+        sendExtensionRequest({ type: "GET_LOCAL_RESOURCES" }),
       ]);
       setBookmarkSaveState(saveState);
       const initialMatch = saveState.status === "exact" || saveState.status === "readonly" ? saveState.matches[0] : undefined;
-      setNote(resourceForUrl(resources, targetUrl)?.userNote || "");
+      setNote(resourceForUrl(currentResources, targetUrl)?.userNote || "");
       setSelectedBookmarkId(initialMatch?.id || "");
       setSaveDisposition(saveState.status === "none" ? "new" : initialMatch ? "reuse" : "");
       setFolders(folderOptions);

@@ -1,0 +1,18 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Aarre 悬浮菜单 · 开发验收场景</title>
+<style>body{margin:0;color:#263041;background:#f6f7fa;font:16px/1.8 system-ui,sans-serif}header{background:white;border-bottom:1px solid #dce0e8;padding:20px max(24px,8vw);display:flex;justify-content:space-between;gap:20px}main{max-width:860px;margin:72px auto;padding:0 24px}small{color:#616c7d}h1{font-size:44px;line-height:1.25;letter-spacing:-1.2px;margin:16px 0 24px}h2{font-size:22px;margin:40px 0 12px}.hero{background:#e5e9ef;height:180px;border-radius:16px;display:grid;place-items:center;color:#445068;margin:32px 0}input{font:inherit;border:1px solid #bcc4cf;border-radius:8px;padding:10px 14px;max-width:90%}.notice{font-size:12px;background:#eef1f6;padding:6px 24px;text-align:center}@media(max-width:600px){main{margin-top:32px}h1{font-size:32px}header{padding:16px 24px}.hero{height:120px}}</style>
+<body><div class="notice">开发验收场景 · 正式宿主和 UI 代码 / 浏览器接口与收藏数据为测试替身 · 非已安装 Chrome 验收</div><header><strong>阅读与设计</strong><small>阅读笔记 / 产品体验</small></header><main><small>设计方法 · 8 分钟阅读</small><h1>让收藏回到阅读的现场</h1><p>有价值的资料，常常出现在正在阅读的网页里。工具应该在需要时出现，让收集、记录和重新发现保持连贯。</p><div class="hero">正在阅读的原始网页</div><h2>随手记录，而后继续</h2><p>这个页面用于检查右侧快捷栏是否遮挡内容、菜单是否留在可视区域，以及关闭菜单后焦点能否回到阅读位置。正文不会因为菜单打开而缩窄。</p><label>网页自身的输入框 <input aria-label="网页输入框" placeholder="可测试输入中文和快捷键"></label><h2>工具与内容各有边界</h2><p>向下滚动、调整窗口大小或在明暗主题间切换时，界面都应保持清晰、可操作。菜单收起后只留下右侧的双按钮快捷栏。</p><p style="margin-top:180px">页面结尾 · 用于验证滚动后的浮动位置。</p></main>
+<script type="module">
+if (!import.meta.env.DEV) throw Error('QA harness requires the development server');
+const params=new URLSearchParams(location.search);
+if(params.has('theme'))localStorage.setItem('aarre:theme',params.get('theme'));
+if(params.has('glass')) { document.body.dataset.glassProbe='true'; const style=document.createElement('style');style.textContent='body[data-glass-probe]{min-height:100vh;background:repeating-linear-gradient(120deg,#799cbb 0px,#799cbb 38px,#deaa85 38px,#deaa85 76px,#536e69 76px,#536e69 114px)}body[data-glass-probe] main,body[data-glass-probe] header{display:none}';document.head.append(style);document.querySelector('.notice').textContent='磨砂验收底图 · 背后的条纹应透色且变模糊'; }
+const listeners=new Set(), nonce=crypto.randomUUID();let position={width:400};
+window.__aarreHarness={events:[],send(message){return new Promise(resolve=>{let handled=false;for(const fn of listeners)handled=fn(message,{},resolve)||handled;if(!handled)resolve(null);});}};
+window.addEventListener('message',event=>{if(event.origin===location.origin && event.data?.session===nonce && event.data?.type==='FLOAT_READY')window.__aarreHarness.frame=event.source;});
+window.chrome={runtime:{id:'aarre-qa-harness',getManifest:()=>({version:'0.6.5-qa'}),getURL:(path)=>`${location.origin}/${path}${path==='floating.html'?'?preview=1&harness=1':''}`,
+ onMessage:{addListener:fn=>listeners.add(fn),removeListener:fn=>listeners.delete(fn)},
+ sendMessage:async(message)=>{window.__aarreHarness.events.push(message.type);if(message.type==='FLOAT_POSITION')position=message.position; 
+ return{ok:true,data:{tabId:7,documentId:'qa-document',nonce,enabled:true,position,theme:localStorage.getItem('aarre:theme')||'light'}};}}};
+const attachShadow=Element.prototype.attachShadow; Element.prototype.attachShadow=function(init){const root=attachShadow.call(this,init);if(this.localName==='aarre-floating-host')window.__aarreHarness.root=root;return root;};
+await import('/src/extension/floating/host.ts'); Element.prototype.attachShadow=attachShadow;
+</script></body></html>

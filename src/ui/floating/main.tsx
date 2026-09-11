@@ -1,7 +1,7 @@
 import { createRoot } from "react-dom/client";
 import { StrictMode } from "react";
 import { initializeTheme, THEME_CHANGE_EVENT } from "../../lib/theme";
-import { FLOATING_VIEW_EVENT, getFloatingContext, postToFloatingHost, setFloatingContext } from "./bridge";
+import { FLOATING_VIEW_EVENT, getFloatingContext, postToFloatingHost, setFloatingContext, requestFloatingSave } from "./bridge";
 import { listenForFrameChallenge, reportFloatingStartupError } from "./startup";
 import "../styles-sidepanel.css";
 import "./floating.css";
@@ -33,6 +33,7 @@ async function start() {
       if (event.source !== parent || event.origin !== parentOrigin || event.data?.session !== nonce) return;
       if (event.data.type === "FLOAT_VIEW") {
         window.dispatchEvent(new CustomEvent(FLOATING_VIEW_EVENT, { detail: event.data.view }));
+        if (typeof event.data.saveRequestId === "string") requestFloatingSave(event.data.saveRequestId);
         if (event.data.focus) requestAnimationFrame(() => (document.querySelector<HTMLElement>('[role="dialog"] button') || document.querySelector<HTMLElement>('#bookmark-agent-prompt'))?.focus({ preventScroll: true }));
       }
     });

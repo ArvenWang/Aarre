@@ -133,8 +133,8 @@
 .topic-directory-results small { color:var(--ink-muted); font-size:var(--fs-caption); }
 .topic-directory-results[hidden] { display:none; }
 .aarre-tabs-list .aarre-tab { width:auto; }
-.manager-view-tabs.aarre-tabs-list { gap:4px; }
-.manager-view-tabs .aarre-tab[data-selected] { background:var(--surface-sunken); color:var(--ink); }
+.manager-view-tabs.aarre-tabs-list { gap:var(--sp-6); }
+.manager-view-tabs .aarre-tab[data-selected] { background:transparent; color:var(--ink); }
 
 .aarre-switch [data-slot="switch-control"] { background:var(--line-strong); border:1px solid var(--ink-faint); }
 .aarre-switch[data-selected] [data-slot="switch-control"] { background:var(--positive); border-color:var(--positive); }

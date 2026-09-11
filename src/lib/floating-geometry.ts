@@ -1,5 +1,5 @@
-export const BAR_WIDTH = 44;
-export const BAR_HEIGHT = 96;
+export const BAR_WIDTH = 52;
+export const BAR_HEIGHT = 100;
 export const FLOAT_EDGE = 12;
 export interface FloatingPosition { width: number }
 export interface Viewport { width: number; height: number; left?: number; top?: number }

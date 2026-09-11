@@ -35,8 +35,8 @@ describe("floating geometry", () => {
           expect(rect.x).toBeGreaterThanOrEqual(0); expect(rect.y).toBeGreaterThanOrEqual(0);
           expect(rect.x+rect.width).toBe(width); expect(rect.y+rect.height).toBeLessThanOrEqual(height);
         }
-        expect(result.bar.width).toBe(44); expect(result.bar.height).toBe(96);
-        expect(result.bar.y+48).toBe(height/2);
+        expect(result.bar.width).toBe(52); expect(result.bar.height).toBe(100);
+        expect(result.bar.y+result.bar.height/2).toBe(height/2);
         expect(result.menu.height).toBe(height-24);
       }
     });

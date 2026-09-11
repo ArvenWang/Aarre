@@ -1,0 +1,195 @@
+{
+  "version": "0.6.5",
+  "reviewedAt": "2026-09-11T09:08:16.117746+00:00",
+  "scope": "Formal UI rendered in Ego with isolated DEV data. Native installed Chrome verified separately; personal browsing screenshots are not stored.",
+  "capturePolicy": "Stable frames after layout and theme transitions; see README for tested environment boundaries.",
+  "records": [
+    {
+      "file": "screenshots/bar-light.png",
+      "title": "普通网页上的右侧快捷栏",
+      "width": 1280,
+      "height": 900,
+      "bytes": 112895,
+      "sha256": "8ca0cc49d8a2328a32194edd06833e0c6787a5a1842c20d571634a63701c0348",
+      "review": "Viewed individually with image viewer. Checked alignment, wrapping, control spacing and visible actions."
+    },
+    {
+      "file": "screenshots/glass-light.png",
+      "title": "日间 · 磨砂与方形悬停区域",
+      "width": 480,
+      "height": 400,
+      "bytes": 28282,
+      "sha256": "58637679efa11cfa5d1155558c213a1e902fa291701e92e22d302e4dd5b8ffab",
+      "review": "Viewed individually with image viewer. Checked alignment, wrapping, control spacing and visible actions."
+    },
+    {
+      "file": "screenshots/glass-dark.png",
+      "title": "夜间 · 磨砂与方形悬停区域",
+      "width": 480,
+      "height": 400,
+      "bytes": 27860,
+      "sha256": "f33911f8c1665eb63a26f724494d301163e3dc94a19a5ad4bf4d3706793c165c",
+      "review": "Viewed individually with image viewer. Checked alignment, wrapping, control spacing and visible actions."
+    },
+    {
+      "file": "screenshots/glass-reduced-transparency.png",
+      "title": "系统减少透明效果 · 实色回退",
+      "width": 480,
+      "height": 400,
+      "bytes": 26676,
+      "sha256": "80546b3d08b336b96933dffc21750b9dbb412fe7a4897e709f53bbadc3a27115",
+      "review": "Viewed individually with image viewer. Checked alignment, wrapping, control spacing and visible actions."
+    },
+    {
+      "file": "screenshots/library-1440-light.png",
+      "title": "1440px · 日间",
+      "width": 1440,
+      "height": 900,
+      "bytes": 189931,
+      "sha256": "45b88580eb96f5e4d3c26cd9fc7e698c37ae9c1ff87e2b138693776f4c79529b",
+      "review": "Viewed individually with image viewer. Checked alignment, wrapping, control spacing and visible actions."
+    },
+    {
+      "file": "screenshots/library-1440-dark.png",
+      "title": "1440px · 夜间",
+      "width": 1440,
+      "height": 900,
+      "bytes": 190904,
+      "sha256": "7e97944c6e8d76e8feee9e2a10681cc9699ae48721e358acd91fe905b6681e75",
+      "review": "Viewed individually with image viewer. Checked alignment, wrapping, control spacing and visible actions."
+    },
+    {
+      "file": "screenshots/library-768-light.png",
+      "title": "768px · 日间",
+      "width": 768,
+      "height": 900,
+      "bytes": 112772,
+      "sha256": "771f82212934ca49b5d1ec595e9014e0a9e2e34de5f03d26ef54b1abfd14df5e",
+      "review": "Viewed individually with image viewer. Checked alignment, wrapping, control spacing and visible actions."
+    },
+    {
+      "file": "screenshots/library-768-dark.png",
+      "title": "768px · 夜间",
+      "width": 768,
+      "height": 900,
+      "bytes": 113492,
+      "sha256": "7aa4c4fb3ece81be77ae18ce166f2fd75255d1efda763889b8545e0c350dce9e",
+      "review": "Viewed individually with image viewer. Checked alignment, wrapping, control spacing and visible actions."
+    },
+    {
+      "file": "screenshots/library-320-light.png",
+      "title": "320px · 日间",
+      "width": 320,
+      "height": 900,
+      "bytes": 51717,
+      "sha256": "8b5e926dd053377879084736f78eb0db24a8974f54ebb0f18b3cd521f72cfe92",
+      "review": "Viewed individually with image viewer. Checked alignment, wrapping, control spacing and visible actions."
+    },
+    {
+      "file": "screenshots/library-320-dark.png",
+      "title": "320px · 夜间",
+      "width": 320,
+      "height": 900,
+      "bytes": 52409,
+      "sha256": "332810c683e3122f3e4ac39f84d7aeeb621c1188fc04b5b2b7d7940f09a35865",
+      "review": "Viewed individually with image viewer. Checked alignment, wrapping, control spacing and visible actions."
+    },
+    {
+      "file": "screenshots/library-search-result.png",
+      "title": "真实搜索交互 · 结果与数量更新",
+      "width": 1440,
+      "height": 900,
+      "bytes": 53215,
+      "sha256": "d1951dc960ff799d07fa7ce5fcd4b14cd630b18377a3ccbbda8711c793db2c09",
+      "review": "Viewed individually with image viewer. Checked alignment, wrapping, control spacing and visible actions."
+    },
+    {
+      "file": "screenshots/topics-desktop.png",
+      "title": "主题图谱 · 共用新版导航",
+      "width": 1440,
+      "height": 900,
+      "bytes": 165098,
+      "sha256": "53fb1d9a366005372ccdb282674a945ba0f015dae96bd2d7a11429f001910f7d",
+      "review": "Viewed individually with image viewer. Checked alignment, wrapping, control spacing and visible actions."
+    },
+    {
+      "file": "screenshots/settings-from-header.png",
+      "title": "右侧设置入口 · 分类面板",
+      "width": 1440,
+      "height": 900,
+      "bytes": 99700,
+      "sha256": "96e6f58dccdbd935d450e02275d338843a113e9797eb85e6fde1448b56c42fc0",
+      "review": "Viewed individually with image viewer. Checked alignment, wrapping, control spacing and visible actions."
+    },
+    {
+      "file": "screenshots/save-1280-900-light.png",
+      "title": "网页内收藏表单 · 日间",
+      "width": 1280,
+      "height": 900,
+      "bytes": 139329,
+      "sha256": "f737b29ad53ffe96938f6f1cc75bba5ae68d668bbadab20c8d2c8fd23b2f9b4d",
+      "review": "Viewed individually with image viewer. Checked alignment, wrapping, control spacing and visible actions."
+    },
+    {
+      "file": "screenshots/save-1280-900-dark.png",
+      "title": "网页内收藏表单 · 夜间",
+      "width": 1280,
+      "height": 900,
+      "bytes": 138762,
+      "sha256": "6f1e6b96ab7c407ca4e6a5aff045d9899347b803a632be71904117c291442d08",
+      "review": "Viewed individually with image viewer. Checked alignment, wrapping, control spacing and visible actions."
+    },
+    {
+      "file": "screenshots/save-320-640-light.png",
+      "title": "320 × 640px 窗口 · 日间",
+      "width": 320,
+      "height": 640,
+      "bytes": 39799,
+      "sha256": "2e4948947b0eb877d2a3120a2dbdafe388b9968b6c57c6ca8765e9492ba97867",
+      "review": "Viewed individually with image viewer. Checked alignment, wrapping, control spacing and visible actions."
+    },
+    {
+      "file": "screenshots/save-320-640-dark.png",
+      "title": "320 × 640px 窗口 · 夜间",
+      "width": 320,
+      "height": 640,
+      "bytes": 39421,
+      "sha256": "81fcdb7950179925d54f0442d017e24cee7d2aad1d7492b37cff58842088bd2b",
+      "review": "Viewed individually with image viewer. Checked alignment, wrapping, control spacing and visible actions."
+    },
+    {
+      "file": "screenshots/save-folder-picker.png",
+      "title": "文件夹选择 · 边距与层级",
+      "width": 1280,
+      "height": 900,
+      "bytes": 137332,
+      "sha256": "4cd32fc0c035fba8276fda75dcef52b1b18c10513e5f019144738aee41a68813",
+      "review": "Viewed individually with image viewer. Checked alignment, wrapping, control spacing and visible actions."
+    },
+    {
+      "file": "screenshots/save-error-narrow.png",
+      "title": "保存失败 · 原内容保留，操作仍可见",
+      "width": 420,
+      "height": 520,
+      "bytes": 33520,
+      "sha256": "75e176a18db537d34fd3a4f1265a0598a520b639012935ab730672875fee50d2",
+      "review": "Viewed individually with image viewer. Checked alignment, wrapping, control spacing and visible actions."
+    }
+  ],
+  "galleryChecks": [
+    {
+      "width": 1150,
+      "clientWidth": 1135,
+      "scrollWidth": 1135,
+      "loaded": 19,
+      "total": 19
+    },
+    {
+      "width": 420,
+      "clientWidth": 405,
+      "scrollWidth": 405,
+      "loaded": 19,
+      "total": 19
+    }
+  ]
+}

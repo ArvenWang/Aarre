@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SidePanelApp } from "../src/ui/sidepanel/SidePanelApp";
 import { installSidePanelPreview } from "../src/ui/sidepanel/preview";
+import { requestFloatingSave, acceptFloatingSave, getFloatingSaveRequest } from "../src/ui/floating/bridge";
 import { previewMutable } from "../src/ui/sidepanel/preview-state";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -38,6 +39,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   await act(async () => root.unmount());
+  const pending = getFloatingSaveRequest(); if (pending) acceptFloatingSave(pending);
   document.body.innerHTML = "";
   localStorage.clear(); sessionStorage.clear();
   vi.unstubAllGlobals();
@@ -141,4 +143,96 @@ it("renders streamed text before completion and releases the same composer when 
   expect(composer()).toBe(original);
   expect(listeners.size).toBe(0);
   expect(port.disconnect).toHaveBeenCalledOnce();
+});
+
+async function editField(selector: string, text: string) {
+  const field = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(selector)!;
+  expect(field).not.toBeNull();
+  await act(async () => {
+    const prototype = field instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(prototype, "value")!.set!.call(field, text);
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+it("opens a cold star request as a full save form, keeps repeated intent drafts, and cancels without a write", async () => {
+  const id = crypto.randomUUID(); requestFloatingSave(id);
+  await mount();
+  await waitFor(() => Boolean(document.querySelector('.floating-save-page .save-source')));
+  expect(document.querySelector('#native-dialog-title')?.textContent).toBe("添加到收藏");
+  expect(document.querySelector('.save-source a')?.getAttribute('href')).toBe("https://example.com/design-review");
+  await editField('.floating-save-page input', '保留这个收藏草稿');
+  await editField('.floating-save-page textarea', '稍后再保存的备注');
+  await act(async () => { requestFloatingSave(id); requestFloatingSave(crypto.randomUUID()); });
+  expect(document.querySelectorAll('.floating-save-page')).toHaveLength(1);
+  expect(document.querySelector<HTMLInputElement>('.floating-save-page input')?.value).toBe('保留这个收藏草稿');
+  expect(document.querySelector<HTMLTextAreaElement>('.floating-save-page textarea')?.value).toBe('稍后再保存的备注');
+  await click('button[aria-label="返回菜单"]');
+  await waitFor(() => !document.querySelector('.floating-save-page'));
+  expect(requests.some(request => request.type === 'SAVE_BOOKMARK')).toBe(false);
+});
+
+it("reads an existing bookmark's fresh note and folder before showing a cold save form", async () => {
+  const runtime = chrome.runtime as unknown as { sendMessage: (request: Record<string, unknown>) => Promise<unknown> };
+  const original = runtime.sendMessage;
+  runtime.sendMessage = async request => {
+    if (request.type === 'GET_BOOKMARK_SAVE_STATE') return { ok: true, data: {status:'exact', matches:[{id:'existing',parentId:'preview-folder-1',title:'已有的自定义名称',url:'https://example.com/design-review',path:['书签栏','前端代码']}]}};
+    if (request.type === 'GET_LOCAL_RESOURCES') return {ok:true,data:[{resourceKey:'existing',url:'https://example.com/design-review',canonicalUrl:'https://example.com/design-review',userNote:'已有备注不能丢失',nativeBookmarkIds:['existing']}]};
+    return original(request);
+  };
+  requestFloatingSave(crypto.randomUUID()); await mount();
+  await waitFor(() => Boolean(document.querySelector('.floating-save-page textarea')));
+  expect(document.querySelector('#native-dialog-title')?.textContent).toBe('管理此收藏');
+  expect(document.querySelector<HTMLInputElement>('.floating-save-page input')?.value).toBe('已有的自定义名称');
+  expect(document.querySelector<HTMLTextAreaElement>('.floating-save-page textarea')?.value).toBe('已有备注不能丢失');
+  expect(document.querySelector('.folder-select')?.textContent || document.querySelector('.floating-save-page')?.textContent).toContain('前端代码');
+  expect(document.querySelector('.save-state-note')?.textContent).toContain('不会创建重复收藏');
+  expect(requests.some(request => request.type === 'SAVE_BOOKMARK')).toBe(false);
+});
+
+it("writes the reviewed title, folder and note only after the save button is confirmed", async () => {
+  const runtime = chrome.runtime as unknown as { sendMessage: (request: Record<string, unknown>) => Promise<unknown> };
+  const original = runtime.sendMessage;
+  let saved: Record<string, unknown> | undefined;
+  runtime.sendMessage = async request => {
+    if (request.type === 'SAVE_BOOKMARK') { saved = request; return {ok:true,data:{resource:null,nativeBookmarkCreated:true,cloudSynced:false}}; }
+    return original(request);
+  };
+  await mount();
+  await act(async () => requestFloatingSave(crypto.randomUUID()));
+  await waitFor(() => Boolean(document.querySelector('.floating-save-page textarea')));
+  await editField('.floating-save-page input', '经过确认的名称');
+  await editField('.floating-save-page textarea', '经过确认的备注');
+  expect(saved).toBeUndefined();
+  const saveButton = Array.from(document.querySelectorAll<HTMLButtonElement>('.native-dialog-actions button')).find(button => button.textContent === '添加到 Chrome')!;
+  expect(saveButton.disabled).toBe(false);
+  await act(async () => saveButton.click());
+  await waitFor(() => Boolean(saved));
+  expect(saved?.payload).toMatchObject({ title:'经过确认的名称', userNote:'经过确认的备注', sourceTabId:1 });
+  expect((saved?.payload as Record<string,unknown>).folderId).toEqual(expect.any(String));
+  await waitFor(() => !document.querySelector('.floating-save-page'));
+});
+
+it("shows a failed save inside the page and retries with the same reviewed fields", async () => {
+  const runtime = chrome.runtime as unknown as { sendMessage: (request: Record<string, unknown>) => Promise<unknown> };
+  const original = runtime.sendMessage;
+  const attempts: unknown[] = [];
+  runtime.sendMessage = async request => {
+    if (request.type === 'SAVE_BOOKMARK') {
+      attempts.push(request.payload);
+      return attempts.length === 1 ? {ok:false,error:'当前无法保存，请重试。'} : {ok:true,data:{resource:null,nativeBookmarkCreated:true,cloudSynced:false}};
+    }
+    return original(request);
+  };
+  await mount(); await act(async () => requestFloatingSave(crypto.randomUUID()));
+  await waitFor(() => Boolean(document.querySelector('.floating-save-page textarea')));
+  await editField('.floating-save-page textarea', '失败重试也要保留');
+  const save = () => Array.from(document.querySelectorAll<HTMLButtonElement>('.native-dialog-actions button')).find(button => button.textContent === '添加到 Chrome')!;
+  await act(async () => save().click());
+  await waitFor(() => Boolean(document.querySelector('.floating-save-page [role="alert"]')));
+  expect(document.querySelector('.floating-save-page [role="alert"]')?.textContent).toBe('当前无法保存，请重试。');
+  expect(document.querySelector<HTMLTextAreaElement>('.floating-save-page textarea')?.value).toBe('失败重试也要保留');
+  await act(async () => save().click());
+  await waitFor(() => !document.querySelector('.floating-save-page'));
+  expect(attempts).toHaveLength(2); expect(attempts[1]).toEqual(attempts[0]);
 });

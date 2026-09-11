@@ -15,7 +15,7 @@ beforeEach(async () => {
   });
   vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
   vi.stubGlobal("chrome", { runtime: {
-    id: "aarre", getManifest: () => ({ version: "0.6.4" }),
+    id: "aarre", getManifest: () => ({ version: "0.6.5" }),
     getURL: (path: string) => `${origin}/${path}`,
     sendMessage: vi.fn(async () => ({ ok: true, data: {
       tabId: 7, documentId: "host-document", nonce, enabled: true, theme: "light",
@@ -126,16 +126,38 @@ it("cancels a delayed close when immediately reopened without replacing the ifra
   expect(shadow.querySelector<HTMLElement>('.panel')!.inert).toBe(false);
 });
 
-it("blocks repeated quick-save clicks while pending and allows a failed save to be retried",async()=>{
-  let resolve!: (value:unknown)=>void;
-  vi.mocked(chrome.runtime.sendMessage).mockImplementationOnce((()=>new Promise(r=>{resolve=r;})) as any);
-  const button=shadow.querySelector<HTMLButtonElement>('.bar-save')!;
-  button.click(); button.click(); expect(button.disabled).toBe(true);
-  expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({type:'FLOAT_QUICK_SAVE',nonce});
-  resolve({ok:false,error:'保存失败，请重试'}); await vi.advanceTimersByTimeAsync(0);
-  expect(button.disabled).toBe(false); expect(shadow.querySelector('.quick-feedback')?.textContent).toBe('保存失败，请重试');
-  (vi.mocked(chrome.runtime.sendMessage) as any).mockResolvedValueOnce({ok:true,data:{existing:false}});
-  button.click(); await vi.advanceTimersByTimeAsync(0);
-  expect(button.getAttribute('aria-pressed')).toBe('true');
-  expect(shadow.querySelector('.quick-feedback')?.textContent).toBe('已添加到收藏');
+function hostMessage(frame: HTMLIFrameElement, data: Record<string, unknown>) {
+  window.dispatchEvent(new MessageEvent("message", { source: frame.contentWindow, origin, data: { session: nonce, ...data } }));
+}
+function latestView(frame: HTMLIFrameElement) {
+  return vi.mocked(frame.contentWindow!.postMessage).mock.calls.map(call => call[0] as Record<string, unknown>).filter(message => message.type === "FLOAT_VIEW").at(-1)!;
+}
+async function clickSave() {
+  shadow.querySelector<HTMLButtonElement>(".bar-save")!.click();
+  await vi.advanceTimersByTimeAsync(0);
+}
+
+it("retains a cold save intent across the initial view announcement without writing a bookmark", async () => {
+  await clickSave(); const frame = currentFrame();
+  hostMessage(frame, { type: "FLOAT_CURRENT_VIEW", view: "chat" });
+  ready(frame);
+  const message = latestView(frame);
+  expect(message.view).toBe("chat");
+  expect(message.saveRequestId).toEqual(expect.any(String));
+  expect(shadow.querySelector<HTMLElement>(".panel")!.inert).toBe(false);
+  expect(vi.mocked(chrome.runtime.sendMessage).mock.calls.some(([request]) => ["FLOAT_QUICK_SAVE", "SAVE_BOOKMARK"].includes((request as unknown as {type:string})?.type))).toBe(false);
+});
+
+it("coalesces pending clicks, validates the acknowledgement, and issues a fresh intent on warm reopening", async () => {
+  await clickSave(); const frame = currentFrame(); ready(frame);
+  const requestId = latestView(frame).saveRequestId;
+  hostMessage(frame, { type: "FLOAT_SAVE_ACCEPTED", requestId, session: "forged" });
+  await clickSave(); expect(latestView(frame).saveRequestId).toBe(requestId);
+  hostMessage(frame, { type: "FLOAT_SAVE_ACCEPTED", requestId: "other" });
+  await clickSave(); expect(latestView(frame).saveRequestId).toBe(requestId);
+  hostMessage(frame, { type: "FLOAT_SAVE_ACCEPTED", requestId });
+  await toggle(); await clickSave();
+  expect(currentFrame()).toBe(frame);
+  expect(latestView(frame).saveRequestId).toEqual(expect.any(String));
+  expect(latestView(frame).saveRequestId).not.toBe(requestId);
 });

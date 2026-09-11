@@ -187,7 +187,7 @@ export function ManagerApp() {
   );
 
   useEffect(() => {
-    // 收藏库先显示真实书签；整理、报告和主题计算在后台继续准备，
+    // 收藏库先显示真实书签；主题计算在后台继续准备，
     // 避免把首次打开时间交给非首屏功能。
     void refresh(false, initial.view !== "library");
     // 首次加载使用 URL 查询词；之后只在用户提交搜索时访问数据层。
@@ -445,7 +445,20 @@ export function ManagerApp() {
             </div>
             <strong>Aarre</strong>
           </div>
-          <ManagerUtilityActions onOpen={setOpenedUtility} themeControl={<Button
+        </div>
+
+        <Tabs.List ref={tabViewportRef} className="manager-view-tabs aarre-tabs-list" aria-label="收藏管理功能">
+          {(
+            [
+              ["library", "收藏库"],
+              ["topics", "主题图谱"],
+            ] as const
+          ).map(([value, label]) => (
+            <Tabs.Tab key={value} id={value} className="aarre-tab">{label}</Tabs.Tab>
+          ))}
+        </Tabs.List>
+        <FloatingScrollbars viewportRef={tabViewportRef} label="收藏库导航" />
+        <ManagerUtilityActions onOpen={setOpenedUtility} themeControl={<Button
           type="button"
           variant="ghost"
           size="icon"
@@ -462,21 +475,6 @@ export function ManagerApp() {
             <SunIcon aria-hidden="true" />
           )}
         </Button>} />
-        </div>
-
-        <Tabs.List ref={tabViewportRef} className="manager-view-tabs aarre-tabs-list" aria-label="收藏管理功能">
-          {(
-            [
-              ["library", "收藏库", libraryResults.length],
-              ["topics", "主题图谱", dashboard?.topicGraph.nodes.length || 0],
-            ] as const
-          ).map(([value, label, count]) => (
-            <Tabs.Tab key={value} id={value} className="aarre-tab">{label}<span className="manager-tab-count">{count}</span></Tabs.Tab>
-          ))}
-        </Tabs.List>
-        <FloatingScrollbars viewportRef={tabViewportRef} label="收藏库导航" />
-
-
       </header>
 
       <h1 className="visually-hidden">{`Aarre · ${VIEW_LABELS[view]}`}</h1>

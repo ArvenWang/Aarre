@@ -264,35 +264,7 @@ export function LibraryView({
             onClearSearch={onClearSearch}
           />
 
-          <div className="library-toolbar-actions">
-            <div className="library-tabs" aria-label="收藏处理状态">
-              {(
-                [
-                  ["all", "全部", scopeCount],
-                  ["ready", "已理解", readyCount],
-                  ["pending", "待处理", pendingCount],
-                ] as const
-              ).map(([value, label, count]) => (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  active={filter === value}
- className="library-tab-button"
-                  aria-pressed={filter === value}
-                  data-active={filter === value}
-                  key={value}
-                  onClick={() => onFilterChange(value)}
-                >
-                  {label}
-                  <span className="library-tab-count">{count}</span>
-                </Button>
-              ))}
-            </div>
-          </div>
-        </div>
 
-        <div className="library-toolbar-secondary">
           <div className="library-controls" aria-label="收藏筛选与排序">
             <label className="library-select-control">
               <span>文件夹</span>
@@ -353,6 +325,37 @@ export function LibraryView({
               </Select>
             </label>
 
+
+          </div>
+        </div>
+        <div className="library-toolbar-secondary">
+          <div className="library-toolbar-actions">
+            <div className="library-tabs" aria-label="收藏处理状态">
+              {(
+                [
+                  ["all", "全部", scopeCount],
+                  ["ready", "已理解", readyCount],
+                  ["pending", "待处理", pendingCount],
+                ] as const
+              ).map(([value, label, count]) => (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  active={filter === value}
+ className="library-tab-button"
+                  aria-pressed={filter === value}
+                  data-active={filter === value}
+                  key={value}
+                  onClick={() => onFilterChange(value)}
+                >
+                  {label}
+                  <span className="library-tab-count">{count}</span>
+                </Button>
+              ))}
+            </div>
+          </div>
+          <div className="library-maintenance">
             <SnapshotBackfillControl
               missingCount={missingSnapshotCount}
               onCollectionChanged={onSnapshotBackfillChanged}

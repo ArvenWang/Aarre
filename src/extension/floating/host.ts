@@ -18,7 +18,7 @@ function startHost() {
   toggle.setAttribute("aria-label", "展开 Aarre 菜单"); toggle.setAttribute("aria-expanded", "false"); toggle.setAttribute("aria-haspopup", "dialog"); toggle.title = "展开 Aarre 菜单";
   toggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3" stroke="currentColor" stroke-width="1.7"/><path d="M14 4v16m-4-12-3 4 3 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const quickSave = document.createElement("button"); quickSave.type = "button"; quickSave.className = "bar-save";
-  quickSave.setAttribute("aria-label", "快捷收藏当前网页"); quickSave.setAttribute("aria-pressed", "false"); quickSave.title = "快捷收藏当前网页";
+  quickSave.setAttribute("aria-label", "添加当前网页到收藏"); quickSave.setAttribute("aria-haspopup", "dialog"); quickSave.title = "添加到收藏";
   quickSave.innerHTML = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3 2.8 5.7 6.3.9-4.5 4.4 1 6.2-5.6-3-5.6 3 1-6.2L2.9 9.6l6.3-.9L12 3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>';
   bar.append(toggle, quickSave);
   const feedback = document.createElement("div"); feedback.className = "quick-feedback"; feedback.setAttribute("role", "status"); feedback.hidden = true;
@@ -30,7 +30,8 @@ function startHost() {
   panel.append(loading, resize); shadow.append(style, surface, bar, panel, feedback);
   let info: HostInfo | null = null, iframe: HTMLIFrameElement | null = null;
   let position = { ...defaultFloatingPosition }, opened = false, opening = false, forced = false, disposed = false, ready = false, needsRetry = false;
-  let view = "library", generation = 0, saving = false;
+  let view = "library", generation = 0;
+  let pendingSaveRequest: string | null = null;
   let watchdog: ReturnType<typeof setTimeout> | undefined, loadTimeout: ReturnType<typeof setTimeout> | undefined, closeTimer: ReturnType<typeof setTimeout> | undefined, feedbackTimer: ReturnType<typeof setTimeout> | undefined;
   let surfaceAnimation: Animation | undefined, panelAnimation: Animation | undefined;
   const captureLeases = new Set<string>();
@@ -98,6 +99,7 @@ function startHost() {
       ], { duration: show ? 140 : 120, delay: show && opacity === 0 ? 100 : 0, fill: "backwards", easing: "ease-out" });
     }
   }
+  const showView = () => send({ type: "FLOAT_VIEW", view, focus: opened, ...(pendingSaveRequest ? { saveRequestId: pendingSaveRequest } : {}) });
   async function open(nextView = "library") {
     const current = ++generation; opening = true; forced = true; view = nextView;
     clearTimeout(closeTimer); feedback.hidden = true;
@@ -117,7 +119,7 @@ function startHost() {
       clearTimeout(loadTimeout); loadTimeout = setTimeout(() => { if (!ready) showLoadError("菜单加载超时，请重新打开。若仍无法打开，请刷新此网页。"); }, 15_000);
     }
     layout(true);
-    if (ready) { send({ type: "FLOAT_VIEW", view, focus: true }); iframe.focus(); }
+    if (ready) { showView(); iframe.focus(); }
   }
   function close(focus = false) {
     generation++; opening = false; opened = false; panel.inert = true; bar.hidden = false; revealPanel(false);
@@ -132,14 +134,8 @@ function startHost() {
     feedbackTimer = setTimeout(() => { feedback.hidden = true; }, failed ? 6_000 : 3_000);
   }
   quickSave.addEventListener("click", () => {
-    if (saving || !info) return;
-    saving = true; quickSave.disabled = true; quickSave.setAttribute("aria-busy", "true"); showQuickFeedback("正在收藏…");
-    void chrome.runtime.sendMessage({ type: "FLOAT_QUICK_SAVE", nonce: info.nonce }).then((response) => {
-      if (!response?.ok) throw new Error(response?.error || "未能收藏，请重试。");
-      quickSave.setAttribute("aria-pressed", "true"); quickSave.title = "此网页已收藏";
-      showQuickFeedback(response.data.existing ? "此网页已在收藏中" : "已添加到收藏");
-    }).catch((error) => showQuickFeedback(error instanceof Error ? error.message : "未能收藏，请重试。", true))
-      .finally(() => { saving = false; quickSave.disabled = false; quickSave.removeAttribute("aria-busy"); });
+    pendingSaveRequest ||= crypto.randomUUID();
+    void open(view).catch(() => showQuickFeedback("连接已失效，请刷新此网页后重试。", true));
   });
   toggle.addEventListener("click", () => { if (opened || opening) close(true); else void open(view).catch(() => showQuickFeedback("连接已失效，请刷新此网页后重试。", true)); });
   let drag: { id: number; x: number; width: number } | null = null;
@@ -164,8 +160,9 @@ function startHost() {
     if (!iframe || !info || event.source !== iframe.contentWindow || event.origin !== chrome.runtime.getURL("").replace(/\/$/, "") || event.data?.session !== info.nonce) return;
     if (event.data.type === "FLOAT_READY") {
       ready = true; needsRetry = false; clearTimeout(loadTimeout); loading.hidden = true; iframe.inert = false;
-      send({ type: "FLOAT_VIEW", view, focus: opened }); if (opened) iframe.focus();
+      showView(); if (opened) iframe.focus();
     }
+    if (event.data.type === "FLOAT_SAVE_ACCEPTED" && event.data.requestId === pendingSaveRequest) pendingSaveRequest = null;
     if (event.data.type === "FLOAT_LOAD_ERROR") showLoadError(typeof event.data.message === "string" ? event.data.message : "请重新打开菜单。");
     if (event.data.type === "FLOAT_CURRENT_VIEW" && ["library", "chat", "settings", "history"].includes(event.data.view)) view = event.data.view;
     if (event.data.type === "FLOAT_CLOSE") close(true);

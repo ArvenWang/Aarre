@@ -5,6 +5,7 @@ import { Button } from "@/ui/components/ui/button";
 import { X } from "lucide-react";
 import { FloatingShell } from "../floating/FloatingShell";
 import { FLOATING_VIEW_EVENT } from "../floating/bridge";
+import { useFloatingSave } from "../floating/use-floating-save";
 import { Suspense, lazy, useCallback, useEffect, useState, type ReactNode } from "react";
 import { sendExtensionRequest } from "../../lib/messages";
 import type { ListCoverStyle } from "../../lib/display-settings";
@@ -137,6 +138,10 @@ export function SidePanelApp({ surface = "sidebar" }: { surface?: "sidebar" | "f
     deleteEditorNode,
   } = editorController;
   usePendingSave({ activeTabId: appState?.activeTab?.id, startSave, setError });
+  useFloatingSave({
+    enabled: surface === "floating", ready: Boolean(appState?.activeTab), busy: Boolean(busy), editorKind: editor?.kind,
+    onOpen: () => { setOnboardingVisible(false); setUtilityView(null); void startSave(); },
+  });
   const { contentRef, atEnd, sync: syncScrollBoundary } = useScrollBoundary(panelView);
 
   const {
@@ -232,7 +237,7 @@ export function SidePanelApp({ surface = "sidebar" }: { surface?: "sidebar" | "f
           onCancel={busy === "agent" || busy === "agent-actions" ? () => void cancelAgentRun() : undefined} />}>
         {children}
       </FloatingShell>
-      {!onboardingVisible && <BookmarkEditorDialog controller={editorController} busy={busy} setNotice={setNotice} refresh={refresh} />}
+      {!onboardingVisible && <BookmarkEditorDialog error={error} presentation={editor?.kind === "save" ? "page" : "dialog"} controller={editorController} busy={busy} setNotice={setNotice} refresh={refresh} />}
       {utilityView && <AppModal labelledBy="floating-utility-title" className="floating-utility-dialog" onClose={closeUtility}>
         <header className="floating-utility-heading"><h2 id="floating-utility-title">{utilityView === "settings" ? "设置" : "历史会话"}</h2><Button variant="ghost" size="icon-sm" aria-label="关闭窗口" onClick={closeUtility}><X size={16}/></Button></header>
         <Suspense fallback={<p className="utility-loading" role="status">正在打开…</p>}>

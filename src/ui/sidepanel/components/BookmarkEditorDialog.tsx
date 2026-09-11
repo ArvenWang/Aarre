@@ -7,11 +7,13 @@ import { visibleFolderPath } from "../../../lib/folder-options";
 import { BookmarkEditorFields } from "../../components/BookmarkEditorFields";
 import { CloudConflictNotice } from "../../components/CloudConflictNotice";
 import { FluidInput, FluidTextarea } from "@/ui/components/ui/input";
-import { CloseIcon, TrashIcon } from "../../components/Icons";
+import { ArrowLeftIcon, CloseIcon, TrashIcon } from "../../components/Icons";
 import { ProtectionControl } from "../../components/ProtectionControl";
 import { FolderSelect } from "./FolderSelect";
 
 interface BookmarkEditorDialogProps {
+  presentation?: "dialog" | "page";
+  error?: string;
   controller: ReturnType<typeof useBookmarkEditor>;
   busy: string;
   setNotice: (value: string) => void;
@@ -19,6 +21,8 @@ interface BookmarkEditorDialogProps {
 }
 
 export function BookmarkEditorDialog({
+  presentation = "dialog",
+  error,
   controller,
   busy,
   setNotice,
@@ -43,27 +47,30 @@ export function BookmarkEditorDialog({
 
   return (
     <AppModal onClose={close} busy={Boolean(busy)} onEscape={confirmDeleteId ? () => setConfirmDeleteId("") : undefined} labelledBy="native-dialog-title"
-      backdropClassName="native-dialog-backdrop"
-      className={`native-dialog ${editor.kind === "bookmark" && editor.node.url ? "bookmark-detail-dialog" : ""}`}>
+      backdropClassName={`native-dialog-backdrop${presentation === "page" ? " save-page-backdrop" : ""}`}
+      className={`native-dialog ${presentation === "page" ? "floating-save-page" : ""} ${editor.kind === "bookmark" && editor.node.url ? "bookmark-detail-dialog" : ""}`}>
         <div className="native-dialog-heading">
-          <div>
+          <div className="native-dialog-title-line">
+            {presentation === "page" && <Button variant="ghost" size="icon-sm" onClick={close} disabled={Boolean(busy)} aria-label="返回菜单"><ArrowLeftIcon /></Button>}
             <h2 id="native-dialog-title">
               {editor.kind === "save"
-                ? bookmarkSaveState?.status === "none" ? "添加到收藏" : "管理此收藏"
+                ? !bookmarkSaveState || bookmarkSaveState.status === "none" ? "添加到收藏" : "管理此收藏"
                 : editor.kind === "folder" ? "新建文件夹"
                   : editor.node.url ? "编辑收藏" : "编辑文件夹"}
             </h2>
           </div>
-          <Button variant="ghost" size="icon-sm" className="dialog-close" onClick={close} disabled={Boolean(busy)} aria-label="关闭">
+          {presentation !== "page" && <Button variant="ghost" size="icon-sm" className="dialog-close" onClick={close} disabled={Boolean(busy)} aria-label="关闭">
             <CloseIcon />
-          </Button>
+          </Button>}
         </div>
 
+        {presentation === "page" && error && <p className="save-page-error" role="alert">{error}</p>}
         <ScrollSurface as="div" className="native-dialog-scroll">
         {editor.kind === "save" && busy === "capture" ? (
           <div className="empty-state dialog-loading">正在读取当前页面…</div>
         ) : (
           <>
+            {editor.kind === "save" && presentation === "page" && capture?.url && <div className="save-source"><span>当前网页</span><a href={capture.url} target="_blank" rel="noreferrer noopener">{capture.url}</a></div>}
             {editor.kind === "bookmark" && editor.node.url ? null : (
               <label className="native-field">
                 <span>名称</span>

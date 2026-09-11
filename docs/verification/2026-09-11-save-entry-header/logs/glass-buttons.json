@@ -1,0 +1,109 @@
+[
+  {
+    "theme": "light",
+    "buttons": [
+      {
+        "rect": {
+          "x": 432,
+          "y": 154,
+          "width": 44,
+          "height": 44,
+          "top": 154,
+          "right": 476,
+          "bottom": 198,
+          "left": 432
+        },
+        "icon": {
+          "x": 444,
+          "y": 166,
+          "width": 20,
+          "height": 20,
+          "top": 166,
+          "right": 464,
+          "bottom": 186,
+          "left": 444
+        }
+      },
+      {
+        "rect": {
+          "x": 432,
+          "y": 202,
+          "width": 44,
+          "height": 44,
+          "top": 202,
+          "right": 476,
+          "bottom": 246,
+          "left": 432
+        },
+        "icon": {
+          "x": 444,
+          "y": 214,
+          "width": 20,
+          "height": 20,
+          "top": 214,
+          "right": 464,
+          "bottom": 234,
+          "left": 444
+        }
+      }
+    ],
+    "bg": "rgba(255, 255, 255, 0.72)",
+    "filter": "blur(16px) saturate(1.3)"
+  },
+  {
+    "theme": "dark",
+    "buttons": [
+      {
+        "rect": {
+          "x": 432,
+          "y": 154,
+          "width": 44,
+          "height": 44,
+          "top": 154,
+          "right": 476,
+          "bottom": 198,
+          "left": 432
+        },
+        "icon": {
+          "x": 444,
+          "y": 166,
+          "width": 20,
+          "height": 20,
+          "top": 166,
+          "right": 464,
+          "bottom": 186,
+          "left": 444
+        }
+      },
+      {
+        "rect": {
+          "x": 432,
+          "y": 202,
+          "width": 44,
+          "height": 44,
+          "top": 202,
+          "right": 476,
+          "bottom": 246,
+          "left": 432
+        },
+        "icon": {
+          "x": 444,
+          "y": 214,
+          "width": 20,
+          "height": 20,
+          "top": 214,
+          "right": 464,
+          "bottom": 234,
+          "left": 444
+        }
+      }
+    ],
+    "bg": "rgba(22, 24, 27, 0.76)",
+    "filter": "blur(16px) saturate(1.3)"
+  },
+  {
+    "reducedTransparency": true,
+    "bg": "rgb(22, 24, 27)",
+    "filter": "none"
+  }
+]
