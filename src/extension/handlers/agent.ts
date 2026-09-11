@@ -6,7 +6,6 @@ import {
   buildLibraryFingerprint,
   dismissStoredOrganizationInsights,
   mergeStoredOrganizationInsights,
-  organizationBadgeText,
   organizationNoticeFromStored,
   sameLibraryFingerprint,
   storedOrganizationInsightsIsCurrent,
@@ -111,21 +110,9 @@ async function getStoredOrganizationInsights(): Promise<
 async function syncOrganizationBadge(
   tabId?: number
 ): Promise<void> {
-  const stored = await getStoredOrganizationInsights();
-  const notice = organizationNoticeFromStored(stored);
-  const text = organizationBadgeText(notice?.proposalCount || 0);
   await Promise.all([
-    chrome.action.setBadgeBackgroundColor({
-      color: "#205aef",
-      tabId
-    }),
-    chrome.action.setBadgeText({ text, tabId }),
-    chrome.action.setTitle({
-      title: notice
-        ? `Aarre：发现 ${notice.proposalCount} 条整理建议`
-        : "打开 Aarre",
-      tabId
-    })
+    chrome.action.setBadgeText({ text: "", tabId }),
+    chrome.action.setTitle({ title: "打开 Aarre 菜单", tabId }),
   ]);
 }
 

@@ -1,0 +1,140 @@
+[
+  {
+    "group": "AI 服务",
+    "theme": "light",
+    "width": 1280,
+    "dialog": {
+      "x": 240,
+      "y": 100,
+      "width": 800,
+      "height": 620,
+      "top": 100,
+      "right": 1040,
+      "bottom": 720,
+      "left": 240
+    },
+    "content": [
+      626,
+      626
+    ],
+    "visibleGroups": 1
+  },
+  {
+    "group": "外观与快捷栏",
+    "theme": "light",
+    "width": 1280,
+    "dialog": {
+      "x": 240,
+      "y": 100,
+      "width": 800,
+      "height": 620,
+      "top": 100,
+      "right": 1040,
+      "bottom": 720,
+      "left": 240
+    },
+    "content": [
+      626,
+      626
+    ],
+    "visibleGroups": 1
+  },
+  {
+    "group": "账号与同步",
+    "theme": "light",
+    "width": 1280,
+    "dialog": {
+      "x": 240,
+      "y": 100,
+      "width": 800,
+      "height": 620,
+      "top": 100,
+      "right": 1040,
+      "bottom": 720,
+      "left": 240
+    },
+    "content": [
+      626,
+      626
+    ],
+    "visibleGroups": 1
+  },
+  {
+    "group": "书签增强",
+    "theme": "light",
+    "width": 1280,
+    "dialog": {
+      "x": 240,
+      "y": 100,
+      "width": 800,
+      "height": 620,
+      "top": 100,
+      "right": 1040,
+      "bottom": 720,
+      "left": 240
+    },
+    "content": [
+      626,
+      626
+    ],
+    "visibleGroups": 1
+  },
+  {
+    "group": "最近动作",
+    "theme": "light",
+    "width": 1280,
+    "dialog": {
+      "x": 240,
+      "y": 100,
+      "width": 800,
+      "height": 620,
+      "top": 100,
+      "right": 1040,
+      "bottom": 720,
+      "left": 240
+    },
+    "content": [
+      626,
+      626
+    ],
+    "visibleGroups": 1
+  },
+  {
+    "group": "数据与帮助",
+    "theme": "light",
+    "width": 1280,
+    "dialog": {
+      "x": 240,
+      "y": 100,
+      "width": 800,
+      "height": 620,
+      "top": 100,
+      "right": 1040,
+      "bottom": 720,
+      "left": 240
+    },
+    "content": [
+      626,
+      626
+    ],
+    "visibleGroups": 1
+  },
+  {
+    "group": "compact",
+    "width": 320,
+    "dialog": {
+      "x": 16,
+      "y": 16,
+      "width": 288,
+      "height": 608,
+      "top": 16,
+      "right": 304,
+      "bottom": 624,
+      "left": 16
+    },
+    "content": [
+      286,
+      286
+    ]
+  }
+]

@@ -15,11 +15,11 @@ beforeEach(async () => {
   });
   vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
   vi.stubGlobal("chrome", { runtime: {
-    id: "aarre", getManifest: () => ({ version: "0.6.3" }),
+    id: "aarre", getManifest: () => ({ version: "0.6.4" }),
     getURL: (path: string) => `${origin}/${path}`,
     sendMessage: vi.fn(async () => ({ ok: true, data: {
       tabId: 7, documentId: "host-document", nonce, enabled: true, theme: "light",
-      position: { edge: "right", ratio: 0.72, width: 400, height: 600 },
+      position: { width: 400 },
     } })),
     onMessage: { addListener: vi.fn(), removeListener: vi.fn() },
   } });
@@ -33,7 +33,7 @@ afterEach(() => {
 });
 
 async function toggle() {
-  shadow.querySelector<HTMLButtonElement>(".ball")!.click();
+  shadow.querySelector<HTMLButtonElement>(".bar-toggle")!.click();
   await vi.advanceTimersByTimeAsync(0);
 }
 function currentFrame() {
@@ -102,4 +102,40 @@ it("still replaces a failed iframe and ignores a late readiness message from the
   expect(shadow.querySelector<HTMLElement>(".loading")!.hidden).toBe(false);
   ready(replacement);
   expect(shadow.querySelector<HTMLElement>(".loading")!.hidden).toBe(true);
+});
+
+it("resizes only from the left separator, clamps width, and retains viewport height",async()=>{
+  await toggle(); const frame=currentFrame();ready(frame);
+  const panel=shadow.querySelector<HTMLElement>('.panel')!, separator=shadow.querySelector<HTMLElement>('[role="separator"]')!;
+  const height=panel.style.height;
+  separator.dispatchEvent(new KeyboardEvent('keydown',{key:'End',bubbles:true}));
+  expect(panel.style.width).toBe('640px');expect(panel.style.height).toBe(height);
+  separator.dispatchEvent(new KeyboardEvent('keydown',{key:'Home',bubbles:true}));
+  expect(panel.style.width).toBe('320px');expect(panel.style.height).toBe(height);
+  expect(shadow.querySelectorAll('[role="separator"]')).toHaveLength(1);
+  expect(shadow.querySelector('.ball')).toBeNull();
+  expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({type:'FLOAT_POSITION',position:{width:320}});
+});
+
+it("cancels a delayed close when immediately reopened without replacing the iframe",async()=>{
+  await toggle(); const frame=currentFrame(); ready(frame);
+  await toggle(); expect(shadow.querySelector<HTMLElement>('.panel')!.inert).toBe(true);
+  await toggle(); await vi.advanceTimersByTimeAsync(250);
+  expect(shadow.querySelector('iframe')).toBe(frame);
+  expect(shadow.querySelector<HTMLElement>('.panel')!.hidden).toBe(false);
+  expect(shadow.querySelector<HTMLElement>('.panel')!.inert).toBe(false);
+});
+
+it("blocks repeated quick-save clicks while pending and allows a failed save to be retried",async()=>{
+  let resolve!: (value:unknown)=>void;
+  vi.mocked(chrome.runtime.sendMessage).mockImplementationOnce((()=>new Promise(r=>{resolve=r;})) as any);
+  const button=shadow.querySelector<HTMLButtonElement>('.bar-save')!;
+  button.click(); button.click(); expect(button.disabled).toBe(true);
+  expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({type:'FLOAT_QUICK_SAVE',nonce});
+  resolve({ok:false,error:'保存失败，请重试'}); await vi.advanceTimersByTimeAsync(0);
+  expect(button.disabled).toBe(false); expect(shadow.querySelector('.quick-feedback')?.textContent).toBe('保存失败，请重试');
+  (vi.mocked(chrome.runtime.sendMessage) as any).mockResolvedValueOnce({ok:true,data:{existing:false}});
+  button.click(); await vi.advanceTimersByTimeAsync(0);
+  expect(button.getAttribute('aria-pressed')).toBe('true');
+  expect(shadow.querySelector('.quick-feedback')?.textContent).toBe('已添加到收藏');
 });

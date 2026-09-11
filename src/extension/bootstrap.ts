@@ -1,4 +1,5 @@
 import { authorizeUiMessage, handleFloatingHost, validateFloatingSender, floatingSource, proveFloatingFrame } from "./floating/session";
+import { createFloatingQuickSave } from "./floating/quick-save";
 import { registerFloatingLifecycle } from "./floating/lifecycle";
 import { requestSync } from "../lib/sync-request";
 
@@ -656,6 +657,7 @@ const handlers = createMessageHandlers(requestHandlers, {
   pullCloudResources
 });
 
+const quickSaveFromFloatingBar = createFloatingQuickSave({ getBookmarkSaveState, captureActivePage, saveBookmark });
 chrome.runtime.onMessage.addListener(
   (
     request: ExtensionRequest,
@@ -663,6 +665,11 @@ chrome.runtime.onMessage.addListener(
     sendResponse: (response: ExtensionResponse<unknown>) => void
   ) => {
     if (isOffscreenSiteIconRequest(request)) return false;
+    if ((request?.type as string) === "FLOAT_QUICK_SAVE") {
+      void quickSaveFromFloatingBar(sender, (request as unknown as { nonce: string }).nonce)
+        .then((data) => sendResponse({ ok: true, data }), (error) => sendResponse({ ok: false, error: errorMessage(error) }));
+      return true;
+    }
     if ((request?.type as string) === "FLOAT_PROVE_FRAME") {
       try {
         proveFloatingFrame(request as unknown as { challenge: string; nonce: string }, sender);

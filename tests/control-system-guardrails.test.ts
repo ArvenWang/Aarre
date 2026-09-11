@@ -44,10 +44,6 @@ const sidepanelEditorHookUrl = new URL(
   "../src/ui/sidepanel/hooks/use-bookmark-editor.ts",
   import.meta.url
 );
-const libraryNoticesUrl = new URL(
-  "../src/ui/sidepanel/components/LibraryNotices.tsx",
-  import.meta.url
-);
 const cloudHandlersUrl = new URL(
   "../src/extension/handlers/cloud.ts",
   import.meta.url
@@ -240,24 +236,7 @@ describe("only one system paints a given control", () => {
     expect(source).not.toContain("active:scale-");
   });
 
-  it("lets project CSS own the resurfacing row's padding and hover fill", async () => {
-    const [source, css] = await Promise.all([
-      readFile(libraryNoticesUrl, "utf8"),
-      readFile(sidepanelCssUrl, "utf8")
-    ]);
-    const row = source.slice(
-      source.indexOf("{resurfacing.map"),
-      source.indexOf("</section>", source.indexOf("{resurfacing.map"))
-    );
 
-    expect(row).toContain('variant="ghost"');
-    expect(rule(css, ".context-resurfacing > button")).toContain(
-      "padding: var(--sp-2) var(--sp-3)"
-    );
-    expect(rule(css, ".context-resurfacing > button:hover")).toContain(
-      "background: var(--surface)"
-    );
-  });
 
   it("keeps every Button on the unified variant system", async () => {
     await projectClassNames();

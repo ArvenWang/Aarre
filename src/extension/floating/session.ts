@@ -89,6 +89,11 @@ export async function authorizeUiMessage(sender: chrome.runtime.MessageSender): 
   if (sender.id !== chrome.runtime.id || !sender.url?.startsWith(`${origin()}/`)) throw error();
   return floatingSource(sender);
 }
+export async function validateFloatingHostSession(sender: chrome.runtime.MessageSender, nonce: unknown): Promise<void> {
+  if (sender.id !== chrome.runtime.id || sender.frameId !== 0 || !sender.tab?.id || !sender.documentId || !isSupportedPageUrl(sender.url || "")) throw error();
+  const [session, parent] = await Promise.all([readSession(sender.tab.id), chrome.webNavigation.getFrame({ tabId: sender.tab.id, frameId: 0 })]);
+  if (!session || typeof nonce !== "string" || nonce !== session.nonce || session.documentId !== sender.documentId || parent?.documentId !== sender.documentId) throw error();
+}
 export async function handleFloatingHost(request: Record<string, any>, sender: chrome.runtime.MessageSender): Promise<unknown> {
   if (sender.id !== chrome.runtime.id || sender.frameId !== 0 || !sender.tab?.id || !sender.documentId || !isSupportedPageUrl(sender.url || "")) throw error();
   const tabId = sender.tab.id;

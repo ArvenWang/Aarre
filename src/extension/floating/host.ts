@@ -1,154 +1,169 @@
-import { defaultFloatingPosition, floatingPositionAt, floatingRects, type FloatingPosition, type Viewport } from "../../lib/floating-geometry";
+import { defaultFloatingPosition, floatingRects, floatingWidth, type FloatingPosition, type Viewport } from "../../lib/floating-geometry";
 import { hostStyles } from "./host-styles";
 
 interface HostInfo { tabId: number; documentId: string; nonce: string; enabled: boolean; position: FloatingPosition; theme?: string }
 declare global { interface Window { __aarreFloatingHost?: { version: string; destroy(): void } } }
 const version = chrome.runtime.getManifest().version;
 if (window.top === window && window.__aarreFloatingHost?.version !== version) {
-  window.__aarreFloatingHost?.destroy();
-  startHost();
+  window.__aarreFloatingHost?.destroy(); startHost();
 }
 function startHost() {
   const host = document.createElement("aarre-floating-host");
-  host.dataset.aarreUi = "floating-host";
-  host.dataset.hidden = "true";
-  host.setAttribute("popover", "manual");
+  host.dataset.aarreUi = "floating-host"; host.dataset.hidden = "true"; host.setAttribute("popover", "manual");
   const shadow = host.attachShadow({ mode: "closed" });
   const style = document.createElement("style"); style.textContent = hostStyles;
-  const ball = document.createElement("button");
-  ball.type = "button"; ball.className = "ball"; ball.setAttribute("aria-label", "打开 Aarre 菜单"); ball.setAttribute("aria-expanded", "false");
-  ball.setAttribute("aria-haspopup", "dialog"); ball.title = "Aarre · 点击打开，拖动调整位置";
-  ball.innerHTML = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 3.5h10a1 1 0 0 1 1 1v16l-6-4-6 4v-16a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 8h4m-4 3h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
-  const panel = document.createElement("div"); panel.className = "panel"; panel.hidden = true;
+  const surface = document.createElement("div"); surface.className = "dock-surface"; surface.setAttribute("aria-hidden", "true");
+  const bar = document.createElement("div"); bar.className = "bar"; bar.setAttribute("role", "group"); bar.setAttribute("aria-label", "Aarre 快捷栏");
+  const toggle = document.createElement("button"); toggle.type = "button"; toggle.className = "bar-toggle";
+  toggle.setAttribute("aria-label", "展开 Aarre 菜单"); toggle.setAttribute("aria-expanded", "false"); toggle.setAttribute("aria-haspopup", "dialog"); toggle.title = "展开 Aarre 菜单";
+  toggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3" stroke="currentColor" stroke-width="1.7"/><path d="M14 4v16m-4-12-3 4 3 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const quickSave = document.createElement("button"); quickSave.type = "button"; quickSave.className = "bar-save";
+  quickSave.setAttribute("aria-label", "快捷收藏当前网页"); quickSave.setAttribute("aria-pressed", "false"); quickSave.title = "快捷收藏当前网页";
+  quickSave.innerHTML = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3 2.8 5.7 6.3.9-4.5 4.4 1 6.2-5.6-3-5.6 3 1-6.2L2.9 9.6l6.3-.9L12 3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>';
+  bar.append(toggle, quickSave);
+  const feedback = document.createElement("div"); feedback.className = "quick-feedback"; feedback.setAttribute("role", "status"); feedback.hidden = true;
+  const panel = document.createElement("div"); panel.className = "panel"; panel.hidden = true; panel.inert = true;
   const loading = document.createElement("div"); loading.className = "loading"; loading.setAttribute("role", "status");
-  loading.innerHTML = "<strong>Aarre</strong><span>正在打开收藏…</span>";
-  const resize = document.createElement("button"); resize.type = "button"; resize.className = "resize";
-  resize.setAttribute("aria-label", "调整菜单大小，使用方向键"); resize.title = "拖动调整菜单大小";
-  resize.innerHTML = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m5 12 7-7m-3 7 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
-  panel.append(loading, resize); shadow.append(style, ball, panel);
+  const resize = document.createElement("div"); resize.className = "resize"; resize.tabIndex = 0;
+  resize.setAttribute("role", "separator"); resize.setAttribute("aria-orientation", "vertical"); resize.setAttribute("aria-label", "调整菜单宽度");
+  resize.setAttribute("aria-valuemin", "320"); resize.setAttribute("aria-valuemax", "640"); resize.title = "拖动左边调整宽度，或使用左右方向键";
+  panel.append(loading, resize); shadow.append(style, surface, bar, panel, feedback);
   let info: HostInfo | null = null, iframe: HTMLIFrameElement | null = null;
-  let position = { ...defaultFloatingPosition }, opened = false, forced = false, disposed = false, ready = false;
-  let needsRetry = false;
-  let view = "library", watchdog: ReturnType<typeof setTimeout> | undefined, loadTimeout: ReturnType<typeof setTimeout> | undefined;
+  let position = { ...defaultFloatingPosition }, opened = false, opening = false, forced = false, disposed = false, ready = false, needsRetry = false;
+  let view = "library", generation = 0, saving = false;
+  let watchdog: ReturnType<typeof setTimeout> | undefined, loadTimeout: ReturnType<typeof setTimeout> | undefined, closeTimer: ReturnType<typeof setTimeout> | undefined, feedbackTimer: ReturnType<typeof setTimeout> | undefined;
+  let surfaceAnimation: Animation | undefined, panelAnimation: Animation | undefined;
   const captureLeases = new Set<string>();
-  let previousFocus: HTMLElement | null = null;
-  let initPromise: Promise<void> | null = null;
+  let previousFocus: HTMLElement | null = null, initPromise: Promise<void> | null = null;
   const viewport = (): Viewport => ({ width: window.visualViewport?.width || innerWidth, height: window.visualViewport?.height || innerHeight, left: window.visualViewport?.offsetLeft || 0, top: window.visualViewport?.offsetTop || 0 });
-  const rectStyle = (element: HTMLElement, rect: { x: number; y: number; width: number; height: number }) => {
-    Object.assign(element.style, { left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.width}px`, height: `${rect.height}px` });
-  };
-  const layout = () => { const rects = floatingRects(position, viewport(), opened); rectStyle(ball, rects.ball); rectStyle(panel, rects.menu); host.dataset.edge = position.edge; };
-  const attach = () => {
+  type Rect = { x: number; y: number; width: number; height: number };
+  const rectStyle = (element: HTMLElement, rect: Rect) => Object.assign(element.style, { left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.width}px`, height: `${rect.height}px` });
+  let surfaceRect: Rect | undefined;
+  function layout(animate = false) {
+    const rects = floatingRects(position, viewport());
+    const target = opened ? rects.menu : rects.bar;
+    const measured = surface.getBoundingClientRect();
+    const from = measured.width ? measured : surfaceRect;
+    surfaceAnimation?.cancel(); surfaceAnimation = undefined;
+    rectStyle(surface, target); rectStyle(bar, rects.bar); rectStyle(panel, rects.menu);
+    feedback.style.right = `${rects.bar.width + 12}px`; feedback.style.top = `${rects.bar.y}px`;
+    resize.setAttribute("aria-valuenow", String(Math.round(rects.menu.width)));
+    resize.setAttribute("aria-valuemin", String(Math.min(320, viewport().width)));
+    resize.setAttribute("aria-valuemax", String(Math.min(640, viewport().width)));
+    surfaceRect = target;
+    if (animate && from && surface.animate && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      surfaceAnimation = surface.animate([
+        { transform: `translate(${from.x-target.x}px, ${from.y-target.y}px) scale(${from.width/target.width}, ${from.height/target.height})` },
+        { transform: "none" },
+      ], { duration: opened ? 280 : 210, easing: "cubic-bezier(.22,1,.36,1)" });
+    }
+  }
+  const mountHost = () => {
     const parent = document.fullscreenElement || document.documentElement;
     if (host.parentElement !== parent) parent.append(host);
-    try { if (!host.matches(":popover-open")) host.showPopover(); } catch { /* Older/fullscreen host still uses fixed positioning. */ }
-    layout();
+    try { if (!host.matches(":popover-open")) host.showPopover(); } catch { /* Fixed positioning also works without the top layer. */ }
   };
+  const attach = () => { mountHost(); layout(); };
   const send = (message: Record<string, unknown>) => { if (iframe && info) iframe.contentWindow?.postMessage({ ...message, session: info.nonce }, chrome.runtime.getURL("").replace(/\/$/, "")); };
   const persist = () => { void chrome.runtime.sendMessage({ type: "FLOAT_POSITION", position }).catch(() => undefined); };
   async function initialize() {
     const response = await chrome.runtime.sendMessage({ type: "FLOAT_HOST_INIT", freshHost: !info });
     if (!response?.ok) throw new Error(response?.error || "菜单连接失败");
-    const next = response.data as HostInfo;
     if (disposed) return;
+    const next = response.data as HostInfo;
     if (info && info.nonce !== next.nonce) { iframe?.remove(); iframe = null; ready = false; }
     info = next; position = next.position;
     host.dataset.theme = next.theme === "dark" || (!next.theme && matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
-    host.dataset.hidden = String(!next.enabled && !forced);
-    attach();
+    host.dataset.hidden = String(!next.enabled && !forced); mountHost();
+    if (surfaceAnimation?.playState !== "running") layout();
   }
   const init = () => initPromise ||= initialize().finally(() => { initPromise = null; });
   function showLoadError(message: string) {
     clearTimeout(loadTimeout); needsRetry = true; ready = false; loading.hidden = false;
+    if (iframe) iframe.inert = true;
     const title = document.createElement("strong"); title.textContent = "菜单未能打开";
     const detail = document.createElement("span"); detail.textContent = message;
     const retry = document.createElement("button"); retry.type = "button"; retry.textContent = "重新打开";
     retry.addEventListener("click", () => { void open(view).catch(() => showLoadError("连接已失效，请刷新此网页后重试。")); });
     loading.replaceChildren(title, detail, retry);
   }
+  function revealPanel(show: boolean) {
+    const opacity = panel.hidden ? 0 : Number(getComputedStyle(panel).opacity);
+    panelAnimation?.cancel(); panelAnimation = undefined;
+    panel.hidden = false; host.dataset.open = String(show);
+    if (panel.animate && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      panelAnimation = panel.animate([
+        { opacity, transform: show ? "translateX(12px)" : "none" },
+        { opacity: show ? 1 : 0, transform: show ? "none" : "translateX(8px)" },
+      ], { duration: show ? 140 : 120, delay: show && opacity === 0 ? 100 : 0, fill: "backwards", easing: "ease-out" });
+    }
+  }
   async function open(nextView = "library") {
-    forced = true; view = nextView;
+    const current = ++generation; opening = true; forced = true; view = nextView;
+    clearTimeout(closeTimer); feedback.hidden = true;
     if (needsRetry) { iframe?.remove(); iframe = null; info = null; ready = false; needsRetry = false; }
-    await init();
-    if (!info || disposed) return;
+    try { await init(); } finally { if (current === generation) opening = false; }
+    if (!info || disposed || current !== generation) return;
     if (!opened) previousFocus = document.activeElement instanceof HTMLElement && document.activeElement !== host ? document.activeElement : null;
-    opened = true; panel.hidden = false; ball.setAttribute("aria-expanded", "true"); ball.setAttribute("aria-label", "收起 Aarre 菜单");
+    // Opening takes precedence over passive launchers from other extensions.
+    // Only reorder our own top-layer surface; never touch their DOM.
+    try { if (host.matches(":popover-open")) host.hidePopover(); host.showPopover(); } catch { /* Fixed-position fallback. */ }
+    opened = true; revealPanel(true); panel.inert = false; bar.hidden = true; toggle.setAttribute("aria-expanded", "true");
     if (!iframe) {
       ready = false; loading.hidden = false; loading.innerHTML = "<strong>Aarre</strong><span>正在打开收藏…</span>";
-      iframe = document.createElement("iframe"); iframe.title = "Aarre 收藏菜单";
-      const frameUrl = new URL(chrome.runtime.getURL("floating.html"));
-      frameUrl.searchParams.set("tab", String(info.tabId)); frameUrl.searchParams.set("session", info.nonce);
-      iframe.src = frameUrl.href;
-      panel.prepend(iframe);
-      clearTimeout(loadTimeout);
-      loadTimeout = setTimeout(() => { if (!ready) showLoadError("菜单加载超时，请重新打开。若仍无法打开，请刷新此网页。"); }, 15_000);
+      iframe = document.createElement("iframe"); iframe.title = "Aarre 收藏菜单"; iframe.inert = true;
+      const frameUrl = new URL(chrome.runtime.getURL("floating.html")); frameUrl.searchParams.set("tab", String(info.tabId)); frameUrl.searchParams.set("session", info.nonce);
+      iframe.src = frameUrl.href; panel.prepend(iframe);
+      clearTimeout(loadTimeout); loadTimeout = setTimeout(() => { if (!ready) showLoadError("菜单加载超时，请重新打开。若仍无法打开，请刷新此网页。"); }, 15_000);
     }
-    layout();
+    layout(true);
     if (ready) { send({ type: "FLOAT_VIEW", view, focus: true }); iframe.focus(); }
   }
   function close(focus = false) {
-    opened = false; panel.hidden = true; ball.setAttribute("aria-expanded", "false"); ball.setAttribute("aria-label", "打开 Aarre 菜单");
-    send({ type: "FLOAT_VISIBILITY", visible: false });
+    generation++; opening = false; opened = false; panel.inert = true; bar.hidden = false; revealPanel(false);
+    toggle.setAttribute("aria-expanded", "false"); send({ type: "FLOAT_VISIBILITY", visible: false }); layout(true);
+    clearTimeout(closeTimer);
+    closeTimer = setTimeout(() => { if (!opened) panel.hidden = true; }, matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 210);
     if (info && !info.enabled) { forced = false; host.dataset.hidden = "true"; if (focus) previousFocus?.focus({ preventScroll: true }); }
-    else if (focus) ball.focus({ preventScroll: true });
+    else if (focus) toggle.focus({ preventScroll: true });
   }
-  let drag: { id: number; x: number; y: number; bx: number; by: number; moved: boolean; mode: "ball" | "resize"; width: number; height: number } | null = null;
-  let suppressClick = false;
-  function pointerDown(event: PointerEvent, mode: "ball" | "resize") {
-    if (event.button !== 0) return;
-    const rect = ball.getBoundingClientRect();
-    drag = { id: event.pointerId, x: event.clientX, y: event.clientY, bx: rect.x, by: rect.y, moved: false, mode, width: position.width, height: position.height };
-    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  function showQuickFeedback(message: string, failed = false) {
+    clearTimeout(feedbackTimer); feedback.textContent = message; feedback.dataset.error = String(failed); feedback.hidden = false;
+    feedbackTimer = setTimeout(() => { feedback.hidden = true; }, failed ? 6_000 : 3_000);
   }
-  const pointerMove = (event: PointerEvent) => {
-    if (!drag || event.pointerId !== drag.id) return;
-    const dx = event.clientX - drag.x, dy = event.clientY - drag.y;
-    if (!drag.moved && Math.hypot(dx, dy) < 6) return;
-    drag.moved = true;
-    if (drag.mode === "ball") {
-      const vp = viewport();
-      const x = Math.max(vp.left || 0, Math.min(drag.bx + dx, (vp.left || 0) + vp.width - 52));
-      const y = Math.max(vp.top || 0, Math.min(drag.by + dy, (vp.top || 0) + vp.height - 52));
-      position = floatingPositionAt(x, y, vp, position);
-      layout(); rectStyle(ball, { x, y, width: 52, height: 52 });
-    } else {
-      position = { ...position, width: Math.max(320, Math.min(560, drag.width + (position.edge === "right" ? -dx : dx))), height: Math.max(360, Math.min(800, drag.height - dy)) }; layout();
-    }
-  };
-  const pointerEnd = (event: PointerEvent) => {
-    if (!drag || event.pointerId !== drag.id) return;
-    suppressClick = drag.moved;
-    if (drag.moved) persist(); drag = null; layout();
-  };
-  for (const [element, mode] of [[ball, "ball"], [resize, "resize"]] as const) {
-    element.addEventListener("pointerdown", (event) => pointerDown(event, mode));
-    element.addEventListener("pointermove", pointerMove);
-    element.addEventListener("pointerup", pointerEnd);
-    element.addEventListener("pointercancel", pointerEnd);
-  }
-  ball.addEventListener("click", () => { if (suppressClick) { suppressClick = false; return; } if (opened) close(true); else void open(view).catch(() => { host.dataset.hidden = "true"; }); });
-  ball.addEventListener("keydown", (event) => {
-    if (!event.key.startsWith("Arrow")) return;
-    event.preventDefault();
-    if (event.key === "ArrowLeft" || event.key === "ArrowRight") position.edge = event.key === "ArrowLeft" ? "left" : "right";
-    else position.ratio = Math.max(0, Math.min(1, position.ratio + (event.key === "ArrowUp" ? -0.05 : 0.05)));
-    layout(); persist();
+  quickSave.addEventListener("click", () => {
+    if (saving || !info) return;
+    saving = true; quickSave.disabled = true; quickSave.setAttribute("aria-busy", "true"); showQuickFeedback("正在收藏…");
+    void chrome.runtime.sendMessage({ type: "FLOAT_QUICK_SAVE", nonce: info.nonce }).then((response) => {
+      if (!response?.ok) throw new Error(response?.error || "未能收藏，请重试。");
+      quickSave.setAttribute("aria-pressed", "true"); quickSave.title = "此网页已收藏";
+      showQuickFeedback(response.data.existing ? "此网页已在收藏中" : "已添加到收藏");
+    }).catch((error) => showQuickFeedback(error instanceof Error ? error.message : "未能收藏，请重试。", true))
+      .finally(() => { saving = false; quickSave.disabled = false; quickSave.removeAttribute("aria-busy"); });
   });
+  toggle.addEventListener("click", () => { if (opened || opening) close(true); else void open(view).catch(() => showQuickFeedback("连接已失效，请刷新此网页后重试。", true)); });
+  let drag: { id: number; x: number; width: number } | null = null;
+  resize.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return; event.preventDefault();
+    drag = { id: event.pointerId, x: event.clientX, width: floatingRects(position, viewport()).menu.width }; resize.setPointerCapture(event.pointerId);
+    host.dataset.resizing = "true";
+  });
+  resize.addEventListener("pointermove", (event) => {
+    if (!drag || event.pointerId !== drag.id) return;
+    position = { width: floatingWidth(drag.width + drag.x - event.clientX) }; layout();
+  });
+  const endResize = () => { if (!drag) return; drag = null; host.dataset.resizing = "false"; persist(); };
+  resize.addEventListener("pointerup", endResize); resize.addEventListener("pointercancel", endResize); resize.addEventListener("lostpointercapture", endResize);
   resize.addEventListener("keydown", (event) => {
-    if (!event.key.startsWith("Arrow")) return; event.preventDefault();
-    const amount = event.shiftKey ? 40 : 10;
-    position.width = Math.max(320, Math.min(560, position.width + (event.key === "ArrowRight" ? amount : event.key === "ArrowLeft" ? -amount : 0)));
-    position.height = Math.max(360, Math.min(800, position.height + (event.key === "ArrowDown" ? amount : event.key === "ArrowUp" ? -amount : 0)));
-    layout(); persist();
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return; event.preventDefault();
+    position = { width: event.key === "Home" ? 320 : event.key === "End" ? 640 : floatingWidth(position.width + (event.key === "ArrowLeft" ? 1 : -1) * (event.shiftKey ? 40 : 10)) }; layout(); persist();
   });
   const outside = (event: PointerEvent) => { if (opened && !event.composedPath().includes(host)) close(); };
-  const escape = (event: KeyboardEvent) => { if (opened && event.key === "Escape" && !event.isComposing && !event.defaultPrevented) { close(true); event.preventDefault(); } };
+  const escape = (event: KeyboardEvent) => { if ((opened || opening) && event.key === "Escape" && !event.isComposing && !event.defaultPrevented) { close(true); event.preventDefault(); } };
   const receive = (event: MessageEvent) => {
     if (!iframe || !info || event.source !== iframe.contentWindow || event.origin !== chrome.runtime.getURL("").replace(/\/$/, "") || event.data?.session !== info.nonce) return;
     if (event.data.type === "FLOAT_READY") {
-      // A late successful load recovers the existing frame. Do not discard its
-      // conversation on the next open just because the timeout fired earlier.
-      ready = true; needsRetry = false; clearTimeout(loadTimeout); loading.hidden = true;
+      ready = true; needsRetry = false; clearTimeout(loadTimeout); loading.hidden = true; iframe.inert = false;
       send({ type: "FLOAT_VIEW", view, focus: opened }); if (opened) iframe.focus();
     }
     if (event.data.type === "FLOAT_LOAD_ERROR") showLoadError(typeof event.data.message === "string" ? event.data.message : "请重新打开菜单。");
@@ -159,18 +174,14 @@ function startHost() {
   };
   const runtimeListener = (message: Record<string, any>, sender: chrome.runtime.MessageSender, respond: (response: unknown) => void) => {
     if (message.type === "FLOAT_VERIFY_FRAME") {
-      if (sender.id !== chrome.runtime.id || !iframe || !info || message.session !== info.nonce || typeof message.challenge !== "string") {
-        respond({ ok: false }); return false;
-      }
-      send({ type: "FLOAT_IDENTITY_CHALLENGE", challenge: message.challenge });
-      respond({ ok: true }); return false;
+      if (sender.id !== chrome.runtime.id || !iframe || !info || message.session !== info.nonce || typeof message.challenge !== "string") { respond({ ok: false }); return false; }
+      send({ type: "FLOAT_IDENTITY_CHALLENGE", challenge: message.challenge }); respond({ ok: true }); return false;
     }
     if (message.type === "FLOAT_OPEN") { void open(message.view).then(() => respond({ ok: true }), () => respond({ ok: false })); return true; }
     if (message.type === "FLOAT_REFRESH") { void init().then(() => respond({ ok: true }), () => respond({ ok: false })); return true; }
     if (message.type === "FLOAT_CAPTURE") {
       if (typeof message.lease !== "string") { respond({ ok: false }); return false; }
-      clearTimeout(watchdog);
-      if (message.hidden) captureLeases.add(message.lease); else captureLeases.delete(message.lease);
+      clearTimeout(watchdog); if (message.hidden) captureLeases.add(message.lease); else captureLeases.delete(message.lease);
       host.dataset.capturing = String(captureLeases.size > 0);
       if (captureLeases.size) watchdog = setTimeout(() => { captureLeases.clear(); host.dataset.capturing = "false"; }, 60_000);
       requestAnimationFrame(() => requestAnimationFrame(() => respond({ ok: true, lease: message.lease }))); return true;
@@ -179,22 +190,17 @@ function startHost() {
   };
   const observer = new MutationObserver(() => { if (!disposed && !host.isConnected && document.documentElement) { iframe?.remove(); iframe = null; info = null; ready = false; attach(); if (opened) void open(view).catch(() => { host.dataset.hidden = "true"; }); } });
   observer.observe(document, { childList: true, subtree: true });
-  document.addEventListener("pointerdown", outside, true);
-  document.addEventListener("keydown", escape);
-  document.addEventListener("fullscreenchange", attach);
-  window.addEventListener("message", receive);
-  window.addEventListener("resize", layout);
-  window.visualViewport?.addEventListener("resize", layout);
-  window.visualViewport?.addEventListener("scroll", layout);
-  const pageshow = () => { void init().catch(() => undefined); };
-  window.addEventListener("pageshow", pageshow);
+  document.addEventListener("pointerdown", outside, true); document.addEventListener("keydown", escape); document.addEventListener("fullscreenchange", attach);
+  window.addEventListener("message", receive); window.addEventListener("resize", attach);
+  window.visualViewport?.addEventListener("resize", attach); window.visualViewport?.addEventListener("scroll", attach);
+  const pageshow = () => { void init().catch(() => undefined); }; window.addEventListener("pageshow", pageshow);
   chrome.runtime.onMessage.addListener(runtimeListener);
   window.__aarreFloatingHost = { version, destroy() {
-    disposed = true; observer.disconnect(); clearTimeout(watchdog); clearTimeout(loadTimeout); host.remove();
+    disposed = true; generation++; observer.disconnect(); surfaceAnimation?.cancel(); panelAnimation?.cancel(); clearTimeout(watchdog); clearTimeout(loadTimeout); clearTimeout(closeTimer); clearTimeout(feedbackTimer); host.remove();
     chrome.runtime.onMessage.removeListener(runtimeListener);
     document.removeEventListener("pointerdown", outside, true); document.removeEventListener("keydown", escape); document.removeEventListener("fullscreenchange", attach);
-    window.removeEventListener("message", receive); window.removeEventListener("resize", layout); window.removeEventListener("pageshow", pageshow);
-    window.visualViewport?.removeEventListener("resize", layout); window.visualViewport?.removeEventListener("scroll", layout);
+    window.removeEventListener("message", receive); window.removeEventListener("resize", attach); window.removeEventListener("pageshow", pageshow);
+    window.visualViewport?.removeEventListener("resize", attach); window.visualViewport?.removeEventListener("scroll", attach);
   } };
   void init().catch(() => { host.dataset.hidden = "true"; });
 }

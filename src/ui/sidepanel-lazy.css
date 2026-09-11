@@ -51,6 +51,28 @@
   padding: var(--sp-1) var(--sp-4) var(--sp-5);
 }
 
+.native-settings-panel { display:flex; flex-direction:column; min-height:0; }
+.settings-workspace { display:flex; flex:1; flex-direction:column; min-width:0; min-height:0; }
+.settings-group-navigation { display:none; }
+.settings-group-picker { flex:none; padding:0 16px 12px; border-bottom:1px solid var(--line); }
+.settings-workspace > .settings-page-content { flex:1; padding:8px 16px 20px; }
+.settings-group-panel[hidden] { display:none; }
+.settings-group-title { margin:16px 0 0; font-size:var(--fs-body); font-weight:var(--fw-strong); }
+.settings-data-links { display:grid; gap:20px; }
+.settings-data-links .settings-link-row { margin:0; padding:0; }
+.settings-data-links .settings-link-row > div { min-width:0; }
+.settings-data-links small { display:block; margin-top:6px; color:var(--ink-muted); font-size:var(--fs-caption); line-height:1.6; }
+.settings-data-links .aarre-button { flex:none; }
+.markdown-cell-content { min-width:0; overflow-wrap:anywhere; }
+@media (min-width:641px) {
+  .native-settings-panel[data-layout="manager"] .settings-workspace { flex-direction:row; }
+  .native-settings-panel[data-layout="manager"] .settings-group-picker { display:none; }
+  .native-settings-panel[data-layout="manager"] .settings-group-navigation { display:flex; flex-direction:column; gap:4px; flex:0 0 172px; padding:16px 12px; border-right:1px solid var(--line); background:var(--surface-sunken); }
+  .settings-group-navigation .aarre-button { justify-content:flex-start; padding-inline:12px; min-height:36px; font-size:var(--fs-small); color:var(--ink-muted); }
+  .settings-group-navigation .aarre-button[aria-current="page"] { background:var(--surface); color:var(--ink); font-weight:var(--fw-strong); }
+  .native-settings-panel[data-layout="manager"] .settings-page-content { padding:8px 24px 24px; }
+}
+
 /* Settings is also loaded by the full library, without sidepanel.css. */
 .settings-field { position: relative; margin-top: var(--sp-4); display: grid; gap: var(--sp-2); }
 .settings-field > span { color: var(--ink-muted); font-size: var(--fs-caption); font-weight: var(--fw-medium); }
@@ -828,6 +850,7 @@
 }
 
 .agent-markdown {
+  container-type: inline-size;
   white-space: normal;
   overflow-wrap: anywhere;
   line-height: var(--agent-markdown-leading);
@@ -870,6 +893,7 @@
   margin: var(--sp-2) 0;
   padding-inline-start: 20px;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--sp-1);
 }
 
@@ -892,9 +916,12 @@
 }
 
 .agent-markdown pre {
-  width: max-content;
-  min-width: 100%;
-  margin: 0;
+  width: 100%;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  tab-size: 2;
+  margin: var(--sp-2) 0;
   padding: var(--sp-2);
   border-radius: var(--radius-sm);
   background: var(--surface-sunken);
@@ -903,6 +930,8 @@
 .agent-markdown pre code {
   padding: 0;
   background: transparent;
+  white-space: inherit;
+  overflow-wrap: inherit;
 }
 
 .agent-markdown a {
@@ -913,9 +942,10 @@
 
 .agent-markdown .agent-inline-source {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--sp-1);
   max-width: 100%;
+  min-width: 0;
   padding: var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-1);
   border: 1px solid var(--line);
   border-radius: var(--radius-control);
@@ -923,7 +953,7 @@
   color: var(--ink);
   text-decoration: none;
   vertical-align: middle;
-  line-height: var(--sp-4);
+  line-height: 1.55;
 }
 
 .agent-markdown .agent-inline-source:hover {
@@ -933,28 +963,39 @@
 
 .agent-inline-source > span:last-child {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .agent-inline-source-thumbnail {
   width: var(--sp-4);
   height: var(--sp-4);
   flex: 0 0 auto;
+  margin-top: 2px;
 }
 
 .agent-markdown table {
-  width: max-content;
-  min-width: 100%;
+  width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: var(--fs-caption);
 }
 
-.markdown-scroll-frame {
-  flex: none;
-  margin-block: var(--sp-2);
-  border-radius: var(--radius-sm);
+.agent-markdown li, .agent-markdown p, .agent-markdown td, .agent-markdown th { min-width:0; max-width:100%; overflow-wrap:anywhere; }
+.agent-markdown table { margin-block:var(--sp-2); }
+.agent-markdown td::before { display:none; }
+.agent-markdown table[data-many-columns="true"],
+.agent-markdown table[data-many-columns="true"] tbody { display:block; }
+.agent-markdown table[data-many-columns="true"] thead { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+.agent-markdown table[data-many-columns="true"] tr { display:block; padding:8px 0; border-bottom:1px solid var(--line); }
+.agent-markdown table[data-many-columns="true"] td { display:grid; grid-template-columns:minmax(64px,28%) minmax(0,1fr); gap:12px; padding:6px 0; border:0; }
+.agent-markdown table[data-many-columns="true"] td::before { display:block; content:attr(data-column-label); color:var(--ink-muted); font-weight:var(--fw-medium); }
+@container (max-width:520px) {
+  .agent-markdown table, .agent-markdown tbody { display:block; }
+  .agent-markdown thead { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+  .agent-markdown tr { display:block; padding:8px 0; border-bottom:1px solid var(--line); }
+  .agent-markdown table td { display:grid; grid-template-columns:minmax(64px,28%) minmax(0,1fr); gap:12px; padding:6px 0; border:0; }
+  .agent-markdown td::before { display:block; content:attr(data-column-label); color:var(--ink-muted); font-weight:var(--fw-medium); }
 }
 
 .agent-markdown th,

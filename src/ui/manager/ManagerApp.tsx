@@ -26,9 +26,7 @@ import {
 import type {
   AppState,
   BookmarkBarSnapshot,
-  BookmarkAgentActionExecutionResult,
   KnowledgeDashboard,
-  LibraryInsights,
   ResourceRecord,
   SearchResult,
   SiteBrandRecord,
@@ -44,27 +42,11 @@ import {
   writeLibraryQuery,
 } from "./library-collection";
 import { LibraryView } from "./views/LibraryView";
-import { OrganizeView } from "./views/OrganizeView";
-import { ReportView } from "./views/ReportView";
-import { ResurfaceView } from "./views/ResurfaceView";
 import { TopicsView } from "./views/TopicsView";
 import { FloatingScrollbar } from "./components/FloatingScrollbar";
 
-const VALID_VIEWS: ManagerView[] = [
-  "library",
-  "organize",
-  "report",
-  "topics",
-  "resurface",
-];
-
-const VIEW_LABELS: Record<ManagerView, string> = {
-  library: "收藏库",
-  organize: "整理提案",
-  report: "报告",
-  topics: "主题图谱",
-  resurface: "重新发现",
-};
+const VALID_VIEWS: ManagerView[] = ["library", "topics"];
+const VIEW_LABELS: Record<ManagerView, string> = { library: "收藏库", topics: "主题图谱" };
 
 function asSearchResults(
   items: ResourceRecord[] | SearchResult[],
@@ -96,6 +78,14 @@ export function ManagerApp() {
   const tabViewportRef = useRef<HTMLDivElement>(null);
   const [openedUtility, setOpenedUtility] = useState<ManagerUtility | null>(() => new URLSearchParams(location.search).has("archive") ? "archive" : new URLSearchParams(location.search).has("settings") ? "settings" : null);
   const initial = useMemo(initialLocationState, []);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const requested = url.searchParams.get("view");
+    if (requested && !VALID_VIEWS.includes(requested as ManagerView)) {
+      url.searchParams.delete("view");
+      window.history.replaceState(null, "", url);
+    }
+  }, []);
   const [themeMode, setThemeMode] = useState<ThemeMode>(() =>
     initializeTheme(),
   );
@@ -117,24 +107,13 @@ export function ManagerApp() {
   const [libraryResults, setLibraryResults] = useState<SearchResult[]>([]);
   const [bookmarkSnapshot, setBookmarkSnapshot] =
     useState<BookmarkBarSnapshot | null>(null);
-  const [insights, setInsights] = useState<LibraryInsights | null>(null);
   const [dashboard, setDashboard] = useState<KnowledgeDashboard | null>(null);
-  const [reportPeriod, setReportPeriod] = useState<"week" | "month">("week");
-  const [selectedActionIds, setSelectedActionIds] = useState<Set<string>>(
-    new Set(),
-  );
-  const [applyResults, setApplyResults] = useState<
-    BookmarkAgentActionExecutionResult[]
-  >([]);
-  const [undoBatchId, setUndoBatchId] = useState("");
-  const [confirmDestructiveApply, setConfirmDestructiveApply] = useState(false);
   const [siteBrands, setSiteBrands] = useState<SiteBrandRecord[]>([]);
   const [pageSnapshotsEnabled, setPageSnapshotsEnabled] = useState(true);
   const [snapshotExcludedHosts, setSnapshotExcludedHosts] = useState<string[]>(
     [],
   );
   const [loading, setLoading] = useState(true);
-  const [action, setAction] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const derivedLoadRef = useRef<Promise<void> | null>(null);
@@ -149,20 +128,8 @@ export function ManagerApp() {
   const loadDerivedData = useCallback(() => {
     if (derivedLoadRef.current) return derivedLoadRef.current;
 
-    const request = Promise.all([
-      sendExtensionRequest({ type: "GET_LIBRARY_INSIGHTS" }),
-      sendExtensionRequest({ type: "GET_KNOWLEDGE_DASHBOARD" }),
-    ]).then(([nextInsights, nextDashboard]) => {
-      setInsights(nextInsights);
-      setDashboard(nextDashboard);
-      setSelectedActionIds(
-        new Set(
-          nextInsights.organizationPlan.proposals
-            .filter((proposal) => proposal.selectedByDefault)
-            .flatMap((proposal) => proposal.actions.map((item) => item.id)),
-        ),
-      );
-    });
+    const request = sendExtensionRequest({ type: "GET_KNOWLEDGE_DASHBOARD" })
+      .then(setDashboard);
     derivedLoadRef.current = request;
     request
       .finally(() => {
@@ -328,14 +295,6 @@ export function ManagerApp() {
       ),
     [siteBrands],
   );
-  const selectedActions = useMemo(() => {
-    const actions =
-      insights?.organizationPlan.proposals.flatMap(
-        (proposal) => proposal.actions,
-      ) || [];
-    return actions.filter((item) => selectedActionIds.has(item.id));
-  }, [insights, selectedActionIds]);
-
   function selectView(nextView: ManagerView) {
     setView(nextView);
     const url = new URL(window.location.href);
@@ -365,64 +324,6 @@ export function ManagerApp() {
     setSort(controls.sort);
     const url = writeLibraryControls(new URL(window.location.href), controls);
     window.history.replaceState(null, "", url);
-  }
-
-  function toggleProposal(actionIds: string[], checked: boolean) {
-    setConfirmDestructiveApply(false);
-    setSelectedActionIds((current) => {
-      const next = new Set(current);
-      for (const id of actionIds) {
-        if (checked) next.add(id);
-        else next.delete(id);
-      }
-      return next;
-    });
-  }
-
-  async function applyOrganizationPlan() {
-    if (!selectedActions.length) return;
-    if (
-      selectedActions.some((item) => item.destructive) &&
-      !confirmDestructiveApply
-    ) {
-      setConfirmDestructiveApply(true);
-      return;
-    }
-    setAction("organize");
-    setError("");
-    try {
-      const result = await sendExtensionRequest({
-        type: "APPLY_ORGANIZATION_ACTIONS",
-        actions: selectedActions.slice(0, 200),
-      });
-      setApplyResults(result.results);
-      setUndoBatchId(result.batchId || "");
-      setConfirmDestructiveApply(false);
-      await refresh(false, true);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "整理操作执行失败");
-    } finally {
-      setAction("");
-    }
-  }
-
-  async function undoOrganizationPlan() {
-    if (!undoBatchId) return;
-    setAction("undo-organize");
-    setError("");
-    try {
-      await sendExtensionRequest({
-        type: "UNDO_BOOKMARK_BATCH",
-        batchId: undoBatchId,
-      });
-      setUndoBatchId("");
-      setApplyResults([]);
-      await refresh(false, true);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "撤销整理失败");
-    } finally {
-      setAction("");
-    }
   }
 
   function handleSearch() {
@@ -493,60 +394,8 @@ export function ManagerApp() {
     );
   } else {
     switch (view) {
-      case "organize":
-        viewContent = (
-          <OrganizeView
-            insights={insights}
-            selectedActionIds={selectedActionIds}
-            selectedActionCount={selectedActions.length}
-            confirmDestructiveApply={confirmDestructiveApply}
-            action={action}
-            undoBatchId={undoBatchId}
-            appliedSuccessCount={
-              applyResults.filter((item) => item.success).length
-            }
-            appliedFailureCount={
-              applyResults.filter((item) => !item.success).length
-            }
-            onSelectSafe={() =>
-              setSelectedActionIds(
-                new Set(
-                  insights?.organizationPlan.proposals
-                    .filter((proposal) => !proposal.destructive)
-                    .flatMap((proposal) =>
-                      proposal.actions.map((item) => item.id),
-                    ) || [],
-                ),
-              )
-            }
-            onToggleProposal={toggleProposal}
-            onApply={() => void applyOrganizationPlan()}
-            onUndo={() => void undoOrganizationPlan()}
-            onOpenResource={(url) => void openResource(url)}
-          />
-        );
-        break;
-      case "report":
-        viewContent = (
-          <ReportView
-            dashboard={dashboard}
-            period={reportPeriod}
-            onPeriodChange={setReportPeriod}
-            onOpenOrganize={() => selectView("organize")}
-            onOpenResource={(url) => void openResource(url)}
-          />
-        );
-        break;
       case "topics":
         viewContent = <TopicsView dashboard={dashboard} resources={libraryResults.map((item) => item.resource)} onOpenResource={(url) => void openResource(url)} />;
-        break;
-      case "resurface":
-        viewContent = (
-          <ResurfaceView
-            dashboard={dashboard}
-            onOpenResource={(url) => void openResource(url)}
-          />
-        );
         break;
       default:
         viewContent = (
@@ -565,7 +414,7 @@ export function ManagerApp() {
             bookmarkSnapshot={bookmarkSnapshot}
             queryDraft={queryDraft}
             query={appliedQuery}
-            action={action}
+            action=""
             siteBrandByHost={siteBrandByHost}
             missingSnapshotCount={missingSnapshotCount}
             onFilterChange={(value) => updateLibraryControls({ filter: value })}
@@ -619,16 +468,9 @@ export function ManagerApp() {
           {(
             [
               ["library", "收藏库", libraryResults.length],
-              [
-                "organize",
-                "整理提案",
-                insights?.organizationPlan.proposalCount || 0,
-              ],
-              ["report", "报告", dashboard?.weekly.createdCount || 0],
               ["topics", "主题图谱", dashboard?.topicGraph.nodes.length || 0],
-              ["resurface", "重新发现", dashboard?.resurfacing.length || 0],
             ] as const
-          ).map(([value, label, count], index) => (
+          ).map(([value, label, count]) => (
             <Tabs.Tab key={value} id={value} className="aarre-tab">{label}<span className="manager-tab-count">{count}</span></Tabs.Tab>
           ))}
         </Tabs.List>

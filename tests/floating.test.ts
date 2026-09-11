@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { floatingRects, defaultFloatingPosition, floatingPositionAt } from "../src/lib/floating-geometry";
+import { floatingRects, defaultFloatingPosition, floatingWidth } from "../src/lib/floating-geometry";
 import { handleFloatingHost, authorizeUiMessage, validateFloatingSender, proveFloatingFrame } from "../src/extension/floating/session";
+import { normalizeFloatingSettings } from "../src/lib/floating-settings";
 import { withFloatingHidden } from "../src/extension/floating/lifecycle";
 const local: Record<string,any> = {}, session: Record<string,any> = {};
 const parent = { frameId: 0, documentId: "parent-a" };
@@ -26,17 +27,31 @@ beforeEach(() => {
 });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 describe("floating geometry", () => {
-  for (const [width,height] of [[360,640],[420,800],[1280,720],[1440,900]]) for (const edge of ["left","right"] as const) for (const ratio of [0,1]) {
-    it(`${width}×${height} ${edge} ${ratio} stays in viewport with a 52px ball`, () => {
-      const result=floatingRects({...defaultFloatingPosition,edge,ratio},{width,height});
-      for(const rect of Object.values(result)) { expect(rect.x).toBeGreaterThanOrEqual(0);expect(rect.y).toBeGreaterThanOrEqual(0);expect(rect.x+rect.width).toBeLessThanOrEqual(width);expect(rect.y+rect.height).toBeLessThanOrEqual(height); }
-      expect(result.ball.width).toBe(52);expect(result.ball.height).toBe(52);
+  for (const [width, height] of [[280,360],[320,640],[420,800],[1280,720],[1440,900]]) {
+    it(`${width}×${height} attaches both states to the right edge without leaving the viewport`, () => {
+      for (const requestedWidth of [320,400,640]) {
+        const result = floatingRects({width:requestedWidth}, {width,height});
+        for (const rect of Object.values(result)) {
+          expect(rect.x).toBeGreaterThanOrEqual(0); expect(rect.y).toBeGreaterThanOrEqual(0);
+          expect(rect.x+rect.width).toBe(width); expect(rect.y+rect.height).toBeLessThanOrEqual(height);
+        }
+        expect(result.bar.width).toBe(44); expect(result.bar.height).toBe(96);
+        expect(result.bar.y+48).toBe(height/2);
+        expect(result.menu.height).toBe(height-24);
+      }
     });
   }
-  it("restores a dragged point after zoom or viewport resizing", () => {
-    const position=floatingPositionAt(0,500,{width:1440,height:900},defaultFloatingPosition);
-    const result=floatingRects(position,{width:420,height:640,left:30,top:20});
-    expect(result.ball.x).toBe(42);expect(position.ratio).toBeGreaterThan(0.5);expect(result.menu.x+result.menu.width).toBeLessThanOrEqual(450);
+  it("respects the visual viewport after zoom and follows only its height", () => {
+    const result = floatingRects(defaultFloatingPosition,{width:420,height:640,left:30,top:20});
+    expect(result.bar.x+result.bar.width).toBe(450);
+    expect(result.menu).toEqual({x:50,y:32,width:400,height:616});
+    expect(floatingRects({width:640},{width:1280,height:900}).menu.height).toBe(876);
+  });
+  it("preserves the preferred width while dropping legacy ball coordinates and manual height", () => {
+    expect(normalizeFloatingSettings({position:{edge:"left",ratio:0.1,width:480,height:600}}).position).toEqual({width:480});
+    expect(normalizeFloatingSettings({position:{width:200}}).position.width).toBe(320);
+    expect(normalizeFloatingSettings({position:{width:800}}).position.width).toBe(640);
+    expect(floatingWidth(100)).toBe(320); expect(floatingWidth(900)).toBe(640);
   });
 });
 describe("floating source identity", () => {

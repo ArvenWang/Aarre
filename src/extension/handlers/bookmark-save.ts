@@ -96,7 +96,7 @@ export function createBookmarkSaveHandlers(dependencies: BookmarkSaveDependencie
   const now = () => new Date().toISOString();
   const SAVED_PAGE_SNAPSHOT_DELAY_MS = 250;
 async function findOrCreateNativeBookmark(
-  input: SaveBookmarkInput
+  input: SaveBookmarkInput, preserveExisting = false
 ): Promise<{ bookmark: chrome.bookmarks.BookmarkTreeNode; created: boolean }> {
   markNativeBookmarksDirty();
   const folderId = input.folderId || (await defaultFolderId());
@@ -129,6 +129,7 @@ async function findOrCreateNativeBookmark(
     if (!existing?.url) {
       throw new Error("选中的收藏已不存在，请刷新后重试。");
     }
+    if (preserveExisting) return { bookmark: existing, created: false };
     if (existing.unmodifiable === "managed") {
       return { bookmark: existing, created: false };
     }
@@ -271,20 +272,23 @@ async function syncPendingIfReady(): Promise<{ synced: number; failed: number }>
 }
 
 async function saveBookmark(
-  input: SaveBookmarkInput
+  input: SaveBookmarkInput, options: { deferEnrichment?: boolean } = {}
 ): Promise<SaveBookmarkResult> {
   const auth = await getAuthState();
   const sourceTab =
     typeof input.sourceTabId === "number"
       ? await chrome.tabs.get(input.sourceTabId).catch(() => null)
       : null;
-  const { bookmark, created } = await findOrCreateNativeBookmark(input);
+  const { bookmark, created } = await findOrCreateNativeBookmark(input, options.deferEnrichment);
   const canonicalUrl = canonicalizeUrl(
     input.capture.url,
     input.capture.canonicalUrl
   );
   const resourceKey = await resourceKeyForUrl(canonicalUrl);
   const existing = await getLocalResource(resourceKey);
+  if (options.deferEnrichment && !created && existing) {
+    return { resource: existing, nativeBookmarkCreated: false, cloudSyncAttempted: false, enhancementPending: needsAiEnrichment(existing) };
+  }
   const nativeBookmarkIds = [
     ...new Set([...(existing?.nativeBookmarkIds || []), bookmark.id])
   ];
@@ -406,7 +410,7 @@ async function saveBookmark(
       enhancementBlockMessage: blockMessage,
       updatedAt: now()
     };
-  } else if (needsAi) {
+  } else if (needsAi && !options.deferEnrichment) {
       const aiSettings = await getAiRuntimeSettings();
       if (aiSettings.apiKey && hasTrustworthyRenderedContent) {
         try {
@@ -466,7 +470,8 @@ async function saveBookmark(
         ? input.capture.content
         : ""
     );
-    synced = await tryImmediateSync(queued);
+    if (options.deferEnrichment) requestSync("quick-save", 3_000);
+    else synced = await tryImmediateSync(queued);
   }
 
   const pendingEnhancements: BookmarkEnhancementPart[] = [];

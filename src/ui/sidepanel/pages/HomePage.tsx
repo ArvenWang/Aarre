@@ -14,7 +14,6 @@ import { BookmarkEditorDialog } from "../components/BookmarkEditorDialog";
 import { BookmarkPreviewLayer } from "../components/BookmarkPreview";
 import { BookmarkTree } from "../components/BookmarkTree";
 import { LibraryHeader } from "../components/LibraryHeader";
-import { LibraryNotices } from "../components/LibraryNotices";
 import { RankedBookmarkResults, type RankedBookmarkResult } from "../components/RankedBookmarkResults";
 import { SearchBar } from "../components/SearchBar";
 
@@ -49,7 +48,6 @@ interface ScrollModel { atEnd: boolean; }
 interface HomePageProps {
   floating?: boolean;
   header: ComponentProps<typeof LibraryHeader>;
-  notices: ComponentProps<typeof LibraryNotices>;
   search: ComponentProps<typeof SearchBar>;
   library: LibraryModel;
   scroll: ScrollModel;
@@ -68,7 +66,6 @@ interface HomePageProps {
 export default function HomePage({
   floating,
   header,
-  notices,
   search,
   library,
   scroll,
@@ -92,7 +89,7 @@ export default function HomePage({
 
   return (
     <main className="native-panel">
-      {!floating && <><LibraryHeader {...header} /><LibraryNotices {...notices} /></>}
+      {!floating && <LibraryHeader {...header} />}
       <SearchBar {...search} />
       <div className="native-content-frame" data-has-folders={library.hasVisibleFolders} data-at-end={scroll.atEnd}>
         {status.error ? (

@@ -17,7 +17,7 @@ async function start() {
       setFloatingContext({ tabId: source.id, nonce: params.get("session")!, source, parentOrigin: location.origin });
     }
   } else {
-    if (window.parent === window) throw new Error("请通过网页上的 Aarre 悬浮球打开菜单。");
+    if (window.parent === window) throw new Error("请通过网页右侧的 Aarre 快捷栏打开菜单。");
     const stopListening = listenForFrameChallenge(params.get("session") || "");
     const response = await chrome.runtime.sendMessage({ type: "FLOAT_CONNECT", nonce: params.get("session") }).finally(stopListening);
     if (!response?.ok || !response.data?.source?.id) throw new Error(response?.error || "此菜单已失效，请重新打开。");

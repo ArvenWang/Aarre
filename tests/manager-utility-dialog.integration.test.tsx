@@ -39,3 +39,14 @@ it("opens one backup dialog from a direct link and closes/reopens without leavin
   await act(async()=>{(container.querySelector('button[aria-label="本地备份与恢复"]') as HTMLButtonElement).click();});
   expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
 });
+
+it.each(["organize", "report", "resurface"])("redirects retired %s links to the library with only two available sections",async(view)=>{
+  vi.stubGlobal("matchMedia",vi.fn(()=>({matches:false,addListener(){},removeListener(){},addEventListener(){},removeEventListener(){}})));
+  vi.stubGlobal("chrome",{storage:{local:{get:async()=>({}),set:async()=>{}}}});
+  window.history.replaceState(null,"",`/manager.html?view=${view}&q=design`);
+  const container=document.createElement("div");document.body.append(container);root=createRoot(container);
+  await act(async()=>{root!.render(<ManagerApp/>);});
+  expect([...container.querySelectorAll('[role="tab"]')].map(el=>el.textContent)).toEqual(["收藏库0","主题图谱0"]);
+  expect(window.location.search).toBe("?q=design");
+  expect(container.textContent).toContain("收藏内容");
+});

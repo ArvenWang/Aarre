@@ -3,7 +3,8 @@ import { FloatingSettingsSection } from "../../floating/FloatingSettingsSection"
 import { useEffect, useRef, useState } from "react";
 import "../../sidepanel-lazy.css";
 import { Button } from "@/ui/components/ui/button";
-import { ArrowLeftIcon, ChevronRightIcon } from "../../components/Icons";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/ui/components/ui/select";
+import { ArrowLeftIcon } from "../../components/Icons";
 import { getAiProviderPreset } from "../../../lib/settings";
 import {
   requestPageSnapshotPermission,
@@ -26,7 +27,14 @@ import type {
 } from "../../../lib/types";
 import type { CloudStorageUsage } from "../../../lib/cloud-settings";
 
+const SETTINGS_GROUPS = [
+  ["ai", "AI 服务"], ["appearance", "外观与快捷栏"], ["account", "账号与同步"],
+  ["enhance", "书签增强"], ["activity", "最近动作"], ["data", "数据与帮助"],
+] as const;
+type SettingsGroup = typeof SETTINGS_GROUPS[number][0];
+
 interface SettingsPageProps {
+  layout?: "manager" | "compact";
   onAiConfiguredChange?: (configured: boolean) => void;
   appState: AppState | null;
   publicFaviconFallback: boolean;
@@ -37,6 +45,7 @@ interface SettingsPageProps {
 }
 
 function SettingsPage({
+  layout = "compact",
   onAiConfiguredChange,
   appState,
   publicFaviconFallback,
@@ -70,9 +79,9 @@ function SettingsPage({
     tone: "error" | "success";
     message: string;
   } | null>(null);
-  // Everything that is read once and then never touched again lives on a
-  // second page, so the first screen stays at three decisions.
-  const [settingsPage, setSettingsPage] = useState<"main" | "more">("main");
+  const [group, setGroup] = useState<SettingsGroup>("ai");
+  const contentRef = useRef<HTMLElement | null>(null);
+  useEffect(() => { if (contentRef.current) contentRef.current.scrollTop = 0; }, [group]);
   const backButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
@@ -304,124 +313,75 @@ function SettingsPage({
   }
 
   return (
-    <main className="native-panel native-settings-panel">
-      <header className="settings-page-header" data-subpage={settingsPage === "more"}>
-        <Button
-          ref={backButtonRef}
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className="icon-button settings-back-button"
-          aria-label={settingsPage === "more" ? "返回设置" : "返回我的书签"}
-          title="返回"
-          onClick={() => {
-            if (settingsPage === "more") {
-              setSettingsPage("main");
-              return;
-            }
-            onClose();
-          }}
-        >
+    <main className="native-panel native-settings-panel" data-layout={layout}>
+      <header className="settings-page-header">
+        <Button ref={backButtonRef} type="button" variant="ghost" size="icon-sm"
+          className="icon-button settings-back-button" aria-label="返回收藏" onClick={onClose}>
           <ArrowLeftIcon />
         </Button>
-        <div>
-          <h1>{settingsPage === "more" ? "最近动作" : "设置"}</h1>
-        </div>
+        <h1>设置</h1>
       </header>
-
-      <ScrollSurface as="section" className="settings-page-content">
-        {settingsPage === "main" ? (
-          <>
-
-            <AiServiceSection
-              settings={settings}
-              provider={provider}
-              model={model}
-              apiKey={apiKey}
-              action={action}
-              feedback={providerFeedback}
+      <div className="settings-workspace">
+        <nav className="settings-group-navigation" aria-label="设置分组">
+          {SETTINGS_GROUPS.map(([id, label]) => (
+            <Button key={id} variant="ghost" size="sm" aria-current={group === id ? "page" : undefined}
+              onClick={() => setGroup(id)}>{label}</Button>
+          ))}
+        </nav>
+        <div className="settings-group-picker">
+          <Select value={group} onValueChange={(id) => setGroup(id as SettingsGroup)}>
+            <SelectTrigger aria-label="设置分组" />
+            <SelectContent>{SETTINGS_GROUPS.map(([id, label], index) => (
+              <SelectItem key={id} value={id} index={index}>{label}</SelectItem>
+            ))}</SelectContent>
+          </Select>
+        </div>
+        <ScrollSurface as="section" className="settings-page-content" ref={contentRef}>
+          <div hidden={group !== "ai"} className="settings-group-panel" aria-label="AI 服务">
+            <AiServiceSection settings={settings} provider={provider} model={model} apiKey={apiKey}
+              action={action} feedback={providerFeedback}
               onProviderChange={(nextProvider, nextModel) => {
-                setProvider(nextProvider);
-                setModel(nextModel);
-                setApiKey("");
-                setProviderFeedback(null);
-              }}
-              onApiKeyChange={setApiKey}
-              onSubmit={() => void saveApiSettings()}
-            />
-
-            <DisplaySettingsSection
-              publicFaviconFallback={publicFaviconFallback}
-              disabled={Boolean(action)}
-              onPublicFaviconFallbackChange={(enabled) =>
-                void handlePublicFaviconFallback(enabled)
-              }
-            />
-
+                setProvider(nextProvider); setModel(nextModel); setApiKey(""); setProviderFeedback(null);
+              }} onApiKeyChange={setApiKey} onSubmit={() => void saveApiSettings()} />
+          </div>
+          <div hidden={group !== "appearance"} className="settings-group-panel" aria-label="外观与快捷栏">
+            <DisplaySettingsSection publicFaviconFallback={publicFaviconFallback} disabled={Boolean(action)}
+              onPublicFaviconFallbackChange={(enabled) => void handlePublicFaviconFallback(enabled)} />
             <FloatingSettingsSection />
-
-            <AccountCloudSection
-              appState={appState}
-              action={action}
-              status={syncStatus}
-              usage={cloudUsage}
-              feedback={cloudFeedback}
-              onLogin={() => void handleLogin()}
-              onSignOut={() => void handleSignOut()}
-              onSync={() => void handleSyncNow()}
-            />
-
-            <LibraryScanSection
-              appState={appState}
-              settings={settings}
-              action={action}
-              feedback={scanFeedback}
-              onAction={(intent) => void handleLibraryScan(intent)}
-            />
-
-            <section className="settings-section settings-more-entry" aria-label="更多设置">
-              <Button
-                type="button"
-                variant="ghost"
-                size="unstyled"
-                className="settings-more-button"
-                onClick={() => {
-                  setSettingsPage("more");
-                }}
-              >
-                <span>
-                  <strong>最近动作</strong>
-                </span>
-                <ChevronRightIcon />
-              </Button>
+          </div>
+          <div hidden={group !== "account"} className="settings-group-panel" aria-label="账号与同步">
+            <AccountCloudSection appState={appState} action={action} status={syncStatus} usage={cloudUsage}
+              feedback={cloudFeedback} onLogin={() => void handleLogin()}
+              onSignOut={() => void handleSignOut()} onSync={() => void handleSyncNow()} />
+          </div>
+          <div hidden={group !== "enhance"} className="settings-group-panel" aria-label="书签增强">
+            <LibraryScanSection appState={appState} settings={settings} action={action}
+              feedback={scanFeedback} onAction={(intent) => void handleLibraryScan(intent)} />
+          </div>
+          <div hidden={group !== "activity"} className="settings-group-panel" aria-label="最近动作">
+            <h2 className="settings-group-title">最近动作</h2>
+            <SettingsMoreContent action={action} undoBatches={undoBatches}
+              onUndo={(batchId) => void handleUndoBatch(batchId)} />
+          </div>
+          <div hidden={group !== "data"} className="settings-group-panel" aria-label="数据与帮助">
+            <h2 className="settings-group-title">数据与帮助</h2>
+            <section className="settings-section settings-data-links">
               <div className="settings-link-row">
-                <strong>首次使用引导</strong>
-                <Button variant="tertiary" size="sm" type="button" onClick={onRestartOnboarding}>
-                  重新查看
-                </Button>
-              </div>
-              <div className="settings-link-row">
-                <strong>本地备份与恢复</strong>
+                <div><strong>本地备份与恢复</strong><small>导出收藏副本，或从备份恢复。</small></div>
                 <Button variant="tertiary" size="sm" asChild><a href={chrome.runtime.getURL("manager.html?archive=1")} target="_blank" rel="noreferrer">打开</a></Button>
               </div>
               <div className="settings-link-row">
-                <strong>隐私与数据</strong>
-                <Button variant="tertiary" size="sm" asChild>
-                  <a href={chrome.runtime.getURL("privacy.html")} target="_blank" rel="noreferrer">
-                    查看
-                  </a>
-                </Button>
+                <div><strong>隐私与数据</strong><small>了解收藏、AI 与同步的数据使用方式。</small></div>
+                <Button variant="tertiary" size="sm" asChild><a href={chrome.runtime.getURL("privacy.html")} target="_blank" rel="noreferrer">查看</a></Button>
+              </div>
+              <div className="settings-link-row">
+                <div><strong>首次使用引导</strong><small>重新了解 Aarre 的使用方式。</small></div>
+                <Button variant="tertiary" size="sm" type="button" onClick={onRestartOnboarding}>重新查看</Button>
               </div>
             </section>
-          </>
-        ) : (
-          <SettingsMoreContent
-            action={action}
-            undoBatches={undoBatches}
-            onUndo={(batchId) => void handleUndoBatch(batchId)}
-          />
-        )}
-      </ScrollSurface>
+          </div>
+        </ScrollSurface>
+      </div>
 
       <LibraryScanConfirmDialog
         estimate={scanEstimate}

@@ -6,9 +6,8 @@ export function normalizeFloatingSettings(raw: unknown): FloatingSettings {
   const p = value.position;
   return { enabled: value.enabled !== false,
     hiddenHosts: Array.isArray(value.hiddenHosts) ? [...new Set(value.hiddenHosts.filter((host) => typeof host === "string" && /^[a-z0-9.:-]+$/i.test(host)))].slice(0, 500) : [],
-    position: { edge: p?.edge === "left" ? "left" : "right", ratio: Number.isFinite(p?.ratio) ? Math.max(0, Math.min(1, p!.ratio)) : defaultFloatingPosition.ratio,
-      width: Number.isFinite(p?.width) ? Math.max(320, Math.min(560, p!.width)) : 400,
-      height: Number.isFinite(p?.height) ? Math.max(360, Math.min(800, p!.height)) : 600 } };
+    // Old ball coordinates and manual height no longer affect the dock.
+    position: { width: Number.isFinite(p?.width) ? Math.max(320, Math.min(640, p!.width)) : defaultFloatingPosition.width } };
 }
 export async function getFloatingSettings(): Promise<FloatingSettings> {
   return normalizeFloatingSettings((await chrome.storage.local.get(FLOATING_SETTINGS_KEY))[FLOATING_SETTINGS_KEY]);

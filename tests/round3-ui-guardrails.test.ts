@@ -45,7 +45,7 @@ describe("Round 3 UI root-cause guardrails", () => {
     expect(markdown).not.toContain('<div className="agent-inline-source"');
   });
 
-  it("gives Markdown prose enough leading for bookmark chips without shrinking them", async () => {
+  it("lets complete bookmark citations wrap with readable leading", async () => {
     const [css, tokens] = await Promise.all([
       readFile(agentCssUrl, "utf8"),
       readFile(tokensUrl, "utf8"),
@@ -59,7 +59,9 @@ describe("Round 3 UI root-cause guardrails", () => {
     expect(source).toContain(
       "padding: var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-1)",
     );
-    expect(source).toContain("line-height: var(--sp-4)");
+    expect(source).toContain("line-height: 1.55");
+    expect(source).toContain("max-width: 100%");
+    expect(rule(css, ".agent-inline-source > span:last-child")).not.toContain("white-space: nowrap");
     expect(source).toContain("vertical-align: middle");
     expect(source).not.toContain("vertical-align: baseline");
     expect(thumbnail).toContain("width: var(--sp-4)");

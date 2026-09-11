@@ -1,9 +1,10 @@
-import { lazy, Suspense, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { Archive, Settings, X } from "lucide-react";
 import { Button } from "@/ui/components/ui/button";
 import { AppModal } from "@/ui/components/ui/modal";
 import { ArchiveControls } from "../../components/ArchiveControls";
 import type { AppState } from "../../../lib/types";
+import { getDisplaySettings } from "../../../lib/display-settings";
 import { restartOnboarding } from "../../../lib/onboarding";
 const SettingsPage = lazy(() => import("../../sidepanel/pages/SettingsPage"));
 export type ManagerUtility = "archive" | "settings";
@@ -22,9 +23,15 @@ export function ManagerUtilities({ opened, onClose, appState, onStateChange, onR
   onStateChange: (state: AppState) => void; onRestored: () => void;
 }) {
   const [busy,setBusy] = useState(false), [publicIcons,setPublicIcons] = useState(true);
+  useEffect(() => {
+    if (opened !== "settings") return;
+    let active = true;
+    void getDisplaySettings().then((settings) => { if (active) setPublicIcons(settings.publicFaviconFallback); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [opened]);
   if (!opened) return null;
-  return <AppModal labelledBy="manager-utility-title" className="manager-utility-dialog" busy={busy} onClose={onClose}>
+  return <AppModal labelledBy="manager-utility-title" className={`manager-utility-dialog${opened === "settings" ? " manager-settings-dialog" : ""}`} busy={busy} onClose={onClose}>
     <header className="manager-utility-header"><h2 id="manager-utility-title">{opened === "archive" ? "本地备份与恢复" : "设置"}</h2><Button variant="ghost" size="icon" aria-label="关闭" disabled={busy} onClick={onClose}><X size={18}/></Button></header>
-    {opened === "archive" ? <ArchiveControls onBusyChange={setBusy} onRestored={onRestored}/> : <Suspense fallback={<p role="status">正在打开设置…</p>}><SettingsPage appState={appState} onAppStateChange={onStateChange} onClose={onClose} publicFaviconFallback={publicIcons} onPublicFaviconFallbackChange={setPublicIcons} onRestartOnboarding={() => { void restartOnboarding().then(() => { localStorage.removeItem("aarre:onboarding-done"); return chrome.tabs.create({url:chrome.runtime.getURL("sidepanel.html?onboarding=1")}); }); }}/></Suspense>}
+    {opened === "archive" ? <ArchiveControls onBusyChange={setBusy} onRestored={onRestored}/> : <Suspense fallback={<p role="status">正在打开设置…</p>}><SettingsPage layout="manager" appState={appState} onAppStateChange={onStateChange} onClose={onClose} publicFaviconFallback={publicIcons} onPublicFaviconFallbackChange={setPublicIcons} onRestartOnboarding={() => { void restartOnboarding().then(() => { localStorage.removeItem("aarre:onboarding-done"); return chrome.tabs.create({url:chrome.runtime.getURL("sidepanel.html?onboarding=1")}); }); }}/></Suspense>}
   </AppModal>;
 }

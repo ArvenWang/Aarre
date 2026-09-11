@@ -5,9 +5,7 @@ import { sendExtensionRequest } from "../../../lib/messages";
 import type {
   AppState,
   BookmarkBarSnapshot,
-  OrganizationNotice,
   ResourceRecord,
-  ResurfacingItem,
   SiteBrandRecord,
 } from "../../../lib/types";
 import {
@@ -35,8 +33,6 @@ export function useAppState(
   const [appState, setAppState] = useState<AppState | null>(null);
   const [resources, setResources] = useState<ResourceRecord[]>([]);
   const [siteBrands, setSiteBrands] = useState<SiteBrandRecord[]>([]);
-  const [contextResurfacing, setContextResurfacing] = useState<ResurfacingItem[]>([]);
-  const [organizationNotice, setOrganizationNotice] = useState<OrganizationNotice | null>(null);
   const [aiConfigured, setAiConfigured] = useState(false);
   const activeTabRefreshRevision = useRef(0);
 
@@ -56,12 +52,10 @@ export function useAppState(
     void sendExtensionRequest({ type: "GET_LOCAL_RESOURCES" })
       .then(setResources)
       .catch((caught) => setError(caught instanceof Error ? caught.message : "本地索引读取失败"));
-    const [nextState, nextSiteBrands, nextAiSettings, nextResurfacing, nextNotice] = await Promise.all([
+    const [nextState, nextSiteBrands, nextAiSettings] = await Promise.all([
       sendExtensionRequest({ type: "GET_APP_STATE" }),
       sendExtensionRequest({ type: "GET_SITE_BRANDS" }),
       sendExtensionRequest({ type: "GET_AI_SETTINGS" }),
-      sendExtensionRequest({ type: "GET_CONTEXT_RESURFACING" }).catch(() => []),
-      sendExtensionRequest({ type: "GET_ORGANIZATION_NOTICE" }).catch(() => null),
     ]);
     setAppState((current) =>
       current && activeTabRefreshRevision.current !== activeTabRevisionAtStart
@@ -70,13 +64,7 @@ export function useAppState(
     );
     setSiteBrands(nextSiteBrands);
     setAiConfigured(nextAiSettings.apiKeyConfigured);
-    setContextResurfacing(nextResurfacing);
-    setOrganizationNotice(nextNotice);
   }, [setError]);
-
-  const loadOrganizationNotice = useCallback(async () => {
-    setOrganizationNotice(await sendExtensionRequest({ type: "GET_ORGANIZATION_NOTICE" }));
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -168,24 +156,17 @@ export function useAppState(
         })
         .catch(() => undefined);
     };
-    const handleOrganizationUpdate = (message: { type?: string }) => {
-      if (message.type === "ORGANIZATION_INSIGHTS_UPDATED") {
-        void loadOrganizationNotice().catch(() => undefined);
-      }
-    };
     eventSource?.addListener(handleScanUpdate);
     eventSource?.addListener(handleSiteBrandsUpdate);
-    eventSource?.addListener(handleOrganizationUpdate);
     return () => {
       eventSource?.removeListener(handleScanUpdate);
       eventSource?.removeListener(handleSiteBrandsUpdate);
-      eventSource?.removeListener(handleOrganizationUpdate);
     };
-  }, [loadOrganizationNotice]);
+  }, []);
 
   return {
-    snapshot, appState, setAppState, resources, siteBrands, contextResurfacing,
-    organizationNotice, setOrganizationNotice, aiConfigured, setAiConfigured,
+    snapshot, appState, setAppState, resources, siteBrands,
+    aiConfigured, setAiConfigured,
     refresh,
   };
 }

@@ -108,7 +108,7 @@ export function createMessageHandlers(
     OPEN_MANAGER: async (request, sender) => {
       const params = new URLSearchParams();
       if (request.query) params.set("q", request.query);
-      if (request.view) params.set("view", request.view);
+      if (request.view === "topics") params.set("view", request.view);
       const suffix = params.size ? `?${params.toString()}` : "";
       return actions.openManagerPage(
         `manager.html${suffix}`,

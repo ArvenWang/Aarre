@@ -1,7 +1,7 @@
 import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { ScrollArea } from "@/ui/components/ui/scroll-area";
+import { responsiveMarkdownTables } from "./markdown-tables";
 import { SiteThumbnail } from "../../components/SiteThumbnail";
 import { currentSiteBrandImageUrl } from "../../../lib/thumbnail";
 import { resourceForUrl, siteBrandForUrl, bookmarkSourceForUrl } from "../bookmark-link";
@@ -21,10 +21,11 @@ export function AgentMarkdown({
   return (
     <div className="agent-markdown">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, responsiveMarkdownTables]}
         components={{
-          pre: ({children}) => <ScrollArea frameClassName="markdown-scroll-frame" label="代码"><pre>{children}</pre></ScrollArea>,
-          table: ({children}) => <ScrollArea frameClassName="markdown-scroll-frame" label="表格"><table>{children}</table></ScrollArea>,
+          pre: ({children}) => <pre>{children}</pre>,
+          table: ({node: _node, ...props}) => <table {...props} />,
+          td: ({node: _node, children, ...props}) => <td {...props}><div className="markdown-cell-content">{children}</div></td>,
           a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
             const resource = href ? resourceForUrl(resourceByUrl, href) : undefined;
             const source = href ? bookmarkSourceForUrl(sources, href) : undefined;

@@ -28,7 +28,6 @@ const OnboardingPage = lazy(() => import("./pages/OnboardingPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 
 export function SidePanelApp({ surface = "sidebar" }: { surface?: "sidebar" | "floating" } = {}) {
-  const [organizationNoticeBusy, setOrganizationNoticeBusy] = useState(false);
   const [listCoverStyle, setListCoverStyle] = useState<ListCoverStyle>("site");
   const [publicFaviconFallback, setPublicFaviconFallback] = useState(true);
   const [pageSnapshotsEnabled, setPageSnapshotsEnabled] = useState(true);
@@ -75,9 +74,6 @@ export function SidePanelApp({ surface = "sidebar" }: { surface?: "sidebar" | "f
     setAppState,
     resources,
     siteBrands,
-    contextResurfacing,
-    organizationNotice,
-    setOrganizationNotice,
     aiConfigured,
     setAiConfigured,
     refresh,
@@ -364,23 +360,6 @@ export function SidePanelApp({ surface = "sidebar" }: { surface?: "sidebar" | "f
         onOpenHistory: () => { void loadConversations(); setPanelView("history"); },
         onOpenManager: () => void sendExtensionRequest({ type: "OPEN_MANAGER" }),
         onOpenSettings: () => setPanelView("settings"),
-      }}
-      notices={{
-        query: libraryQuery,
-        organizationNotice,
-        organizationNoticeBusy,
-        resurfacing: contextResurfacing,
-        onDismissOrganization: () => {
-          setOrganizationNoticeBusy(true);
-          void sendExtensionRequest({ type: "DISMISS_ORGANIZATION_NOTICE" })
-            .then(() => setOrganizationNotice(null))
-            .catch((caught) => setError(caught instanceof Error ? caught.message : "暂时无法隐藏整理提示"))
-            .finally(() => setOrganizationNoticeBusy(false));
-        },
-        onOpenOrganization: () => void sendExtensionRequest({ type: "OPEN_MANAGER", view: "organize" })
-          .catch((caught) => setError(caught instanceof Error ? caught.message : "无法打开整理提案")),
-        onOpenResurfacing: () => void sendExtensionRequest({ type: "OPEN_MANAGER", view: "resurface" }),
-        onOpenItem: (item) => void openNavigation({ text: item.url, url: item.url }),
       }}
       search={{
         value: libraryQuery,
