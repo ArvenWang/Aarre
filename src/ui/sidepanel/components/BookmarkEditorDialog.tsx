@@ -7,9 +7,15 @@ import { visibleFolderPath } from "../../../lib/folder-options";
 import { BookmarkEditorFields } from "../../components/BookmarkEditorFields";
 import { CloudConflictNotice } from "../../components/CloudConflictNotice";
 import { FluidInput, FluidTextarea } from "@/ui/components/ui/input";
-import { ArrowLeftIcon, CloseIcon, TrashIcon } from "../../components/Icons";
+import { ArrowLeftIcon, ChevronDownIcon, CloseIcon, TrashIcon } from "../../components/Icons";
 import { ProtectionControl } from "../../components/ProtectionControl";
 import { FolderSelect } from "./FolderSelect";
+import { SaveFormBody } from "../../floating/SaveFormBody";
+
+function sourceLabel(url: string) {
+  try { const source = new URL(url); return source.host || source.protocol.replace(":", ""); }
+  catch { return url; }
+}
 
 interface BookmarkEditorDialogProps {
   presentation?: "dialog" | "page";
@@ -64,13 +70,14 @@ export function BookmarkEditorDialog({
           </Button>}
         </div>
 
-        {presentation === "page" && error && <p className="save-page-error" role="alert">{error}</p>}
         <ScrollSurface as="div" className="native-dialog-scroll">
+        <SaveFormBody compact={presentation === "page"} loading={busy === "capture"}>
+        {presentation === "page" && error && <p className="save-page-error" role="alert" ref={node => node?.scrollIntoView?.({ block: "nearest" })}>{error}</p>}
         {editor.kind === "save" && busy === "capture" ? (
           <div className="empty-state dialog-loading">正在读取当前页面…</div>
         ) : (
           <>
-            {editor.kind === "save" && presentation === "page" && capture?.url && <div className="save-source"><span>当前网页</span><a href={capture.url} target="_blank" rel="noreferrer noopener">{capture.url}</a></div>}
+            {editor.kind === "save" && presentation === "page" && capture?.url && <details className="save-source"><summary><span>当前网页</span><span>{sourceLabel(capture.url)}</span><ChevronDownIcon /></summary><a href={capture.url} target="_blank" rel="noreferrer noopener">{capture.url}</a></details>}
             {editor.kind === "bookmark" && editor.node.url ? null : (
               <label className="native-field">
                 <span>名称</span>
@@ -190,17 +197,18 @@ export function BookmarkEditorDialog({
                   )}
                   {folderSuggestions.length && !selectedSaveMatch?.unmodifiable ? (
                     <div className="folder-suggestions" aria-label="推荐文件夹">
-                      <small>本地推荐</small>
+                      <small>{presentation === "page" ? "推荐" : "本地推荐"}</small>
                       {folderSuggestions.map((suggestion) => (
                         <Button
                           type="button"
                           variant="ghost"
                           key={suggestion.folderId}
                           data-selected={folderId === suggestion.folderId}
+                          aria-pressed={folderId === suggestion.folderId}
                           onClick={() => setFolderId(suggestion.folderId)}
-                          title={suggestion.reason}
+                          title={`${visibleFolderPath(suggestion.path).join(" / ")} · ${suggestion.reason}`}
                         >
-                          {visibleFolderPath(suggestion.path).join(" / ")}<span>{suggestion.reason}</span>
+                          {presentation === "page" ? visibleFolderPath(suggestion.path).at(-1) : <>{visibleFolderPath(suggestion.path).join(" / ")}<span>{suggestion.reason}</span></>}
                         </Button>
                       ))}
                     </div>
@@ -208,7 +216,7 @@ export function BookmarkEditorDialog({
                 </div>
                 <label className="native-field">
                   <span>备注</span>
-                  <FluidTextarea value={note} onChange={(event) => setNote(event.target.value)} rows={3} maxLength={2_000} placeholder="可选。记录你保存它的原因。" />
+                  <FluidTextarea value={note} onChange={(event) => setNote(event.target.value)} rows={presentation === "page" ? 2 : 3} maxLength={2_000} placeholder="可选。记录你保存它的原因。" />
                 </label>
                 {captureWarning ? <p className="dialog-warning">{captureWarning}</p> : null}
               </>
@@ -216,6 +224,7 @@ export function BookmarkEditorDialog({
 
           </>
         )}
+        </SaveFormBody>
         </ScrollSurface>
         {!(editor.kind === "save" && busy === "capture") && (
             <div className="native-dialog-actions">

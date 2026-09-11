@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { floatingRects, defaultFloatingPosition, floatingWidth } from "../src/lib/floating-geometry";
+import { floatingRects, floatingSaveRect, defaultFloatingPosition, floatingWidth } from "../src/lib/floating-geometry";
 import { handleFloatingHost, authorizeUiMessage, validateFloatingSender, proveFloatingFrame } from "../src/extension/floating/session";
 import { normalizeFloatingSettings } from "../src/lib/floating-settings";
 import { withFloatingHidden } from "../src/extension/floating/lifecycle";
@@ -27,6 +27,15 @@ beforeEach(() => {
 });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 describe("floating geometry", () => {
+  it("sizes the save task to content independently of the workspace and centers it on the launcher", () => {
+    expect(floatingSaveRect({width:1280,height:900},420)).toEqual({x:920,y:240,width:360,height:420});
+    expect(floatingRects({width:600},{width:1280,height:900}).menu).toEqual({x:680,y:12,width:600,height:876});
+  });
+  it("clamps a long save form in a short or zoomed viewport", () => {
+    expect(floatingSaveRect({width:280,height:360,left:30,top:20},1200)).toEqual({x:30,y:32,width:280,height:336});
+    expect(floatingSaveRect({width:1440,height:1200},2000).height).toBe(640);
+    expect(floatingSaveRect({width:320,height:640},Number.NaN).height).toBe(448);
+  });
   for (const [width, height] of [[280,360],[320,640],[420,800],[1280,720],[1440,900]]) {
     it(`${width}×${height} attaches both states to the right edge without leaving the viewport`, () => {
       for (const requestedWidth of [320,400,640]) {

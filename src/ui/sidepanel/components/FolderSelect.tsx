@@ -1,4 +1,5 @@
 import { ScrollSurface } from "@/ui/components/ui/scroll-area";
+import { Popover } from "@heroui/react/popover";
 import React, { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/ui/components/ui/button";
 import { FluidInput } from "@/ui/components/ui/input";
@@ -19,7 +20,6 @@ function FolderSelect({
   disabled = false,
 }: FolderSelectProps) {
   const listboxId = useId();
-  const rootRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [liveOptions, setLiveOptions] = useState(options);
@@ -42,21 +42,6 @@ function FolderSelect({
   useEffect(() => {
     setActiveIndex(selectedIndex);
   }, [selectedIndex]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleOutsidePointer = (event: PointerEvent) => {
-      if (
-        event.target instanceof Node &&
-        !rootRef.current?.contains(event.target)
-      ) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("pointerdown", handleOutsidePointer);
-    return () =>
-      document.removeEventListener("pointerdown", handleOutsidePointer);
-  }, [open]);
 
   function focusOption(index: number) {
     const next = Math.max(0, Math.min(index, liveOptions.length - 1));
@@ -154,10 +139,9 @@ function FolderSelect({
 
   return (
     <div
-      ref={rootRef}
       className="folder-select"
       data-open={open}
-      onKeyDown={handleKeyDown}
+      onKeyDown={open ? undefined : handleKeyDown}
     >
       <Button
         variant="ghost"
@@ -175,10 +159,13 @@ function FolderSelect({
         </span>
         <ChevronDownIcon />
       </Button>
-      {open ? (
+      <Popover.Content triggerRef={triggerRef} isOpen={open} onOpenChange={setOpen} placement="bottom start" offset={6}
+        className="aarre-folder-popover" style={{ width: triggerRef.current?.offsetWidth }}>
+        <Popover.Dialog aria-label="选择文件夹" className="folder-popover-dialog">
         <ScrollSurface as="div"
+          onKeyDown={handleKeyDown}
           id={listboxId}
-          className="folder-select-popover"
+          className="folder-select-popover folder-select-viewport"
           role="listbox"
           aria-label="文件夹"
         >
@@ -244,7 +231,8 @@ function FolderSelect({
             )}
           </div>
         </ScrollSurface>
-      ) : null}
+        </Popover.Dialog>
+      </Popover.Content>
     </div>
   );
 }

@@ -172,6 +172,20 @@ it("opens a cold star request as a full save form, keeps repeated intent drafts,
   expect(requests.some(request => request.type === 'SAVE_BOOKMARK')).toBe(false);
 });
 
+it("dismisses the portaled folder picker with Escape while retaining the save form and its draft", async () => {
+  await mount();
+  await act(async () => requestFloatingSave("folder-picker-escape"));
+  await waitFor(() => Boolean(document.querySelector('.floating-save-page textarea')));
+  await editField('.floating-save-page textarea', '选文件夹时保留这条备注');
+  await click('.folder-select-trigger');
+  await waitFor(() => Boolean(document.querySelector('.aarre-folder-popover')));
+  const option=document.querySelector<HTMLElement>('.folder-select-option[data-active="true"]')!;
+  await act(async () => { option.focus(); option.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true})); });
+  await waitFor(() => !document.querySelector('.aarre-folder-popover'));
+  expect(document.querySelector<HTMLTextAreaElement>('.floating-save-page textarea')?.value).toBe('选文件夹时保留这条备注');
+  expect(requests.some(request => request.type === 'SAVE_BOOKMARK')).toBe(false);
+});
+
 it("reads an existing bookmark's fresh note and folder before showing a cold save form", async () => {
   const runtime = chrome.runtime as unknown as { sendMessage: (request: Record<string, unknown>) => Promise<unknown> };
   const original = runtime.sendMessage;

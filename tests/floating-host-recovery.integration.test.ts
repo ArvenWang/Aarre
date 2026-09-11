@@ -161,3 +161,31 @@ it("coalesces pending clicks, validates the acknowledgement, and issues a fresh 
   expect(latestView(frame).saveRequestId).toEqual(expect.any(String));
   expect(latestView(frame).saveRequestId).not.toBe(requestId);
 });
+
+it("opens the star at a compact size before readiness and restores the preferred workspace width after returning", async () => {
+  await clickSave(); const frame = currentFrame(); const panel = shadow.querySelector<HTMLElement>(".panel")!;
+  expect(panel.style.width).toBe("360px"); expect(panel.style.height).toBe("448px");
+  expect(shadow.querySelector<HTMLElement>(".resize")!.hidden).toBe(true);
+  ready(frame);
+  hostMessage(frame,{type:"FLOAT_SAVE_ACCEPTED",requestId:latestView(frame).saveRequestId});
+  hostMessage(frame,{type:"FLOAT_SAVE_LAYOUT",height:412});
+  expect(panel.style.height).toBe("412px");
+  hostMessage(frame,{type:"FLOAT_WORKSPACE_LAYOUT"});
+  expect(panel.style.width).toBe("400px"); expect(panel.style.height).toBe(`${innerHeight-24}px`);
+  expect(shadow.querySelector<HTMLElement>(".resize")!.hidden).toBe(false);
+  expect(currentFrame()).toBe(frame);
+  expect(vi.mocked(chrome.runtime.sendMessage).mock.calls.some(([request])=>(request as any)?.type==="FLOAT_POSITION")).toBe(false);
+});
+
+it("rejects untrusted and malformed layout requests, bounds oversized content, and keeps the compact draft on reopen", async () => {
+  await clickSave(); const frame = currentFrame(); ready(frame);
+  const panel = shadow.querySelector<HTMLElement>(".panel")!;
+  for (const height of [Number.NaN,Infinity,-10,0,"400"]) hostMessage(frame,{type:"FLOAT_SAVE_LAYOUT",height});
+  hostMessage(frame,{type:"FLOAT_SAVE_LAYOUT",height:500,session:"forged"});
+  expect(panel.style.height).toBe("448px");
+  hostMessage(frame,{type:"FLOAT_SAVE_LAYOUT",height:2000});
+  expect(panel.style.height).toBe("640px");
+  await toggle(); await toggle();
+  expect(panel.style.width).toBe("360px"); expect(panel.style.height).toBe("640px");
+  expect(currentFrame()).toBe(frame);
+});

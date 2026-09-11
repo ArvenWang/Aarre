@@ -35,13 +35,30 @@ html, body, #root { height:100%; min-height:0; overflow:hidden; }
 .save-page-backdrop.aarre-modal-backdrop { display:flex; align-items:stretch; justify-content:stretch; padding:0; background:var(--surface); }
 .save-page-backdrop .aarre-modal-container { flex:1; min-width:0; max-width:none; width:100%; height:100%; padding:0; align-items:stretch; justify-content:stretch; }
 .save-page-backdrop .aarre-modal-container > .floating-save-page { width:100%; max-width:none; height:100dvh; max-height:100dvh; margin:0; padding:0; gap:0; min-width:0; min-height:0; border:0; border-radius:0; box-shadow:none; animation:none; }
-.floating-save-page .native-dialog-heading { flex:none; margin:0; padding:12px 16px; min-height:56px; border-bottom:1px solid var(--line); }
+/* Stronger than shared modal rules regardless of production CSS chunk order. */
+.floating-save-page.native-dialog > .native-dialog-heading { flex:none; margin:0; padding:8px 12px; min-height:48px; border-bottom:1px solid var(--line); }
 .native-dialog-title-line { display:flex; align-items:center; min-width:0; gap:8px; }
-.floating-save-page .native-dialog-scroll { flex:1; min-height:0; padding:20px 20px 16px; }
-.floating-save-page .native-dialog-actions { flex:none; margin:0; padding:12px 20px 16px; border-top:1px solid var(--line); }
-.save-source { display:grid; gap:4px; margin-bottom:20px; min-width:0; font-size:var(--fs-small); }
-.save-source > span { color:var(--ink-muted); font-size:var(--fs-caption); }
-.save-source a { color:var(--ink-muted); overflow-wrap:anywhere; text-decoration:none; }
+.floating-save-page .native-dialog-scroll { flex:1; min-height:0; padding:12px 16px 16px; }
+.floating-save-page.native-dialog > .native-dialog-actions { flex:none; margin:0; padding:12px 16px; border-top:1px solid var(--line); }
+.save-form-content { display:grid; gap:12px; min-width:0; }
+.floating-save-page .native-field { margin:0; gap:8px; }
+.floating-save-page .native-field input, .floating-save-page .folder-select-trigger { min-height:var(--control-h-md); height:var(--control-h-md); }
+.floating-save-page .native-field textarea { min-height:64px; max-height:160px; resize:vertical; }
+.floating-save-page .save-state-note, .floating-save-page .save-match-picker, .floating-save-page .dialog-warning { margin:0; }
+.floating-save-page .folder-suggestions { display:flex; align-items:center; flex-wrap:wrap; gap:4px; margin:0; }
+.floating-save-page .folder-suggestions > small { flex:none; margin-right:4px; }
+.floating-save-page .folder-suggestions button { min-height:28px; height:auto; max-width:100%; padding:4px 8px; border:0; border-radius:var(--radius-control); background:var(--surface-sunken); line-height:1.5; overflow-wrap:anywhere; white-space:normal; }
+.floating-save-page .folder-suggestions button[data-selected="true"] { color:var(--accent); background:color-mix(in srgb,var(--accent) 10%,var(--surface)); }
+.floating-save-page .folder-suggestions button span { color:inherit; }
+.save-source { min-width:0; font-size:var(--fs-caption); color:var(--ink-muted); }
+.save-source summary { display:flex; align-items:center; gap:8px; min-height:24px; cursor:pointer; list-style:none; border-radius:var(--radius-control); }
+.save-source summary::-webkit-details-marker { display:none; }
+.save-source summary > span:first-child { flex:none; }
+.save-source summary > span:nth-child(2) { flex:1; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; color:var(--ink); }
+.save-source summary svg { flex:none; width:14px; height:14px; margin-right:4px; }
+.save-source[open] summary svg { transform:rotate(180deg); }
+.save-source summary:focus-visible { outline:1px solid var(--focus-ring); outline-offset:2px; }
+.save-source a { display:block; margin-top:8px; color:var(--ink-muted); overflow-wrap:anywhere; text-decoration:none; }
 .save-source a:hover { color:var(--ink); text-decoration:underline; text-underline-offset:3px; }
 
-.floating-save-page .save-page-error { flex:none; margin:0; padding:12px 20px; color:var(--negative); font-size:var(--fs-small); overflow-wrap:anywhere; }
+.floating-save-page .save-page-error { margin:0; color:var(--negative); font-size:var(--fs-small); overflow-wrap:anywhere; }

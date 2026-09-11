@@ -1,4 +1,4 @@
-import { defaultFloatingPosition, floatingRects, floatingWidth, type FloatingPosition, type Viewport } from "../../lib/floating-geometry";
+import { defaultFloatingPosition, floatingRects, floatingSaveRect, floatingWidth, SAVE_PANEL_INITIAL_HEIGHT, type FloatingPosition, type Viewport } from "../../lib/floating-geometry";
 import { hostStyles } from "./host-styles";
 
 interface HostInfo { tabId: number; documentId: string; nonce: string; enabled: boolean; position: FloatingPosition; theme?: string }
@@ -32,6 +32,7 @@ function startHost() {
   let position = { ...defaultFloatingPosition }, opened = false, opening = false, forced = false, disposed = false, ready = false, needsRetry = false;
   let view = "library", generation = 0;
   let pendingSaveRequest: string | null = null;
+  let saveHeight: number | null = null;
   let watchdog: ReturnType<typeof setTimeout> | undefined, loadTimeout: ReturnType<typeof setTimeout> | undefined, closeTimer: ReturnType<typeof setTimeout> | undefined, feedbackTimer: ReturnType<typeof setTimeout> | undefined;
   let surfaceAnimation: Animation | undefined, panelAnimation: Animation | undefined;
   const captureLeases = new Set<string>();
@@ -42,11 +43,13 @@ function startHost() {
   let surfaceRect: Rect | undefined;
   function layout(animate = false) {
     const rects = floatingRects(position, viewport());
-    const target = opened ? rects.menu : rects.bar;
+    const menu = saveHeight === null ? rects.menu : floatingSaveRect(viewport(), saveHeight);
+    const target = opened ? menu : rects.bar;
     const measured = surface.getBoundingClientRect();
     const from = measured.width ? measured : surfaceRect;
     surfaceAnimation?.cancel(); surfaceAnimation = undefined;
-    rectStyle(surface, target); rectStyle(bar, rects.bar); rectStyle(panel, rects.menu);
+    rectStyle(surface, target); rectStyle(bar, rects.bar); rectStyle(panel, menu);
+    resize.hidden = saveHeight !== null;
     feedback.style.right = `${rects.bar.width + 12}px`; feedback.style.top = `${rects.bar.y}px`;
     resize.setAttribute("aria-valuenow", String(Math.round(rects.menu.width)));
     resize.setAttribute("aria-valuemin", String(Math.min(320, viewport().width)));
@@ -135,12 +138,13 @@ function startHost() {
   }
   quickSave.addEventListener("click", () => {
     pendingSaveRequest ||= crypto.randomUUID();
+    saveHeight ??= SAVE_PANEL_INITIAL_HEIGHT;
     void open(view).catch(() => showQuickFeedback("连接已失效，请刷新此网页后重试。", true));
   });
   toggle.addEventListener("click", () => { if (opened || opening) close(true); else void open(view).catch(() => showQuickFeedback("连接已失效，请刷新此网页后重试。", true)); });
   let drag: { id: number; x: number; width: number } | null = null;
   resize.addEventListener("pointerdown", (event) => {
-    if (event.button !== 0) return; event.preventDefault();
+    if (event.button !== 0 || saveHeight !== null) return; event.preventDefault();
     drag = { id: event.pointerId, x: event.clientX, width: floatingRects(position, viewport()).menu.width }; resize.setPointerCapture(event.pointerId);
     host.dataset.resizing = "true";
   });
@@ -151,6 +155,7 @@ function startHost() {
   const endResize = () => { if (!drag) return; drag = null; host.dataset.resizing = "false"; persist(); };
   resize.addEventListener("pointerup", endResize); resize.addEventListener("pointercancel", endResize); resize.addEventListener("lostpointercapture", endResize);
   resize.addEventListener("keydown", (event) => {
+    if (saveHeight !== null) return;
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return; event.preventDefault();
     position = { width: event.key === "Home" ? 320 : event.key === "End" ? 640 : floatingWidth(position.width + (event.key === "ArrowLeft" ? 1 : -1) * (event.shiftKey ? 40 : 10)) }; layout(); persist();
   });
@@ -163,6 +168,12 @@ function startHost() {
       showView(); if (opened) iframe.focus();
     }
     if (event.data.type === "FLOAT_SAVE_ACCEPTED" && event.data.requestId === pendingSaveRequest) pendingSaveRequest = null;
+    if (event.data.type === "FLOAT_SAVE_LAYOUT" && typeof event.data.height === "number" && Number.isFinite(event.data.height) && event.data.height > 0) {
+      if (saveHeight !== event.data.height) { saveHeight = event.data.height; layout(); }
+    }
+    if (event.data.type === "FLOAT_WORKSPACE_LAYOUT" && !pendingSaveRequest && saveHeight !== null) {
+      saveHeight = null; layout(opened);
+    }
     if (event.data.type === "FLOAT_LOAD_ERROR") showLoadError(typeof event.data.message === "string" ? event.data.message : "请重新打开菜单。");
     if (event.data.type === "FLOAT_CURRENT_VIEW" && ["library", "chat", "settings", "history"].includes(event.data.view)) view = event.data.view;
     if (event.data.type === "FLOAT_CLOSE") close(true);
