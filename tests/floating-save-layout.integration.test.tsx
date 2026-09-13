@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SaveFormBody } from "../src/ui/floating/SaveFormBody";
 import { postToFloatingHost } from "../src/ui/floating/bridge";
-vi.mock("../src/ui/floating/bridge", () => ({ postToFloatingHost: vi.fn() }));
+vi.mock("../src/ui/floating/bridge", () => ({ postToFloatingHost: vi.fn(), getFloatingSaveLayoutRequest: () => "save-layout", FLOATING_SAVE_EVENT: "save-request" }));
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 let root: Root, callbacks: (() => void)[], contentHeight: number;
 beforeEach(() => {
@@ -26,15 +26,15 @@ async function render(compact = true, loading = false) {
   </div>));
 }
 it("measures untransformed content, reacts to disclosure growth, and sends no resize feedback for unchanged height", async () => {
-  await render(); expect(postToFloatingHost).toHaveBeenLastCalledWith({type:"FLOAT_SAVE_LAYOUT",height:436});
+  await render(); expect(postToFloatingHost).toHaveBeenLastCalledWith({type:"FLOAT_SAVE_LAYOUT",height:436,ready:true,requestId:"save-layout"});
   vi.mocked(postToFloatingHost).mockClear();
   await act(async () => callbacks.at(-1)!()); expect(postToFloatingHost).not.toHaveBeenCalled();
   contentHeight = 400;
-  await act(async () => callbacks.at(-1)!()); expect(postToFloatingHost).toHaveBeenLastCalledWith({type:"FLOAT_SAVE_LAYOUT",height:536});
+  await act(async () => callbacks.at(-1)!()); expect(postToFloatingHost).toHaveBeenLastCalledWith({type:"FLOAT_SAVE_LAYOUT",height:536,ready:true,requestId:"save-layout"});
   await render(false); expect(postToFloatingHost).toHaveBeenLastCalledWith({type:"FLOAT_WORKSPACE_LAYOUT"});
 });
 it("keeps a stable loading size and never requests a compact host for an ordinary editor", async () => {
   await render(false); expect(postToFloatingHost).not.toHaveBeenCalled();
-  await render(true,true); expect(postToFloatingHost).toHaveBeenLastCalledWith({type:"FLOAT_SAVE_LAYOUT",height:448});
-  await render(true,false); expect(postToFloatingHost).toHaveBeenLastCalledWith({type:"FLOAT_SAVE_LAYOUT",height:436});
+  await render(true,true); expect(postToFloatingHost).toHaveBeenLastCalledWith({type:"FLOAT_SAVE_LAYOUT",height:560,ready:false,requestId:"save-layout"});
+  await render(true,false); expect(postToFloatingHost).toHaveBeenLastCalledWith({type:"FLOAT_SAVE_LAYOUT",height:436,ready:true,requestId:"save-layout"});
 });

@@ -1,0 +1,81 @@
+{
+  "versions": {
+    "nexalign": "0.1.0 · 2a7bd4ac · 20260913T0536Z",
+    "aarre": "0.6.16"
+  },
+  "browser": "Chrome/152.0.7977.84",
+  "sharedFiles": [
+    {
+      "file": "src/shared/suite-dock/background.ts",
+      "sha256": "869e9e78adbfdc499cb3b3c304d3ef0d2908017fed9c5cd1b50ce302315c694b"
+    },
+    {
+      "file": "src/shared/suite-dock/client.ts",
+      "sha256": "1742615e8b1f410b8fae82405535cb2124546c82bfc64e1f825b9450eb15ee95"
+    },
+    {
+      "file": "src/shared/suite-dock/contract.ts",
+      "sha256": "747734f1e25b100feeaef259debe264fd3d4aefb822eac96bbf0004f70604f38"
+    },
+    {
+      "file": "src/shared/suite-dock/geometry.ts",
+      "sha256": "135f457bddc3300851fdef4e4c712c580b8d66551241e094f26eb340abf86025"
+    },
+    {
+      "file": "src/shared/suite-dock/morph.ts",
+      "sha256": "f1e5c8fdb500b47e05d8522a1b99d2ebefcfb1653259c29cfb0778ba60c34dc2"
+    },
+    {
+      "file": "src/shared/suite-dock/parking.ts",
+      "sha256": "20d11dd06998b10ee6714ff8f48551579c1eb0ac23d4a775f38c14f341e99523"
+    },
+    {
+      "file": "src/shared/suite-dock/ui.ts",
+      "sha256": "ea86ed3b741d949fc75d8cda7dd7fd32c9304df9b37f06f762fe4eb4b6849a24"
+    }
+  ],
+  "files": {
+    "Aarre": [
+      {
+        "file": "src/extension/floating/host.ts",
+        "sha256": "f7f790e36bd0339231d94ce128b254feaa37996b467e6caa54470729a929594b"
+      },
+      {
+        "file": "src/extension/floating/host-styles.ts",
+        "sha256": "9bed1f7a8ab1a24d20a74302b9ca82a0af5a353a238f44aa0dd0dc7384f0a39f"
+      },
+      {
+        "file": "src/lib/floating-geometry.ts",
+        "sha256": "dd54ff0c22c19534b223919e15a1d2b2273159eb5547bcc92511bd2177b7df85"
+      },
+      {
+        "file": "scripts/verify-floating-save-transition.mjs",
+        "sha256": "83b216c3b1e840309094c9abb3eadaac8943b3ebe7991f7cc7108047a4094ecb"
+      },
+      {
+        "file": "dist/manifest.json",
+        "sha256": "f997dfcb8ded49c66338868f8f3ec69f59473867f94da3f5ff73910215aacb97"
+      },
+      {
+        "file": "dist/floating-host.js",
+        "sha256": "d277bdcd0382b085bbbd2eded2ba5ea1c12946c279b0755060d650a569e38f6e"
+      }
+    ],
+    "LayerScope": [
+      {
+        "file": "src/content/source-canvas.ts",
+        "sha256": "8421bc79122a7443968776bb55d022c1467337b7072b8c38ba89dfa4d1a863cb"
+      },
+      {
+        "file": "scripts/verify-shared-dock.mjs",
+        "sha256": "2384d6a54e448ffc6f7f0e7325200b40391d4b97c92e32849fe9230275fc47ea"
+      },
+      {
+        "file": "dist/manifest.json",
+        "sha256": "6bace996e2fbca83f31e30f7fb8c32bd8865bf25da7f5422e20b7958ed8d4a9a"
+      }
+    ]
+  },
+  "videoSha256": "145e6aab0336480854ac98213fc831fe0f49ece4c5ce9de61ef7ce7cff397037",
+  "evidenceDirectory": "/Users/nefish/Desktop/Coding/Aarre/work/product-handle-20260913/final-visible"
+}

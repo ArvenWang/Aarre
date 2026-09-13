@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SidePanelApp } from "../src/ui/sidepanel/SidePanelApp";
 import { installSidePanelPreview } from "../src/ui/sidepanel/preview";
-import { requestFloatingSave, acceptFloatingSave, getFloatingSaveRequest, setFloatingContext } from "../src/ui/floating/bridge";
+import { requestFloatingSave, acceptFloatingSave, getFloatingSaveRequest, setFloatingContext, cancelFloatingClose, completeFloatingClose } from "../src/ui/floating/bridge";
 import { previewMutable } from "../src/ui/sidepanel/preview-state";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -38,6 +38,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  cancelFloatingClose();
   await act(async () => root.unmount());
   const pending = getFloatingSaveRequest(); if (pending) acceptFloatingSave(pending);
   document.body.innerHTML = "";
@@ -160,7 +161,7 @@ it("opens a cold star request as a full save form, keeps repeated intent drafts,
     source: { id: 1, url: "https://example.com/design-review", title: "Test", faviconUrl: "", supported: true } });
   const committed: boolean[] = [];
   const post = vi.spyOn(window.parent, "postMessage").mockImplementation(message => {
-    if (message.type === "FLOAT_SAVE_ACCEPTED") committed.push(Boolean(document.querySelector(".floating-save-page")));
+    if (message.type === "FLOAT_SAVE_ACCEPTED") committed.push(Boolean(document.querySelector(".floating-save-page .save-source")) && !document.querySelector(".dialog-loading"));
   });
   const id = crypto.randomUUID(); requestFloatingSave(id);
   await mount();
@@ -176,8 +177,14 @@ it("opens a cold star request as a full save form, keeps repeated intent drafts,
   expect(committed.length).toBeGreaterThan(0); expect(committed.every(Boolean)).toBe(true);
   expect(document.querySelector('button[aria-label="返回菜单"]')).toBeNull();
   await click('button[aria-label="关闭"]');
+  const closing = post.mock.calls.map(([message]) => message).find(message => message.type === "FLOAT_CLOSE");
+  expect(closing).toMatchObject({ type: "FLOAT_CLOSE", resetSave: true, requestId: expect.any(String), session: "ui-close-test" });
+  expect(document.querySelector<HTMLInputElement>('.floating-save-page input')?.value).toBe('保留这个收藏草稿');
+  await act(async () => completeFloatingClose("outdated-close"));
+  expect(document.querySelector('.floating-save-page')).not.toBeNull();
+  await act(async () => completeFloatingClose(closing.requestId));
   await waitFor(() => !document.querySelector('.floating-save-page'));
-  expect(post).toHaveBeenCalledWith({ type: "FLOAT_CLOSE", resetSave: true, session: "ui-close-test" }, location.origin);
+  expect(post).toHaveBeenCalledWith(closing, location.origin);
   post.mockRestore();
   expect(requests.some(request => request.type === 'SAVE_BOOKMARK')).toBe(false);
 });
@@ -288,7 +295,9 @@ it('shows completed AI without changing the reviewed fields and ignores results 
   const original=runtime.sendMessage;const answers:Array<(value:unknown)=>void>=[];
   runtime.sendMessage=async request=>request.type==='PREPARE_BOOKMARK_AI'?new Promise(r=>answers.push(r)):original(request);
   await mount();await act(async()=>requestFloatingSave(crypto.randomUUID()));await waitFor(()=>answers.length===1);
-  await click('button[aria-label="关闭"]');await waitFor(()=>!document.querySelector('.floating-save-page'));
+  await click('button[aria-label="关闭"]');
+  await act(async()=>completeFloatingClose());
+  await waitFor(()=>!document.querySelector('.floating-save-page'));
   await act(async()=>requestFloatingSave(crypto.randomUUID()));await waitFor(()=>answers.length===2);
   await editField('.floating-save-page input','新表单名称');await editField('.floating-save-page textarea','新表单备注');
   await act(async()=>answers[0]({ok:true,data:{status:'ready',summary:'不应混入的旧摘要',tags:['旧标签']}}));

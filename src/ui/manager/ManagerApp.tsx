@@ -31,7 +31,9 @@ import type {
   SearchResult,
   SiteBrandRecord,
 } from "../../lib/types";
-import { BookmarkIcon, MoonIcon, SunIcon } from "../components/Icons";
+import { MoonIcon, SunIcon } from "../components/Icons";
+import { AarreIcon } from "../components/AarreIcon";
+import { AarreWordmark } from "../components/AarreWordmark";
 import type { LibraryFilter, LibrarySort, ManagerView } from "./types";
 import {
   ALL_LIBRARY_FOLDERS,
@@ -449,10 +451,8 @@ export function ManagerApp() {
       <header className="manager-header">
         <div className="manager-topbar">
           <div className="manager-brand">
-            <div className="brand-mark">
-              <BookmarkIcon />
-            </div>
-            <strong>Aarre</strong>
+            <AarreIcon size={30} />
+            <AarreWordmark />
           </div>
         </div>
 

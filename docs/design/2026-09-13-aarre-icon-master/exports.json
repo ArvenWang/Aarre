@@ -1,0 +1,120 @@
+{
+  "source": "Figma native vector export",
+  "fileKey": "u5KlPWzuoMDQBPdO0lP6Mp",
+  "reviewNodeId": "7387:8839",
+  "files": [
+    {
+      "name": "icon-aubergine-micro.svg",
+      "bytes": 1242,
+      "width": 128,
+      "height": 128,
+      "sha256": "10da8c0c651e86266a999dade336973de8641e4124ea80c5e018686e989bd2ab",
+      "paths": 3
+    },
+    {
+      "name": "icon-aubergine.svg",
+      "bytes": 1249,
+      "width": 128,
+      "height": 128,
+      "sha256": "b6993268905f5da7d5eff6fdfcda60151189ed9b3cc2a664c5882105a0cc39d6",
+      "paths": 3
+    },
+    {
+      "name": "icon-lavender-micro.svg",
+      "bytes": 1242,
+      "width": 128,
+      "height": 128,
+      "sha256": "d7a4f3c3d3bac2cc3a5e95527a4b5a5d12a71f0314ed62c82d6f2ddd37e2e128",
+      "paths": 3
+    },
+    {
+      "name": "icon-lavender.svg",
+      "bytes": 1249,
+      "width": 128,
+      "height": 128,
+      "sha256": "cc6b3a39705be4082b9073639c0be9e3372d96df4f1284e042d0ed085a16748c",
+      "paths": 3
+    },
+    {
+      "name": "icon-poppy-128.png",
+      "bytes": 3261,
+      "width": 128,
+      "height": 128,
+      "sha256": "8919cb1981256f00ce3d97048b782e343ac808aeb173ca44f3aa36d3bbb0ce21"
+    },
+    {
+      "name": "icon-poppy-16.png",
+      "bytes": 499,
+      "width": 16,
+      "height": 16,
+      "sha256": "53956b6e8b61720e91098f6bd68d52bb88cae6d1a8a2b23d26899ed817753d84"
+    },
+    {
+      "name": "icon-poppy-20.png",
+      "bytes": 659,
+      "width": 20,
+      "height": 20,
+      "sha256": "424dd97258c8dc240ca664e2d259ec2aa4edb4b190342d90fd1ee464d59388a0"
+    },
+    {
+      "name": "icon-poppy-24.png",
+      "bytes": 776,
+      "width": 24,
+      "height": 24,
+      "sha256": "fd96866df579986866f90aa6a2b106d52a7ca9a0dabd35dbe93ccc0063870916"
+    },
+    {
+      "name": "icon-poppy-32.png",
+      "bytes": 970,
+      "width": 32,
+      "height": 32,
+      "sha256": "4f645224edef252ef32653c22774e2bc3e7a02b98a24843f7fd2979ee4abda9d"
+    },
+    {
+      "name": "icon-poppy-48.png",
+      "bytes": 1367,
+      "width": 48,
+      "height": 48,
+      "sha256": "826f5b1330e2c5c7cd6921cc9682070dc8e94fff8dca89c6206938313ddf338e"
+    },
+    {
+      "name": "icon-poppy-64.png",
+      "bytes": 1786,
+      "width": 64,
+      "height": 64,
+      "sha256": "72748b57a19c607f8d88be1dd90e0bd20f9caf52f0d4edd95af16dc61fe99d6f"
+    },
+    {
+      "name": "icon-poppy-micro.svg",
+      "bytes": 1242,
+      "width": 128,
+      "height": 128,
+      "sha256": "9d0727f5e34a2f652412e2d6703ab0bc9d1b30ba7b471a32e8787cff7d42f70f",
+      "paths": 3
+    },
+    {
+      "name": "icon-poppy.svg",
+      "bytes": 1249,
+      "width": 128,
+      "height": 128,
+      "sha256": "38a571fe0705f174a26e630070ed1f32dae54642871ddb0b43f6e73ed29411b7",
+      "paths": 3
+    },
+    {
+      "name": "mark-poppy-micro.svg",
+      "bytes": 1187,
+      "width": 128,
+      "height": 128,
+      "sha256": "d767b957256fcb160b86e5423a7828dd67ff1d75fb5fd78841915172ed775a85",
+      "paths": 3
+    },
+    {
+      "name": "mark-poppy.svg",
+      "bytes": 1187,
+      "width": 128,
+      "height": 128,
+      "sha256": "52c1f861457045ea7adaba7a8056c1fdee5eb7a672969d2a0c9366d20b1c17bc",
+      "paths": 3
+    }
+  ]
+}

@@ -45,7 +45,7 @@ export function Select({ children, value, defaultValue, onValueChange, disabled,
 }
 // This component mounts with the portal, so the scrollbar observes a live viewport.
 function SelectPopover({ children, className }: { children: ReactNode; className: string }) {
-  return <HeroSelect.Popover className={className} offset={6}>
+  return <HeroSelect.Popover data-elevation="popover" className={className} offset={6}>
     <SelectViewport>{children}</SelectViewport>
   </HeroSelect.Popover>;
 }

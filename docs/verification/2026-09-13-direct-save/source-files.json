@@ -1,0 +1,10 @@
+{
+  "src/extension/floating/host.ts": "c2bc534f8618f172e628642ae61bc920dc893f961632281b532a82f8e233dcb0",
+  "src/extension/floating/host-styles.ts": "f31819a3b65abbfd950c4a138afd0d7a6cdd9a82cd8502565e0d729d326b1fb3",
+  "src/ui/floating/SaveFormBody.tsx": "80b90ee18e464b8d779d450f1c0406114a965b36459752ced60ae003a2b0a21c",
+  "src/ui/floating/use-floating-save.ts": "417cd05ba7c36d38f13407948b266bae13ff6893b0456604310d1b4cc0dd791b",
+  "src/ui/floating/bridge.ts": "5d2d571cc08ce67a7141a3e7acd386c708259054ef5e8c58a69f331c7c5f03c1",
+  "src/ui/floating/floating.css": "c918690a71e403c12a0ae6cc0c681ae6ce484162651a9ed4cd81b6577d082292",
+  "dist/floating-host.js": "c861bc443c63287e6c4b6e04d177cda6cd81f0ad8023093ccf8caebc7b026d08",
+  "dist/manifest.json": "0eb01f463abb96a9778a02a4a1f4274d6508634f14982bbf1498ffc7976bd68d"
+}

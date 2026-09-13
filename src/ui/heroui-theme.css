@@ -4,7 +4,7 @@
   --default-foreground: var(--ink);
   --surface-foreground: var(--ink);
   --surface-secondary: var(--surface-sunken);
-  --overlay: var(--surface);
+  --overlay: var(--surface-popover);
   --overlay-foreground: var(--ink);
   --field-background: var(--surface);
   --field-foreground: var(--ink);
@@ -82,7 +82,20 @@
 .aarre-modal-backdrop { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 12px; background: var(--scrim-modal); z-index: 100; }
 .aarre-modal-container { width: min(640px,100%); max-width: 100%; margin: 0; padding: 0; border: 0; box-shadow: none; background: transparent; }
 .aarre-modal-container > [role="dialog"] { width: 100%; max-height: calc(100dvh - 24px); margin: 0; overflow-y: auto; overscroll-behavior: contain; outline: none; }
-.aarre-switch { flex: 0 0 auto; --accent: var(--ink); --accent-foreground: var(--bg); }
+/* Set the surface context at shared overlay boundaries. Descendant panels,
+   footers and controls inherit it instead of repainting the page underneath. */
+[data-elevation="dialog"] { --surface:var(--surface-dialog); --surface-sunken:var(--surface-dialog-muted); }
+[data-elevation="popover"] { --surface:var(--surface-popover); --surface-sunken:var(--surface-popover-muted); }
+[data-elevation="dialog"], [data-elevation="popover"] {
+  --line:var(--line-elevated); --line-strong:var(--line-elevated-strong);
+  --ink-faint:var(--ink-elevated-faint); --field-placeholder:var(--ink-faint);
+  --shadow-float:var(--shadow-elevated); --default:var(--surface-sunken);
+  --field-background:var(--surface); --field-border:var(--line-strong);
+  --field-readonly-surface:var(--surface-sunken); --separator:var(--line);
+  background:var(--surface); color:var(--ink); border:1px solid var(--line);
+  box-shadow:var(--shadow-float);
+}
+.aarre-switch { flex: 0 0 auto; --accent: var(--toggle-active-track); --accent-foreground: var(--scrim-ink); }
 .aarre-switch .switch__control { width: 40px; height: 24px; }
 .manager-tab-count { margin-left: 6px; font-variant-numeric: tabular-nums; color: var(--ink-muted); }
 .cloud-backup-consent { margin-top:16px; padding:14px; border:1px solid var(--line); border-radius:var(--radius-module); background:var(--surface-sunken); }
@@ -105,7 +118,6 @@
 .manager-settings-dialog .manager-utility-header { border-bottom:1px solid var(--line); }
 .manager-settings-dialog .native-settings-panel { flex:1; overflow:hidden; }
 .manager-settings-dialog .settings-workspace > .settings-page-content { overflow-x:hidden; overflow-y:auto; }
-.manager-settings-dialog .settings-group-picker { padding-top:12px; }
 .archive-controls { padding:0 16px 16px; font-size:var(--fs-body); line-height:1.7; }
 .archive-controls p { color:var(--ink-muted); margin:16px 0; }
 .archive-actions { display:flex; flex-wrap:wrap; gap:8px; }
@@ -137,7 +149,7 @@
 .manager-view-tabs .aarre-tab[data-selected] { background:transparent; color:var(--ink); }
 
 .aarre-switch [data-slot="switch-control"] { background:var(--line-strong); border:1px solid var(--ink-faint); }
-.aarre-switch[data-selected] [data-slot="switch-control"] { background:var(--positive); border-color:var(--positive); }
+.aarre-switch[data-selected] [data-slot="switch-control"] { background:var(--toggle-active-track); border-color:var(--toggle-active-track); }
 .aarre-switch [data-slot="switch-thumb"] { background:var(--scrim-ink); }
 
 .aarre-modal-container > .native-dialog { display:flex; flex-direction:column; gap:0; overflow:hidden; padding:16px; }

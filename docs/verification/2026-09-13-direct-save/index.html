@@ -1,0 +1,13 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Aarre 0.6.12 · 收藏直接展开</title>
+<style>body{max-width:1050px;margin:auto;padding:32px 20px;font:15px/1.7 system-ui,sans-serif;color:#202326;background:#f7f8fa}h1{font-size:26px;margin:0 0 12px}p{max-width:860px}a{color:#087e77}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}figure{margin:0;padding:12px;background:white;border:1px solid #e0e4e7;border-radius:12px}img{width:100%;height:280px;object-fit:contain}figcaption{font-size:13px;margin-top:8px;color:#58626d}video{width:100%;max-height:640px;background:#fff;border-radius:12px}small{color:#68737e}</style>
+<h1>收藏直接展开 · 0.6.12</h1>
+<p>问题已复现并修复：原来先出现 448px 高的占位窗口，再调整到表单高度；弹层外层的淡入还会透出首页。现在准备完成后直接显示完整表单，取消或关闭立即回到右侧入口。</p>
+<p><strong>25 项真实浏览器检查、43 项针对性检查通过。</strong>覆盖首次/重复打开、两插件切换后打开、窄短窗口、仅安装 Aarre，以及取消不写入书签。正式构建与类型、设计检查通过。</p>
+<div class="grid"><figure><a href="diagnosis-home-bleed.png"><img src="diagnosis-home-bleed.png" alt="排查过程中捕捉到表单淡入透出首页"></a><figcaption>排查过程：表单外层淡入，首页透出。</figcaption></figure>
+<figure><a href="save-first-frame.png"><img src="save-first-frame.png" alt="修复后首次显示完整的添加收藏表单"></a><figcaption>修复后：首次显示就是完整表单，无尺寸拉伸和首页透出。</figcaption></figure>
+<figure><a href="save-narrow.png"><img src="save-narrow.png" alt="360乘480窗口中收藏表单及固定操作栏"></a><figcaption>360 × 480 窗口：表单适配、底部操作可见。</figcaption></figure>
+<figure><a href="closed.png"><img src="closed.png" alt="关闭后回到双插件共享入口"></a><figcaption>关闭后直接恢复共享入口。</figcaption></figure></div>
+<p>实际操作录屏：两只真实扩展运行在独立 Chrome 152 配置中，来源为本地验收网页，未使用日常书签或在线 AI 服务。</p>
+<video controls preload="metadata" src="verification.webm" poster="save-first-frame.png"></video>
+<p><a href="verification.json">最终逐帧验证记录</a> · <a href="before.json">原问题复现记录</a> · <a href="source-files.json">本次构建记录</a></p>
+<small>本地 dist 已更新为 0.6.12；日常 Chrome 尚未重载，重新加载 Aarre 扩展后生效。NexAlign 源码及共享协议未改。本轮未重跑全量测试、联网 AI、手机及云同步。</small></html>

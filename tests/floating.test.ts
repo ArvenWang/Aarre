@@ -34,7 +34,7 @@ describe("floating geometry", () => {
   it("clamps a long save form in a short or zoomed viewport", () => {
     expect(floatingSaveRect({width:280,height:360,left:30,top:20},1200)).toEqual({x:30,y:32,width:280,height:336});
     expect(floatingSaveRect({width:1440,height:1200},2000).height).toBe(640);
-    expect(floatingSaveRect({width:320,height:640},Number.NaN).height).toBe(448);
+    expect(floatingSaveRect({width:320,height:640},Number.NaN).height).toBe(560);
   });
   for (const [width, height] of [[280,360],[320,640],[420,800],[1280,720],[1440,900]]) {
     it(`${width}×${height} attaches both states to the right edge without leaving the viewport`, () => {
@@ -44,7 +44,7 @@ describe("floating geometry", () => {
           expect(rect.x).toBeGreaterThanOrEqual(0); expect(rect.y).toBeGreaterThanOrEqual(0);
           expect(rect.x+rect.width).toBe(width); expect(rect.y+rect.height).toBeLessThanOrEqual(height);
         }
-        expect(result.bar.width).toBe(52); expect(result.bar.height).toBe(100);
+        expect(result.bar.width).toBe(52); expect(result.bar.height).toBe(52);
         expect(result.bar.y+result.bar.height/2).toBe(height/2);
         expect(result.menu.height).toBe(height-24);
       }

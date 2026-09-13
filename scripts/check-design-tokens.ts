@@ -6,6 +6,8 @@ const SOURCE_DIRECTORY = new URL("../src/", import.meta.url);
 const TOKEN_FILE = "tokens.css";
 const ALLOWED_TOKEN_COLORS = new Set([
   "#ffffff",
+  // 0.6.23: logo orange, accessible accent text and neutral dark-theme accent.
+  "#f2633d", "#b74624", "#dedede",
   // 0.6.0: contrast-tested secondary and accent text palette.
   "#58616a", "#68717a", "#087b70", "#adb5be", "#919aa4",
   "#fcfcfc",

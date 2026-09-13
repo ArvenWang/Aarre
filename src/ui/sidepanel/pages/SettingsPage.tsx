@@ -1,9 +1,10 @@
+import { registerParkPreparation } from "../../../shared/suite-dock/parking";
 import { ScrollSurface } from "@/ui/components/ui/scroll-area";
 import { FloatingSettingsSection } from "../../floating/FloatingSettingsSection";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Accordion } from "@heroui/react/accordion";
 import "../../sidepanel-lazy.css";
 import { Button } from "@/ui/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/ui/components/ui/select";
 import { ArrowLeftIcon } from "../../components/Icons";
 import { getAiProviderPreset } from "../../../lib/settings";
 import {
@@ -79,9 +80,15 @@ function SettingsPage({
     tone: "error" | "success";
     message: string;
   } | null>(null);
-  const [group, setGroup] = useState<SettingsGroup>("ai");
+  useEffect(() => registerParkPreparation(() => {
+    if (action) throw new Error("设置操作仍在进行，完成后再切换应用。");
+    if (apiKey.trim() || (settings && (provider !== settings.provider || model !== settings.model))) {
+      const message = "AI 设置尚未保存，请先保存或还原，再切换应用。";
+      setProviderFeedback({ tone: "error", message });
+      throw new Error(message);
+    }
+  }), [action, apiKey, model, provider, settings]);
   const contentRef = useRef<HTMLElement | null>(null);
-  useEffect(() => { if (contentRef.current) contentRef.current.scrollTop = 0; }, [group]);
   const backButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
@@ -322,49 +329,34 @@ function SettingsPage({
         <h1>设置</h1>
       </header>
       <div className="settings-workspace">
-        <nav className="settings-group-navigation" aria-label="设置分组">
-          {SETTINGS_GROUPS.map(([id, label]) => (
-            <Button key={id} variant="ghost" size="sm" aria-current={group === id ? "page" : undefined}
-              onClick={() => setGroup(id)}>{label}</Button>
-          ))}
-        </nav>
-        <div className="settings-group-picker">
-          <Select value={group} onValueChange={(id) => setGroup(id as SettingsGroup)}>
-            <SelectTrigger aria-label="设置分组" />
-            <SelectContent>{SETTINGS_GROUPS.map(([id, label], index) => (
-              <SelectItem key={id} value={id} index={index}>{label}</SelectItem>
-            ))}</SelectContent>
-          </Select>
-        </div>
         <ScrollSurface as="section" className="settings-page-content" ref={contentRef}>
-          <div hidden={group !== "ai"} className="settings-group-panel" aria-label="AI 服务">
+          <Accordion className="settings-drawers" defaultExpandedKeys={["ai"]} allowsMultipleExpanded={false}>
+          <SettingsDrawer id="ai">
             <AiServiceSection settings={settings} provider={provider} model={model} apiKey={apiKey}
               action={action} feedback={providerFeedback}
               onProviderChange={(nextProvider, nextModel) => {
                 setProvider(nextProvider); setModel(nextModel); setApiKey(""); setProviderFeedback(null);
               }} onApiKeyChange={setApiKey} onSubmit={() => void saveApiSettings()} />
-          </div>
-          <div hidden={group !== "appearance"} className="settings-group-panel" aria-label="外观与快捷栏">
+          </SettingsDrawer>
+          <SettingsDrawer id="appearance">
             <DisplaySettingsSection publicFaviconFallback={publicFaviconFallback} disabled={Boolean(action)}
               onPublicFaviconFallbackChange={(enabled) => void handlePublicFaviconFallback(enabled)} />
             <FloatingSettingsSection />
-          </div>
-          <div hidden={group !== "account"} className="settings-group-panel" aria-label="账号与同步">
+          </SettingsDrawer>
+          <SettingsDrawer id="account">
             <AccountCloudSection appState={appState} action={action} status={syncStatus} usage={cloudUsage}
               feedback={cloudFeedback} onLogin={() => void handleLogin()}
               onSignOut={() => void handleSignOut()} onSync={() => void handleSyncNow()} />
-          </div>
-          <div hidden={group !== "enhance"} className="settings-group-panel" aria-label="书签增强">
+          </SettingsDrawer>
+          <SettingsDrawer id="enhance">
             <LibraryScanSection appState={appState} settings={settings} action={action}
               feedback={scanFeedback} onAction={(intent) => void handleLibraryScan(intent)} />
-          </div>
-          <div hidden={group !== "activity"} className="settings-group-panel" aria-label="最近动作">
-            <h2 className="settings-group-title">最近动作</h2>
+          </SettingsDrawer>
+          <SettingsDrawer id="activity">
             <SettingsMoreContent action={action} undoBatches={undoBatches}
               onUndo={(batchId) => void handleUndoBatch(batchId)} />
-          </div>
-          <div hidden={group !== "data"} className="settings-group-panel" aria-label="数据与帮助">
-            <h2 className="settings-group-title">数据与帮助</h2>
+          </SettingsDrawer>
+          <SettingsDrawer id="data">
             <section className="settings-section settings-data-links">
               <div className="settings-link-row">
                 <div><strong>本地备份与恢复</strong><small>导出收藏副本，或从备份恢复。</small></div>
@@ -379,7 +371,8 @@ function SettingsPage({
                 <Button variant="tertiary" size="sm" type="button" onClick={onRestartOnboarding}>重新查看</Button>
               </div>
             </section>
-          </div>
+          </SettingsDrawer>
+          </Accordion>
         </ScrollSurface>
       </div>
 
@@ -393,5 +386,19 @@ function SettingsPage({
   );
 }
 
+
+function SettingsDrawer({ id, children }: { id: SettingsGroup; children: ReactNode }) {
+  const label = SETTINGS_GROUPS.find(([key]) => key === id)![1];
+  return <Accordion.Item id={id} className="settings-drawer">
+    <Accordion.Heading className="settings-drawer-heading">
+      <Accordion.Trigger className="settings-drawer-trigger">
+        <span>{label}</span><Accordion.Indicator />
+      </Accordion.Trigger>
+    </Accordion.Heading>
+    <Accordion.Panel className="settings-group-panel" aria-label={label}>
+      <div className="settings-drawer-content">{children}</div>
+    </Accordion.Panel>
+  </Accordion.Item>;
+}
 
 export default SettingsPage;

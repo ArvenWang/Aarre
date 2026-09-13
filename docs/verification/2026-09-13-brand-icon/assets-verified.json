@@ -1,0 +1,102 @@
+{
+  "figmaFile": "u5KlPWzuoMDQBPdO0lP6Mp",
+  "nodes": {
+    "light": "7386:8817",
+    "dark": "7386:8827",
+    "micro16": "7387:8894"
+  },
+  "assets": [
+    {
+      "source": "icon-poppy.svg",
+      "product": "icons/icon.svg",
+      "sha256": "38a571fe0705f174a26e630070ed1f32dae54642871ddb0b43f6e73ed29411b7",
+      "dimensions": [
+        128,
+        128
+      ],
+      "exactFigmaBytes": true
+    },
+    {
+      "source": "icon-aubergine.svg",
+      "product": "icons/icon-dark.svg",
+      "sha256": "b6993268905f5da7d5eff6fdfcda60151189ed9b3cc2a664c5882105a0cc39d6",
+      "dimensions": [
+        128,
+        128
+      ],
+      "exactFigmaBytes": true
+    },
+    {
+      "source": "icon-poppy-16.png",
+      "product": "icons/icon-16.png",
+      "sha256": "53956b6e8b61720e91098f6bd68d52bb88cae6d1a8a2b23d26899ed817753d84",
+      "dimensions": [
+        16,
+        16
+      ],
+      "exactFigmaBytes": true
+    },
+    {
+      "source": "icon-poppy-32.png",
+      "product": "icons/icon-32.png",
+      "sha256": "4f645224edef252ef32653c22774e2bc3e7a02b98a24843f7fd2979ee4abda9d",
+      "dimensions": [
+        32,
+        32
+      ],
+      "exactFigmaBytes": true
+    },
+    {
+      "source": "icon-poppy-48.png",
+      "product": "icons/icon-48.png",
+      "sha256": "826f5b1330e2c5c7cd6921cc9682070dc8e94fff8dca89c6206938313ddf338e",
+      "dimensions": [
+        48,
+        48
+      ],
+      "exactFigmaBytes": true
+    },
+    {
+      "source": "icon-poppy-128.png",
+      "product": "icons/icon-128.png",
+      "sha256": "8919cb1981256f00ce3d97048b782e343ac808aeb173ca44f3aa36d3bbb0ce21",
+      "dimensions": [
+        128,
+        128
+      ],
+      "exactFigmaBytes": true
+    }
+  ],
+  "sharedModules": [
+    {
+      "name": "contract.ts",
+      "sha256": "747734f1e25b100feeaef259debe264fd3d4aefb822eac96bbf0004f70604f38"
+    },
+    {
+      "name": "geometry.ts",
+      "sha256": "135f457bddc3300851fdef4e4c712c580b8d66551241e094f26eb340abf86025"
+    },
+    {
+      "name": "morph.ts",
+      "sha256": "f1e5c8fdb500b47e05d8522a1b99d2ebefcfb1653259c29cfb0778ba60c34dc2"
+    },
+    {
+      "name": "background.ts",
+      "sha256": "869e9e78adbfdc499cb3b3c304d3ef0d2908017fed9c5cd1b50ce302315c694b"
+    },
+    {
+      "name": "parking.ts",
+      "sha256": "20d11dd06998b10ee6714ff8f48551579c1eb0ac23d4a775f38c14f341e99523"
+    },
+    {
+      "name": "client.ts",
+      "sha256": "1742615e8b1f410b8fae82405535cb2124546c82bfc64e1f825b9450eb15ee95"
+    },
+    {
+      "name": "ui.ts",
+      "sha256": "c9ed2f0bc0b08f90c61c4f3c60d4607760c0f2cd532d32a796dd2e585728d0ac"
+    }
+  ],
+  "aVersion": "0.6.17",
+  "nVersion": "0.1.0 · 2a7bd4ac · 20260913T1316Z"
+}

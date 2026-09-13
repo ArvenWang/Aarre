@@ -1,0 +1,9 @@
+{
+  "tool": "image_gen.imagegen",
+  "direction": "A complete irregular gemstone; new silhouettes and monochromatic color families",
+  "discarded": [
+    "01",
+    "03"
+  ],
+  "discardReason": "01 resembles a cuboid; 03 resembles a tag rather than a gemstone."
+}

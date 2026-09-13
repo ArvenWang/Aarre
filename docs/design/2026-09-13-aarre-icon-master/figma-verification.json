@@ -1,0 +1,295 @@
+{
+  "review": {
+    "id": "7387:8839",
+    "width": 1440,
+    "height": 1546
+  },
+  "masters": {
+    "id": "7390:8878",
+    "width": 1440,
+    "height": 534
+  },
+  "markCounts": [
+    {
+      "key": "regular",
+      "id": "7385:8826",
+      "children": [
+        {
+          "id": "7385:8827",
+          "type": "VECTOR",
+          "paths": 1,
+          "paint": {
+            "type": "SOLID",
+            "visible": true,
+            "opacity": 1,
+            "blendMode": "NORMAL",
+            "color": {
+              "r": 0.9490196108818054,
+              "g": 0.38823530077934265,
+              "b": 0.239215686917305
+            },
+            "boundVariables": {
+              "color": {
+                "type": "VARIABLE_ALIAS",
+                "id": "VariableID:7385:8818"
+              }
+            }
+          },
+          "x": 34.75,
+          "y": 8
+        },
+        {
+          "id": "7385:8828",
+          "type": "VECTOR",
+          "paths": 1,
+          "paint": {
+            "type": "SOLID",
+            "visible": true,
+            "opacity": 1,
+            "blendMode": "NORMAL",
+            "color": {
+              "r": 0.9490196108818054,
+              "g": 0.38823530077934265,
+              "b": 0.239215686917305
+            },
+            "boundVariables": {
+              "color": {
+                "type": "VARIABLE_ALIAS",
+                "id": "VariableID:7385:8818"
+              }
+            }
+          },
+          "x": 10.75,
+          "y": 59
+        },
+        {
+          "id": "7385:8829",
+          "type": "VECTOR",
+          "paths": 1,
+          "paint": {
+            "type": "SOLID",
+            "visible": true,
+            "opacity": 1,
+            "blendMode": "NORMAL",
+            "color": {
+              "r": 0.9490196108818054,
+              "g": 0.38823530077934265,
+              "b": 0.239215686917305
+            },
+            "boundVariables": {
+              "color": {
+                "type": "VARIABLE_ALIAS",
+                "id": "VariableID:7385:8818"
+              }
+            }
+          },
+          "x": 66.25,
+          "y": 68
+        }
+      ]
+    },
+    {
+      "key": "micro",
+      "id": "7385:8830",
+      "children": [
+        {
+          "id": "7385:8831",
+          "type": "VECTOR",
+          "paths": 1,
+          "paint": {
+            "type": "SOLID",
+            "visible": true,
+            "opacity": 1,
+            "blendMode": "NORMAL",
+            "color": {
+              "r": 0.9490196108818054,
+              "g": 0.38823530077934265,
+              "b": 0.239215686917305
+            },
+            "boundVariables": {
+              "color": {
+                "type": "VARIABLE_ALIAS",
+                "id": "VariableID:7385:8818"
+              }
+            }
+          },
+          "x": 36.75,
+          "y": 10
+        },
+        {
+          "id": "7385:8832",
+          "type": "VECTOR",
+          "paths": 1,
+          "paint": {
+            "type": "SOLID",
+            "visible": true,
+            "opacity": 1,
+            "blendMode": "NORMAL",
+            "color": {
+              "r": 0.9490196108818054,
+              "g": 0.38823530077934265,
+              "b": 0.239215686917305
+            },
+            "boundVariables": {
+              "color": {
+                "type": "VARIABLE_ALIAS",
+                "id": "VariableID:7385:8818"
+              }
+            }
+          },
+          "x": 12.75,
+          "y": 61
+        },
+        {
+          "id": "7385:8833",
+          "type": "VECTOR",
+          "paths": 1,
+          "paint": {
+            "type": "SOLID",
+            "visible": true,
+            "opacity": 1,
+            "blendMode": "NORMAL",
+            "color": {
+              "r": 0.9490196108818054,
+              "g": 0.38823530077934265,
+              "b": 0.239215686917305
+            },
+            "boundVariables": {
+              "color": {
+                "type": "VARIABLE_ALIAS",
+                "id": "VariableID:7385:8818"
+              }
+            }
+          },
+          "x": 68.25,
+          "y": 70
+        }
+      ]
+    }
+  ],
+  "samples": [
+    {
+      "size": 16,
+      "optical": "Micro",
+      "id": "7387:8894",
+      "width": 16,
+      "height": 16,
+      "type": "INSTANCE",
+      "mainComponentId": "7386:8822"
+    },
+    {
+      "size": 20,
+      "optical": "Micro",
+      "id": "7387:8902",
+      "width": 20,
+      "height": 20,
+      "type": "INSTANCE",
+      "mainComponentId": "7386:8822"
+    },
+    {
+      "size": 24,
+      "optical": "Regular",
+      "id": "7387:8910",
+      "width": 24,
+      "height": 24,
+      "type": "INSTANCE",
+      "mainComponentId": "7386:8817"
+    },
+    {
+      "size": 32,
+      "optical": "Regular",
+      "id": "7387:8918",
+      "width": 32,
+      "height": 32,
+      "type": "INSTANCE",
+      "mainComponentId": "7386:8817"
+    },
+    {
+      "size": 48,
+      "optical": "Regular",
+      "id": "7387:8926",
+      "width": 48,
+      "height": 48,
+      "type": "INSTANCE",
+      "mainComponentId": "7386:8817"
+    },
+    {
+      "size": 64,
+      "optical": "Regular",
+      "id": "7387:8934",
+      "width": 64,
+      "height": 64,
+      "type": "INSTANCE",
+      "mainComponentId": "7386:8817"
+    },
+    {
+      "size": 128,
+      "optical": "Regular",
+      "id": "7387:8942",
+      "width": 128,
+      "height": 128,
+      "type": "INSTANCE",
+      "mainComponentId": "7386:8817"
+    }
+  ],
+  "circles": 9,
+  "rasterFills": [],
+  "brandCollections": [
+    {
+      "id": "VariableCollectionId:7385:8817",
+      "name": "Aarre / Brand colors",
+      "count": 4
+    }
+  ],
+  "original": {
+    "id": "7364:8824",
+    "x": 96250,
+    "y": 196,
+    "width": 218,
+    "height": 218,
+    "children": [
+      "7364:8818",
+      "7364:8819",
+      "7364:8820",
+      "7364:8821",
+      "7364:8822",
+      "7364:8823"
+    ]
+  },
+  "gridStroke": [
+    {
+      "type": "SOLID",
+      "visible": true,
+      "opacity": 1,
+      "blendMode": "NORMAL",
+      "color": {
+        "r": 0.2235294133424759,
+        "g": 0.16862745583057404,
+        "b": 0.22745098173618317
+      },
+      "boundVariables": {
+        "color": {
+          "type": "VARIABLE_ALIAS",
+          "id": "VariableID:7385:8824"
+        }
+      }
+    }
+  ],
+  "visuallyChecked": [
+    "figma-review.png",
+    "figma-components.png",
+    "figma-icon-masters.png"
+  ],
+  "finalGuideOpacities": {
+    "grid": 0.16,
+    "circles": 0.55,
+    "centers": 0.7
+  },
+  "assetChecks": {
+    "svg": 8,
+    "png": 7,
+    "everySvgHasThreePaths": true,
+    "pngDimensionsMatchNames": true
+  },
+  "productionAssetsChanged": false
+}

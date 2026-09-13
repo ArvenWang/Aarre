@@ -1,5 +1,5 @@
 import { useLayoutEffect, useState, type ReactNode } from "react";
-import { postToFloatingHost } from "./bridge";
+import { FLOATING_SAVE_EVENT, getFloatingSaveLayoutRequest, postToFloatingHost } from "./bridge";
 import { SAVE_PANEL_INITIAL_HEIGHT } from "../../lib/floating-geometry";
 
 /** Measure intrinsic content, never the stretched viewport (which would feed back). */
@@ -12,7 +12,7 @@ export function SaveFormBody({ compact, loading, children }: { compact: boolean;
     const actions = dialog?.querySelector<HTMLElement>(".native-dialog-actions");
     const viewport = content.parentElement;
     if (!heading || !viewport) return;
-    let lastHeight = 0;
+    let lastLayout = "";
     const measure = () => {
       const padding = getComputedStyle(viewport);
       const height = loading ? SAVE_PANEL_INITIAL_HEIGHT : Math.ceil(
@@ -20,15 +20,18 @@ export function SaveFormBody({ compact, loading, children }: { compact: boolean;
         heading.offsetHeight + content.offsetHeight + (actions?.offsetHeight || 0)
         + parseFloat(padding.paddingTop) + parseFloat(padding.paddingBottom),
       );
-      if (height > 0 && height !== lastHeight) {
-        lastHeight = height;
-        postToFloatingHost({ type: "FLOAT_SAVE_LAYOUT", height });
+      const requestId = getFloatingSaveLayoutRequest();
+      const layout = `${height}:${loading}:${requestId}`;
+      if (height > 0 && layout !== lastLayout) {
+        lastLayout = layout;
+        postToFloatingHost({ type: "FLOAT_SAVE_LAYOUT", height, ready: !loading, requestId });
       }
     };
     measure();
     const observer = new ResizeObserver(measure);
     for (const element of [heading, content, actions]) if (element) observer.observe(element);
-    return () => observer.disconnect();
+    window.addEventListener(FLOATING_SAVE_EVENT, measure);
+    return () => { observer.disconnect(); window.removeEventListener(FLOATING_SAVE_EVENT, measure); };
   }, [compact, content, loading]);
   useLayoutEffect(() => {
     if (compact) return () => postToFloatingHost({ type: "FLOAT_WORKSPACE_LAYOUT" });

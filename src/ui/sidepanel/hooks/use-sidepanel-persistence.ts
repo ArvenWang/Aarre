@@ -1,3 +1,4 @@
+import { registerParkPreparation } from "../../../shared/suite-dock/parking";
 import { useEffect, useRef } from "react";
 import { getOnboardingState } from "../../../lib/onboarding";
 import { getSidepanelState, saveSidepanelState } from "../../../lib/sidepanel-state";
@@ -82,6 +83,12 @@ export function useSidepanelPersistence({
       });
     });
   }, [contentRef, onboardingVisible, panelView, syncScrollThumb]);
+
+  useEffect(() => registerParkPreparation(async () => {
+    if (!loaded.current) return;
+    if (saveTimer.current !== undefined) window.clearTimeout(saveTimer.current);
+    await saveSidepanelState({ expandedFolderIds: [...expanded], scrollTop: contentRef.current?.scrollTop || 0 });
+  }), [contentRef, expanded]);
 
   return () => {
     revealScrollThumb();

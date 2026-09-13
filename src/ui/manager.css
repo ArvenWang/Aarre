@@ -71,25 +71,8 @@ html.manager-page[data-theme="light"] .manager-shell {
   flex: 0 0 auto;
 }
 
-.brand-mark {
-  width: 30px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-sm);
-  color: var(--bg);
-  background: var(--ink);
-}
-
-.brand-mark svg {
-  width: 15px;
-  height: 15px;
-}
-
-.manager-brand strong {
-  font-size: var(--fs-body);
-  font-weight: var(--fw-strong);
-  letter-spacing: -0.02em;
+.manager-brand .aarre-wordmark {
+  font-size: var(--fs-brand-large);
 }
 
 .library-search {

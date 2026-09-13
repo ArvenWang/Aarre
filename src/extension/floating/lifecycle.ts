@@ -14,7 +14,7 @@ export function ensureFloatingHost(tabId: number): Promise<void> {
       new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), 2_000); }),
     ]).finally(() => clearTimeout(timer));
     if (reply?.ok && reply.version === chrome.runtime.getManifest().version) return;
-    await chrome.scripting.executeScript({ target: { tabId, frameIds: [0] }, files: ["floating-host.js"] });
+    await chrome.scripting.executeScript({ target: { tabId, frameIds: [0] }, files: ["floating-host.js"], injectImmediately: true });
   })().finally(() => repairs.delete(tabId));
   repairs.set(tabId, work);
   return work;

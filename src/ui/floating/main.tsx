@@ -1,8 +1,10 @@
+import { prepareToPark } from "../../shared/suite-dock/parking";
 import { createRoot } from "react-dom/client";
 import { StrictMode } from "react";
 import { initializeTheme, THEME_CHANGE_EVENT } from "../../lib/theme";
-import { FLOATING_VIEW_EVENT, getFloatingContext, postToFloatingHost, setFloatingContext, requestFloatingSave } from "./bridge";
+import { FLOATING_VIEW_EVENT, getFloatingContext, postToFloatingHost, setFloatingContext, requestFloatingSave, cancelFloatingClose, completeFloatingClose } from "./bridge";
 import { listenForFrameChallenge, reportFloatingStartupError } from "./startup";
+import { readDraft, writeDraft } from "../sidepanel/drafts";
 import "../styles-sidepanel.css";
 import "./floating.css";
 
@@ -27,17 +29,28 @@ async function start() {
     setFloatingContext({ tabId: source.id, nonce, source, parentOrigin });
   }
   const verifiedContext = getFloatingContext();
+  // A loading form can be cancelled before its React tree receives a close.
+  // Clear only that cancelled save draft after authenticating the replacement.
+  if (verifiedContext && params.get("discardSave") === "1" && readDraft<{ editor?: { kind: string } }>("bookmark-editor")?.editor?.kind === "save") {
+    writeDraft("bookmark-editor", null);
+  }
   if (verifiedContext && params.get("save")) requestFloatingSave(params.get("save")!);
   if (verifiedContext) {
     const { parentOrigin, nonce } = verifiedContext;
     window.addEventListener("message", (event) => {
       if (event.source !== parent || event.origin !== parentOrigin || event.data?.session !== nonce) return;
+      if (event.data.type === "SUITE_PREPARE_PARK" && typeof event.data.id === "string") {
+        completeFloatingClose();
+        const reply = (ok: boolean, error?: string) => postToFloatingHost({ type: "SUITE_PARK_READY", id: event.data.id, ok, error });
+        void prepareToPark().then(() => reply(true), error => reply(false, error instanceof Error ? error.message : String(error)));
+      }
       if (event.data.type === "FLOAT_VIEW") {
-        delete document.documentElement.dataset.floatingClosing;
+        cancelFloatingClose();
         window.dispatchEvent(new CustomEvent(FLOATING_VIEW_EVENT, { detail: event.data.view }));
         if (typeof event.data.saveRequestId === "string") requestFloatingSave(event.data.saveRequestId);
         if (event.data.focus) requestAnimationFrame(() => (document.querySelector<HTMLElement>('[role="dialog"] input, [role="dialog"] textarea') || document.querySelector<HTMLElement>('#bookmark-agent-prompt'))?.focus({ preventScroll: true }));
       }
+      if (event.data.type === "FLOAT_CLOSED" && typeof event.data.requestId === "string") completeFloatingClose(event.data.requestId);
     });
     window.addEventListener("keydown", (event) => {
       if (event.key !== "Escape" || event.isComposing || event.defaultPrevented) return;

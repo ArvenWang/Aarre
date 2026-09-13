@@ -1,3 +1,4 @@
+import { registerParkPreparation } from "../../../shared/suite-dock/parking";
 import { readDraft, writeDraft } from "../drafts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { streamAgentTurn } from "../../../lib/agent-stream-client";
@@ -36,6 +37,7 @@ export function useAgentChat({
 }: UseAgentChatInput) {
   const [prompt, setPrompt] = useState(() => readDraft<string>("ai-prompt") || "");
   useEffect(() => { writeDraft("ai-prompt", prompt || null); }, [prompt]);
+  useEffect(() => registerParkPreparation(() => { writeDraft("ai-prompt", prompt || null, true); }), [prompt]);
   const [conversations, setConversations] = useState<AgentConversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<AgentConversation | null>(null);
   const resumeId = useRef(readDraft<string>("ai-conversation"));

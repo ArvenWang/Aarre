@@ -1,0 +1,21 @@
+.aarre-product-icon {
+  display: inline-grid;
+  flex: none;
+  vertical-align: middle;
+}
+
+.aarre-product-icon > img {
+  display: block;
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+}
+
+.aarre-product-icon > .aarre-product-icon-dark,
+html[data-theme="dark"] .aarre-product-icon > .aarre-product-icon-light {
+  display: none;
+}
+
+html[data-theme="dark"] .aarre-product-icon > .aarre-product-icon-dark {
+  display: block;
+}

@@ -1,0 +1,354 @@
+{
+  "checks": [
+    {
+      "pass": true,
+      "name": "两只正式构建通过 Chrome 身份与同文档握手",
+      "evidence": {
+        "a": {
+          "aarreUi": "floating-host",
+          "hidden": "false",
+          "open": "false",
+          "savePreparing": "false",
+          "suitePaired": "true",
+          "suiteAway": "false",
+          "theme": "light",
+          "suiteTheme": "light"
+        },
+        "n": {
+          "layerscopeCanvasToolbar": "",
+          "deviceProfile": "desktop",
+          "floatingSide": "right",
+          "floatingVertical": "top",
+          "floatingTheme": "light",
+          "menuOpen": "false",
+          "suitePaired": "true",
+          "suiteTheme": "light"
+        }
+      }
+    },
+    {
+      "pass": true,
+      "name": "light：收藏库 30px 图标完整显示",
+      "evidence": {
+        "width": 30,
+        "height": 30,
+        "theme": "light",
+        "images": [
+          {
+            "src": "/icons/icon.svg",
+            "loaded": true
+          }
+        ]
+      }
+    },
+    {
+      "pass": true,
+      "name": "light：把手只展示相应版本的三个原始矢量",
+      "evidence": {
+        "visible": true,
+        "inert": false,
+        "x": 1232,
+        "y": 404,
+        "width": 44,
+        "height": 44,
+        "visibleIconFills": [
+          "rgb(242, 99, 61)",
+          "rgb(249, 240, 213)",
+          "rgb(249, 240, 213)",
+          "rgb(249, 240, 213)"
+        ],
+        "background": "rgba(0, 0, 0, 0)",
+        "opacity": 1,
+        "radius": "14px",
+        "focused": false,
+        "viewBoxes": [
+          "0 0 128 128",
+          "0 0 128 128"
+        ],
+        "transform": "none",
+        "strokes": [
+          "none",
+          "none",
+          "none",
+          "none",
+          "none",
+          "none",
+          "none",
+          "none"
+        ],
+        "fills": [
+          "rgb(242, 99, 61)",
+          "rgb(249, 240, 213)",
+          "rgb(249, 240, 213)",
+          "rgb(249, 240, 213)",
+          "rgb(57, 43, 58)",
+          "rgb(249, 240, 213)",
+          "rgb(249, 240, 213)",
+          "rgb(249, 240, 213)"
+        ]
+      }
+    },
+    {
+      "pass": true,
+      "name": "light：悬停收藏功能仍可用"
+    },
+    {
+      "pass": true,
+      "name": "light：悬浮菜单 24px 图标完整显示",
+      "evidence": {
+        "width": 24,
+        "height": 24,
+        "theme": "light",
+        "images": [
+          {
+            "src": "/icons/icon.svg",
+            "loaded": true
+          }
+        ]
+      }
+    },
+    {
+      "pass": true,
+      "name": "dark：收藏库 30px 图标完整显示",
+      "evidence": {
+        "width": 30,
+        "height": 30,
+        "theme": "dark",
+        "images": [
+          {
+            "src": "/icons/icon-dark.svg",
+            "loaded": true
+          }
+        ]
+      }
+    },
+    {
+      "pass": true,
+      "name": "dark：把手只展示相应版本的三个原始矢量",
+      "evidence": {
+        "visible": true,
+        "inert": false,
+        "x": 1232,
+        "y": 404,
+        "width": 44,
+        "height": 44,
+        "visibleIconFills": [
+          "rgb(57, 43, 58)",
+          "rgb(249, 240, 213)",
+          "rgb(249, 240, 213)",
+          "rgb(249, 240, 213)"
+        ],
+        "background": "rgba(0, 0, 0, 0)",
+        "opacity": 1,
+        "radius": "14px",
+        "focused": true,
+        "viewBoxes": [
+          "0 0 128 128",
+          "0 0 128 128"
+        ],
+        "transform": "none",
+        "strokes": [
+          "none",
+          "none",
+          "none",
+          "none",
+          "none",
+          "none",
+          "none",
+          "none"
+        ],
+        "fills": [
+          "rgb(242, 99, 61)",
+          "rgb(249, 240, 213)",
+          "rgb(249, 240, 213)",
+          "rgb(249, 240, 213)",
+          "rgb(57, 43, 58)",
+          "rgb(249, 240, 213)",
+          "rgb(249, 240, 213)",
+          "rgb(249, 240, 213)"
+        ]
+      }
+    },
+    {
+      "pass": true,
+      "name": "dark：悬停收藏功能仍可用"
+    },
+    {
+      "pass": true,
+      "name": "dark：悬浮菜单 24px 图标完整显示",
+      "evidence": {
+        "width": 24,
+        "height": 24,
+        "theme": "dark",
+        "images": [
+          {
+            "src": "/icons/icon-dark.svg",
+            "loaded": true
+          }
+        ]
+      }
+    },
+    {
+      "pass": true,
+      "name": "刷新后仍保持深色图标",
+      "evidence": {
+        "width": 30,
+        "height": 30,
+        "theme": "dark",
+        "images": [
+          {
+            "src": "/icons/icon-dark.svg",
+            "loaded": true
+          }
+        ]
+      }
+    },
+    {
+      "pass": true,
+      "name": "标签页引用已更新的正式扩展 PNG"
+    },
+    {
+      "pass": true,
+      "name": "单独安装 Aarre 时保留正确深色品牌图标",
+      "evidence": {
+        "visible": true,
+        "inert": false,
+        "x": 1232,
+        "y": 428,
+        "width": 44,
+        "height": 44,
+        "visibleIconFills": [
+          "rgb(57, 43, 58)",
+          "rgb(249, 240, 213)",
+          "rgb(249, 240, 213)",
+          "rgb(249, 240, 213)"
+        ],
+        "background": "rgba(0, 0, 0, 0)",
+        "opacity": 1,
+        "radius": "14px",
+        "focused": true,
+        "viewBoxes": [
+          "0 0 128 128",
+          "0 0 128 128"
+        ],
+        "transform": "none",
+        "strokes": [
+          "none",
+          "none",
+          "none",
+          "none",
+          "none",
+          "none",
+          "none",
+          "none"
+        ],
+        "fills": [
+          "rgb(242, 99, 61)",
+          "rgb(249, 240, 213)",
+          "rgb(249, 240, 213)",
+          "rgb(249, 240, 213)",
+          "rgb(57, 43, 58)",
+          "rgb(249, 240, 213)",
+          "rgb(249, 240, 213)",
+          "rgb(249, 240, 213)"
+        ]
+      }
+    },
+    {
+      "pass": true,
+      "name": "未记录到页面运行异常"
+    }
+  ],
+  "errors": [],
+  "versions": {
+    "nexalign": "0.1.0 · 2a7bd4ac · 20260913T1316Z",
+    "aarre": "0.6.17"
+  },
+  "browser": {
+    "protocolVersion": "1.3",
+    "product": "Chrome/152.0.7977.84",
+    "revision": "@4334922f44c77b1208072c4deac29db3af39bbea",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+    "jsVersion": "15.2.124.21"
+  },
+  "ids": {
+    "aarreId": "ppjmhonejgpcdmjmcbbdjookgiagambm",
+    "nexId": "obnemfdgnkklhbdngemomokiklpaenmj"
+  },
+  "bookmarkFolder": {
+    "dateAdded": 1789305443011,
+    "dateGroupModified": 1789305443011,
+    "id": "5",
+    "index": 0,
+    "parentId": "2",
+    "syncing": false,
+    "title": "共享入口验证"
+  },
+  "lastClick": {
+    "box": {
+      "visible": true,
+      "inert": false,
+      "x": 1232,
+      "y": 404,
+      "width": 44,
+      "height": 44,
+      "visibleIconFills": [
+        "rgb(57, 43, 58)",
+        "rgb(249, 240, 213)",
+        "rgb(249, 240, 213)",
+        "rgb(249, 240, 213)"
+      ],
+      "background": "rgba(0, 0, 0, 0)",
+      "opacity": 1,
+      "radius": "14px",
+      "focused": true,
+      "viewBoxes": [
+        "0 0 128 128",
+        "0 0 128 128"
+      ],
+      "transform": "none",
+      "strokes": [
+        "none",
+        "none",
+        "none",
+        "none",
+        "none",
+        "none",
+        "none",
+        "none"
+      ],
+      "fills": [
+        "rgb(242, 99, 61)",
+        "rgb(249, 240, 213)",
+        "rgb(249, 240, 213)",
+        "rgb(249, 240, 213)",
+        "rgb(57, 43, 58)",
+        "rgb(249, 240, 213)",
+        "rgb(249, 240, 213)",
+        "rgb(249, 240, 213)"
+      ]
+    },
+    "before": {
+      "a": {
+        "aarreUi": "floating-host",
+        "hidden": "false",
+        "open": "false",
+        "savePreparing": "false",
+        "suitePaired": "true",
+        "suiteAway": "false",
+        "theme": "dark",
+        "suiteTheme": "dark"
+      },
+      "n": {
+        "layerscopeCanvasToolbar": "",
+        "deviceProfile": "desktop",
+        "floatingSide": "right",
+        "floatingVertical": "top",
+        "floatingTheme": "dark",
+        "menuOpen": "false",
+        "suitePaired": "true",
+        "suiteTheme": "dark"
+      }
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "checks": [
+    {
+      "fonts": [
+        {
+          "name": "Fraunces",
+          "status": "loaded"
+        },
+        {
+          "name": "Lora",
+          "status": "loaded"
+        },
+        {
+          "name": "Alegreya",
+          "status": "loaded"
+        },
+        {
+          "name": "Cormorant",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "mode": "light",
+      "images": true
+    },
+    {
+      "mode": "dark",
+      "images": true
+    },
+    {
+      "width": 390,
+      "scrollWidth": 390,
+      "buttonOverflow": false
+    },
+    {
+      "width": 320,
+      "scrollWidth": 320,
+      "buttonOverflow": false
+    }
+  ],
+  "errors": []
+}

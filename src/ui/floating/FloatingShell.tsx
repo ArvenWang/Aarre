@@ -1,7 +1,9 @@
 import { useEffect, type ReactNode } from "react";
 import { Dropdown } from "@heroui/react/dropdown";
 import { Label } from "@heroui/react/label";
-import { Bookmark, Settings, X, Maximize2, History, SquarePen, MoreHorizontal, Star, FolderPlus, ArrowLeft } from "lucide-react";
+import { Settings, X, Maximize2, History, SquarePen, MoreHorizontal, Star, FolderPlus, ArrowLeft } from "lucide-react";
+import { AarreIcon } from "../components/AarreIcon";
+import { AarreWordmark } from "../components/AarreWordmark";
 import { Button, buttonVariants } from "@/ui/components/ui/button";
 import { Tooltip } from "@/ui/components/ui/tooltip";
 import { ScrollSurface } from "@/ui/components/ui/scroll-area";
@@ -32,8 +34,8 @@ export function FloatingShell({ children, composer, view, conversationTitle, onV
   return <div className="floating-shell">
     <header className="floating-header">
       <div className="floating-brand">
-        {view === "chat" ? <Tooltip content="返回收藏列表"><Button variant="ghost" size="icon-sm" aria-label="返回收藏列表" onClick={() => onViewChange("library")}><ArrowLeft size={16}/></Button></Tooltip> : <Bookmark size={18} aria-hidden="true" />}
-        <strong title={view === "chat" ? conversationTitle : undefined}>{view === "chat" ? conversationTitle || "对话" : "Aarre"}</strong>
+        {view === "chat" ? <Tooltip content="返回收藏列表"><Button variant="ghost" size="icon-sm" aria-label="返回收藏列表" onClick={() => onViewChange("library")}><ArrowLeft size={16}/></Button></Tooltip> : <AarreIcon />}
+        {view === "chat" ? <strong title={conversationTitle}>{conversationTitle || "对话"}</strong> : <AarreWordmark />}
       </div>
       <div className="floating-window-actions">
         {!onboarding && <Tooltip content={currentSaved ? "管理当前网页收藏" : "收藏当前网页"}>
@@ -43,7 +45,7 @@ export function FloatingShell({ children, composer, view, conversationTitle, onV
         </Tooltip>}
         {!onboarding && <Dropdown>
           <Dropdown.Trigger className={buttonVariants({variant:"ghost",size:"icon-sm"})} aria-label="更多操作"><MoreHorizontal size={18} aria-hidden="true" /></Dropdown.Trigger>
-          <Dropdown.Popover className="aarre-menu-popover" placement="bottom end" offset={6}>
+          <Dropdown.Popover data-elevation="popover" className="aarre-menu-popover" placement="bottom end" offset={6}>
             <ScrollSurface className="aarre-menu-viewport" label="更多操作">
               <Dropdown.Menu aria-label="菜单操作" className="aarre-menu" onAction={key => {
                 if (key === "new") onNewConversation();

@@ -53,26 +53,24 @@
 
 .native-settings-panel { display:flex; flex-direction:column; min-height:0; }
 .settings-workspace { display:flex; flex:1; flex-direction:column; min-width:0; min-height:0; }
-.settings-group-navigation { display:none; }
-.settings-group-picker { flex:none; padding:0 16px 12px; border-bottom:1px solid var(--line); }
-.settings-workspace > .settings-page-content { flex:1; padding:8px 16px 20px; }
-.settings-group-panel[hidden] { display:none; }
-.settings-group-title { margin:16px 0 0; font-size:var(--fs-body); font-weight:var(--fw-strong); }
+.settings-workspace > .settings-page-content { flex:1; padding:0 16px 16px; }
+.settings-drawers { min-width:0; }
+.settings-drawer-heading { margin:0; }
+.settings-drawer-trigger { width:100%; min-width:0; min-height:var(--control-h-lg); gap:12px; padding:12px 4px; border-radius:var(--radius-control); color:var(--ink-muted); font:inherit; font-size:var(--fs-body); text-align:left; }
+.settings-drawer-trigger[aria-expanded="true"] { color:var(--ink); font-weight:var(--fw-strong); }
+.settings-drawer-trigger .accordion__indicator { color:inherit; }
+.settings-drawer-trigger:focus-visible { outline:1px solid var(--focus-ring); outline-offset:-2px; }
+.settings-drawer-content { min-width:0; padding:0 4px 16px; }
+.settings-drawer-content > .settings-section:first-child { padding-top:0; }
+.settings-drawer-content > .settings-section:last-child { padding-bottom:0; }
+/* The disclosure heading already names AI services; keep its form label for assistive tech. */
+.settings-drawer-content > form[aria-labelledby="ai-settings-title"] > .settings-section-heading { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip-path:inset(50%); }
 .settings-data-links { display:grid; gap:20px; }
 .settings-data-links .settings-link-row { margin:0; padding:0; }
 .settings-data-links .settings-link-row > div { min-width:0; }
 .settings-data-links small { display:block; margin-top:6px; color:var(--ink-muted); font-size:var(--fs-caption); line-height:1.6; }
 .settings-data-links .aarre-button { flex:none; }
 .markdown-cell-content { min-width:0; overflow-wrap:anywhere; }
-@media (min-width:641px) {
-  .native-settings-panel[data-layout="manager"] .settings-workspace { flex-direction:row; }
-  .native-settings-panel[data-layout="manager"] .settings-group-picker { display:none; }
-  .native-settings-panel[data-layout="manager"] .settings-group-navigation { display:flex; flex-direction:column; gap:4px; flex:0 0 172px; padding:16px 12px; border-right:1px solid var(--line); background:var(--surface-sunken); }
-  .settings-group-navigation .aarre-button { justify-content:flex-start; padding-inline:12px; min-height:36px; font-size:var(--fs-small); color:var(--ink-muted); }
-  .settings-group-navigation .aarre-button[aria-current="page"] { background:var(--surface); color:var(--ink); font-weight:var(--fw-strong); }
-  .native-settings-panel[data-layout="manager"] .settings-page-content { padding:8px 24px 24px; }
-}
-
 /* Settings is also loaded by the full library, without sidepanel.css. */
 .settings-field { position: relative; margin-top: var(--sp-4); display: grid; gap: var(--sp-2); }
 .settings-field > span { color: var(--ink-muted); font-size: var(--fs-caption); font-weight: var(--fw-medium); }

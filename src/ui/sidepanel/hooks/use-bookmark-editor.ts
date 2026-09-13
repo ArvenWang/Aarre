@@ -1,3 +1,4 @@
+import { registerParkPreparation } from "../../../shared/suite-dock/parking";
 import { readDraft, writeDraft } from "../drafts";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { buildBookmarkEditorModel, mergeBookmarkEditorTags } from "../../../lib/bookmark-editor";
@@ -82,6 +83,9 @@ export function useBookmarkEditor({
   useEffect(() => {
     writeDraft("bookmark-editor", editor ? { editor, editBookmarkId, editParentId, editTitle, editUrl, editTags, editTagInput, editTagsChanged, capture, captureSourceTabId, note, folderId, folders, folderSuggestions, bookmarkSaveState, saveDisposition, selectedBookmarkId, captureWarning } : null);
   }, [editor, editBookmarkId, editParentId, editTitle, editUrl, editTags, editTagInput, editTagsChanged, capture, captureSourceTabId, note, folderId, folders, folderSuggestions, bookmarkSaveState, saveDisposition, selectedBookmarkId, captureWarning]);
+  useEffect(() => registerParkPreparation(() => {
+    writeDraft("bookmark-editor", editor ? { editor, editBookmarkId, editParentId, editTitle, editUrl, editTags, editTagInput, editTagsChanged, capture, captureSourceTabId, note, folderId, folders, folderSuggestions, bookmarkSaveState, saveDisposition, selectedBookmarkId, captureWarning } : null, true);
+  }), [editor, editBookmarkId, editParentId, editTitle, editUrl, editTags, editTagInput, editTagsChanged, capture, captureSourceTabId, note, folderId, folders, folderSuggestions, bookmarkSaveState, saveDisposition, selectedBookmarkId, captureWarning]);
 
 
   const currentPageSaveState = useMemo(() => {

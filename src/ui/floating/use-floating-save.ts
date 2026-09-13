@@ -21,8 +21,9 @@ export function useFloatingSave({ enabled, ready, busy, editorKind, onOpen, onDe
       deferFloatingSave(requestId); setRequestId(null); onDeferred?.(); return;
     }
     if (!editorKind) { if (!busy) onOpen(); return; }
-    // Acknowledge only after the destination exists in the committed DOM.
-    // The host keeps its loading surface above the iframe until this point.
+    // The host already animates its loading surface. Replace that surface
+    // only after the requested form has committed, never with the homepage.
+    if (busy) return;
     acceptFloatingSave(requestId);
     setRequestId(null);
   }, [enabled, ready, busy, editorKind, requestId, onOpen, onDeferred]);

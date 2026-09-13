@@ -1,0 +1,122 @@
+{
+  "checks": [
+    {
+      "pass": true,
+      "name": "dark 420px：六个纵向抽屉，默认仅一项展开",
+      "detail": {
+        "width": 420,
+        "dialog": {
+          "x": 12,
+          "y": 153.34375,
+          "w": 396,
+          "h": 569.3125
+        },
+        "allVisible": true,
+        "count": 6,
+        "rows": 6,
+        "overflow": false,
+        "root": "rgb(22, 24, 27)",
+        "surface": "rgb(36, 39, 42)",
+        "expanded": [
+          "AI 服务"
+        ]
+      }
+    },
+    {
+      "pass": true,
+      "name": "dark 420px：展开另一抽屉会收起当前项"
+    },
+    {
+      "pass": true,
+      "name": "dark 320px：六个纵向抽屉，默认仅一项展开",
+      "detail": {
+        "width": 320,
+        "dialog": {
+          "x": 12,
+          "y": 140.046875,
+          "w": 296,
+          "h": 595.90625
+        },
+        "allVisible": true,
+        "count": 6,
+        "rows": 6,
+        "overflow": false,
+        "root": "rgb(22, 24, 27)",
+        "surface": "rgb(36, 39, 42)",
+        "expanded": [
+          "AI 服务"
+        ]
+      }
+    },
+    {
+      "pass": true,
+      "name": "dark 320px：展开另一抽屉会收起当前项"
+    },
+    {
+      "pass": true,
+      "name": "light 420px：六个纵向抽屉，默认仅一项展开",
+      "detail": {
+        "width": 420,
+        "dialog": {
+          "x": 12,
+          "y": 153.34375,
+          "w": 396,
+          "h": 569.3125
+        },
+        "allVisible": true,
+        "count": 6,
+        "rows": 6,
+        "overflow": false,
+        "root": "rgb(255, 255, 255)",
+        "surface": "rgb(255, 255, 255)",
+        "expanded": [
+          "AI 服务"
+        ]
+      }
+    },
+    {
+      "pass": true,
+      "name": "light 420px：展开另一抽屉会收起当前项"
+    },
+    {
+      "pass": true,
+      "name": "light 320px：六个纵向抽屉，默认仅一项展开",
+      "detail": {
+        "width": 320,
+        "dialog": {
+          "x": 12,
+          "y": 140.046875,
+          "w": 296,
+          "h": 595.90625
+        },
+        "allVisible": true,
+        "count": 6,
+        "rows": 6,
+        "overflow": false,
+        "root": "rgb(255, 255, 255)",
+        "surface": "rgb(255, 255, 255)",
+        "expanded": [
+          "AI 服务"
+        ]
+      }
+    },
+    {
+      "pass": true,
+      "name": "light 320px：展开另一抽屉会收起当前项"
+    },
+    {
+      "pass": true,
+      "name": "完整收藏库同步使用单项展开抽屉",
+      "detail": {
+        "count": 6,
+        "expanded": 1
+      }
+    },
+    {
+      "pass": true,
+      "name": "无页面运行异常",
+      "detail": []
+    }
+  ],
+  "errors": []
+}

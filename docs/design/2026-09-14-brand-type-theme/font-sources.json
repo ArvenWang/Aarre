@@ -1,0 +1,38 @@
+[
+  {
+    "id": "fraunces",
+    "file": "fonts/fraunces.ttf",
+    "source": "https://github.com/google/fonts/blob/main/ofl/fraunces/Fraunces-Italic[SOFT,WONK,opsz,wght].ttf",
+    "download": "https://raw.githubusercontent.com/google/fonts/main/ofl/fraunces/Fraunces-Italic%5BSOFT%2CWONK%2Copsz%2Cwght%5D.ttf",
+    "license": "https://github.com/google/fonts/blob/main/ofl/fraunces/OFL.txt",
+    "bytes": 414904,
+    "sha256": "b24448c43702fac4ee856781d461a0dfba8d8e594b6e8e190234b75fed2c0e01"
+  },
+  {
+    "id": "lora",
+    "file": "fonts/lora.ttf",
+    "source": "https://github.com/google/fonts/blob/main/ofl/lora/Lora-Italic[wght].ttf",
+    "download": "https://raw.githubusercontent.com/google/fonts/main/ofl/lora/Lora-Italic%5Bwght%5D.ttf",
+    "license": "https://github.com/google/fonts/blob/main/ofl/lora/OFL.txt",
+    "bytes": 221232,
+    "sha256": "22d8d8854b53807aa664ca34f2031a9ed57a1d0dea296b8b96cdd3aad937a2b3"
+  },
+  {
+    "id": "alegreya",
+    "file": "fonts/alegreya.ttf",
+    "source": "https://github.com/google/fonts/blob/main/ofl/alegreya/Alegreya-Italic[wght].ttf",
+    "download": "https://raw.githubusercontent.com/google/fonts/main/ofl/alegreya/Alegreya-Italic%5Bwght%5D.ttf",
+    "license": "https://github.com/google/fonts/blob/main/ofl/alegreya/OFL.txt",
+    "bytes": 425852,
+    "sha256": "fa915eec76227935dc5fb678953c94b71287c360928013cfdb441dfe52f5a391"
+  },
+  {
+    "id": "cormorantgaramond",
+    "file": "fonts/cormorantgaramond.ttf",
+    "source": "https://github.com/google/fonts/blob/main/ofl/cormorantgaramond/CormorantGaramond-Italic[wght].ttf",
+    "download": "https://raw.githubusercontent.com/google/fonts/main/ofl/cormorantgaramond/CormorantGaramond-Italic%5Bwght%5D.ttf",
+    "license": "https://github.com/google/fonts/blob/main/ofl/cormorantgaramond/OFL.txt",
+    "bytes": 715644,
+    "sha256": "0f48ea6abb2084537854f7174c470991a463b13036309e3b50a81511611c530d"
+  }
+]

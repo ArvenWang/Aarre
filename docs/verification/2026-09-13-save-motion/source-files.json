@@ -1,0 +1,10 @@
+{
+  "src/extension/floating/host.ts": "961a394a6e41d2f0258ca30af8aee1b544be1f4cb260128e4089312a458aae9a",
+  "src/ui/floating/bridge.ts": "090a140a1632dd8750bbdeb5ff599d7c33c30fbfe80b32363d55792f209b1229",
+  "src/ui/floating/main.tsx": "f00800757e98c397c3440e532a2586389304775cf68f1e4c7bea2898d5e8abf9",
+  "src/ui/floating/floating.css": "25fc91fb880be01408343382d5dfc8c69fbbe1d3cf932c7d245b73b2dc012a37",
+  "src/ui/sidepanel/components/BookmarkEditorDialog.tsx": "71be2ecb8300a028d01dac4eed5c2775655f60a92a44d5d6a55ec3fcbeb9a2c9",
+  "src/shared/suite-dock/morph.ts": "f1e5c8fdb500b47e05d8522a1b99d2ebefcfb1653259c29cfb0778ba60c34dc2",
+  "dist/manifest.json": "331165dcf50861de4ed815aaa66c2fc3e3bb96d35acc7ea43465dc50e37cb68a",
+  "dist/floating-host.js": "4822445f3680de2c2f0596a45781ec24e0dd2542217d3db8c504388adf1cae16"
+}

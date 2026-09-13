@@ -1,0 +1,33 @@
+{
+  "tool": "image_gen.imagegen",
+  "outputs": [
+    {
+      "number": "01",
+      "name": "原矿",
+      "file": "01.png",
+      "original": "/Users/nefish/.codex/generated_images/01a08469-63db-7310-98b4-2064fe966d1b/exec-ecaacd7a-991d-41e7-a922-2bbf57bcedf7.png",
+      "sha256": "8b82ad25d72053f05b3f9b18c31dd0805d5d5a322d5a78cc541fad8e7cb3354b"
+    },
+    {
+      "number": "02",
+      "name": "斜晶",
+      "file": "02.png",
+      "original": "/Users/nefish/.codex/generated_images/01a08469-63db-7310-98b4-2064fe966d1b/exec-d7cd5504-510b-4782-ba5f-090662aaf6c6.png",
+      "sha256": "d9aae68e0f6a741b0db73269eba1f3c10b44d7fc2781b92489142064696541ed"
+    },
+    {
+      "number": "03",
+      "name": "润玉",
+      "file": "03.png",
+      "original": "/Users/nefish/.codex/generated_images/01a08469-63db-7310-98b4-2064fe966d1b/exec-11be79a0-cb90-4e83-bc01-ea5f41790fc3.png",
+      "sha256": "7408ecd756b94289cb2af2a2256cfbe7566b143c1f378e36e74371a70e81fbf0"
+    },
+    {
+      "number": "04",
+      "name": "藏晶",
+      "file": "04.png",
+      "original": "/Users/nefish/.codex/generated_images/01a08469-63db-7310-98b4-2064fe966d1b/exec-6024e54b-b932-40f4-bb04-6ba8ef00a190.png",
+      "sha256": "11086e8b7abd0ead9b63f3574c012019b5f7beda22d676a3f2a067f6e2bfe70a"
+    }
+  ]
+}

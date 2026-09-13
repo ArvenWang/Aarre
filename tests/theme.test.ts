@@ -16,7 +16,7 @@ beforeEach(() => {
   vi.stubGlobal("chrome", {
     storage: {
       local: {
-        get: async (key: string) => ({ [key]: values[key] }),
+        get: async (key: string | string[]) => Object.fromEntries((Array.isArray(key) ? key : [key]).map(k => [k, values[k]])),
         set: async (next: Record<string, unknown>) => Object.assign(values, next)
       }
     }

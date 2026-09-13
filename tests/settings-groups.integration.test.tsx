@@ -18,8 +18,10 @@ it("shows one settings group at a time and preserves the unfinished key edit whe
   vi.stubGlobal("matchMedia",vi.fn(()=>({matches:false,addEventListener(){},removeEventListener(){}})));
   const container=document.createElement('div');document.body.append(container);root=createRoot(container);
   await act(async()=>root!.render(<SettingsPage layout="manager" appState={null} publicFaviconFallback onPublicFaviconFallbackChange={()=>{}} onAppStateChange={()=>{}} onRestartOnboarding={()=>{}} onClose={()=>{}}/>));
-  const group=(name:string)=>[...container.querySelectorAll<HTMLButtonElement>('.settings-group-navigation button')].find(b=>b.textContent===name)!;
-  const visible=()=>[...container.querySelectorAll<HTMLElement>('.settings-group-panel')].filter(e=>!e.hidden);
+  const group=(name:string)=>[...container.querySelectorAll<HTMLButtonElement>('.settings-drawer-trigger')].find(b=>b.textContent===name)!;
+  const visible=()=>[...container.querySelectorAll<HTMLElement>('.settings-group-panel')].filter(e=>e.hasAttribute('data-expanded'));
+  expect(container.querySelectorAll('.settings-drawer-trigger')).toHaveLength(6);
+  expect(visible()).toHaveLength(1);
   const edit=[...container.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='编辑')!;
   await act(async()=>edit.click());
   const input=container.querySelector<HTMLInputElement>('input[type="password"]')!;
@@ -30,4 +32,5 @@ it("shows one settings group at a time and preserves the unfinished key edit whe
   expect(visible()).toHaveLength(1);
   expect(container.querySelector('input[type="password"]')).toBe(input);
   expect(input.value).toBe('unsaved-qa-key');
+  expect(container.querySelectorAll('.settings-drawer-trigger[aria-expanded="true"]')).toHaveLength(1);
 });

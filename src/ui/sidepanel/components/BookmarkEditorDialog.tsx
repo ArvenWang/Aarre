@@ -11,7 +11,7 @@ import { ChevronDownIcon, CloseIcon, TrashIcon } from "../../components/Icons";
 import { ProtectionControl } from "../../components/ProtectionControl";
 import { FolderSelect } from "./FolderSelect";
 import { SaveFormBody } from "../../floating/SaveFormBody";
-import { getFloatingContext, postToFloatingHost } from "../../floating/bridge";
+import { getFloatingContext, requestFloatingClose } from "../../floating/bridge";
 import { SaveAiPreview } from "./SaveAiPreview";
 
 function sourceLabel(url: string) {
@@ -49,16 +49,16 @@ export function BookmarkEditorDialog({
   if (!editor) return null;
 
   const close = () => {
+    const finish = () => { setEditor(null); setConfirmDeleteId(""); };
     if (presentation === "page" && getFloatingContext()) {
-      document.documentElement.dataset.floatingClosing = "true";
-      postToFloatingHost({ type: "FLOAT_CLOSE", resetSave: true });
+      requestFloatingClose(finish);
+      return;
     }
-    setEditor(null);
-    setConfirmDeleteId("");
+    finish();
   };
 
   return (
-    <AppModal onClose={close} busy={Boolean(busy)} onEscape={confirmDeleteId ? () => setConfirmDeleteId("") : undefined} labelledBy="native-dialog-title"
+    <AppModal presentation={presentation} onClose={close} busy={Boolean(busy)} onEscape={confirmDeleteId ? () => setConfirmDeleteId("") : undefined} labelledBy="native-dialog-title"
       backdropClassName={`native-dialog-backdrop${presentation === "page" ? " save-page-backdrop" : ""}`}
       className={`native-dialog ${presentation === "page" ? "floating-save-page" : ""} ${editor.kind === "bookmark" && editor.node.url ? "bookmark-detail-dialog" : ""}`}>
         <div className="native-dialog-heading">

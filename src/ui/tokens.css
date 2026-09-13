@@ -5,6 +5,15 @@
   --page-bg-light: #ffffff;
   --surface: #ffffff;
   --surface-sunken: #f5f6f7;
+  /* Raised surfaces are independent of the page, including portalled menus. */
+  --surface-dialog: #ffffff;
+  --surface-dialog-muted: #f5f6f7;
+  --surface-popover: #ffffff;
+  --surface-popover-muted: #f5f6f7;
+  --line-elevated: #dadde0;
+  --ink-elevated-faint: #68717a;
+  --line-elevated-strong: color-mix(in srgb, #17191c 24%, #ffffff);
+  --shadow-elevated: 0 2px 8px color-mix(in srgb, #0f1113 12%, transparent), 0 20px 56px color-mix(in srgb, #0f1113 22%, transparent);
   /* Transparent site-brand artwork always sits on a white carrier. */
   --site-icon-canvas: #ffffff;
   --ink: #17191c;
@@ -13,14 +22,17 @@
   --line: #ebedef;
   --line-strong: #dadde0;
   --card-outline: rgb(0 0 0 / 6%);
-  --accent: #087b70;
-  --positive: #087b70;
+  /* Small accent text uses a deeper orange; solid controls match the logo. */
+  --accent: #b74624;
+  --accent-solid: #f2633d;
+  --accent-solid-ink: #17191c;
+  --positive: var(--accent);
   --negative: #b83b30;
   --danger-ink: var(--scrim-ink);
   --cover-action-bg: var(--surface);
   --cover-action-ink: var(--ink);
 
-  --chart-1: #12a594;
+  --chart-1: var(--accent-solid);
   --chart-2: #5b7cd8;
   --chart-3: #c2762e;
   --chart-4: #7b6bc4;
@@ -64,8 +76,7 @@
   --scrim-ink: #ffffff;
   --scrim-ink-muted: color-mix(in srgb, #ffffff 72%, transparent);
 
-  /* Keyboard/selection rings stay cool-neutral. Accent is brand colour for
-     charts and status — not for focus chrome, which read as a green frame. */
+  /* Keyboard rings stay neutral; brand accents identify selections and status. */
   --focus-ring: color-mix(in srgb, #1c2430 70%, transparent);
 
   /* Every interactive control resolves to one of these heights. Declared as
@@ -88,6 +99,7 @@
   --toggle-track-h: 24px;
   --toggle-thumb: 18px;
   --toggle-inset: 2px;
+  --toggle-active-track: var(--accent-solid);
   --control-border-w: 1px;
   --tag-entry-width: 128px;
   --icon-xs: 12px;
@@ -107,6 +119,7 @@
   --fw-regular: 400;
   --fw-medium: 500;
   --fw-strong: 650;
+  --fw-brand: 600;
 
   --dur-fast: 120ms;
   --dur-base: 200ms;
@@ -115,6 +128,9 @@
   --font-ui:
     "Avenir Next", "Avenir", "PingFang SC", "Hiragino Sans GB",
     "Microsoft YaHei", sans-serif;
+  --font-brand: "Aarre Wordmark", Georgia, serif;
+  --fs-brand: 1.25rem;
+  --fs-brand-large: 1.375rem;
   --fs-caption: 12px;
   --fs-small: 13px;
   --fs-body: 15px;
@@ -200,14 +216,24 @@
   --bg: #0f1113;
   --surface: #16181b;
   --surface-sunken: #1d2023;
+  --surface-dialog: #24272a;
+  --surface-dialog-muted: #34383c;
+  --surface-popover: #34383c;
+  --surface-popover-muted: color-mix(in srgb, #34383c 90%, #ffffff);
+  --line-elevated: color-mix(in srgb, #eef0f2 18%, #24272a);
+  --ink-elevated-faint: #adb5be;
+  --line-elevated-strong: color-mix(in srgb, #eef0f2 26%, #24272a);
+  --shadow-elevated: 0 2px 8px color-mix(in srgb, #0f1113 36%, transparent), 0 20px 56px color-mix(in srgb, #0f1113 55%, transparent);
   --ink: #eef0f2;
   --ink-muted: #adb5be;
   --ink-faint: #919aa4;
   --line: #24272a;
   --line-strong: #34383c;
   --card-outline: rgb(255 255 255 / 6%);
-  --accent: #2ec4b0;
-  --positive: #2ec4b0;
+  --accent: #dedede;
+  --accent-solid: #dedede;
+  --toggle-active-track: color-mix(in srgb, #dedede 56%, #17191c);
+  --positive: var(--accent);
   --negative: #e0776a;
   --danger-ink: var(--bg);
   --cover-action-bg: var(--ink);
@@ -215,7 +241,7 @@
   --focus-ring: color-mix(in srgb, #c5ceda 55%, transparent);
   --scrim-cover: color-mix(in srgb, #0a0d12 72%, transparent);
 
-  --chart-1: #2ec4b0;
+  --chart-1: var(--accent-solid);
   --chart-2: #7d9ce8;
   --chart-3: #dba05a;
   --chart-4: #a394e0;
@@ -227,14 +253,24 @@
     --bg: #0f1113;
     --surface: #16181b;
     --surface-sunken: #1d2023;
+    --surface-dialog: #24272a;
+    --surface-dialog-muted: #34383c;
+    --surface-popover: #34383c;
+    --surface-popover-muted: color-mix(in srgb, #34383c 90%, #ffffff);
+    --line-elevated: color-mix(in srgb, #eef0f2 18%, #24272a);
+    --ink-elevated-faint: #adb5be;
+    --line-elevated-strong: color-mix(in srgb, #eef0f2 26%, #24272a);
+    --shadow-elevated: 0 2px 8px color-mix(in srgb, #0f1113 36%, transparent), 0 20px 56px color-mix(in srgb, #0f1113 55%, transparent);
     --ink: #eef0f2;
     --ink-muted: #adb5be;
     --ink-faint: #919aa4;
     --line: #24272a;
     --line-strong: #34383c;
     --card-outline: rgb(255 255 255 / 6%);
-    --accent: #2ec4b0;
-    --positive: #2ec4b0;
+    --accent: #dedede;
+    --accent-solid: #dedede;
+    --toggle-active-track: color-mix(in srgb, #dedede 56%, #17191c);
+    --positive: var(--accent);
     --negative: #e0776a;
     --danger-ink: var(--bg);
     --cover-action-bg: var(--ink);
@@ -242,7 +278,7 @@
     --focus-ring: color-mix(in srgb, #c5ceda 55%, transparent);
     --scrim-cover: color-mix(in srgb, #0a0d12 72%, transparent);
 
-    --chart-1: #2ec4b0;
+    --chart-1: var(--accent-solid);
     --chart-2: #7d9ce8;
     --chart-3: #dba05a;
     --chart-4: #a394e0;

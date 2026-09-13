@@ -31,7 +31,7 @@ it("replaces disconnected hosts even when the installed version has not changed"
   send.mockRejectedValue(new Error("Extension context invalidated"));
   await Promise.all([ensureFloatingHost(8), ensureFloatingHost(8)]);
   expect(inject).toHaveBeenCalledTimes(1);
-  expect(inject).toHaveBeenCalledWith({ target: { tabId: 8, frameIds: [0] }, files: ["floating-host.js"] });
+  expect(inject).toHaveBeenCalledWith({ target: { tabId: 8, frameIds: [0] }, files: ["floating-host.js"], injectImmediately: true });
 });
 it("replaces older live hosts on extension reload and injects missing hosts on navigation", async () => {
   send.mockResolvedValue({ ok: true, version: "0.6.7" });

@@ -1,10 +1,11 @@
+import { registerParkPreparation } from "../../shared/suite-dock/parking";
 import { AgentComposer } from "./components/AgentComposer";
 import { BookmarkEditorDialog } from "./components/BookmarkEditorDialog";
 import { AppModal } from "@/ui/components/ui/modal";
 import { Button } from "@/ui/components/ui/button";
 import { X } from "lucide-react";
 import { FloatingShell } from "../floating/FloatingShell";
-import { FLOATING_VIEW_EVENT } from "../floating/bridge";
+import { FLOATING_VIEW_EVENT, postToFloatingHost } from "../floating/bridge";
 import { useFloatingSave } from "../floating/use-floating-save";
 import { Suspense, lazy, useCallback, useEffect, useState, type ReactNode } from "react";
 import { sendExtensionRequest } from "../../lib/messages";
@@ -37,6 +38,7 @@ export function SidePanelApp({ surface = "sidebar" }: { surface?: "sidebar" | "f
   );
   const [panelView, setWorkspaceView] = useState<SidePanelView>("library");
   const [utilityView, setUtilityView] = useState<"settings" | "history" | null>(null);
+  useEffect(() => { postToFloatingHost({ type: "FLOAT_CURRENT_VIEW", view: utilityView ?? panelView }); }, [panelView, utilityView]);
   const setPanelView = useCallback((next: SidePanelView) => {
     if (surface === "floating" && (next === "settings" || next === "history")) setUtilityView(next);
     else { setWorkspaceView(next); setUtilityView(null); }
@@ -65,6 +67,9 @@ export function SidePanelApp({ surface = "sidebar" }: { surface?: "sidebar" | "f
     dismiss: dismissBookmarkPreviewImmediately,
   } = useBookmarkPreview();
   const [busy, setBusy] = useState("");
+  useEffect(() => registerParkPreparation(() => {
+    if (busy) throw new Error("当前操作仍在进行，完成后再切换应用。");
+  }), [busy]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const dismissError = useCallback(() => setError(""), []);

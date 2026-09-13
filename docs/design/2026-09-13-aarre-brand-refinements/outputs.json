@@ -1,0 +1,83 @@
+{
+  "method": "builtin image_gen.imagegen",
+  "outputs": [
+    {
+      "id": "A1",
+      "family": "拾集",
+      "name": "聚拢",
+      "source": "/Users/nefish/.codex/generated_images/01a08469-63db-7310-98b4-2064fe966d1b/exec-0436c2b9-f211-42e4-b286-8d6ed958a07c.png",
+      "file": "A1-cabinet-cluster.png",
+      "reference": "/Users/nefish/Desktop/Coding/Aarre/docs/design/2026-09-13-aarre-brand-directions/03-cabinet.png",
+      "review": "已目视检查；使用原方向作参考的品牌延展概念。",
+      "width": 1536,
+      "height": 1024,
+      "sha256": "c06989805830ac311cb0fc2279948ad44d290aaf747d422b31c77bc899437856",
+      "bytes": 1681103
+    },
+    {
+      "id": "A2",
+      "family": "拾集",
+      "name": "拼合",
+      "source": "/Users/nefish/.codex/generated_images/01a08469-63db-7310-98b4-2064fe966d1b/exec-a963d42f-1d64-4227-a610-a88e1671ad8e.png",
+      "file": "A2-cabinet-fit.png",
+      "reference": "/Users/nefish/Desktop/Coding/Aarre/docs/design/2026-09-13-aarre-brand-directions/03-cabinet.png",
+      "review": "已目视检查；使用原方向作参考的品牌延展概念。",
+      "width": 1536,
+      "height": 1024,
+      "sha256": "05ee4485a24cbd48d7c0faaa78a4a01592d1d0aa571efc166305b2013339dcda",
+      "bytes": 1802859
+    },
+    {
+      "id": "B1",
+      "family": "回流",
+      "name": "方环",
+      "source": "/Users/nefish/.codex/generated_images/01a08469-63db-7310-98b4-2064fe966d1b/exec-be559cf6-c411-4bce-9a30-3b63da2017bb.png",
+      "file": "B1-current-square.png",
+      "reference": "/Users/nefish/Desktop/Coding/Aarre/docs/design/2026-09-13-aarre-brand-directions/02-current.png",
+      "review": "已目视检查；使用原方向作参考的品牌延展概念。",
+      "width": 1536,
+      "height": 1024,
+      "sha256": "032058dc02877a769bdf3bcd10447852a78db27fdd1959c4991f84ccbaec3973",
+      "bytes": 1622305
+    },
+    {
+      "id": "B2",
+      "family": "回流",
+      "name": "旋流",
+      "source": "/Users/nefish/.codex/generated_images/01a08469-63db-7310-98b4-2064fe966d1b/exec-37460ebb-48ec-4b39-9eb9-4a1c226c36a7.png",
+      "file": "B2-current-flow.png",
+      "reference": "/Users/nefish/Desktop/Coding/Aarre/docs/design/2026-09-13-aarre-brand-directions/02-current.png",
+      "review": "已目视检查；使用原方向作参考的品牌延展概念。",
+      "width": 1536,
+      "height": 1024,
+      "sha256": "c50628263d5d67273562f5f04ebd7122e7414309cba359d2e99d3cd750cca16b",
+      "bytes": 1667232
+    },
+    {
+      "id": "C1",
+      "family": "林间",
+      "name": "新芽",
+      "source": "/Users/nefish/.codex/generated_images/01a08469-63db-7310-98b4-2064fe966d1b/exec-10b501af-1618-4b8d-85a4-50cced37bd19.png",
+      "file": "C1-grove-sprout.png",
+      "reference": "/Users/nefish/Desktop/Coding/Aarre/docs/design/2026-09-13-aarre-brand-directions/05-grove.png",
+      "review": "已目视检查；使用原方向作参考的品牌延展概念。",
+      "width": 1536,
+      "height": 1024,
+      "sha256": "9b17bc180ac4702143a5d27b51c33226dd51e1f64f7029595247d2aed585f93f",
+      "bytes": 1843975
+    },
+    {
+      "id": "C2",
+      "family": "林间",
+      "name": "林隙",
+      "source": "/Users/nefish/.codex/generated_images/01a08469-63db-7310-98b4-2064fe966d1b/exec-bf577267-a454-4f26-8baf-84a69203b706.png",
+      "file": "C2-grove-clearing.png",
+      "reference": "/Users/nefish/Desktop/Coding/Aarre/docs/design/2026-09-13-aarre-brand-directions/05-grove.png",
+      "review": "已目视检查；使用原方向作参考的品牌延展概念。",
+      "width": 1536,
+      "height": 1024,
+      "sha256": "5b7ffef8337f0886002890528f9a55546072c74640f1e0d6ab63a916c969d776",
+      "bytes": 1964124
+    }
+  ]
+}

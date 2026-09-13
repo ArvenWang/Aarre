@@ -1,0 +1,70 @@
+{
+  "outputs": [
+    {
+      "id": "05",
+      "name": "林间",
+      "source": "/Users/nefish/.codex/generated_images/01a08469-63db-7310-98b4-2064fe966d1b/exec-2cf23e32-770d-439e-84d0-4014ac2f5fea.png",
+      "file": "05-grove.png",
+      "review": "已目视检查；品牌探索概念，未替换产品资产。",
+      "sha256": "0f0fe22a2e4f4b98379e1adff5317643e9c9a503e554ec2f08057766b6e7241a",
+      "bytes": 1947733,
+      "width": 1536,
+      "height": 1024
+    },
+    {
+      "id": "06",
+      "name": "索引",
+      "source": "/Users/nefish/.codex/generated_images/01a08469-63db-7310-98b4-2064fe966d1b/exec-042510af-fdcc-4c77-9eb0-33570ad37aeb.png",
+      "file": "06-index.png",
+      "review": "已目视检查；品牌探索概念，未替换产品资产。",
+      "sha256": "9afa4e97b377f5ee4be7c6c5ea73883e22f89d22a0e817e4cc5f34105aea3474",
+      "bytes": 1556344,
+      "width": 1536,
+      "height": 1024
+    },
+    {
+      "id": "07",
+      "name": "余波",
+      "source": "/Users/nefish/.codex/generated_images/01a08469-63db-7310-98b4-2064fe966d1b/exec-b8bebdf6-f171-4ea1-b636-6518b71ea265.png",
+      "file": "07-echo.png",
+      "review": "已目视检查；品牌探索概念，未替换产品资产。",
+      "sha256": "6fce370cd0315f3d74df253e59e17c7a559347bc76122ddc0b9f52a3954c6c88",
+      "bytes": 1845892,
+      "width": 1536,
+      "height": 1024
+    },
+    {
+      "id": "08",
+      "name": "剪藏",
+      "source": "/Users/nefish/.codex/generated_images/01a08469-63db-7310-98b4-2064fe966d1b/exec-7caf8691-a608-48b6-833a-0af1709cbb09.png",
+      "file": "08-cut.png",
+      "review": "已目视检查；品牌探索概念，未替换产品资产。",
+      "sha256": "ac6ec1b4e744d1ecbba5c6f01690ce0000617428ee25837d1138f040227ad926",
+      "bytes": 1982400,
+      "width": 1536,
+      "height": 1024
+    },
+    {
+      "id": "09",
+      "name": "藏印",
+      "source": "/Users/nefish/.codex/generated_images/01a08469-63db-7310-98b4-2064fe966d1b/exec-5ad315b3-e37d-442c-a30c-d7b448e4be31.png",
+      "file": "09-imprint.png",
+      "review": "已目视检查；品牌探索概念，未替换产品资产。",
+      "sha256": "e86e40f382a16d470407d05eb67a9bc5f7ae53c157a30e44a3f17624f49c6827",
+      "bytes": 1771296,
+      "width": 1536,
+      "height": 1024
+    },
+    {
+      "id": "10",
+      "name": "闪存",
+      "source": "/Users/nefish/.codex/generated_images/01a08469-63db-7310-98b4-2064fe966d1b/exec-86bc0632-af53-464a-b353-fd934609cee8.png",
+      "file": "10-signal.png",
+      "review": "已目视检查；品牌探索概念，未替换产品资产。",
+      "sha256": "74e9b2847d062c6a446c9660353efe72ad4ae0a537e565210b2d9a15530d0ce9",
+      "bytes": 1668934,
+      "width": 1536,
+      "height": 1024
+    }
+  ]
+}

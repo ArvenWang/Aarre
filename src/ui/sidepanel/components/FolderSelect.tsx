@@ -160,7 +160,7 @@ function FolderSelect({
         <ChevronDownIcon />
       </Button>
       <Popover.Content triggerRef={triggerRef} isOpen={open} onOpenChange={setOpen} placement="bottom start" offset={6}
-        className="aarre-folder-popover" style={{ width: triggerRef.current?.offsetWidth }}>
+        data-elevation="popover" className="aarre-folder-popover" style={{ width: triggerRef.current?.offsetWidth }}>
         <Popover.Dialog aria-label="选择文件夹" className="folder-popover-dialog">
         <ScrollSurface as="div"
           onKeyDown={handleKeyDown}

@@ -1,0 +1,11 @@
+{
+  "version": "0.6.15",
+  "files": {
+    "src/extension/floating/host.ts": "9ba26420746fb2414e9e6411664908376ce3ff230afa47d5fe0ad95fc3488f4d",
+    "tests/floating-host-recovery.integration.test.ts": "1eb5fcf70bfc6af58bb7d049e1a18f84eb697a93c68073c1adb14258c27255a7",
+    "scripts/verify-floating-save-transition.mjs": "30f3a2b982bf0e20f84f8f41f9387715ca9193dc617eb87369f37d350e277ed5",
+    "public/manifest.json": "34eb6b42f473605234ead811a0f36131c24c6ec3d8fad793d2ffd103d7e0a4f6",
+    "dist/manifest.json": "fedfbe4740ec0405f7fa92375269f1ebfdfd63eeff3c0d1c6a03c3413a205cac",
+    "dist/floating-host.js": "73b5b937d1ddfd0bb8ccbfcccf8325af2e1c57159bc8495fd5449dcf16590ce3"
+  }
+}
