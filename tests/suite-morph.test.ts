@@ -29,15 +29,15 @@ it("does not replay or cancel opening when readiness and broker state repeat", (
   expect(animation.cancel).not.toHaveBeenCalled();
 });
 
-it("reverses from the currently rendered surface, opacity and translation", () => {
+it("reverses from the currently rendered surface and opacity without shifting content", () => {
   const f = fixture(); f.controller.layout(f.menu, true, true);
-  vi.spyOn(f.surface, "getBoundingClientRect").mockReturnValue({ x: 1030, y: 200, width: 250, height: 500 } as DOMRect);
+  vi.spyOn(f.surface, "getBoundingClientRect").mockReturnValue({ x: 1022, y: 200, width: 250, height: 500 } as DOMRect);
   const native = getComputedStyle;
-  vi.stubGlobal("getComputedStyle", (el: Element) => el === f.panel ? { opacity: "0.45", transform: "matrix(1, 0, 0, 1, 6, 0)" } : native(el));
+  vi.stubGlobal("getComputedStyle", (el: Element) => el === f.panel ? { opacity: "0.45", transform: "none" } : native(el));
   f.controller.layout(f.bar, false, true);
-  expect(f.content.mock.calls[1][0][0]).toEqual({ opacity: .45, transform: "matrix(1, 0, 0, 1, 6, 0)" });
+  expect(f.content.mock.calls[1][0][0]).toEqual({ opacity: .45 });
   expect(f.base.mock.calls[1][0][0].transform).toContain(`scale(${250 / 52},${500 / SUITE_BAR_HEIGHT})`);
-  expect(f.panel.style.opacity).toBe("0"); expect(f.panel.style.transform).toBe("translateX(8px)");
+  expect(f.panel.style.opacity).toBe("0"); expect(f.panel.style.transform).toBe("none");
   f.controller.destroy(); expect(f.base.mock.results[1].value.cancel).toHaveBeenCalled();
 });
 
@@ -50,14 +50,34 @@ it("retargets a changed viewport without extending the current transition deadli
   expect(f.content).toHaveBeenCalledTimes(1);
 });
 
-it("keeps content at its real size while using the common enter and exit motion", () => {
+it("keeps content at its final position while using the common enter and exit motion", () => {
   const f = fixture(); f.controller.layout(f.menu, true, true);
   const [frames, options] = f.content.mock.calls[0];
-  expect(frames).toEqual([{ opacity: 0, transform: "translateX(12px)" }, { opacity: 1, transform: "none" }]);
+  expect(frames).toEqual([{ opacity: 0 }, { opacity: 1 }]);
   expect(options).toMatchObject({ duration: 140, delay: 100 });
   f.controller.layout(f.bar, false, true);
   expect(f.content.mock.calls[1][1]).toMatchObject({ duration: 120, delay: 0 });
   expect(f.base.mock.calls.map(call => call[1].duration)).toEqual([280, 210]);
+});
+
+it("moves the visible content with a changed right edge within the opening deadline", () => {
+  const f = fixture(); f.controller.layout(f.menu, true, true);
+  const first = f.base.mock.results[0].value; first.currentTime = 80;
+  vi.spyOn(f.surface, "getBoundingClientRect").mockReturnValue({ x: 1022, y: 200, width: 250, height: 500 } as DOMRect);
+  f.controller.layout({ ...f.menu, x: f.menu.x + 18 }, true);
+  const [frames, timing] = f.content.mock.calls[1];
+  expect(frames).toEqual([{ transform: "translateX(-18px)" }, { transform: "none" }]);
+  expect(timing).toMatchObject({ duration: 200, easing: f.base.mock.calls[1][1].easing });
+  expect(f.content.mock.calls.filter(([keys]) => "opacity" in keys[0])).toHaveLength(1);
+});
+
+it("animates a late viewport edge change without replaying content appearance", () => {
+  const f = fixture(); f.controller.layout(f.menu, true, true);
+  f.base.mock.results[0].value.playState = "finished";
+  vi.spyOn(f.surface, "getBoundingClientRect").mockReturnValue({ ...f.menu } as DOMRect);
+  f.controller.layout({ ...f.menu, x: f.menu.x + 18 }, true);
+  expect(f.base.mock.calls[1][0][0].transform).toContain("translate(-18px,0px)");
+  expect(f.content.mock.calls[1][0]).toEqual([{ transform: "translateX(-18px)" }, { transform: "none" }]);
 });
 
 it("shows and hides immediately for reduced motion without creating animations", () => {

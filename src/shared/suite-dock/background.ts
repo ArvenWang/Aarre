@@ -1,4 +1,4 @@
-import { canonicalTheme, compareTheme, isApp, isMode, isTheme, NEXALIGN_IDS, SUITE_DOCK_PORT, SUITE_THEME_KEY, SUITE_THEME_PORT, type SuiteApp, type SuiteTheme } from "./contract";
+import { canonicalTheme, compareTheme, isApp, isMode, isRatio, isTheme, NEXALIGN_IDS, SUITE_DOCK_PORT, SUITE_THEME_KEY, SUITE_THEME_PORT, type SuiteApp, type SuiteTheme } from "./contract";
 
 export function installSuiteBackground(app: SuiteApp) {
   const themePorts = new Set<chrome.runtime.Port>();
@@ -61,12 +61,12 @@ export function installSuiteBackground(app: SuiteApp) {
   if (app !== "aarre") return;
 
   type Client = { port: chrome.runtime.Port; app: SuiteApp; enabled: boolean; opened: boolean };
-  type Group = { clients: Map<SuiteApp, Client>; active: SuiteApp | null; sequence: number; queue?: Promise<void> };
+  type Group = { clients: Map<SuiteApp, Client>; active: SuiteApp | null; ratio?: number; sequence: number; queue?: Promise<void> };
   const groups = new Map<string, Group>();
   const replies = new Map<string, { port: chrome.runtime.Port; finish: (ok: boolean) => void }>();
   const paired = (group: Group) => group.clients.get("aarre")?.enabled === true && group.clients.get("nexalign")?.enabled === true;
   const broadcast = (group: Group) => {
-    for (const client of group.clients.values()) safePost(client.port, { type: "STATE", paired: paired(group), active: group.active });
+    for (const client of group.clients.values()) safePost(client.port, { type: "STATE", paired: paired(group), active: group.active, ratio: group.ratio });
   };
   const command = (client: Client, type: "OPEN" | "CLOSE") => new Promise<boolean>(resolve => {
     const id = crypto.randomUUID();
@@ -114,7 +114,7 @@ export function installSuiteBackground(app: SuiteApp) {
       || sender.frameId !== 0 || typeof sender.tab?.id !== "number" || !sender.documentId
       || sender.documentLifecycle !== "active" || !/^https?:\/\//.test(sender.url ?? "")) { port.disconnect(); return; }
     const key = `${sender.tab.id}:${sender.documentId}`;
-    const group = groups.get(key) ?? { clients: new Map(), active: null, sequence: 0 };
+    const group: Group = groups.get(key) ?? { clients: new Map(), active: null, sequence: 0 };
     groups.set(key, group);
     const old = group.clients.get(app);
     const client: Client = { port, app, enabled: false, opened: false };
@@ -145,6 +145,12 @@ export function installSuiteBackground(app: SuiteApp) {
     port.onMessage.addListener(message => {
       if (group.clients.get(app) !== client) return;
       if (message?.type === "PONG" && message.id === probe) probe = undefined;
+      // Only the visible handle's owning host can move the paired surface.
+      // The hosts persist the accepted ratio through their existing settings.
+      if (message?.type === "POSITION" && isRatio(message.ratio) && client.enabled
+        && (!paired(group) || app === "aarre") && !group.active) {
+        group.ratio = message.ratio; broadcast(group);
+      }
       if (message?.type === "HELLO" && message.version === 1) {
         if (client.enabled && message.enabled !== true) group.sequence++;
         client.enabled = message.enabled === true; client.opened = message.opened === true;

@@ -1,4 +1,4 @@
-import { AARRE_ID, isApp, isTheme, resolvedTheme, SUITE_DOCK_PORT, SUITE_THEME_PORT, type SuiteApp, type SuiteState, type SuiteTheme } from "./contract";
+import { AARRE_ID, isApp, isRatio, isTheme, resolvedTheme, SUITE_DOCK_PORT, SUITE_THEME_PORT, type SuiteApp, type SuiteState, type SuiteTheme } from "./contract";
 
 export function createSuiteClient(app: SuiteApp, hooks: {
   state: (state: SuiteState) => void; theme: (theme: "light" | "dark") => void;
@@ -31,7 +31,7 @@ export function createSuiteClient(app: SuiteApp, hooks: {
       port.onMessage.addListener(message => {
         if (dock !== port || disposed) return;
         if (message?.type === "STATE" && typeof message.paired === "boolean" && (message.active === null || isApp(message.active))) {
-          connected = true; state = { paired: message.paired, active: message.active }; hooks.state(state);
+          connected = true; state = { paired: message.paired, active: message.active, ...(isRatio(message.ratio) ? { ratio: message.ratio } : {}) }; hooks.state(state);
         }
         if (message?.type === "THEME" && isTheme(message.theme)) post(themes, { type: "MERGE", theme: message.theme });
         if (message?.type === "PING" && typeof message.id === "string" && alive()) post(port, { type: "PONG", id: message.id });
@@ -62,6 +62,7 @@ export function createSuiteClient(app: SuiteApp, hooks: {
   const heartbeat = setInterval(() => { connectThemes(); connect(); post(dock, { type: "PING" }); post(themes, { type: "PING" }); }, 20_000);
   return {
     get paired() { return state.paired; },
+    position(ratio: number) { if (isRatio(ratio)) post(dock, { type: "POSITION", ratio }); },
     enabled(value: boolean) { if (enabled !== value) { enabled = value; hello(); } },
     changed(value: boolean) {
       if (opened === value) return;

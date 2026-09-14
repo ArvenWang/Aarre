@@ -102,3 +102,15 @@ it("recovers from an uninstalled caller even when Chrome leaves its external Por
   expect(n.disconnect).toHaveBeenCalled();
   expect(sent(a, "STATE").at(-1)).toMatchObject({ paired: false, active: null });
 });
+
+it("shares a valid vertical position only from the visible paired handle", async () => {
+  const a=port("aarre"), n=port("nexalign"); await flush();
+  a.onMessage.emit({type:"POSITION",ratio:.19}); await flush();
+  expect(sent(n,"STATE").at(-1).ratio).toBe(.19);
+  for(const ratio of [NaN,Infinity,-1,2,".5",null]) a.onMessage.emit({type:"POSITION",ratio});
+  n.onMessage.emit({type:"POSITION",ratio:.8}); await flush();
+  expect(sent(a,"STATE").at(-1).ratio).toBe(.19);
+  await openNex(a,n);
+  a.onMessage.emit({type:"POSITION",ratio:.7}); await flush();
+  expect(sent(n,"STATE").at(-1).ratio).toBe(.19);
+});

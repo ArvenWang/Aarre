@@ -4,6 +4,9 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 let shadow: ShadowRoot;
 const nonce = "host-recovery-test";
 const origin = location.origin;
+type PositionRequest = { type: "FLOAT_POSITION"; position: { width: number } } | { type: "FLOAT_HOST_INIT" };
+// Select Chrome's promise-based, same-extension overload for delayed replies.
+const positionMessages = () => vi.mocked(chrome.runtime.sendMessage as (message: PositionRequest) => Promise<unknown>);
 
 beforeEach(async () => {
   vi.resetModules(); vi.useFakeTimers();
@@ -142,7 +145,53 @@ it("resizes only from the left separator, clamps width, and retains viewport hei
   expect(panel.style.width).toBe('320px');expect(panel.style.height).toBe(height);
   expect(shadow.querySelectorAll('[role="separator"][tabindex="0"]')).toHaveLength(1);
   expect(shadow.querySelector('.ball')).toBeNull();
+  await vi.advanceTimersByTimeAsync(0);
   expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({type:'FLOAT_POSITION',position:{width:320}});
+});
+
+it("retains the user's new geometry when an older settings read finishes late", async () => {
+  await toggle(); ready(currentFrame());
+  let finishRead!: (value: unknown) => void;
+  positionMessages().mockImplementation(async message => {
+    if (message.type === "FLOAT_HOST_INIT") return new Promise<unknown>(resolve => { finishRead = resolve; });
+    return { ok: true };
+  });
+  window.dispatchEvent(new Event("pageshow"));
+  await vi.advanceTimersByTimeAsync(0);
+  shadow.querySelector<HTMLElement>(".resize")!.dispatchEvent(new KeyboardEvent("keydown", { key: "End", bubbles: true }));
+  finishRead({ ok: true, data: { tabId: 7, documentId: "host-document", nonce, enabled: true, theme: "light", position: { width: 400 } } });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(shadow.querySelector<HTMLElement>(".panel")!.style.width).toBe("640px");
+});
+
+it("persists rapid geometry changes in order before refreshing host settings", async () => {
+  await toggle(); ready(currentFrame());
+  let releaseWrite!: () => void;
+  let stored = { width: 400 };
+  const requests: string[] = [];
+  positionMessages().mockImplementation(async message => {
+    if (message.type === "FLOAT_POSITION") {
+      requests.push(`write:${message.position.width}`);
+      if (message.position.width === 640) await new Promise<void>(resolve => { releaseWrite = resolve; });
+      stored = message.position;
+    }
+    if (message.type === "FLOAT_HOST_INIT") {
+      requests.push("read");
+      return { ok: true, data: { tabId: 7, documentId: "host-document", nonce, enabled: true, theme: "light", position: stored } };
+    }
+    return { ok: true };
+  });
+  const separator = shadow.querySelector<HTMLElement>(".resize")!;
+  separator.dispatchEvent(new KeyboardEvent("keydown", { key: "End", bubbles: true }));
+  separator.dispatchEvent(new KeyboardEvent("keydown", { key: "Home", bubbles: true }));
+  window.dispatchEvent(new Event("pageshow"));
+  await vi.advanceTimersByTimeAsync(0);
+  expect(requests).toEqual(["write:640"]);
+  releaseWrite();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(requests).toEqual(["write:640", "write:320", "read"]);
+  expect(stored.width).toBe(320);
+  expect(shadow.querySelector<HTMLElement>(".panel")!.style.width).toBe("320px");
 });
 
 it("cancels a delayed close when immediately reopened without replacing the iframe",async()=>{
@@ -237,7 +286,11 @@ it("covers cold and warm content until the save form has committed without hidin
   expect(shadow.querySelector<HTMLElement>(".bar")!.hidden).toBe(true);
   await presentSave(frame);
   expect(frame.style.visibility).toBe("visible");
-  const panelStyle = shadow.querySelector<HTMLElement>(".panel")!.style;
+  const panel = shadow.querySelector<HTMLElement>(".panel")!;
+  const panelStyle = panel.style;
+  // jsdom has no layout engine; supply the browser's measured CSS width while
+  // the real host preserves the outgoing form and aligns its right edge.
+  vi.spyOn(panel, "offsetWidth", "get").mockImplementation(() => Number.parseFloat(panelStyle.width));
   const geometryBeforeClose = [panelStyle.left, panelStyle.top, panelStyle.width, panelStyle.height];
   hostMessage(frame, { type: "FLOAT_CLOSE", resetSave: true, requestId: "close-save" });
   expect([panelStyle.left, panelStyle.top, panelStyle.width, panelStyle.height]).toEqual(geometryBeforeClose);

@@ -28,21 +28,21 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 describe("floating geometry", () => {
   it("sizes the save task to content independently of the workspace and centers it on the launcher", () => {
-    expect(floatingSaveRect({width:1280,height:900},420)).toEqual({x:920,y:240,width:360,height:420});
-    expect(floatingRects({width:600},{width:1280,height:900}).menu).toEqual({x:680,y:12,width:600,height:876});
+    expect(floatingSaveRect({width:1280,height:900},420)).toEqual({x:912,y:240,width:360,height:420});
+    expect(floatingRects({width:600},{width:1280,height:900}).menu).toEqual({x:672,y:12,width:600,height:876});
   });
   it("clamps a long save form in a short or zoomed viewport", () => {
-    expect(floatingSaveRect({width:280,height:360,left:30,top:20},1200)).toEqual({x:30,y:32,width:280,height:336});
+    expect(floatingSaveRect({width:280,height:360,left:30,top:20},1200)).toEqual({x:38,y:32,width:264,height:336});
     expect(floatingSaveRect({width:1440,height:1200},2000).height).toBe(640);
     expect(floatingSaveRect({width:320,height:640},Number.NaN).height).toBe(560);
   });
   for (const [width, height] of [[280,360],[320,640],[420,800],[1280,720],[1440,900]]) {
-    it(`${width}×${height} attaches both states to the right edge without leaving the viewport`, () => {
+    it(`${width}×${height} floats both states eight pixels from the right edge without leaving the viewport`, () => {
       for (const requestedWidth of [320,400,640]) {
         const result = floatingRects({width:requestedWidth}, {width,height});
         for (const rect of Object.values(result)) {
           expect(rect.x).toBeGreaterThanOrEqual(0); expect(rect.y).toBeGreaterThanOrEqual(0);
-          expect(rect.x+rect.width).toBe(width); expect(rect.y+rect.height).toBeLessThanOrEqual(height);
+          expect(rect.x+rect.width).toBe(width-8); expect(rect.y+rect.height).toBeLessThanOrEqual(height);
         }
         expect(result.bar.width).toBe(52); expect(result.bar.height).toBe(52);
         expect(result.bar.y+result.bar.height/2).toBe(height/2);
@@ -52,8 +52,8 @@ describe("floating geometry", () => {
   }
   it("respects the visual viewport after zoom and follows only its height", () => {
     const result = floatingRects(defaultFloatingPosition,{width:420,height:640,left:30,top:20});
-    expect(result.bar.x+result.bar.width).toBe(450);
-    expect(result.menu).toEqual({x:50,y:32,width:400,height:616});
+    expect(result.bar.x+result.bar.width).toBe(442);
+    expect(result.menu).toEqual({x:42,y:32,width:400,height:616});
     expect(floatingRects({width:640},{width:1280,height:900}).menu.height).toBe(876);
   });
   it("preserves the preferred width while dropping legacy ball coordinates and manual height", () => {
@@ -62,6 +62,27 @@ describe("floating geometry", () => {
     expect(normalizeFloatingSettings({position:{width:800}}).position.width).toBe(640);
     expect(floatingWidth(100)).toBe(320); expect(floatingWidth(900)).toBe(640);
   });
+  it("keeps main menus fixed and save tasks visible at every vertical handle position", () => {
+    for (const viewport of [{width:1280,height:900},{width:320,height:360,left:30,top:20}]) {
+      let main;
+      for (const handleRatio of [0,.12,.5,.91,1]) {
+        const position={width:400,handleRatio};
+        const rects=floatingRects(position,viewport,100);
+        main ??= rects.menu;
+        expect(rects.menu).toEqual(main);
+        const task=floatingSaveRect(viewport,560,position,100);
+        expect(task.y).toBeGreaterThanOrEqual(rects.menu.y);
+        expect(task.y+task.height).toBeLessThanOrEqual(rects.menu.y+rects.menu.height);
+        expect(task.x+task.width).toBe(rects.bar.x+rects.bar.width);
+        expect(rects.bar.y).toBeGreaterThanOrEqual((viewport.top ?? 0)+8);
+        expect(rects.bar.y+rects.bar.height).toBeLessThanOrEqual((viewport.top ?? 0)+viewport.height-8);
+      }
+    }
+    expect(normalizeFloatingSettings({position:{width:480,handleRatio:.27}}).position).toEqual({width:480,handleRatio:.27});
+    expect(normalizeFloatingSettings({position:{width:480,handleRatio:5}}).position.handleRatio).toBe(1);
+    expect(normalizeFloatingSettings({position:{width:480,handleRatio:NaN}}).position.handleRatio).toBeUndefined();
+  });
+
 });
 describe("floating source identity", () => {
   async function prepare() {
