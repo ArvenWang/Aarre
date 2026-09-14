@@ -1,3 +1,5 @@
+import { registerParkPreparation } from "../../../shared/suite-dock/parking";
+import { readDraft, writeDraft } from "../drafts";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { buildBookmarkEditorModel, mergeBookmarkEditorTags } from "../../../lib/bookmark-editor";
 import { buildBookmarkSaveState } from "../../../lib/bookmark-save-state";
@@ -17,6 +19,7 @@ import type {
 } from "../../../lib/types";
 import { canonicalizeUrl } from "../../../lib/url";
 import { captureFromDraft, emptyCapture } from "../utils";
+import { useSaveAiPreview } from "./use-save-ai-preview";
 
 export type EditorState =
   | { kind: "bookmark"; node: NativeBookmarkNode; resourceKey?: string }
@@ -54,27 +57,36 @@ export function useBookmarkEditor({
   refresh,
   dismissPreview,
 }: UseBookmarkEditorInput) {
-  const [editor, setEditor] = useState<EditorState>(null);
-  const [editBookmarkId, setEditBookmarkId] = useState("");
-  const [editParentId, setEditParentId] = useState("");
-  const [editTitle, setEditTitle] = useState("");
-  const [editUrl, setEditUrl] = useState("");
-  const [editTags, setEditTags] = useState<string[]>([]);
-  const [editTagInput, setEditTagInput] = useState("");
-  const [editTagsChanged, setEditTagsChanged] = useState(false);
-  const [capture, setCapture] = useState<PageCapture | null>(null);
-  const [captureSourceTabId, setCaptureSourceTabId] = useState<number>();
-  const [note, setNote] = useState("");
-  const [folderId, setFolderId] = useState("");
-  const [folders, setFolders] = useState<NativeFolderOption[]>([]);
-  const [folderSuggestions, setFolderSuggestions] = useState<FolderSuggestion[]>([]);
-  const [bookmarkSaveState, setBookmarkSaveState] = useState<BookmarkSaveState | null>(null);
-  const [saveDisposition, setSaveDisposition] = useState<"reuse" | "new" | "">("");
-  const [selectedBookmarkId, setSelectedBookmarkId] = useState("");
-  const [captureWarning, setCaptureWarning] = useState("");
+  const draft = useMemo(() => readDraft<Record<string, any>>("bookmark-editor"), []);
+  const [editor, setEditor] = useState<EditorState>(draft?.editor || null);
+  const [editBookmarkId, setEditBookmarkId] = useState(draft?.editBookmarkId ?? "");
+  const [editParentId, setEditParentId] = useState(draft?.editParentId ?? "");
+  const [editTitle, setEditTitle] = useState(draft?.editTitle ?? "");
+  const [editUrl, setEditUrl] = useState(draft?.editUrl ?? "");
+  const [editTags, setEditTags] = useState<string[]>(draft?.editTags ?? []);
+  const [editTagInput, setEditTagInput] = useState(draft?.editTagInput ?? "");
+  const [editTagsChanged, setEditTagsChanged] = useState(draft?.editTagsChanged ?? false);
+  const [capture, setCapture] = useState<PageCapture | null>(draft?.capture ?? null);
+  const [captureSourceTabId, setCaptureSourceTabId] = useState<number | undefined>(draft?.captureSourceTabId ?? undefined);
+  const [note, setNote] = useState(draft?.note ?? "");
+  const [folderId, setFolderId] = useState(draft?.folderId ?? "");
+  const [folders, setFolders] = useState<NativeFolderOption[]>(draft?.folders ?? []);
+  const [folderSuggestions, setFolderSuggestions] = useState<FolderSuggestion[]>(draft?.folderSuggestions ?? []);
+  const [bookmarkSaveState, setBookmarkSaveState] = useState<BookmarkSaveState | null>(draft?.bookmarkSaveState ?? null);
+  const [saveDisposition, setSaveDisposition] = useState<"reuse" | "new" | "">(draft?.saveDisposition ?? "");
+  const [selectedBookmarkId, setSelectedBookmarkId] = useState(draft?.selectedBookmarkId ?? "");
+  const [captureWarning, setCaptureWarning] = useState(draft?.captureWarning ?? "");
   const [confirmDeleteId, setConfirmDeleteId] = useState("");
   const [removedNodeIds, setRemovedNodeIds] = useState<string[]>([]);
   const dialogRef = useRef<HTMLElement | null>(null);
+  const saveAi = useSaveAiPreview(editor?.kind === "save" && busy !== "capture", capture, captureSourceTabId);
+  useEffect(() => {
+    writeDraft("bookmark-editor", editor ? { editor, editBookmarkId, editParentId, editTitle, editUrl, editTags, editTagInput, editTagsChanged, capture, captureSourceTabId, note, folderId, folders, folderSuggestions, bookmarkSaveState, saveDisposition, selectedBookmarkId, captureWarning } : null);
+  }, [editor, editBookmarkId, editParentId, editTitle, editUrl, editTags, editTagInput, editTagsChanged, capture, captureSourceTabId, note, folderId, folders, folderSuggestions, bookmarkSaveState, saveDisposition, selectedBookmarkId, captureWarning]);
+  useEffect(() => registerParkPreparation(() => {
+    writeDraft("bookmark-editor", editor ? { editor, editBookmarkId, editParentId, editTitle, editUrl, editTags, editTagInput, editTagsChanged, capture, captureSourceTabId, note, folderId, folders, folderSuggestions, bookmarkSaveState, saveDisposition, selectedBookmarkId, captureWarning } : null, true);
+  }), [editor, editBookmarkId, editParentId, editTitle, editUrl, editTags, editTagInput, editTagsChanged, capture, captureSourceTabId, note, folderId, folders, folderSuggestions, bookmarkSaveState, saveDisposition, selectedBookmarkId, captureWarning]);
+
 
   const currentPageSaveState = useMemo(() => {
     if (!snapshot || !appState?.activeTab?.url) return null;
@@ -117,39 +129,7 @@ export function useBookmarkEditor({
     [editBookmarkId, editorModel.locations],
   );
 
-  useEffect(() => {
-    if (!editor) return;
-    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const frame = window.requestAnimationFrame(() => {
-      const dialog = dialogRef.current;
-      const preferred = dialog?.querySelector<HTMLElement>("[autofocus]");
-      (preferred || dialog?.querySelector<HTMLElement>("button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href]"))?.focus();
-    });
-    const onKeyDown = (event: KeyboardEvent) => {
-      const dialog = dialogRef.current;
-      if (!dialog) return;
-      if (event.key === "Escape") {
-        if (busy) return;
-        event.preventDefault();
-        setEditor(null);
-        setConfirmDeleteId("");
-        return;
-      }
-      if (event.key !== "Tab") return;
-      const focusable = [...dialog.querySelectorAll<HTMLElement>("button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href]")];
-      if (!focusable.length) return;
-      const first = focusable[0];
-      const last = focusable.at(-1)!;
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      document.removeEventListener("keydown", onKeyDown);
-      previousFocus?.focus();
-    };
-  }, [busy, editor]);
+
 
   async function startSave(draft?: PendingSaveDraft) {
     if (!appState) return;
@@ -167,13 +147,14 @@ export function useBookmarkEditor({
     setSelectedBookmarkId("");
     try {
       const targetUrl = draft?.url || appState.activeTab?.url || "";
-      const [folderOptions, saveState] = await Promise.all([
+      const [folderOptions, saveState, currentResources] = await Promise.all([
         sendExtensionRequest({ type: "GET_FOLDERS" }),
         sendExtensionRequest({ type: "GET_BOOKMARK_SAVE_STATE", url: targetUrl }),
+        sendExtensionRequest({ type: "GET_LOCAL_RESOURCES" }),
       ]);
       setBookmarkSaveState(saveState);
       const initialMatch = saveState.status === "exact" || saveState.status === "readonly" ? saveState.matches[0] : undefined;
-      setNote(resourceForUrl(resources, targetUrl)?.userNote || "");
+      setNote(resourceForUrl(currentResources, targetUrl)?.userNote || "");
       setSelectedBookmarkId(initialMatch?.id || "");
       setSaveDisposition(saveState.status === "none" ? "new" : initialMatch ? "reuse" : "");
       setFolders(folderOptions);
@@ -186,7 +167,7 @@ export function useBookmarkEditor({
         setCaptureWarning("这是链接收藏。保存后打开该网页，可继续补充正文摘要和 AI 标签。");
       } else {
         try {
-          const page = await sendExtensionRequest({ type: "CAPTURE_ACTIVE_PAGE", tabId: draft?.tabId });
+          const page = await sendExtensionRequest({ type: "CAPTURE_ACTIVE_PAGE", tabId: draft?.tabId || appState.activeTab?.id });
           const merged = draft ? { ...page, selectedText: draft.selectedText || page.selectedText } : page;
           setCapture(merged);
           setEditTitle(initialMatch?.title || draft?.title || merged.title);
@@ -274,6 +255,7 @@ export function useBookmarkEditor({
           payload: {
             capture, ...(typeof captureSourceTabId === "number" ? { sourceTabId: captureSourceTabId } : {}),
             title: editTitle, userNote: note, folderId, requestAi: true,
+            ...(saveAi.requestId ? { aiPreparationId: saveAi.requestId } : {}),
             ...(saveDisposition === "reuse" && selectedBookmarkId ? { existingBookmarkId: selectedBookmarkId } : {}),
             ...(saveDisposition === "new" && bookmarkSaveState?.status !== "none" ? { createSeparate: true } : {}),
             ...(saveDisposition === "reuse" && bookmarkSaveState?.matches.find((match) => match.id === selectedBookmarkId)?.matchKind === "canonical" ? { confirmedCanonicalReuse: true } : {}),
@@ -309,7 +291,7 @@ export function useBookmarkEditor({
   return {
     editor, setEditor, dialogRef, editBookmarkId, editParentId, setEditParentId, editTitle, setEditTitle,
     editUrl, setEditUrl, editTags, setEditTags, editTagInput, setEditTagInput, setEditTagsChanged,
-    capture, note, setNote, folderId, setFolderId, folders, folderSuggestions,
+    capture, note, setNote, folderId, setFolderId, folders, folderSuggestions, saveAi,
     bookmarkSaveState, saveDisposition, setSaveDisposition, selectedBookmarkId,
     setSelectedBookmarkId, captureWarning, confirmDeleteId, setConfirmDeleteId,
     removedNodeIds, currentSaved: Boolean(currentPageSaveState && currentPageSaveState.status !== "none"),

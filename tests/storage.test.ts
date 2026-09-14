@@ -19,6 +19,7 @@ import {
   invalidateStaleSiteBrandIcons,
   mergeLocalResources,
   normalizeResourceRecord,
+  patchLocalResource,
   putUndoSnapshot,
   putSiteBrand,
   putPageSnapshot,
@@ -444,4 +445,20 @@ describe("duplicateSnapshotGroups", () => {
       ])
     ).toEqual([]);
   });
+});
+
+
+it("patches concurrent AI and user changes atomically and preserves field clocks", async () => {
+  const key = "concurrent-save-ai";
+  await upsertLocalResource(resource(key, { nativeBookmarkIds: ["test-bookmark"] }));
+  await Promise.all([
+    patchLocalResource(key, current => ({ ...current, userNote: "later user note", updatedAt: "2026-09-11T12:01:00.000Z" })),
+    patchLocalResource(key, current => ({ ...current, summary: "AI summary", aiStatus: "ready", updatedAt: "2026-09-11T12:02:00.000Z" })),
+  ]);
+  const saved = await getLocalResource(key);
+  expect(saved).toMatchObject({ userNote: "later user note", summary: "AI summary", aiStatus: "ready" });
+  expect(saved?.fieldUpdatedAt?.userNote).toBe("2026-09-11T12:01:00.000Z");
+  expect(saved?.fieldUpdatedAt?.summary).toBe("2026-09-11T12:02:00.000Z");
+  expect(await patchLocalResource("deleted-save-ai", current => current)).toBeNull();
+  expect(await getLocalResource("deleted-save-ai")).toBeUndefined();
 });

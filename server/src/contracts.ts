@@ -79,6 +79,7 @@ export const syncCursorSchema = z.object({
 export const assetCreateSchema = z.object({
   assetId: z.string().uuid(),
   operationId: z.string().uuid(),
+  baseRevision: z.number().int().min(0).optional(),
   resourceKey: z.string().regex(/^[a-f0-9]{64}$/),
   kind: z.enum(["cover", "snapshot", "site-icon", "user-cover"]),
   sha256: z.string().regex(/^[a-f0-9]{64}$/),
@@ -104,6 +105,8 @@ export const assetCreateSchema = z.object({
 });
 
 export const assetCompleteSchema = z.object({
+  uploadId: z.string().uuid().optional(),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   operationId: z.string().uuid()
 }).strict();
 

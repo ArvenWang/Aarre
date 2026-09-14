@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aarre × NexAlign · 产品图标把手</title>
+<style>
+  :root{color-scheme:light;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#20241f;background:#f5f6f3}
+  *{box-sizing:border-box}body{margin:0}main{max-width:1080px;margin:auto;padding:48px 24px 64px}a{color:inherit;text-underline-offset:4px}p{line-height:1.75;margin:12px 0;color:#596156}
+  .eyebrow{font-size:12px;letter-spacing:.08em;font-weight:600;color:#5a6c45}h1{font-size:clamp(28px,4vw,40px);line-height:1.2;letter-spacing:-.035em;margin:12px 0 16px}h2{font-size:21px;letter-spacing:-.02em;margin:0 0 18px}h3{font-size:14px;margin:0 0 8px}
+  .intro{max-width:720px}.reload{padding:14px 18px;border:1px solid #d9e1cf;background:#edf2e7;border-radius:12px;margin:24px 0 38px;font-size:14px;line-height:1.7}
+  section{margin-top:38px}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}figure{margin:0;background:white;border:1px solid #e2e6df;border-radius:16px;overflow:hidden}.shot{display:flex;align-items:center;justify-content:center;background:#f3f4f7;min-height:244px}.shot img{display:block;width:180px;max-width:100%;height:auto}figcaption{padding:16px;font-size:13px;line-height:1.65;color:#66705e}figcaption strong{display:block;color:#20241f;font-weight:600;margin-bottom:3px}
+  .steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;padding:24px 0;border-top:1px solid #dce1d7;border-bottom:1px solid #dce1d7}.steps p{font-size:14px;margin:0}.number{display:block;font-size:12px;color:#718062;margin-bottom:10px}
+  video{display:block;width:100%;background:#f3f4f7;border:1px solid #dfe3dc;border-radius:16px}.note{font-size:13px}.additional{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.additional figure{background:#fff}.additional .shot{height:260px;min-height:0}.additional .shot img{max-height:260px;width:auto;max-width:100%}
+  details{background:white;border:1px solid #e2e6df;border-radius:12px;padding:16px 20px;font-size:14px;margin-top:24px}summary{cursor:pointer;font-weight:600}details p{font-size:13px}footer{margin-top:36px;color:#75806d;font-size:12px;line-height:1.8}
+  @media(max-width:760px){main{padding:30px 16px 44px}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.steps{grid-template-columns:1fr;gap:20px}.additional{grid-template-columns:1fr}.shot{min-height:220px}.additional .shot{height:auto;min-height:220px}.additional .shot img{max-height:400px}}
+</style>
+<main>
+  <header>
+    <div class="eyebrow">AARRE × NEXALIGN · 2026.09.13</div>
+    <h1>两个产品，一个把手</h1>
+    <p class="intro">默认展示 Aarre 与 NexAlign 的正式产品图标。悬停 Aarre 时，新增收藏入口向左展开；点击产品图标，依然直接打开对应菜单。</p>
+    <div class="reload">本次同时更新了两个扩展。请重新加载 <strong>Aarre 与 NexAlign</strong>，再刷新网页体验。</div>
+  </header>
+  <section aria-labelledby="visual-title">
+    <h2 id="visual-title">真实扩展截图</h2>
+    <div class="grid">
+      <figure><a class="shot" href="handle-light.png"><img src="handle-light.png" alt="浅色把手默认展示 Aarre 与 NexAlign 两个真实产品图标"></a><figcaption><strong>浅色 · 默认</strong>只有两个产品入口。</figcaption></figure>
+      <figure><a class="shot" href="hover-light.png"><img src="hover-light.png" alt="悬停 Aarre 后，空心收藏星标向左出现"></a><figcaption><strong>浅色 · 悬停</strong>收藏星标从左侧出现。</figcaption></figure>
+      <figure><a class="shot" href="handle-dark.png"><img src="handle-dark.png" alt="深色主题下的两枚正式产品图标"></a><figcaption><strong>深色 · 默认</strong>NexAlign 使用正式深色图标。</figcaption></figure>
+      <figure><a class="shot" href="hover-dark.png"><img src="hover-dark.png" alt="深色悬停状态，已收藏星标显示为实心"></a><figcaption><strong>深色 · 已收藏</strong>已保存网页显示实心星标。</figcaption></figure>
+    </div>
+    <p class="note">外层圆角 18px，按钮圆角 14px，四周保留 4px 间距；按钮均为 44 × 44px。点击截图可查看原图。</p>
+  </section>
+  <section class="steps" aria-label="体验方式">
+    <div><span class="number">01</span><h3>点击产品</h3><p>点击 Aarre 打开收藏菜单；点击 NexAlign 打开设计检查菜单，沿用统一的展开与收起动画。</p></div>
+    <div><span class="number">02</span><h3>悬停再收藏</h3><p>鼠标移到 Aarre 后向左移动，点击星标进入添加表单。跨过间隙时，快捷按钮保持可操作。</p></div>
+    <div><span class="number">03</span><h3>键盘也能操作</h3><p>Tab 聚焦 Aarre，按左方向键进入收藏按钮。Esc 收起快捷操作，并把焦点留在产品入口。</p></div>
+  </section>
+  <section aria-labelledby="motion-title">
+    <h2 id="motion-title">实际操作录屏</h2>
+    <video controls playsinline preload="metadata" poster="main-open.png" aria-label="真实 Chrome 内悬停、收藏和产品菜单操作录屏"><source src="product-handle.webm" type="video/webm">浏览器不支持此视频格式。<a href="product-handle.webm">查看录屏</a></video>
+    <p class="note">录屏来自独立 Chrome 配置中的实际扩展，包含悬停、键盘、取消、真实保存、再次管理和两个产品的菜单操作。</p>
+  </section>
+  <section aria-labelledby="compat-title">
+    <h2 id="compat-title">其他使用状态</h2>
+    <div class="additional">
+      <figure><a class="shot" href="standalone-aarre.png"><img src="standalone-aarre.png" alt="单独安装 Aarre 时，一个产品图标加悬停收藏操作"></a><figcaption><strong>只安装 Aarre</strong>默认一个产品入口，悬停仍可收藏。</figcaption></figure>
+      <figure><a class="shot" href="standalone-nexalign.png"><img src="standalone-nexalign.png" alt="单独安装 NexAlign 时，只有正式 NexAlign 图标"></a><figcaption><strong>只安装 NexAlign</strong>保留 NexAlign 自身的产品入口。</figcaption></figure>
+      <figure><a class="shot" href="narrow.png"><img src="narrow.png" alt="360px 窄窗口中，左侧收藏操作仍在可视区域内"></a><figcaption><strong>窄窗口</strong>360px 宽窗口下，快捷操作仍在可视区域内。</figcaption></figure>
+    </div>
+  </section>
+  <details>
+    <summary>验证范围与版本</summary>
+    <p>Aarre 0.6.16；NexAlign 0.1.0 · 2a7bd4ac · 20260913T0536Z。独立 Chrome 152 内 22 项检查通过，未记录到页面运行异常；实际写入一条临时收藏、取消不写入、再次进入不重复添加。</p>
+    <p>Aarre 59 项定向测试、类型与设计检查、构建通过；NexAlign 类型与 UI 边界、构建、25 个脚本产物检查与包体检查通过。共享模块保持一致。没有重跑与本次改动无关的完整回归，也没有调用在线 AI 服务或操作日常 Chrome 中的收藏。</p>
+    <p><a href="verification.json">浏览器验证记录</a> · <a href="source-files.json">产物与源码校验记录</a></p>
+  </details>
+  <footer>此页用于查看真实运行效果，产品交互请在重新加载后的扩展中体验。</footer>
+</main>
+</html>

@@ -1,0 +1,180 @@
+
+> @aarre/sync-api@0.1.15 test
+> node --import tsx --test --test-concurrency=1 test/*.test.ts
+
+TAP version 13
+# Subtest: every online user-data SQL statement carries an explicit user_id scope
+ok 1 - every online user-data SQL statement carries an explicit user_id scope
+  ---
+  duration_ms: 25.178
+  type: 'test'
+  ...
+# Subtest: HTTP user-data routes authenticate before invoking services
+ok 2 - HTTP user-data routes authenticate before invoking services
+  ---
+  duration_ms: 1.388208
+  type: 'test'
+  ...
+# Subtest: quota checks lock only the account usage row
+ok 3 - quota checks lock only the account usage row
+  ---
+  duration_ms: 0.676291
+  type: 'test'
+  ...
+# (node:47460) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+# (Use `node --trace-deprecation ...` to show where the warning was created)
+# Subtest: ticket exchange issues revocable opaque tokens and detects refresh replay
+ok 4 - ticket exchange issues revocable opaque tokens and detects refresh replay
+  ---
+  duration_ms: 370.65575
+  type: 'test'
+  ...
+# Subtest: OAuth start only accepts the exact allowlisted Chromium extension redirect
+ok 5 - OAuth start only accepts the exact allowlisted Chromium extension redirect
+  ---
+  duration_ms: 65.841958
+  type: 'test'
+  ...
+# Subtest: resource sync is encrypted, idempotent, field-clock merged and user isolated
+ok 6 - resource sync is encrypted, idempotent, field-clock merged and user isolated
+  ---
+  duration_ms: 251.745958
+  type: 'test'
+  ...
+# Subtest: stale note and tag edits are preserved as resolvable encrypted conflicts
+ok 7 - stale note and tag edits are preserved as resolvable encrypted conflicts
+  ---
+  duration_ms: 200.53225
+  type: 'test'
+  ...
+# Subtest: protection purges metadata and every COS object version and blocks stale devices
+ok 8 - protection purges metadata and every COS object version and blocks stale devices
+  ---
+  duration_ms: 210.995375
+  type: 'test'
+  ...
+# Subtest: durable entities support mixed idempotent batches without quota deadlocks
+ok 9 - durable entities support mixed idempotent batches without quota deadlocks
+  ---
+  duration_ms: 153.933583
+  type: 'test'
+  ...
+# Subtest: folder protection purges descendant metadata and blocks resource, bookmark, and asset uploads
+ok 10 - folder protection purges descendant metadata and blocks resource, bookmark, and asset uploads
+  ---
+  duration_ms: 145.656959
+  type: 'test'
+  ...
+# Subtest: metadata quota is enforced transactionally and forbidden secret fields are rejected
+ok 11 - metadata quota is enforced transactionally and forbidden secret fields are rejected
+  ---
+  duration_ms: 102.55325
+  type: 'test'
+  ...
+# Subtest: usage sync preserves pricing provenance while rejecting unknown fields
+ok 12 - usage sync preserves pricing provenance while rejecting unknown fields
+  ---
+  duration_ms: 88.247208
+  type: 'test'
+  ...
+# Subtest: protection bootstrap preserves the stored update clock instead of manufacturing changes
+ok 13 - protection bootstrap preserves the stored update clock instead of manufacturing changes
+  ---
+  duration_ms: 238.577125
+  type: 'test'
+  ...
+# Subtest: bookmark positions and theme are encrypted durable entities scoped to one account
+ok 14 - bookmark positions and theme are encrypted durable entities scoped to one account
+  ---
+  duration_ms: 91.186625
+  type: 'test'
+  ...
+# Subtest: account deletion revokes tokens and physically removes the user after asset cleanup
+ok 15 - account deletion revokes tokens and physically removes the user after asset cleanup
+  ---
+  duration_ms: 101.403417
+  type: 'test'
+  ...
+# Subtest: refresh retries recover the same encrypted response and retain replay protection
+ok 16 - refresh retries recover the same encrypted response and retain replay protection
+  ---
+  duration_ms: 110.443542
+  type: 'test'
+  ...
+# Subtest: same-slot cover replacement stays invisible until verified and rejects a stale completion
+ok 17 - same-slot cover replacement stays invisible until verified and rejects a stale completion
+  ---
+  duration_ms: 101.052791
+  type: 'test'
+  ...
+# (node:47638) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+# (Use `node --trace-deprecation ...` to show where the warning was created)
+# Subtest: production accepts a versioned root-file KEK keyring and rejects test-only fallback
+ok 18 - production accepts a versioned root-file KEK keyring and rejects test-only fallback
+  ---
+  duration_ms: 3.079292
+  type: 'test'
+  ...
+# Subtest: root-file wrapper keeps old DEKs readable after forward key rotation
+ok 19 - root-file wrapper keeps old DEKs readable after forward key rotation
+  ---
+  duration_ms: 1.421625
+  type: 'test'
+  ...
+# Subtest: migration discovery rejects macOS AppleDouble sidecar files
+ok 20 - migration discovery rejects macOS AppleDouble sidecar files
+  ---
+  duration_ms: 0.769167
+  type: 'test'
+  ...
+# Subtest: migration SQL is split only at top-level semicolons
+ok 21 - migration SQL is split only at top-level semicolons
+  ---
+  duration_ms: 0.333083
+  type: 'test'
+  ...
+# Subtest: migration SQL rejects unfinished quoted input
+ok 22 - migration SQL rejects unfinished quoted input
+  ---
+  duration_ms: 0.270292
+  type: 'test'
+  ...
+# Subtest: request logs remove OAuth query parameters and authorization headers
+ok 23 - request logs remove OAuth query parameters and authorization headers
+  ---
+  duration_ms: 1.663709
+  type: 'test'
+  ...
+# Subtest: telemetry drops request context, user data and secret-like text
+ok 24 - telemetry drops request context, user data and secret-like text
+  ---
+  duration_ms: 0.780916
+  type: 'test'
+  ...
+# Subtest: public pages are self-contained, canonical and free of executable scripts
+ok 25 - public pages are self-contained, canonical and free of executable scripts
+  ---
+  duration_ms: 2.170709
+  type: 'test'
+  ...
+# Subtest: privacy and terms describe the production data boundaries
+ok 26 - privacy and terms describe the production data boundaries
+  ---
+  duration_ms: 0.446417
+  type: 'test'
+  ...
+# Subtest: entity batches retry deadlocks and keep one account transaction active
+ok 27 - entity batches retry deadlocks and keep one account transaction active
+  ---
+  duration_ms: 49.489292
+  type: 'test'
+  ...
+1..27
+# tests 27
+# suites 0
+# pass 27
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 7992.091417

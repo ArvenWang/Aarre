@@ -1,3 +1,6 @@
+import { authorizeUiMessage, handleFloatingHost, validateFloatingSender, floatingSource, proveFloatingFrame } from "./floating/session";
+import { createFloatingQuickSave } from "./floating/quick-save";
+import { registerFloatingLifecycle } from "./floating/lifecycle";
 import { requestSync } from "../lib/sync-request";
 
 import {
@@ -9,7 +12,6 @@ import {
 import { registerNetworkRecovery } from "./lifecycle/network";
 import { registerAgentStream } from "./lifecycle/agent-stream";
 import {
-  configureActionSidePanelBehavior,
 } from "./lifecycle/context-menu-core";
 import { createContextMenuLifecycle } from "./lifecycle/context-menus-lazy";
 import { createManualSnapshotHelpers } from "./lifecycle/manual-snapshot";
@@ -429,6 +431,7 @@ bookmarkSaveHandlers = createBookmarkSaveHandlers({
 });
 const {
   syncPendingIfReady,
+  prepareBookmarkAi,
   saveBookmark
 } = bookmarkSaveHandlers;
 
@@ -622,6 +625,7 @@ const handlers = createMessageHandlers(requestHandlers, {
   navigate,
   getFolderOptions,
   getFolderSuggestions,
+  prepareBookmarkAi,
   saveBookmark,
   askAgent,
   cancelAgent,
@@ -655,6 +659,7 @@ const handlers = createMessageHandlers(requestHandlers, {
   pullCloudResources
 });
 
+const quickSaveFromFloatingBar = createFloatingQuickSave({ getBookmarkSaveState, captureActivePage, saveBookmark });
 chrome.runtime.onMessage.addListener(
   (
     request: ExtensionRequest,
@@ -662,10 +667,46 @@ chrome.runtime.onMessage.addListener(
     sendResponse: (response: ExtensionResponse<unknown>) => void
   ) => {
     if (isOffscreenSiteIconRequest(request)) return false;
+    if ((request?.type as string) === "FLOAT_QUICK_SAVE") {
+      void quickSaveFromFloatingBar(sender, (request as unknown as { nonce: string }).nonce)
+        .then((data) => sendResponse({ ok: true, data }), (error) => sendResponse({ ok: false, error: errorMessage(error) }));
+      return true;
+    }
+    if ((request?.type as string) === "FLOAT_PROVE_FRAME") {
+      try {
+        proveFloatingFrame(request as unknown as { challenge: string; nonce: string }, sender);
+        sendResponse({ ok: true, data: null });
+      } catch (error) { sendResponse({ ok: false, error: errorMessage(error) }); }
+      return false;
+    }
+    if (["FLOAT_HOST_INIT", "FLOAT_POSITION"].includes(request?.type as string)) {
+      void handleFloatingHost(request, sender).then((data) => sendResponse({ ok: true, data }),
+        (error) => sendResponse({ ok: false, error: errorMessage(error) }));
+      return true;
+    }
+    if ((request?.type as string) === "FLOAT_CONNECT") {
+      void validateFloatingSender(sender, (request as unknown as { nonce: string }).nonce)
+        .then(async () => ({ source: await floatingSource(sender) }))
+        .then((data) => sendResponse({ ok: true, data }), (error) => sendResponse({ ok: false, error: errorMessage(error) }));
+      return true;
+    }
     const handler = handlers[request?.type];
     if (!handler) return false;
-    void handler(request, sender)
-      .then((data) => sendResponse({ ok: true, data }))
+    void authorizeUiMessage(sender).then(async (source) => {
+      let scoped = request;
+      if (source) {
+        if (request.type === "CAPTURE_ACTIVE_PAGE" || request.type === "GET_PENDING_SAVE") scoped = { ...request, tabId: source.id };
+        if (request.type === "SAVE_BOOKMARK") scoped = { ...request, payload: { ...request.payload, sourceTabId: source.id } };
+        if (request.type === "PREPARE_BOOKMARK_AI") scoped = { ...request, payload: { ...request.payload, sourceTabId: source.id } };
+        if (request.type === "NAVIGATE") scoped = { ...request, payload: { ...request.payload, sourceTabId: source.id } };
+      }
+      const data = await handler(scoped, sender) as any;
+      if (source && data) {
+        if (request.type === "GET_BOOTSTRAP") data.appState.activeTab = source;
+        if (["GET_APP_STATE", "AUTH_CHANGED", "SIGN_IN_CLOUD", "SIGN_OUT_CLOUD"].includes(request.type)) data.activeTab = source;
+      }
+      return data;
+    }).then((data) => sendResponse({ ok: true, data }))
       .catch((error) =>
         sendResponse({ ok: false, error: errorMessage(error) })
       );
@@ -698,8 +739,8 @@ const contextMenuLifecycle = createContextMenuLifecycle({
   upsertLocalResource
 });
 
-void configureActionSidePanelBehavior().catch(() => undefined);
 runBackgroundStartupMaintenance();
+registerFloatingLifecycle();
 
 registerUiEvents({
   contextMenus: contextMenuLifecycle,
@@ -746,7 +787,6 @@ registerBookmarkEvents({
 
 registerInstallLifecycle({
   ensurePinnedSiteBrandIcons: () => siteIconHandlers.ensurePinnedSiteBrandIcons(),
-  configureActionSidePanelBehavior,
   registerContextMenus: () => contextMenuLifecycle.register(),
   refreshContextMenu: () => contextMenuLifecycle.refresh(),
   importNativeBookmarks,

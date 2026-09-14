@@ -1,3 +1,5 @@
+import { AppModal } from "@/ui/components/ui/modal";
+import { ScrollSurface } from "@/ui/components/ui/scroll-area";
 import { BookmarkEditorFields } from "../../components/BookmarkEditorFields";
 import { CloudConflictNotice } from "../../components/CloudConflictNotice";
 import {
@@ -233,7 +235,7 @@ export function LibraryCardEditor({
       onChanged(
         hasOtherLocations
           ? "已删除所选收藏位置，其余位置仍然保留。"
-          : "收藏已删除，可在侧边栏设置的“最近的更改”中恢复。",
+          : "收藏已删除，可在设置的“最近的更改”中恢复。",
         {
           resourceKey: resource.resourceKey,
           kind: hasOtherLocations ? "location-removed" : "removed",
@@ -263,24 +265,10 @@ export function LibraryCardEditor({
         </Button>
       </Tooltip>
 
-      {open
-        ? createPortal(
-            <div
-              className="library-card-editor-backdrop"
-              onMouseDown={(event) => {
-                if (event.target === event.currentTarget) closeEditor();
-              }}
-            >
-              <div
-                ref={dialogRef}
-                className="library-card-editor-dialog"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby={`library-editor-title-${resource.resourceKey}`}
-                aria-describedby={`library-editor-description-${resource.resourceKey}`}
-                tabIndex={-1}
-                onKeyDown={handleDialogKeyDown}
-              >
+      {open ? <AppModal onClose={closeEditor} busy={Boolean(action)} onEscape={confirmDelete ? () => setConfirmDelete(false) : undefined}
+        labelledBy={`library-editor-title-${resource.resourceKey}`}
+        describedBy={`library-editor-description-${resource.resourceKey}`}
+        className="library-card-editor-dialog" backdropClassName="library-card-editor-backdrop">
                 <header className="library-card-editor-heading">
                   <div>
                     <h2 id={`library-editor-title-${resource.resourceKey}`}>
@@ -307,6 +295,7 @@ export function LibraryCardEditor({
                 </header>
 
                 <form onSubmit={(event) => void save(event)}>
+                  <ScrollSurface className="library-card-editor-body" label="收藏编辑内容">
                   <CloudConflictNotice
                     resourceKey={resource.resourceKey}
                     currentUserNote={userNote}
@@ -351,6 +340,7 @@ export function LibraryCardEditor({
                       {error}
                     </p>
                   ) : null}
+                  </ScrollSurface>
 
                   {confirmDelete ? (
                     <div
@@ -367,7 +357,7 @@ export function LibraryCardEditor({
                           <small>
                             {hasOtherLocations
                               ? "其他位置与 Aarre 智能信息保留"
-                              : "30 天内可在侧边栏设置撤销"}
+                              : "30 天内可在设置撤销"}
                           </small>
                         </span>
                       </p>
@@ -432,11 +422,7 @@ export function LibraryCardEditor({
                     </footer>
                   )}
                 </form>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
+      </AppModal> : null}
     </>
   );
 }

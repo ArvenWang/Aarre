@@ -1,0 +1,198 @@
+[
+  {
+    "requestedWidth": 360,
+    "viewport": {
+      "width": 345,
+      "height": 640
+    },
+    "ball": {
+      "x": 281,
+      "y": 576,
+      "width": 52,
+      "height": 52,
+      "right": 333,
+      "bottom": 628
+    },
+    "menu": {
+      "x": 12,
+      "y": 12,
+      "width": 321,
+      "height": 552,
+      "right": 333,
+      "bottom": 564
+    },
+    "iframe": {
+      "width": 319,
+      "scrollWidth": 319
+    },
+    "tabs": {
+      "x": 12,
+      "y": 52,
+      "width": 295,
+      "height": 44,
+      "right": 307,
+      "bottom": 96
+    },
+    "alignment": [
+      {
+        "label": "收藏",
+        "iconToControlCenterY": 0
+      },
+      {
+        "label": "AI",
+        "iconToControlCenterY": 0
+      },
+      {
+        "label": "设置",
+        "iconToControlCenterY": 0
+      }
+    ]
+  },
+  {
+    "requestedWidth": 420,
+    "viewport": {
+      "width": 405,
+      "height": 640
+    },
+    "ball": {
+      "x": 341,
+      "y": 576,
+      "width": 52,
+      "height": 52,
+      "right": 393,
+      "bottom": 628
+    },
+    "menu": {
+      "x": 12,
+      "y": 12,
+      "width": 381,
+      "height": 552,
+      "right": 393,
+      "bottom": 564
+    },
+    "iframe": {
+      "width": 379,
+      "scrollWidth": 379
+    },
+    "tabs": {
+      "x": 12,
+      "y": 52,
+      "width": 355,
+      "height": 44,
+      "right": 367,
+      "bottom": 96
+    },
+    "alignment": [
+      {
+        "label": "收藏",
+        "iconToControlCenterY": 0
+      },
+      {
+        "label": "AI",
+        "iconToControlCenterY": 0
+      },
+      {
+        "label": "设置",
+        "iconToControlCenterY": 0
+      }
+    ]
+  },
+  {
+    "requestedWidth": 1280,
+    "viewport": {
+      "width": 1265,
+      "height": 1000
+    },
+    "ball": {
+      "x": 1201,
+      "y": 677.2734375,
+      "width": 52,
+      "height": 52,
+      "right": 1253,
+      "bottom": 729.2734375
+    },
+    "menu": {
+      "x": 789,
+      "y": 129.2734375,
+      "width": 400,
+      "height": 600,
+      "right": 1189,
+      "bottom": 729.2734375
+    },
+    "iframe": {
+      "width": 398,
+      "scrollWidth": 398
+    },
+    "tabs": {
+      "x": 12,
+      "y": 52,
+      "width": 374,
+      "height": 44,
+      "right": 386,
+      "bottom": 96
+    },
+    "alignment": [
+      {
+        "label": "收藏",
+        "iconToControlCenterY": 0
+      },
+      {
+        "label": "AI",
+        "iconToControlCenterY": 0
+      },
+      {
+        "label": "设置",
+        "iconToControlCenterY": 0
+      }
+    ]
+  },
+  {
+    "requestedWidth": 1440,
+    "viewport": {
+      "width": 1425,
+      "height": 1000
+    },
+    "ball": {
+      "x": 1361,
+      "y": 677.2734375,
+      "width": 52,
+      "height": 52,
+      "right": 1413,
+      "bottom": 729.2734375
+    },
+    "menu": {
+      "x": 949,
+      "y": 129.2734375,
+      "width": 400,
+      "height": 600,
+      "right": 1349,
+      "bottom": 729.2734375
+    },
+    "iframe": {
+      "width": 398,
+      "scrollWidth": 398
+    },
+    "tabs": {
+      "x": 12,
+      "y": 52,
+      "width": 374,
+      "height": 44,
+      "right": 386,
+      "bottom": 96
+    },
+    "alignment": [
+      {
+        "label": "收藏",
+        "iconToControlCenterY": 0
+      },
+      {
+        "label": "AI",
+        "iconToControlCenterY": 0
+      },
+      {
+        "label": "设置",
+        "iconToControlCenterY": 0
+      }
+    ]
+  }
+]

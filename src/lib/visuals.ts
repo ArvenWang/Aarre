@@ -38,6 +38,8 @@ async function sha256(blob: Blob): Promise<string> {
     .join("");
 }
 
+export const hashImageDataUrl = (dataUrl: string) => sha256(dataUrlToBlob(dataUrl).blob);
+
 /** 自动来源永远不能覆盖用户手动设置的视觉资产。 */
 export async function putVisual(
   next: VisualAsset,

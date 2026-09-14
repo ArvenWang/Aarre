@@ -3,7 +3,7 @@
   "name": "Aarre",
   "short_name": "Aarre",
   "description": "保留 Chrome 原生书签，同步网页上下文，并用 AI 帮你重新找到真正需要的内容。",
-  "version": "0.5.73",
+  "version": "0.6.25",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAl7PAFyise3JcAlr02k25FLL5x7jTgSjK7TcCJdObik3EaQ26uxyM+sOd0qJyqNiWjUPEVP0z8a+qcqgdtdn0FRKO14zGt4Wtarz4GLzMnx28SLa3qsRNAbSZx0qfTwAvjwnZ8g55HdQGvFMeydDVkxQFN1H6yr152eY3r8zW5YhPnS5a8K9hPGn5LDouzH1CIpWWK7F1CrKANPn3eQFWvCEldyC90tMWnQw5rxwMASAl2yJCAmFG70wtYyq4rA2P3esSVvYfIjqsSd0wLmhWkJPtUO7rsvwQV4YT19734Ozx1kCKObMQQ17YlR55eDD5CdgRywSvZX89iO2TnAehCwIDAQAB",
   "minimum_chrome_version": "134",
   "permissions": [
@@ -19,7 +19,6 @@
     "offscreen",
     "search",
     "scripting",
-    "sidePanel",
     "storage",
     "tabs",
     "unlimitedStorage",
@@ -33,10 +32,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "打开 Aarre"
-  },
-  "side_panel": {
-    "default_path": "sidepanel.html"
+    "default_title": "打开 Aarre 悬浮菜单"
   },
   "commands": {
     "_execute_action": {
@@ -54,5 +50,24 @@
     "32": "icons/icon-32.png",
     "48": "icons/icon-48.png",
     "128": "icons/icon-128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "floating-host.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+  "externally_connectable": {
+    "ids": [
+      "aaepppdlfiikfmomfllpghojedjkmopf",
+      "obnemfdgnkklhbdngemomokiklpaenmj"
+    ]
   }
 }

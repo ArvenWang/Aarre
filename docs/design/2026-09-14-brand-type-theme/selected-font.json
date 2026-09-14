@@ -1,0 +1,17 @@
+{
+  "source": "docs/design/2026-09-14-brand-type-theme/fonts/fraunces.ttf",
+  "sourceSha256": "b24448c43702fac4ee856781d461a0dfba8d8e594b6e8e190234b75fed2c0e01",
+  "font": "src/ui/assets/aarre-wordmark.woff",
+  "bytes": 2188,
+  "sha256": "f732d05cecf372ce4f02d589ddef192af5814a6945e2627bc35d99d7b1e85c9a",
+  "axes": {
+    "wght": 600,
+    "opsz": 24,
+    "SOFT": 100,
+    "WONK": 1
+  },
+  "text": "Aarre",
+  "family": "Aarre Wordmark",
+  "format": "woff",
+  "license": "public/fonts/OFL-Aarre-Wordmark.txt"
+}

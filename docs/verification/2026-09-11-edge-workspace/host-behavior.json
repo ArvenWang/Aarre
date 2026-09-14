@@ -1,0 +1,30 @@
+[
+  {
+    "step": "reopen",
+    "sameFrame": true,
+    "draft": "开合验收草稿",
+    "width": 640
+  },
+  {
+    "step": "viewport",
+    "viewport": {
+      "width": 405,
+      "height": 640
+    },
+    "panel": {
+      "x": 0,
+      "y": 12,
+      "width": 405,
+      "height": 616,
+      "top": 12,
+      "right": 405,
+      "bottom": 628,
+      "left": 0
+    }
+  },
+  {
+    "step": "reduced-motion",
+    "surfaceAnimations": 0,
+    "panelAnimations": 0
+  }
+]

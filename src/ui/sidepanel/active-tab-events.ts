@@ -1,3 +1,4 @@
+import { getFloatingContext } from "../floating/bridge";
 import type { ActiveTabSummary } from "../../lib/types";
 import { isSupportedPageUrl } from "../../lib/url";
 
@@ -9,10 +10,9 @@ interface ActiveTabEventApi {
 }
 
 export async function readActiveTabSummary(): Promise<ActiveTabSummary | null> {
-  const [tab] = await chrome.tabs.query({
-    active: true,
-    lastFocusedWindow: true
-  });
+  const context = getFloatingContext();
+  const tab = context ? await chrome.tabs.get(context.tabId).catch(() => null)
+    : (await chrome.tabs.query({ active: true, lastFocusedWindow: true }))[0];
   if (!tab) return null;
   const url = tab.url || "";
   return {

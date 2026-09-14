@@ -1,0 +1,4 @@
+{
+  "tool": "image_gen.imagegen",
+  "delivery": "Original generated image outputs, without a comparison-page wrapper"
+}

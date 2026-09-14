@@ -1,0 +1,15 @@
+{
+  "baselineCommit": "cc352cfb16b30fb16b84eec9dff74aa1ea23b8b8",
+  "version": "0.6.0",
+  "minimumChromeVersion": "134",
+  "builtAt": "2026-09-09T08:34:06.114Z",
+  "workerBytes": 298658,
+  "workerLimit": 330000,
+  "workerSha256": "b105f998823bf4d2c396aaf251baa10527cef2aca6a76904f64ee7beaed759f5",
+  "missingAccessibleFiles": [],
+  "developmentFixtureLeaks": [],
+  "sidePanelPermission": false,
+  "sidePanelManifestEntry": false,
+  "installedChromeVerified": false,
+  "serverDeployed": false
+}

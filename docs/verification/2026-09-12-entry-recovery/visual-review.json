@@ -1,0 +1,72 @@
+[
+  {
+    "file": "bar-light.png",
+    "title": "未收藏 · 日间",
+    "sha256": "1b346393240dd0d6523687b9967ea9978d092eeba2506494c91a5386784cfa14",
+    "visuallyReviewed": true,
+    "source": "Current UI with isolated development fixtures; direct browser screenshots"
+  },
+  {
+    "file": "bar-light-hover.png",
+    "title": "悬停 · 日间磨砂",
+    "sha256": "4fc58c18f88ea9522173ce8faa79ef933bfa8cd1ee37e86694a4d984131422a2",
+    "visuallyReviewed": true,
+    "source": "Current UI with isolated development fixtures; direct browser screenshots"
+  },
+  {
+    "file": "bar-dark-saved-hover.png",
+    "title": "已收藏 · 夜间磨砂",
+    "sha256": "1bea0c36f89bffea00e761abf3786929a0e56d26fb6ae44054511409b0193c42",
+    "visuallyReviewed": true,
+    "source": "Current UI with isolated development fixtures; direct browser screenshots"
+  },
+  {
+    "file": "save-direct-light.png",
+    "title": "添加到收藏 · 日间",
+    "sha256": "df2c808565a8797faf2b2ef60305e812bc4d94e3b0bf646ff2faafa3dd477037",
+    "visuallyReviewed": true,
+    "source": "Current UI with isolated development fixtures; direct browser screenshots"
+  },
+  {
+    "file": "save-direct-dark.png",
+    "title": "添加到收藏 · 夜间",
+    "sha256": "c2d11c40314ddffe5249f14f2e53d9ed4fe02a50980ac59e6d3b8b81ca3c26a1",
+    "visuallyReviewed": true,
+    "source": "Current UI with isolated development fixtures; direct browser screenshots"
+  },
+  {
+    "file": "save-direct-narrow.png",
+    "title": "320px 窄窗口",
+    "sha256": "61518e30136267c6a61f44c1ce0715963f43de6c6292f9d1d4589c1cbc89fa40",
+    "visuallyReviewed": true,
+    "source": "Current UI with isolated development fixtures; direct browser screenshots"
+  },
+  {
+    "file": "save-direct-short.png",
+    "title": "380px 短窗口 · 顶部",
+    "sha256": "b2fce4ad5d2959f720f5f00846d2bc348c20e913ff58e9646890ee06b47fc274",
+    "visuallyReviewed": true,
+    "source": "Current UI with isolated development fixtures; direct browser screenshots"
+  },
+  {
+    "file": "save-short-bottom.png",
+    "title": "380px 短窗口 · 底部",
+    "sha256": "b0aa68d9ee1c9435db680a267f588e7b81c74ec5d4cbfa0901526d73c6d59a7f",
+    "visuallyReviewed": true,
+    "source": "Current UI with isolated development fixtures; direct browser screenshots"
+  },
+  {
+    "file": "menu-light.png",
+    "title": "主菜单 · 日间",
+    "sha256": "0199b9bbb64817b65b3bccdfd04e617179bb68e124585e74badacbbdacbff385",
+    "visuallyReviewed": true,
+    "source": "Current UI with isolated development fixtures; direct browser screenshots"
+  },
+  {
+    "file": "menu-dark.png",
+    "title": "主菜单 · 夜间",
+    "sha256": "a7d64fa9b423211cda29ca5eadbff1c353f19c00eb46b21a6d1427f0ce19adc8",
+    "visuallyReviewed": true,
+    "source": "Current UI with isolated development fixtures; direct browser screenshots"
+  }
+]

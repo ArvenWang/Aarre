@@ -31,20 +31,21 @@ describe("Round 3 UI root-cause guardrails", () => {
   });
 
   it("renders cited bookmark links inline without nesting block cards in paragraphs", async () => {
-    const [page, css] = await Promise.all([
+    const [page, css, markdown] = await Promise.all([
       readFile(agentPageUrl, "utf8"),
       readFile(agentCssUrl, "utf8"),
+      readFile(new URL("../src/ui/sidepanel/components/AgentMarkdown.tsx", import.meta.url), "utf8"),
     ]);
-    expect(page).toContain('className="agent-inline-source"');
-    expect(page).toContain("bookmarkSourceForUrl(sources, href)");
+    expect(markdown).toContain('className="agent-inline-source"');
+    expect(markdown).toContain("bookmarkSourceForUrl(sources, href)");
     expect(page).toContain("sources={message.sources}");
     expect(page).toContain("uncitedSources(message.content, message.sources)");
     expect(page).toContain("其他相关收藏");
     expect(css).toContain(".agent-markdown .agent-inline-source");
-    expect(page).not.toContain('<div className="agent-inline-source"');
+    expect(markdown).not.toContain('<div className="agent-inline-source"');
   });
 
-  it("gives Markdown prose enough leading for bookmark chips without shrinking them", async () => {
+  it("lets complete bookmark citations wrap with readable leading", async () => {
     const [css, tokens] = await Promise.all([
       readFile(agentCssUrl, "utf8"),
       readFile(tokensUrl, "utf8"),
@@ -53,12 +54,14 @@ describe("Round 3 UI root-cause guardrails", () => {
     const source = rule(css, ".agent-markdown .agent-inline-source");
     const thumbnail = rule(css, ".agent-inline-source-thumbnail");
 
-    expect(tokens).toContain("--agent-markdown-leading: 2.2");
+    expect(tokens).toContain("--agent-markdown-leading: 1.8");
     expect(markdown).toContain("line-height: var(--agent-markdown-leading)");
     expect(source).toContain(
       "padding: var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-1)",
     );
-    expect(source).toContain("line-height: var(--sp-4)");
+    expect(source).toContain("line-height: 1.55");
+    expect(source).toContain("max-width: 100%");
+    expect(rule(css, ".agent-inline-source > span:last-child")).not.toContain("white-space: nowrap");
     expect(source).toContain("vertical-align: middle");
     expect(source).not.toContain("vertical-align: baseline");
     expect(thumbnail).toContain("width: var(--sp-4)");

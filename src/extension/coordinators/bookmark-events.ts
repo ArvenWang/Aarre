@@ -1,3 +1,4 @@
+import { archiveOwnsNode } from "../../lib/archive-guard";
 import { enqueueOutbox, getLocalResources, putUndoSnapshot } from "../../lib/storage";
 import { createRemovedNodeUndoBatch } from "../../lib/bookmark-undo";
 import { removeFolderProtections } from "../../lib/protection";
@@ -70,10 +71,9 @@ chrome.bookmarks.onCreated.addListener((id, node) => {
   ) {
     return;
   }
-  void indexNativeBookmark(id, node, {
-    enhance: true,
-    feedback: true
-  });
+  void archiveOwnsNode(node.parentId).then((owned) => {
+    if (!owned) return indexNativeBookmark(id, node, { enhance: true, feedback: true });
+  }).catch(() => undefined);
 });
 
 chrome.bookmarks.onImportBegan.addListener(() => {

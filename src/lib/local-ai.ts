@@ -202,48 +202,16 @@ export function parseJsonObject(content: string): Record<string, unknown> {
   return parsed as Record<string, unknown>;
 }
 
-function requestSignal(parentSignal?: AbortSignal): {
-  signal: AbortSignal;
-  dispose: () => void;
-} {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    controller.abort(new DOMException("AI 请求超时。", "TimeoutError"));
-  }, REQUEST_TIMEOUT_MS);
-  const forwardAbort = () => {
-    controller.abort(
-      parentSignal?.reason || new DOMException("AI 请求已停止。", "AbortError")
-    );
-  };
-
-  if (parentSignal) {
-    if (parentSignal.aborted) {
-      forwardAbort();
-    } else {
-      parentSignal.addEventListener("abort", forwardAbort, { once: true });
-    }
-  }
-
-  return {
-    signal: controller.signal,
-    dispose: () => {
-      clearTimeout(timeoutId);
-      parentSignal?.removeEventListener("abort", forwardAbort);
-    }
-  };
-}
-
 async function fetchWithRequestSignal(
   input: RequestInfo | URL,
   init: RequestInit,
   parentSignal?: AbortSignal
 ): Promise<Response> {
-  const request = requestSignal(parentSignal);
-  try {
-    return await fetch(input, { ...init, signal: request.signal });
-  } finally {
-    request.dispose();
-  }
+  // Keep cancellation attached while the response body is consumed too.
+  // Detaching after headers left JSON body reads outside the timeout.
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  const signal = parentSignal ? AbortSignal.any([timeout, parentSignal]) : timeout;
+  return fetch(input, { ...init, signal });
 }
 
 function retryDelay(signal: AbortSignal | undefined, milliseconds: number) {
@@ -554,7 +522,7 @@ async function generateConfiguredJson(
   }
 }
 
-async function generateEnrichmentJson(prompt: string): Promise<{
+async function generateEnrichmentJson(prompt: string, signal?: AbortSignal): Promise<{
   generated: Awaited<ReturnType<typeof generateConfiguredJson>>;
   enrichment: BookmarkEnrichment;
 }> {
@@ -572,7 +540,8 @@ async function generateEnrichmentJson(prompt: string): Promise<{
         : "\n\n上一次响应缺少必要字段。请严格按八个字段重新生成完整 JSON；没有明确实体时 entities 可返回空数组。";
     const generated = await generateConfiguredJson(
       `${prompt}${retryInstruction}`,
-      "enrichment"
+      "enrichment",
+      signal
     );
     usage = {
       inputTokens: usage.inputTokens + generated.usage.inputTokens,
@@ -700,14 +669,15 @@ function applyEnrichment(
 
 export async function enrichResourceLocally(
   resource: ResourceRecord,
-  capture: PageCapture
+  capture: PageCapture,
+  signal?: AbortSignal
 ): Promise<ResourceRecord> {
   if (capture.content.trim().length < 80) {
     throw new Error("页面正文不足，已保存书签但没有生成 AI 信息。");
   }
 
   const prompt = enrichmentPrompt(resource, capture);
-  const { enrichment } = await generateEnrichmentJson(prompt);
+  const { enrichment } = await generateEnrichmentJson(prompt, signal);
   return applyEnrichment(resource, enrichment);
 }
 

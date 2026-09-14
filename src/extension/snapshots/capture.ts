@@ -1,3 +1,4 @@
+import { withFloatingHidden } from "../floating/lifecycle";
 import type {
   SnapshotEnhancementProgress
 } from "../../lib/bookmark-enhancement";
@@ -351,9 +352,9 @@ export function createSnapshotCapture<
       ...(options.showToast ? { showToast: true } : {}),
       ...(options.refreshExisting ? { refreshExisting: true } : {})
     });
-    const pngDataUrl = isBatch
-      ? await capturePageSnapshotViaDebugger(tabId)
-      : await chrome.tabs.captureVisibleTab(tab.windowId, { format: "png" });
+    const pngDataUrl = await withFloatingHidden(tabId, () => isBatch
+      ? capturePageSnapshotViaDebugger(tabId)
+      : chrome.tabs.captureVisibleTab(tab.windowId, { format: "png" }));
     const capturedTab = await chrome.tabs.get(tabId).catch(() => null);
     if (!isBatch) {
       const [capturedTargetWindow, capturedWindow] = await Promise.all([

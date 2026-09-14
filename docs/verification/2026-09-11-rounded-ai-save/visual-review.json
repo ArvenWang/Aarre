@@ -1,0 +1,84 @@
+{
+  "version": "0.6.7",
+  "method": "Each final image opened individually with view_image",
+  "screenshots": [
+    {
+      "name": "bar-glass-light",
+      "title": "日间 · 大圆角与磨砂",
+      "sha256": "4e441c0d7a857631dcb1f920c8235b42ef63bb69798af488e91b13ece3b35c4e",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "bar-glass-dark",
+      "title": "夜间 · 大圆角与磨砂",
+      "sha256": "8ed4fdcf4324768d4dcf0f1e46ac9227fe61f18a739555a8fd2d6910a1515eeb",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "bar-keyboard",
+      "title": "键盘焦点 · 细描边",
+      "sha256": "8f00612cab4d8cbc7a38cb81ea32a5803e365b2aec98fb09400201c49650bed9",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "bar-solid-fallback",
+      "title": "减少透明效果 · 实色回退",
+      "sha256": "dd086d37fc69f51ba31e3bf2e69c5291334c59b838452341cf3e94fa4cc6e170",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "save-ai-loading",
+      "title": "打开即分析 · 可继续编辑和保存",
+      "sha256": "2567c1d4b7a225adc8a4fb4a7d6bf8a6da95638804a87f0de955b72bd33bd2a2",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "save-ai-ready-light",
+      "title": "摘要与标签 · 日间",
+      "sha256": "8d70f22cfa56fde65d130171cbc708d8e770b9d4a529256b11a5655962b46ba1",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "save-ai-ready-dark",
+      "title": "摘要与标签 · 夜间",
+      "sha256": "3fd5a249956ba184e0474abd5d3bd978a664e71eb5afd51bd78b6ddc47f98cc8",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "save-ai-ready-narrow",
+      "title": "320px 窄窗 · 无横向溢出",
+      "sha256": "ffd46f39d71fe399c85a5473961539d9fa13b00ec68b25ef2d0b8b0e8f625a6d",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "save-ai-ready-short",
+      "title": "短窗口 · 保存区固定",
+      "sha256": "a2acbc4db0d9811443e3882ce4185a788cc921f421295d6c924d9f8189bf2719",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "save-ai-short-bottom",
+      "title": "短窗口 · 滚动至备注",
+      "sha256": "7cdebab279a5404ba19ae4577e9bf9abe0fbd54c3064f4080dde541c130975a9",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "save-ai-failed",
+      "title": "失败 · 可重试或先保存",
+      "sha256": "b3f15eec58841c4a966473b611660a5babfd42fe1cb6533188c72871dde6e4da",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "save-unconfigured",
+      "title": "未连接服务 · 普通收藏可用",
+      "sha256": "b00c62c42c0a78812d9f66d7f77795968e2def0149d2e5568f03c80df42a81ec",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "save-ai-protected",
+      "title": "隐私保护 · 不发送页面内容",
+      "sha256": "5430599990b18eed4e1c513827e215097f9c3310fce5f34f3e298219888df930",
+      "visuallyReviewed": true
+    }
+  ]
+}

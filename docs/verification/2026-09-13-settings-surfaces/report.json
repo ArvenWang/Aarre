@@ -1,0 +1,200 @@
+{
+  "checks": [
+    {
+      "pass": true,
+      "name": "dark 420px：六个分类全部可见、无溢出",
+      "detail": {
+        "width": 420,
+        "height": 876,
+        "dialog": {
+          "x": 12,
+          "y": 216.875,
+          "w": 396,
+          "h": 442.25
+        },
+        "allVisible": true,
+        "count": 6,
+        "rows": 2,
+        "overflow": false,
+        "root": "rgb(22, 24, 27)",
+        "surface": "rgb(36, 39, 42)",
+        "panel": "rgb(36, 39, 42)",
+        "border": "rgb(72, 75, 78)",
+        "shadow": "rgba(15, 17, 19, 0.36) 0px 2px 8px 0px, rgba(15, 17, 19, 0.55) 0px 20px 56px 0px",
+        "selected": "AI 服务"
+      }
+    },
+    {
+      "pass": true,
+      "name": "420px：弹窗与页面明度分层，内部背景一致",
+      "detail": {
+        "width": 420,
+        "height": 876,
+        "dialog": {
+          "x": 12,
+          "y": 216.875,
+          "w": 396,
+          "h": 442.25
+        },
+        "allVisible": true,
+        "count": 6,
+        "rows": 2,
+        "overflow": false,
+        "root": "rgb(22, 24, 27)",
+        "surface": "rgb(36, 39, 42)",
+        "panel": "rgb(36, 39, 42)",
+        "border": "rgb(72, 75, 78)",
+        "shadow": "rgba(15, 17, 19, 0.36) 0px 2px 8px 0px, rgba(15, 17, 19, 0.55) 0px 20px 56px 0px",
+        "selected": "AI 服务"
+      }
+    },
+    {
+      "pass": true,
+      "name": "dark 420px：六个分类均可直接切换"
+    },
+    {
+      "pass": true,
+      "name": "设置内下拉使用通用的更高一层表面",
+      "detail": {
+        "background": "rgb(52, 56, 60)",
+        "elevation": "popover",
+        "shadow": "rgba(15, 17, 19, 0.36) 0px 2px 8px 0px, rgba(15, 17, 19, 0.55) 0px 20px 56px 0px"
+      }
+    },
+    {
+      "pass": true,
+      "name": "dark 320px：六个分类全部可见、无溢出",
+      "detail": {
+        "width": 320,
+        "height": 876,
+        "dialog": {
+          "x": 12,
+          "y": 183.484375,
+          "w": 296,
+          "h": 509.03125
+        },
+        "allVisible": true,
+        "count": 6,
+        "rows": 3,
+        "overflow": false,
+        "root": "rgb(22, 24, 27)",
+        "surface": "rgb(36, 39, 42)",
+        "panel": "rgb(36, 39, 42)",
+        "border": "rgb(72, 75, 78)",
+        "shadow": "rgba(15, 17, 19, 0.36) 0px 2px 8px 0px, rgba(15, 17, 19, 0.55) 0px 20px 56px 0px",
+        "selected": "AI 服务"
+      }
+    },
+    {
+      "pass": true,
+      "name": "320px：弹窗与页面明度分层，内部背景一致",
+      "detail": {
+        "width": 320,
+        "height": 876,
+        "dialog": {
+          "x": 12,
+          "y": 183.484375,
+          "w": 296,
+          "h": 509.03125
+        },
+        "allVisible": true,
+        "count": 6,
+        "rows": 3,
+        "overflow": false,
+        "root": "rgb(22, 24, 27)",
+        "surface": "rgb(36, 39, 42)",
+        "panel": "rgb(36, 39, 42)",
+        "border": "rgb(72, 75, 78)",
+        "shadow": "rgba(15, 17, 19, 0.36) 0px 2px 8px 0px, rgba(15, 17, 19, 0.55) 0px 20px 56px 0px",
+        "selected": "AI 服务"
+      }
+    },
+    {
+      "pass": true,
+      "name": "dark 320px：六个分类均可直接切换"
+    },
+    {
+      "pass": true,
+      "name": "light 420px：六个分类全部可见、无溢出",
+      "detail": {
+        "width": 420,
+        "height": 876,
+        "dialog": {
+          "x": 12,
+          "y": 216.875,
+          "w": 396,
+          "h": 442.25
+        },
+        "allVisible": true,
+        "count": 6,
+        "rows": 2,
+        "overflow": false,
+        "root": "rgb(255, 255, 255)",
+        "surface": "rgb(255, 255, 255)",
+        "panel": "rgb(255, 255, 255)",
+        "border": "rgb(218, 221, 224)",
+        "shadow": "rgba(15, 17, 19, 0.12) 0px 2px 8px 0px, rgba(15, 17, 19, 0.22) 0px 20px 56px 0px",
+        "selected": "AI 服务"
+      }
+    },
+    {
+      "pass": true,
+      "name": "light 420px：六个分类均可直接切换"
+    },
+    {
+      "pass": true,
+      "name": "light 320px：六个分类全部可见、无溢出",
+      "detail": {
+        "width": 320,
+        "height": 876,
+        "dialog": {
+          "x": 12,
+          "y": 183.484375,
+          "w": 296,
+          "h": 509.03125
+        },
+        "allVisible": true,
+        "count": 6,
+        "rows": 3,
+        "overflow": false,
+        "root": "rgb(255, 255, 255)",
+        "surface": "rgb(255, 255, 255)",
+        "panel": "rgb(255, 255, 255)",
+        "border": "rgb(218, 221, 224)",
+        "shadow": "rgba(15, 17, 19, 0.12) 0px 2px 8px 0px, rgba(15, 17, 19, 0.22) 0px 20px 56px 0px",
+        "selected": "AI 服务"
+      }
+    },
+    {
+      "pass": true,
+      "name": "light 320px：六个分类均可直接切换"
+    },
+    {
+      "pass": true,
+      "name": "更多菜单也接入共享浮层规范"
+    },
+    {
+      "pass": true,
+      "name": "新建文件夹使用相同弹窗层级",
+      "detail": {
+        "surface": "rgb(36, 39, 42)",
+        "elevation": "dialog"
+      }
+    },
+    {
+      "pass": true,
+      "name": "完整收藏库保留六项左侧分类",
+      "detail": {
+        "display": "flex",
+        "direction": "column",
+        "count": 6
+      }
+    },
+    {
+      "pass": true,
+      "name": "无页面运行异常",
+      "detail": []
+    }
+  ],
+  "errors": []
+}

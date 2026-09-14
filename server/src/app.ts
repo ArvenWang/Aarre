@@ -157,7 +157,10 @@ export async function buildApp(dependencies: {
 
   app.post("/v1/auth/refresh", {
     config: { rateLimit: { max: 60, timeWindow: "1 minute" } }
-  }, async (request) => auth.refresh(refreshSchema.parse(request.body).refreshToken));
+  }, async (request) => auth.refresh(
+    refreshSchema.parse(request.body).refreshToken,
+    z.string().uuid().optional().parse(request.headers["idempotency-key"])
+  ));
 
   app.post("/v1/auth/logout", async (request) => {
     await auth.signOut(await requireAccount(request));
@@ -266,7 +269,7 @@ export async function buildApp(dependencies: {
     return assets.downloadUrl(await requireAccount(request), assetId);
   });
 
-  app.get("/v1/assets", async (request) => ({ assets: await assets.list(await requireAccount(request)) }));
+  app.get("/v1/assets", async (request) => ({ writePreconditions: true, assets: await assets.list(await requireAccount(request)) }));
   app.delete("/v1/assets", async (request) => assets.deleteAllForAccount(await requireAccount(request)));
 
   return { app, services: { auth, sync, assets, account } };

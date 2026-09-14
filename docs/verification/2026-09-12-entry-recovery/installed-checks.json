@@ -1,0 +1,35 @@
+{
+  "version": "0.6.8",
+  "surface": "Native Chrome, installed unpacked extension; no CDP attachment to its iframe",
+  "loadedFrom": "/Users/nefish/Desktop/Coding/Aarre/dist",
+  "permissionsObserved": "在所有网站上",
+  "checks": {
+    "automaticNewPageEntry": true,
+    "navigationEntry": true,
+    "directSaveForm": true,
+    "cancelClosesMenu": true,
+    "closeButtonClosesMenu": true,
+    "noBackArrow": true,
+    "upgradeRetiresLegacyHost": true,
+    "sameVersionReloadRecovers": true,
+    "pageInputRetainedAcrossReload": true,
+    "savedSolidStarAfterNativeBookmark": true,
+    "outlineAfterNativeRemoval": true,
+    "unsentComposerDraftRetainedAfterNavigation": true
+  },
+  "testBookmark": "http://127.0.0.1:4179/native-probe.html",
+  "testBookmarkRemoved": true,
+  "testComposerDraftCleared": true,
+  "realAiRequestThisRound": false,
+  "aiOnLocalPage": "Skipped by existing privacy protection",
+  "finalSealedBuildReload": {
+    "passed": true,
+    "version": "0.6.8",
+    "sourceCommit": "ef18f29d35de726e75f6945f331e92f9424b7c20",
+    "loadedFrom": "/Users/nefish/Desktop/Coding/Aarre/dist",
+    "directSaveAndCloseVerified": true,
+    "singleAccessibleBar": true,
+    "verifiedAt": "2026-09-12T01:29:50.706575+08:00"
+  },
+  "ownedNativeQaTabsClosed": true
+}

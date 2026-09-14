@@ -1,3 +1,4 @@
+import { ScrollSurface } from "@/ui/components/ui/scroll-area";
 import { useState } from "react";
 import "../../sidepanel-lazy.css";
 import { Button } from "@/ui/components/ui/button";
@@ -12,6 +13,17 @@ interface AgentHistoryPageProps {
   onBack: () => void;
   onOpen: (conversation: AgentConversation) => void;
   onDelete: (id: string) => Promise<void>;
+}
+
+function conversationPreview(content?: string) {
+  if (!content?.trim()) return "";
+  // A short reading excerpt, not a concatenation of headings, tables and code.
+  return content.trim().split(/\r?\n\s*\r?\n/, 1)[0]
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^[`~]{3}.*$/gm, "")
+    .replace(/!?\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/(\*\*|__|`)(.*?)\1/g, "$2")
+    .trim() || content.trim();
 }
 
 function AgentHistoryPage({
@@ -41,7 +53,7 @@ function AgentHistoryPage({
           <h1>历史会话</h1>
         </div>
       </header>
-      <section className="agent-history-list">
+      <ScrollSurface as="section" className="agent-history-list">
         {conversations.length ? (
           conversations.map((conversation) => {
             const preview = [...conversation.messages]
@@ -57,7 +69,7 @@ function AgentHistoryPage({
                   onClick={() => onOpen(conversation)}
                 >
                   <strong>{conversation.title}</strong>
-                  <small>{preview || "尚未生成回答"}</small>
+                  <small>{conversationPreview(preview) || "尚未生成回答"}</small>
                   <time>{conversationDate(conversation.updatedAt)}</time>
                 </Button>
                 <div className="agent-history-actions">
@@ -90,10 +102,9 @@ function AgentHistoryPage({
           <div className="agent-history-empty">
             <HistoryIcon />
             <strong>还没有历史会话</strong>
-            <p>在收藏列表底部提问后，会话会自动保存在这里。</p>
           </div>
         )}
-      </section>
+      </ScrollSurface>
     </main>
   );
 }

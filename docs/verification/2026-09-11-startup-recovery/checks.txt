@@ -1,0 +1,154 @@
+
+> bookmark-layer@0.6.3 check
+> npm run check:node && npm run check:design && npm run typecheck && npm run test && npm run build
+
+
+> bookmark-layer@0.6.3 check:node
+> node scripts/check-node.mjs
+
+
+> bookmark-layer@0.6.3 check:design
+> tsx scripts/check-design-tokens.ts
+
+设计 token 检查通过：11 个 CSS 文件与全部 tsx 无硬编码回归。
+
+> bookmark-layer@0.6.3 typecheck
+> tsc --noEmit
+
+
+> bookmark-layer@0.6.3 test
+> vitest run
+
+
+ RUN  v4.1.11 /Users/nefish/Desktop/Coding/Aarre
+
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+
+ Test Files  100 passed (100)
+      Tests  536 passed (536)
+   Start at  13:10:43
+   Duration  10.47s (transform 5.84s, setup 816ms, import 21.28s, tests 10.79s, environment 42.78s)
+
+
+> bookmark-layer@0.6.3 build
+> node scripts/build.mjs
+
+vite v8.1.5 building client environment for production...
+[2Ktransforming...✓ 2888 modules transformed.
+[lightningcss minify] Unknown at rule: @theme
+1054 |  }
+1055 |  
+1056 |  @theme inline {
+     |        ^
+1057 |    --color-background: var(--bg);
+1058 |    --color-foreground: var(--ink);
+rendering chunks...
+computing gzip size...
+dist/icon-processor.html                               0.48 kB │ gzip:   0.30 kB
+dist/floating.html                                     0.98 kB │ gzip:   0.45 kB
+dist/privacy.html                                      1.20 kB │ gzip:   0.48 kB
+dist/manager.html                                      2.11 kB │ gzip:   0.69 kB
+dist/sidepanel.html                                    3.77 kB │ gzip:   1.13 kB
+dist/assets/documentation-api-v3-BpyUPRMy.webp        12.13 kB
+dist/assets/job-career-v2-VaS121c2.webp               13.17 kB
+dist/assets/ai-automation-v1-BwEn1KYz.webp            13.93 kB
+dist/assets/health-medical-v2-CiSdlHl8.webp           14.16 kB
+dist/assets/home-family-v1-DK3FMhWo.webp              14.58 kB
+dist/assets/hardware-devices-v1-DpjcOxdF.webp         14.73 kB
+dist/assets/development-software-v1-DyLw-n9n.webp     15.11 kB
+dist/assets/web-tool-v1-yGdMZ7ZL.webp                 15.65 kB
+dist/assets/work-productivity-v1-DCodBVkb.webp        16.35 kB
+dist/assets/work-dashboard-v1-COjuIhc6.webp           16.54 kB
+dist/assets/generic-webpage-v1-DEysxZce.webp          17.69 kB
+dist/assets/code-repository-v1-DXsPu5A1.webp          17.98 kB
+dist/assets/pdf-report-v1-CfzxLDF5.webp               18.50 kB
+dist/assets/newsletter-rss-v1-CNXZsXch.webp           18.75 kB
+dist/assets/video-v2-ypzSIusH.webp                    19.45 kB
+dist/.vite/manifest.json                              19.65 kB │ gzip:   2.82 kB
+dist/assets/education-science-v3-BcRQqCW3.webp        19.78 kB
+dist/assets/data-chart-v1-oX9dwBYU.webp               19.91 kB
+dist/assets/paper-research-v1-CB_oZml4.webp           19.97 kB
+dist/assets/security-privacy-v1-fikHJ8KT.webp         20.62 kB
+dist/assets/event-ticket-v1-C3npFPRE.webp             20.91 kB
+dist/assets/automotive-mobility-v1-D1X7EL_H.webp      21.07 kB
+dist/assets/real-estate-housing-v1-DVmJxJPH.webp      21.99 kB
+dist/assets/consumer-fashion-v1-BLrxJeGl.webp         24.11 kB
+dist/assets/food-cooking-v1-qv9aXebm.webp             24.18 kB
+dist/assets/nature-pets-v1-92FI4Ehj.webp              24.20 kB
+dist/assets/finance-investing-v3-CvKYkrYo.webp        24.26 kB
+dist/assets/data-cloud-v1-BC1Nmm3i.webp               24.47 kB
+dist/assets/sports-fitness-v1-CfD1WvXq.webp           24.65 kB
+dist/assets/tutorial-course-v1-B4d0U9aD.webp          25.23 kB
+dist/assets/business-startup-v1-Ba2lCQn2.webp         25.64 kB
+dist/assets/design-creation-v1-D88PwLUA.webp          26.05 kB
+dist/assets/audio-podcast-v1-BTpFAu2z.webp            28.10 kB
+dist/assets/travel-places-v3-suitcase-BhhEFec8.webp   28.58 kB
+dist/assets/place-map-v1-BYxMYR6_.webp                29.14 kB
+dist/assets/news-society-v1-1FVKMXDY.webp             29.15 kB
+dist/assets/games-hobbies-v1-PgRntD89.webp            29.28 kB
+dist/assets/art-creation-v2-BVtY71IQ.webp             31.65 kB
+dist/assets/shopping-products-v2-SQ0LsCsK.webp        31.65 kB
+dist/assets/entertainment-culture-v2-BmChjMSH.webp    32.54 kB
+dist/assets/portfolio-gallery-v2-TaQ2dtXk.webp        37.12 kB
+dist/assets/floating-CUfUvLeI.css                      3.12 kB │ gzip:   0.98 kB
+dist/assets/sidepanel-lazy-BEIXjEZB.css               23.24 kB │ gzip:   4.16 kB
+dist/assets/privacy-wBJ3jsOl.css                      35.50 kB │ gzip:   7.42 kB
+dist/assets/styles-sidepanel-Dm97aGMK.css            481.96 kB │ gzip:  50.17 kB
+dist/assets/manager-CMLBJdoH.css                     484.04 kB │ gzip:  50.47 kB
+dist/assets/chevron-down-C6NppS8U.js                   0.12 kB │ gzip:   0.13 kB
+dist/assets/bridge-BiPql89Q.js                         0.17 kB │ gzip:   0.15 kB
+dist/assets/messages-Sc4M7Lwk.js                       0.31 kB │ gzip:   0.29 kB
+dist/assets/onboarding-DcJmrHgo.js                     0.43 kB │ gzip:   0.24 kB
+dist/assets/settings-CctZf6N5.js                       0.65 kB │ gzip:   0.40 kB
+dist/assets/rolldown-runtime-QTnfLwEv.js               0.69 kB │ gzip:   0.42 kB
+dist/assets/modulepreload-polyfill-Dezn_h7o.js         0.69 kB │ gzip:   0.39 kB
+dist/assets/theme-NLM8dFnR.js                          0.75 kB │ gzip:   0.36 kB
+dist/assets/sidepanel-BW18gqvj.js                      0.77 kB │ gzip:   0.46 kB
+dist/assets/error-boundary-CHBzXFFa.js                 0.79 kB │ gzip:   0.51 kB
+dist/assets/utils-oOOy0IZv.js                          0.85 kB │ gzip:   0.49 kB
+dist/assets/input-CiRMapeI.js                          1.09 kB │ gzip:   0.59 kB
+dist/assets/preload-helper-Czpn1I53.js                 1.19 kB │ gzip:   0.67 kB
+dist/assets/display-settings-CPdMsd_W.js               1.81 kB │ gzip:   0.68 kB
+dist/assets/AgentHistoryPage-CXNhrCpx.js               2.01 kB │ gzip:   1.00 kB
+dist/assets/iconProcessor-BENerQQN.js                  2.57 kB │ gzip:   1.28 kB
+dist/assets/switch-BZU8o0UP.js                         3.28 kB │ gzip:   1.40 kB
+dist/assets/Icons-D8gJU_YS.js                          3.52 kB │ gzip:   1.12 kB
+dist/assets/AgentThinkingSteps-BylFWDSX.js             3.70 kB │ gzip:   1.83 kB
+dist/assets/floating-BUDQK2sz.js                       3.97 kB │ gzip:   1.91 kB
+dist/assets/OnboardingPage-BhbHvHbq.js                 6.43 kB │ gzip:   3.00 kB
+dist/assets/scroll-area-CbTNOpdU.js                    6.87 kB │ gzip:   2.82 kB
+dist/assets/privacy-RsRcQnGm.js                        8.14 kB │ gzip:   3.85 kB
+dist/assets/SiteThumbnail-CwBvOO9T.js                 13.54 kB │ gzip:   5.25 kB
+dist/assets/ResourceIdentity-CVU7aMGc.js              14.67 kB │ gzip:   5.95 kB
+dist/assets/data-export-CKxV0q_u.js                   16.44 kB │ gzip:   6.19 kB
+dist/assets/thumbnail-GMogAOvZ.js                     20.94 kB │ gzip:   5.21 kB
+dist/assets/SettingsPage-C0b3s_Yj.js                  23.08 kB │ gzip:   7.60 kB
+dist/assets/button-BT2L8lwd.js                        28.25 kB │ gzip:   9.18 kB
+dist/assets/SidePanelApp-DVZEJFnF.js                  70.49 kB │ gzip:  22.91 kB
+dist/assets/manager-BfjvaMeC.js                       71.62 kB │ gzip:  24.06 kB
+dist/assets/AgentChatPage-CjxkDpY1.js                162.80 kB │ gzip:  49.18 kB
+dist/assets/react-vendor-CplVsv6E.js                 189.63 kB │ gzip:  59.66 kB
+dist/assets/pinyin-search-DVrv6fWI.js                286.77 kB │ gzip: 141.68 kB
+dist/assets/ui-vendor-Bpc02o2S.js                    300.44 kB │ gzip:  90.83 kB
+
+[33m[INEFFECTIVE_DYNAMIC_IMPORT] [0msrc/lib/visuals.ts is dynamically imported by src/lib/storage.ts but also statically imported by src/lib/archive-format.ts, src/lib/archive-restore.ts, dynamic import will not move module into another chunk.
+
+✓ built in 1.18s
+vite v8.1.5 building client environment for production...
+[2Ktransforming...✓ 155 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/background.js  431.41 kB │ gzip: 123.13 kB
+
+✓ built in 139ms
+MV3 worker: 299768 bytes, 422 shared string values; public property names preserved.
+
+  dist/content-capture.js  91.5kb
+
+⚡ Done in 44ms
+
+  dist/floating-host.js  12.2kb
+
+⚡ Done in 4ms
+JavaScript 产物语法检查通过：dist/assets/AgentChatPage-CjxkDpY1.js, dist/assets/AgentHistoryPage-CXNhrCpx.js, dist/assets/AgentThinkingSteps-BylFWDSX.js, dist/assets/Icons-D8gJU_YS.js, dist/assets/OnboardingPage-BhbHvHbq.js, dist/assets/ResourceIdentity-CVU7aMGc.js, dist/assets/SettingsPage-C0b3s_Yj.js, dist/assets/SidePanelApp-DVZEJFnF.js, dist/assets/SiteThumbnail-CwBvOO9T.js, dist/assets/bridge-BiPql89Q.js, dist/assets/button-BT2L8lwd.js, dist/assets/chevron-down-C6NppS8U.js, dist/assets/data-export-CKxV0q_u.js, dist/assets/display-settings-CPdMsd_W.js, dist/assets/error-boundary-CHBzXFFa.js, dist/assets/floating-BUDQK2sz.js, dist/assets/iconProcessor-BENerQQN.js, dist/assets/input-CiRMapeI.js, dist/assets/manager-BfjvaMeC.js, dist/assets/messages-Sc4M7Lwk.js, dist/assets/modulepreload-polyfill-Dezn_h7o.js, dist/assets/onboarding-DcJmrHgo.js, dist/assets/pinyin-search-DVrv6fWI.js, dist/assets/preload-helper-Czpn1I53.js, dist/assets/privacy-RsRcQnGm.js, dist/assets/react-vendor-CplVsv6E.js, dist/assets/rolldown-runtime-QTnfLwEv.js, dist/assets/scroll-area-CbTNOpdU.js, dist/assets/settings-CctZf6N5.js, dist/assets/sidepanel-BW18gqvj.js, dist/assets/switch-BZU8o0UP.js, dist/assets/theme-NLM8dFnR.js, dist/assets/thumbnail-GMogAOvZ.js, dist/assets/ui-vendor-Bpc02o2S.js, dist/assets/utils-oOOy0IZv.js, dist/background.js, dist/content-capture.js, dist/floating-host.js

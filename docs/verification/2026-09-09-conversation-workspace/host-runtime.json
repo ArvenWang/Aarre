@@ -1,0 +1,129 @@
+{
+  "boundary": "Current host and UI source with controlled browser transport. Not installed Chrome.",
+  "scenes": [
+    {
+      "name": "host-desktop-light",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "pageWidth": 1265,
+      "frame": {
+        "x": 790,
+        "y": 58.2734375,
+        "width": 398,
+        "height": 598,
+        "top": 58.2734375,
+        "right": 1188,
+        "bottom": 656.2734375,
+        "left": 790
+      },
+      "frameViewport": {
+        "width": 398,
+        "height": 598
+      },
+      "frameScrollWidth": 398,
+      "composer": {
+        "x": 12,
+        "y": 464,
+        "width": 374,
+        "height": 122,
+        "top": 464,
+        "right": 386,
+        "bottom": 586,
+        "left": 12
+      },
+      "tabs": 0,
+      "draft": "",
+      "active": "bookmark-agent-prompt",
+      "theme": "light"
+    },
+    {
+      "name": "host-desktop-dark",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "pageWidth": 1265,
+      "frame": {
+        "x": 790,
+        "y": 58.2734375,
+        "width": 398,
+        "height": 598,
+        "top": 58.2734375,
+        "right": 1188,
+        "bottom": 656.2734375,
+        "left": 790
+      },
+      "frameViewport": {
+        "width": 398,
+        "height": 598
+      },
+      "frameScrollWidth": 398,
+      "composer": {
+        "x": 12,
+        "y": 464,
+        "width": 374,
+        "height": 122,
+        "top": 464,
+        "right": 386,
+        "bottom": 586,
+        "left": 12
+      },
+      "tabs": 0,
+      "draft": "帮我整理收藏里的设计资料",
+      "active": "bookmark-agent-prompt",
+      "theme": "dark"
+    },
+    {
+      "name": "host-420-light",
+      "viewport": {
+        "width": 420,
+        "height": 760
+      },
+      "pageWidth": 405,
+      "frame": {
+        "x": 13,
+        "y": 85,
+        "width": 379,
+        "height": 598,
+        "top": 85,
+        "right": 392,
+        "bottom": 683,
+        "left": 13
+      },
+      "frameViewport": {
+        "width": 379,
+        "height": 598
+      },
+      "frameScrollWidth": 379,
+      "composer": {
+        "x": 12,
+        "y": 464,
+        "width": 355,
+        "height": 122,
+        "top": 464,
+        "right": 367,
+        "bottom": 586,
+        "left": 12
+      },
+      "tabs": 0,
+      "draft": "帮我整理收藏里的设计资料",
+      "active": "bookmark-agent-prompt",
+      "theme": "light"
+    }
+  ],
+  "reopen": {
+    "sameFrame": true,
+    "sameComposer": true,
+    "draft": "帮我整理收藏里的设计资料",
+    "active": "bookmark-agent-prompt",
+    "pageWidthBefore": 1265,
+    "pageWidthAfter": 1265
+  },
+  "transportEvents": [
+    "FLOAT_HOST_INIT",
+    "FLOAT_HOST_INIT",
+    "FLOAT_HOST_INIT"
+  ]
+}

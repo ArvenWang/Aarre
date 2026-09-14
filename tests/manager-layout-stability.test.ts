@@ -129,7 +129,7 @@ describe("manager layout stability", () => {
     expect(masonrySource).toContain("ResizeObserver");
   });
 
-  it("keeps brand and navigation in one header without a bottom rule", async () => {
+  it("keeps brand, navigation and utilities together in a vertically centered header", async () => {
     const [css, source] = await Promise.all([
       readFile(managerCssUrl, "utf8"),
       readFile(managerAppUrl, "utf8")
@@ -141,11 +141,12 @@ describe("manager layout stability", () => {
       /<header className="manager-header">[\s\S]*?<\/header>/
     )?.[0];
 
-    expect(headerRule).not.toContain("border-bottom");
+    expect(headerRule).toContain("align-items: center");
     expect(topbarRule).not.toContain("border-bottom");
     expect(tabsRule).not.toContain("border-bottom");
     expect(headerMarkup).toContain('className="manager-topbar"');
-    expect(headerMarkup).toContain('className="manager-view-tabs"');
+    expect(headerMarkup).toContain("<ManagerUtilityActions");
+    expect(headerMarkup).toContain('className="manager-view-tabs aarre-tabs-list"');
   });
 
   it("keeps the editor visually open and aligns non-action proposal marks", async () => {
@@ -170,28 +171,15 @@ describe("manager layout stability", () => {
     expect(close).toContain("background: transparent");
   });
 
-  it("uses a manager-only floating scrollbar without consuming page width", async () => {
+  it("shares the overlay scrollbar while preserving the manager page background", async () => {
     const [css, component, main, tokens] = await Promise.all([
-      readFile(managerCssUrl, "utf8"),
-      readFile(floatingScrollbarUrl, "utf8"),
-      readFile(managerMainUrl, "utf8"),
-      readFile(tokensUrl, "utf8")
+      readFile(managerCssUrl, "utf8"), readFile(floatingScrollbarUrl, "utf8"),
+      readFile(managerMainUrl, "utf8"), readFile(tokensUrl, "utf8")
     ]);
-
     expect(css).toContain("scrollbar-width: none");
-    expect(css).toContain("body.manager-page::-webkit-scrollbar");
-    expect(css).toContain(".manager-floating-scrollbar {");
-    expect(css).toContain("position: fixed");
-    expect(css).toContain("pointer-events: none");
-    expect(css).toContain("pointer-events: auto");
-    expect(css).toContain("opacity: 0");
-    expect(css).toContain("--scrollbar-thumb-size");
-    expect(css).toContain('html.manager-page[data-theme="light"]');
-    expect(component).toContain('role="scrollbar"');
-    expect(component).toContain("onPointerDown={beginDrag}");
-    expect(component).toContain("onKeyDown={handleKeyDown}");
-    expect(component).toContain('document.addEventListener("scroll"');
+    expect(component).toContain("DocumentScrollbar as FloatingScrollbar");
     expect(main).toContain('classList.add("manager-page")');
+    expect(css).toContain('html.manager-page[data-theme="light"]');
     expect(tokens).toContain("--page-bg-light: #ffffff");
   });
 });

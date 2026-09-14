@@ -1,3 +1,4 @@
+import { buildKnowledgeDashboard } from "../../lib/knowledge-insights";
 import type { PreviewRequest } from "./preview-request";
 import { PREVIEW_UNHANDLED } from "./preview-request";
 import {
@@ -320,33 +321,7 @@ export async function handlePreviewDataMessage(request: PreviewRequest, previewS
                     largeFolders: 1
                   }
                 },
-                topicGraph: {
-                  nodes: [
-                    { id: "AI Agent", label: "AI Agent", count: 28 },
-                    { id: "产品设计", label: "产品设计", count: 23 },
-                    { id: "前端性能", label: "前端性能", count: 18 },
-                    { id: "React", label: "React", count: 16 },
-                    { id: "RAG", label: "RAG", count: 12 },
-                    { id: "动画", label: "动画", count: 9 }
-                  ],
-                  edges: [
-                    {
-                      source: "AI Agent",
-                      target: "RAG",
-                      weight: 8
-                    },
-                    {
-                      source: "产品设计",
-                      target: "动画",
-                      weight: 5
-                    },
-                    {
-                      source: "前端性能",
-                      target: "React",
-                      weight: 7
-                    }
-                  ]
-                },
+                topicGraph: buildKnowledgeDashboard(previewResources, previewAgentCatalog()).topicGraph,
                 resurfacing: previewResources.slice(0, 9).map(
                   (resource, index) => ({
                     resourceKey: resource.resourceKey,

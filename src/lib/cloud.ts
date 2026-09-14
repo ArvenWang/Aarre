@@ -1,3 +1,4 @@
+import { cloudOwner } from "./cloud-owner";
 import { cloudRequest } from "./auth";
 import {
   buildProtectionPolicy,
@@ -10,9 +11,8 @@ import {
   deferOutboxItem,
   getLocalResource,
   getOutbox,
-  mergeLocalResources,
-  upsertLocalResource
 } from "./storage";
+import { clearCloudResourceTracking, commitCloudResourceChanges, readCloudResourceTracking, type CloudResourceChange } from "./cloud-resource-store";
 import type { OutboxItem, ResourceRecord } from "./types";
 
 interface CloudResourcePayload {
@@ -53,11 +53,6 @@ interface CloudResourceResponse {
   conflictCount?: number;
 }
 
-const CLOUD_CURSOR_KEY = "aarre:cloud-sync-cursor:v1";
-const CLOUD_RESOURCE_REVISIONS_KEY = "aarre:cloud-resource-revisions:v1";
-
-type CloudResourceRevisions = Record<string, number>;
-
 export interface CloudConflict {
   conflictId: string;
   resourceKey: string;
@@ -71,15 +66,6 @@ export interface CloudConflict {
   }>;
 }
 
-async function readCloudResourceRevisions(): Promise<CloudResourceRevisions> {
-  const stored = (await chrome.storage.local.get(CLOUD_RESOURCE_REVISIONS_KEY))[
-    CLOUD_RESOURCE_REVISIONS_KEY
-  ];
-  return stored && typeof stored === "object"
-    ? stored as CloudResourceRevisions
-    : {};
-}
-
 /**
  * The local sync status is not account-scoped and can survive upgrades from an
  * older cloud implementation. The revision map, however, is cleared whenever
@@ -89,7 +75,7 @@ async function readCloudResourceRevisions(): Promise<CloudResourceRevisions> {
  * revision for it.
  */
 export async function getTrackedCloudResourceKeys(): Promise<ReadonlySet<string>> {
-  return new Set(Object.keys(await readCloudResourceRevisions()));
+  return new Set(Object.keys((await readCloudResourceTracking()).revisions));
 }
 
 export function shouldQueueResourceForCloud(
@@ -103,17 +89,8 @@ export function shouldQueueResourceForCloud(
   );
 }
 
-async function saveCloudResourceRevision(resourceKey: string, revision: number): Promise<void> {
-  const revisions = await readCloudResourceRevisions();
-  revisions[resourceKey] = revision;
-  await chrome.storage.local.set({ [CLOUD_RESOURCE_REVISIONS_KEY]: revisions });
-}
-
 export async function clearCloudResourceSyncTracking(): Promise<void> {
-  await chrome.storage.local.remove([
-    CLOUD_CURSOR_KEY,
-    CLOUD_RESOURCE_REVISIONS_KEY
-  ]);
+  await clearCloudResourceTracking();
 }
 
 function nonEmpty<T>(value: T | "" | undefined): T | undefined {
@@ -124,8 +101,8 @@ export function resourceCloudPayload(resource: ResourceRecord): CloudResourcePay
   return {
     canonicalUrl: resource.canonicalUrl,
     ...(nonEmpty(resource.summary) ? { summary: resource.summary } : {}),
-    ...(nonEmpty(resource.userNote) ? { userNote: resource.userNote } : {}),
-    ...(resource.tags.length ? { tags: resource.tags } : {}),
+    ...(resource.userNote || resource.fieldClears?.includes("userNote") ? { userNote: resource.userNote } : {}),
+    ...(resource.tags.length || resource.fieldClears?.includes("tags") ? { tags: resource.tags } : {}),
     ...(resource.tagsSource ? { tagsSource: resource.tagsSource } : {}),
     ...(resource.topics.length ? { topics: resource.topics } : {}),
     ...(resource.aliases?.length ? { aliases: resource.aliases } : {}),
@@ -205,20 +182,26 @@ async function responseToLocal(cloud: CloudResourceResponse): Promise<ResourceRe
     updatedAt: payload.updatedAt || timestamp,
     lastSyncedAt: timestamp,
     // 携带云端的字段时钟，让 mergeLocalResources 能逐字段裁决而不是整条覆盖。
-    fieldUpdatedAt: cloud.fieldUpdatedAt || {}
+    fieldUpdatedAt: cloud.fieldUpdatedAt || {},
+    fieldClears: [
+      ...(Object.hasOwn(payload, "userNote") && payload.userNote === "" ? ["userNote" as const] : []),
+      ...(Object.hasOwn(payload, "tags") && payload.tags?.length === 0 ? ["tags" as const] : [])
+    ]
   };
 }
 
 export async function syncOneResource(
   resource: ResourceRecord,
   _content: string,
-  operationId: string = crypto.randomUUID()
+  operationId: string = crypto.randomUUID(),
+  owner?: string
 ): Promise<ResourceRecord> {
   if (await resourceIsProtected(resource)) {
     throw Object.assign(new Error("受保护的收藏不会上传云端。"), { protectedResource: true });
   }
   const payload = resourceCloudPayload(resource);
-  const baseRevision = (await readCloudResourceRevisions())[resource.resourceKey] || 0;
+  const tracking = await readCloudResourceTracking();
+  const baseRevision = tracking.revisions[resource.resourceKey] || 0;
   const response = await cloudRequest<CloudResourceResponse>(
     `/v1/sync/resources/${encodeURIComponent(resource.resourceKey)}`,
     {
@@ -236,100 +219,97 @@ export async function syncOneResource(
         ),
         deleted: Boolean(resource.deletedAt)
       })
-    }
+    }, owner
   );
-  await saveCloudResourceRevision(resource.resourceKey, response.revision);
-  if (resource.deletedAt) return resource;
+  if (resource.deletedAt) {
+    await commitCloudResourceChanges(tracking.generation, [{ resourceKey: resource.resourceKey, revision: response.revision }]);
+    return resource;
+  }
   const local = await responseToLocal(response);
-  await upsertLocalResource(local);
-  return local;
+  const applied = await commitCloudResourceChanges(tracking.generation, [{ resourceKey: resource.resourceKey, revision: response.revision, resource: local }]);
+  return applied[0] || (await getLocalResource(resource.resourceKey)) || local;
 }
 
 async function pullFullCloudResources(): Promise<ResourceRecord[]> {
-  const incoming: ResourceRecord[] = [];
-  const revisions: CloudResourceRevisions = {};
+  const tracking = await readCloudResourceTracking();
+  const incoming = new Map<string, ResourceRecord>();
   let offset = 0;
-  let cursor = 0;
+  let bootstrapCursor: number | undefined;
   while (true) {
     const page = await cloudRequest<{
       resources: CloudResourceResponse[];
       nextOffset: number | null;
       cursor: number;
     }>(`/v1/sync/bootstrap?offset=${offset}&limit=200`);
+    // Replay changes since the first page, including edits while bootstrap ran.
+    bootstrapCursor ??= page.cursor;
+    const changes: CloudResourceChange[] = [];
     for (const cloud of page.resources) {
-      revisions[cloud.resourceKey] = cloud.revision;
-      if (cloud.deleted) {
-        await deleteLocalResource(cloud.resourceKey);
-      } else {
-        incoming.push(await responseToLocal(cloud));
-      }
+      changes.push({
+        resourceKey: cloud.resourceKey, revision: cloud.revision,
+        ...(cloud.deleted ? { deleted: true } : { resource: await responseToLocal(cloud) })
+      });
+      if (cloud.deleted) incoming.delete(cloud.resourceKey);
     }
-    cursor = Math.max(cursor, page.cursor);
+    const applied = await commitCloudResourceChanges(
+      tracking.generation, changes, page.nextOffset === null ? bootstrapCursor : undefined
+    );
+    for (const item of applied) incoming.set(item.resourceKey, item);
     if (page.nextOffset === null) break;
+    if (!Number.isSafeInteger(page.nextOffset) || page.nextOffset <= offset) {
+      throw new Error("云端分页没有继续推进，已保留已接收数据并停止重试。");
+    }
     offset = page.nextOffset;
   }
-  if (incoming.length) await mergeLocalResources(incoming);
-  await chrome.storage.local.set({
-    [CLOUD_CURSOR_KEY]: cursor,
-    [CLOUD_RESOURCE_REVISIONS_KEY]: revisions
-  });
-  return incoming;
+  return [...incoming.values()];
 }
 
 export async function pullCloudResources(): Promise<ResourceRecord[]> {
-  const stored = (await chrome.storage.local.get(CLOUD_CURSOR_KEY))[CLOUD_CURSOR_KEY];
-  let cursor = typeof stored === "number" && Number.isSafeInteger(stored) && stored > 0
-    ? stored
-    : 0;
+  const tracking = await readCloudResourceTracking();
+  let cursor = tracking.cursor;
   if (!cursor) return pullFullCloudResources();
-
-  const incoming: ResourceRecord[] = [];
-  const revisions = await readCloudResourceRevisions();
+  const incoming = new Map<string, ResourceRecord>();
   while (true) {
     const page = await cloudRequest<{
       changes: Array<{
-        sequence: number;
-        entityType: string;
-        entityId: string;
-        revision: number;
-        deleted: boolean;
+        sequence: number; entityType: string; entityId: string;
+        revision: number; deleted: boolean;
         payload?: CloudResourcePayload | null;
         fieldUpdatedAt?: Record<string, string>;
       }>;
-      cursor: number;
-      hasMore: boolean;
-      fullResyncRequired: boolean;
+      cursor: number; hasMore: boolean; fullResyncRequired: boolean;
     }>(`/v1/sync/changes?cursor=${cursor}&limit=200`);
-    if (page.fullResyncRequired) return pullFullCloudResources();
-    for (const change of page.changes) {
-      if (change.entityType === "resource") {
-        revisions[change.entityId] = change.revision;
-      }
+    if (page.fullResyncRequired) {
+      await clearCloudResourceTracking(tracking.generation);
+      return pullFullCloudResources();
+    }
+    if (!Number.isSafeInteger(page.cursor) || page.cursor < cursor || (page.hasMore && page.cursor === cursor)) {
+      throw new Error("云端同步进度无效，已停止提交这批变化。");
+    }
+    const changes: CloudResourceChange[] = [];
+    for (const change of [...page.changes].sort((a, b) => a.sequence - b.sequence)) {
       if (change.entityType !== "resource") continue;
       if (change.deleted) {
-        // 云端墓碑只清理 Aarre 智能层。Chrome 原生书签由 Chrome Sync 管理。
-        await deleteLocalResource(change.entityId);
-        continue;
+        changes.push({ resourceKey: change.entityId, revision: change.revision, deleted: true });
+        incoming.delete(change.entityId);
+      } else if (change.payload) {
+        changes.push({
+          resourceKey: change.entityId, revision: change.revision,
+          resource: await responseToLocal({
+            resourceKey: change.entityId, payload: change.payload, revision: change.revision,
+            fieldUpdatedAt: change.fieldUpdatedAt || {}, deleted: false, sequence: change.sequence
+          })
+        });
+      } else {
+        throw new Error("云端变化缺少收藏内容，已停止提交这批数据。");
       }
-      if (!change.payload) continue;
-      incoming.push(await responseToLocal({
-        resourceKey: change.entityId,
-        payload: change.payload,
-        revision: change.revision,
-        fieldUpdatedAt: change.fieldUpdatedAt || {},
-        deleted: false,
-        sequence: change.sequence
-      }));
     }
-    cursor = Math.max(cursor, page.cursor);
-    await chrome.storage.local.set({
-      [CLOUD_CURSOR_KEY]: cursor,
-      [CLOUD_RESOURCE_REVISIONS_KEY]: revisions
-    });
+    const applied = await commitCloudResourceChanges(tracking.generation, changes, page.cursor);
+    for (const item of applied) incoming.set(item.resourceKey, item);
+    cursor = page.cursor;
     if (!page.hasMore) break;
   }
-  if (incoming.length) await mergeLocalResources(incoming);
-  return incoming;
+  return [...incoming.values()];
 }
 
 export async function listCloudConflicts(): Promise<CloudConflict[]> {
@@ -362,12 +342,13 @@ function message(error: unknown): string {
   return error instanceof Error ? error.message : "云端同步失败";
 }
 
-export async function processOutbox(): Promise<{
+export async function processOutbox(options: { force?: boolean } = {}): Promise<{
   attempted: number;
   synced: number;
   failed: number;
 }> {
-  const items = (await getOutbox()).filter((item) => due(item)).slice(0, 25);
+  const owner = await cloudOwner();
+  const items = (await getOutbox()).filter((item) => options.force || due(item)).slice(0, 25);
   let synced = 0;
   let failed = 0;
   for (const item of items) {
@@ -376,7 +357,7 @@ export async function processOutbox(): Promise<{
         await completeOutboxItem(item);
         continue;
       }
-      await syncOneResource(item.resource, "", item.revision || crypto.randomUUID());
+      await syncOneResource(item.resource, "", item.revision || crypto.randomUUID(), owner);
       const completed = await completeOutboxItem(item);
       if (completed && item.resource.deletedAt) {
         await deleteLocalResource(item.resource.resourceKey);

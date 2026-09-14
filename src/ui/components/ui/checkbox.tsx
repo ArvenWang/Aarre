@@ -1,29 +1,14 @@
-import { forwardRef } from "react";
-import * as CheckboxPrimitive from "@radix-ui/react-checkbox";
-import { CheckIcon } from "lucide-react";
+import { Checkbox as HeroCheckbox } from "@heroui/react/checkbox";
+import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/utils";
-
-const Checkbox = forwardRef<
-  React.ElementRef<typeof CheckboxPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof CheckboxPrimitive.Root>
->(({ className, ...props }, ref) => (
-  <CheckboxPrimitive.Root
-    ref={ref}
-    data-slot="checkbox"
-    className={cn(
-      "inline-flex size-4 shrink-0 items-center justify-center border border-border bg-background text-background outline-none",
-      "data-[state=checked]:border-foreground data-[state=checked]:bg-foreground",
-      "focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring)] disabled:pointer-events-none disabled:opacity-50",
-      className,
-    )}
-    {...props}
-  >
-    <CheckboxPrimitive.Indicator className="inline-flex items-center justify-center">
-      <CheckIcon className="size-3" strokeWidth={2.5} />
-    </CheckboxPrimitive.Indicator>
-  </CheckboxPrimitive.Root>
-));
-
-Checkbox.displayName = "Checkbox";
-
-export { Checkbox };
+type Props = Omit<ComponentProps<typeof HeroCheckbox>, "onChange" | "isSelected" | "children"> & {
+  children?: ReactNode;
+  checked?: boolean | "indeterminate"; disabled?: boolean; onCheckedChange?: (value: boolean) => void;
+};
+export function Checkbox({ checked, disabled, onCheckedChange, className, children, "aria-label": ariaLabel, "aria-labelledby": ariaLabelledBy, ...props }: Props) {
+  return <HeroCheckbox {...props} aria-label={ariaLabel} aria-labelledby={ariaLabelledBy} isSelected={checked === true} isIndeterminate={checked === "indeterminate"}
+    isDisabled={disabled} onChange={onCheckedChange} className={cn("aarre-checkbox", className)}>
+    <HeroCheckbox.Content><HeroCheckbox.Control><HeroCheckbox.Indicator /></HeroCheckbox.Control></HeroCheckbox.Content>
+    {children}
+  </HeroCheckbox>;
+}

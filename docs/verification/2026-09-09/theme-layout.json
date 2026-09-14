@@ -1,0 +1,30 @@
+[
+  {
+    "theme": "light",
+    "colors": {
+      "--ink": "#17191c",
+      "--ink-muted": "#58616a",
+      "--ink-faint": "#68717a",
+      "--positive": "#087b70",
+      "--negative": "#b83b30",
+      "--danger-ink": "#ffffff",
+      "--bg": "#ffffff",
+      "--surface": "#ffffff",
+      "--surface-sunken": "#f5f6f7"
+    }
+  },
+  {
+    "theme": "dark",
+    "colors": {
+      "--ink": "#eef0f2",
+      "--ink-muted": "#adb5be",
+      "--ink-faint": "#919aa4",
+      "--positive": "#2ec4b0",
+      "--negative": "#e0776a",
+      "--danger-ink": "#0f1113",
+      "--bg": "#0f1113",
+      "--surface": "#16181b",
+      "--surface-sunken": "#1d2023"
+    }
+  }
+]

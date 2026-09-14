@@ -1,0 +1,23 @@
+/* One overlay system for menu, popover, editor, textarea and full-page scroll. */
+:where(html, body, *) { scrollbar-width: none; }
+::-webkit-scrollbar { display: none; width: 0; height: 0; }
+.scroll-area, .fluid-textarea-frame { position: relative; min-width: 0; min-height: 0; }
+:where([data-scroll-viewport]) { position: relative; }
+.scroll-area { display: flex; flex-direction: column; flex: 1 1 auto; overflow: hidden; }
+.scroll-area-viewport { min-width: 0; min-height: 0; flex: 1 1 auto; overflow: auto; overscroll-behavior: contain; }
+.floating-scrollbars { position: absolute; z-index: 8; pointer-events: none; background: transparent; }
+.floating-scrollbars-document { position: fixed; z-index: 20; }
+.floating-scrollbar-thumb { position: absolute; display: block; border: 0; padding: 0; background: transparent; opacity: 0; pointer-events: none; touch-action: none; user-select: none; transition: opacity 160ms var(--ease); }
+.floating-scrollbar-thumb[data-axis="y"] { top: var(--scrollbar-inset); right: 0; width: var(--scrollbar-hit-size); cursor: ns-resize; }
+.floating-scrollbar-thumb[data-axis="x"] { left: var(--scrollbar-inset); bottom: 0; height: var(--scrollbar-hit-size); cursor: ew-resize; }
+.floating-scrollbar-thumb > span { position: absolute; border-radius: var(--radius-pill); background: var(--scrollbar-thumb-color); transition: background-color var(--dur-fast) var(--ease); }
+.floating-scrollbar-thumb[data-axis="y"] > span { inset-block: 0; right: var(--scrollbar-edge); width: var(--scrollbar-thumb-size); }
+.floating-scrollbar-thumb[data-axis="x"] > span { inset-inline: 0; bottom: var(--scrollbar-edge); height: var(--scrollbar-thumb-size); }
+.floating-scrollbars[data-active="true"] > .floating-scrollbar-thumb,
+.floating-scrollbars[data-dragging="true"] > .floating-scrollbar-thumb,
+.floating-scrollbar-thumb:focus-visible { opacity: 1; pointer-events: auto; }
+.floating-scrollbar-thumb:hover > span, .floating-scrollbar-thumb:focus-visible > span { background: var(--scrollbar-thumb-color-hover); }
+.floating-scrollbar-thumb:focus-visible { outline: 1px solid var(--focus-ring); outline-offset: -1px; border-radius: var(--radius-control); }
+.fluid-textarea-frame { display: flex; flex: 1 1 auto; align-self: stretch; }
+.fluid-textarea-frame > textarea { flex: 1 1 auto; min-width: 0; }
+@media (forced-colors: active) { .floating-scrollbar-thumb > span { background: CanvasText; } }

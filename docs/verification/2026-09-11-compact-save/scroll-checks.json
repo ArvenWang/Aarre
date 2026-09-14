@@ -1,0 +1,65 @@
+{
+  "before": {
+    "top": 0,
+    "width": 360,
+    "footer": {
+      "x": 0,
+      "y": 295,
+      "width": 360,
+      "height": 61,
+      "top": 295,
+      "right": 360,
+      "bottom": 356,
+      "left": 0
+    },
+    "thumb": [
+      {
+        "opacity": "0",
+        "width": "12px",
+        "track": "rgba(0, 0, 0, 0)"
+      }
+    ]
+  },
+  "during": {
+    "top": 143,
+    "width": 360,
+    "footer": {
+      "x": 0,
+      "y": 295,
+      "width": 360,
+      "height": 61,
+      "top": 295,
+      "right": 360,
+      "bottom": 356,
+      "left": 0
+    },
+    "thumb": [
+      {
+        "opacity": "0.989818",
+        "width": "12px",
+        "track": "rgba(0, 0, 0, 0)"
+      }
+    ]
+  },
+  "after": {
+    "top": 143,
+    "width": 360,
+    "footer": {
+      "x": 0,
+      "y": 295,
+      "width": 360,
+      "height": 61,
+      "top": 295,
+      "right": 360,
+      "bottom": 356,
+      "left": 0
+    },
+    "thumb": [
+      {
+        "opacity": "0",
+        "width": "12px",
+        "track": "rgba(0, 0, 0, 0)"
+      }
+    ]
+  }
+}

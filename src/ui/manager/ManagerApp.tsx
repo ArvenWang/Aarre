@@ -1,5 +1,7 @@
+import { FloatingScrollbars } from "@/ui/components/ui/scroll-area";
+import { ManagerUtilities, ManagerUtilityActions, type ManagerUtility } from "./components/ManagerUtilities";
 import { Button } from "@/ui/components/ui/button";
-import { TabsSubtle, TabsSubtleItem } from "@/ui/components/ui/tabs-subtle";
+import { Tabs } from "@heroui/react/tabs";
 import {
   useCallback,
   useEffect,
@@ -24,14 +26,14 @@ import {
 import type {
   AppState,
   BookmarkBarSnapshot,
-  BookmarkAgentActionExecutionResult,
   KnowledgeDashboard,
-  LibraryInsights,
   ResourceRecord,
   SearchResult,
   SiteBrandRecord,
 } from "../../lib/types";
-import { BookmarkIcon, MoonIcon, SunIcon } from "../components/Icons";
+import { MoonIcon, SunIcon } from "../components/Icons";
+import { AarreIcon } from "../components/AarreIcon";
+import { AarreWordmark } from "../components/AarreWordmark";
 import type { LibraryFilter, LibrarySort, ManagerView } from "./types";
 import {
   ALL_LIBRARY_FOLDERS,
@@ -42,27 +44,11 @@ import {
   writeLibraryQuery,
 } from "./library-collection";
 import { LibraryView } from "./views/LibraryView";
-import { OrganizeView } from "./views/OrganizeView";
-import { ReportView } from "./views/ReportView";
-import { ResurfaceView } from "./views/ResurfaceView";
 import { TopicsView } from "./views/TopicsView";
 import { FloatingScrollbar } from "./components/FloatingScrollbar";
 
-const VALID_VIEWS: ManagerView[] = [
-  "library",
-  "organize",
-  "report",
-  "topics",
-  "resurface",
-];
-
-const VIEW_LABELS: Record<ManagerView, string> = {
-  library: "收藏库",
-  organize: "整理提案",
-  report: "报告",
-  topics: "主题图谱",
-  resurface: "重新发现",
-};
+const VALID_VIEWS: ManagerView[] = ["library", "topics"];
+const VIEW_LABELS: Record<ManagerView, string> = { library: "收藏库", topics: "主题图谱" };
 
 function asSearchResults(
   items: ResourceRecord[] | SearchResult[],
@@ -91,7 +77,17 @@ function initialLocationState(): {
 }
 
 export function ManagerApp() {
+  const tabViewportRef = useRef<HTMLDivElement>(null);
+  const [openedUtility, setOpenedUtility] = useState<ManagerUtility | null>(() => new URLSearchParams(location.search).has("archive") ? "archive" : new URLSearchParams(location.search).has("settings") ? "settings" : null);
   const initial = useMemo(initialLocationState, []);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const requested = url.searchParams.get("view");
+    if (requested && !VALID_VIEWS.includes(requested as ManagerView)) {
+      url.searchParams.delete("view");
+      window.history.replaceState(null, "", url);
+    }
+  }, []);
   const [themeMode, setThemeMode] = useState<ThemeMode>(() =>
     initializeTheme(),
   );
@@ -113,24 +109,13 @@ export function ManagerApp() {
   const [libraryResults, setLibraryResults] = useState<SearchResult[]>([]);
   const [bookmarkSnapshot, setBookmarkSnapshot] =
     useState<BookmarkBarSnapshot | null>(null);
-  const [insights, setInsights] = useState<LibraryInsights | null>(null);
   const [dashboard, setDashboard] = useState<KnowledgeDashboard | null>(null);
-  const [reportPeriod, setReportPeriod] = useState<"week" | "month">("week");
-  const [selectedActionIds, setSelectedActionIds] = useState<Set<string>>(
-    new Set(),
-  );
-  const [applyResults, setApplyResults] = useState<
-    BookmarkAgentActionExecutionResult[]
-  >([]);
-  const [undoBatchId, setUndoBatchId] = useState("");
-  const [confirmDestructiveApply, setConfirmDestructiveApply] = useState(false);
   const [siteBrands, setSiteBrands] = useState<SiteBrandRecord[]>([]);
   const [pageSnapshotsEnabled, setPageSnapshotsEnabled] = useState(true);
   const [snapshotExcludedHosts, setSnapshotExcludedHosts] = useState<string[]>(
     [],
   );
   const [loading, setLoading] = useState(true);
-  const [action, setAction] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const derivedLoadRef = useRef<Promise<void> | null>(null);
@@ -145,20 +130,8 @@ export function ManagerApp() {
   const loadDerivedData = useCallback(() => {
     if (derivedLoadRef.current) return derivedLoadRef.current;
 
-    const request = Promise.all([
-      sendExtensionRequest({ type: "GET_LIBRARY_INSIGHTS" }),
-      sendExtensionRequest({ type: "GET_KNOWLEDGE_DASHBOARD" }),
-    ]).then(([nextInsights, nextDashboard]) => {
-      setInsights(nextInsights);
-      setDashboard(nextDashboard);
-      setSelectedActionIds(
-        new Set(
-          nextInsights.organizationPlan.proposals
-            .filter((proposal) => proposal.selectedByDefault)
-            .flatMap((proposal) => proposal.actions.map((item) => item.id)),
-        ),
-      );
-    });
+    const request = sendExtensionRequest({ type: "GET_KNOWLEDGE_DASHBOARD" })
+      .then(setDashboard);
     derivedLoadRef.current = request;
     request
       .finally(() => {
@@ -216,7 +189,7 @@ export function ManagerApp() {
   );
 
   useEffect(() => {
-    // 收藏库先显示真实书签；整理、报告和主题计算在后台继续准备，
+    // 收藏库先显示真实书签；主题计算在后台继续准备，
     // 避免把首次打开时间交给非首屏功能。
     void refresh(false, initial.view !== "library");
     // 首次加载使用 URL 查询词；之后只在用户提交搜索时访问数据层。
@@ -226,6 +199,15 @@ export function ManagerApp() {
   useEffect(() => {
     document.title = `Aarre · ${VIEW_LABELS[view]}`;
   }, [view]);
+
+  useEffect(() => {
+    const eventSource = typeof chrome !== "undefined" ? chrome.runtime?.onMessage : undefined;
+    const onAiUpdate = (message: { type?: string }) => {
+      if (message.type === "BOOKMARK_AI_UPDATED") void loadResources().catch(() => undefined);
+    };
+    eventSource?.addListener(onAiUpdate);
+    return () => eventSource?.removeListener(onAiUpdate);
+  }, [loadResources]);
 
   useEffect(() => {
     if (!notice) return;
@@ -324,14 +306,6 @@ export function ManagerApp() {
       ),
     [siteBrands],
   );
-  const selectedActions = useMemo(() => {
-    const actions =
-      insights?.organizationPlan.proposals.flatMap(
-        (proposal) => proposal.actions,
-      ) || [];
-    return actions.filter((item) => selectedActionIds.has(item.id));
-  }, [insights, selectedActionIds]);
-
   function selectView(nextView: ManagerView) {
     setView(nextView);
     const url = new URL(window.location.href);
@@ -361,64 +335,6 @@ export function ManagerApp() {
     setSort(controls.sort);
     const url = writeLibraryControls(new URL(window.location.href), controls);
     window.history.replaceState(null, "", url);
-  }
-
-  function toggleProposal(actionIds: string[], checked: boolean) {
-    setConfirmDestructiveApply(false);
-    setSelectedActionIds((current) => {
-      const next = new Set(current);
-      for (const id of actionIds) {
-        if (checked) next.add(id);
-        else next.delete(id);
-      }
-      return next;
-    });
-  }
-
-  async function applyOrganizationPlan() {
-    if (!selectedActions.length) return;
-    if (
-      selectedActions.some((item) => item.destructive) &&
-      !confirmDestructiveApply
-    ) {
-      setConfirmDestructiveApply(true);
-      return;
-    }
-    setAction("organize");
-    setError("");
-    try {
-      const result = await sendExtensionRequest({
-        type: "APPLY_ORGANIZATION_ACTIONS",
-        actions: selectedActions.slice(0, 200),
-      });
-      setApplyResults(result.results);
-      setUndoBatchId(result.batchId || "");
-      setConfirmDestructiveApply(false);
-      await refresh(false, true);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "整理操作执行失败");
-    } finally {
-      setAction("");
-    }
-  }
-
-  async function undoOrganizationPlan() {
-    if (!undoBatchId) return;
-    setAction("undo-organize");
-    setError("");
-    try {
-      await sendExtensionRequest({
-        type: "UNDO_BOOKMARK_BATCH",
-        batchId: undoBatchId,
-      });
-      setUndoBatchId("");
-      setApplyResults([]);
-      await refresh(false, true);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "撤销整理失败");
-    } finally {
-      setAction("");
-    }
   }
 
   function handleSearch() {
@@ -489,60 +405,8 @@ export function ManagerApp() {
     );
   } else {
     switch (view) {
-      case "organize":
-        viewContent = (
-          <OrganizeView
-            insights={insights}
-            selectedActionIds={selectedActionIds}
-            selectedActionCount={selectedActions.length}
-            confirmDestructiveApply={confirmDestructiveApply}
-            action={action}
-            undoBatchId={undoBatchId}
-            appliedSuccessCount={
-              applyResults.filter((item) => item.success).length
-            }
-            appliedFailureCount={
-              applyResults.filter((item) => !item.success).length
-            }
-            onSelectSafe={() =>
-              setSelectedActionIds(
-                new Set(
-                  insights?.organizationPlan.proposals
-                    .filter((proposal) => !proposal.destructive)
-                    .flatMap((proposal) =>
-                      proposal.actions.map((item) => item.id),
-                    ) || [],
-                ),
-              )
-            }
-            onToggleProposal={toggleProposal}
-            onApply={() => void applyOrganizationPlan()}
-            onUndo={() => void undoOrganizationPlan()}
-            onOpenResource={(url) => void openResource(url)}
-          />
-        );
-        break;
-      case "report":
-        viewContent = (
-          <ReportView
-            dashboard={dashboard}
-            period={reportPeriod}
-            onPeriodChange={setReportPeriod}
-            onOpenOrganize={() => selectView("organize")}
-            onOpenResource={(url) => void openResource(url)}
-          />
-        );
-        break;
       case "topics":
-        viewContent = <TopicsView dashboard={dashboard} />;
-        break;
-      case "resurface":
-        viewContent = (
-          <ResurfaceView
-            dashboard={dashboard}
-            onOpenResource={(url) => void openResource(url)}
-          />
-        );
+        viewContent = <TopicsView dashboard={dashboard} resources={libraryResults.map((item) => item.resource)} onOpenResource={(url) => void openResource(url)} />;
         break;
       default:
         viewContent = (
@@ -561,7 +425,7 @@ export function ManagerApp() {
             bookmarkSnapshot={bookmarkSnapshot}
             queryDraft={queryDraft}
             query={appliedQuery}
-            action={action}
+            action=""
             siteBrandByHost={siteBrandByHost}
             missingSnapshotCount={missingSnapshotCount}
             onFilterChange={(value) => updateLibraryControls({ filter: value })}
@@ -583,47 +447,27 @@ export function ManagerApp() {
   return (
     <>
       <main className="manager-shell">
+      <Tabs selectedKey={view} onSelectionChange={(key) => selectView(String(key) as typeof view)} className="aarre-tabs">
       <header className="manager-header">
         <div className="manager-topbar">
           <div className="manager-brand">
-            <div className="brand-mark">
-              <BookmarkIcon />
-            </div>
-            <strong>Aarre</strong>
+            <AarreIcon size={30} />
+            <AarreWordmark />
           </div>
         </div>
 
-        <TabsSubtle
-          selectedIndex={VALID_VIEWS.indexOf(view)}
-          onSelect={(index) => {
-            const nextView = VALID_VIEWS[index];
-            if (nextView) selectView(nextView);
-          }}
-          className="manager-view-tabs"
-          aria-label="收藏管理功能"
-        >
+        <Tabs.List ref={tabViewportRef} className="manager-view-tabs aarre-tabs-list" aria-label="收藏管理功能">
           {(
             [
-              ["library", "收藏库", libraryResults.length],
-              [
-                "organize",
-                "整理提案",
-                insights?.organizationPlan.proposalCount || 0,
-              ],
-              ["report", "报告", dashboard?.weekly.createdCount || 0],
-              ["topics", "主题图谱", dashboard?.topicGraph.nodes.length || 0],
-              ["resurface", "重新发现", dashboard?.resurfacing.length || 0],
+              ["library", "收藏库"],
+              ["topics", "主题图谱"],
             ] as const
-          ).map(([value, label, count], index) => (
-            <TabsSubtleItem
-              key={value}
-              label={`${label} ${count}`}
-              index={index}
-            />
+          ).map(([value, label]) => (
+            <Tabs.Tab key={value} id={value} className="aarre-tab">{label}</Tabs.Tab>
           ))}
-        </TabsSubtle>
-
-        <Button
+        </Tabs.List>
+        <FloatingScrollbars viewportRef={tabViewportRef} label="收藏库导航" />
+        <ManagerUtilityActions onOpen={setOpenedUtility} themeControl={<Button
           type="button"
           variant="ghost"
           size="icon"
@@ -639,7 +483,7 @@ export function ManagerApp() {
           ) : (
             <SunIcon aria-hidden="true" />
           )}
-        </Button>
+        </Button>} />
       </header>
 
       <h1 className="visually-hidden">{`Aarre · ${VIEW_LABELS[view]}`}</h1>
@@ -662,9 +506,11 @@ export function ManagerApp() {
         </div>
       ) : null}
 
-        <div className="manager-view" data-view={view}>
-          {viewContent}
-        </div>
+        {VALID_VIEWS.map((id) => <Tabs.Panel key={id} id={id} className="manager-view aarre-tab-panel" data-view={id}>
+          {view === id ? viewContent : null}
+        </Tabs.Panel>)}
+      </Tabs>
+      <ManagerUtilities opened={openedUtility} onClose={() => setOpenedUtility(null)} appState={appState} onStateChange={setAppState} onRestored={() => { void loadResources(); void loadDerivedData(); }} />
       </main>
       <FloatingScrollbar />
     </>

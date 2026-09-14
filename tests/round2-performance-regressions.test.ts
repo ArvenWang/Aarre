@@ -74,7 +74,7 @@ describe("Round 2 startup performance guardrails", () => {
     expect(hook).toContain("function regenerate(messageId: string)");
     expect(hook).toContain("function editQuestion(messageId: string)");
     expect(hook).toContain("async function copyAnswer(messageId: string)");
-    expect(page).toContain("编辑并重发");
+    expect(page).toContain('aria-label="编辑问题并重发"');
     expect(page).toContain("重新生成");
     expect(page).toContain('message.status === "failed" ? "重试"');
     expect(page).toContain("复制");

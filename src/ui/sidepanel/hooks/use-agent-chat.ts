@@ -1,10 +1,12 @@
+import { registerParkPreparation } from "../../../shared/suite-dock/parking";
+import { readDraft, writeDraft } from "../drafts";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { streamAgentTurn } from "../../../lib/agent-stream-client";
 import { sendExtensionRequest } from "../../../lib/messages";
 import type {
   AgentChatMessage,
   AgentConversation,
   BookmarkAgentActionProposal,
-  BookmarkAgentResponse,
   BookmarkAgentProgress,
   BookmarkAgentProgressStage,
 } from "../../../lib/types";
@@ -33,13 +35,18 @@ export function useAgentChat({
   setPanelView,
   refresh,
 }: UseAgentChatInput) {
-  const [prompt, setPrompt] = useState("");
+  const [prompt, setPrompt] = useState(() => readDraft<string>("ai-prompt") || "");
+  useEffect(() => { writeDraft("ai-prompt", prompt || null); }, [prompt]);
+  useEffect(() => registerParkPreparation(() => { writeDraft("ai-prompt", prompt || null, true); }), [prompt]);
   const [conversations, setConversations] = useState<AgentConversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<AgentConversation | null>(null);
+  const resumeId = useRef(readDraft<string>("ai-conversation"));
+  useEffect(() => { if (activeConversation) writeDraft("ai-conversation", activeConversation.id); }, [activeConversation]);
   const activeRequest = useRef("");
   const activeMessage = useRef("");
   const activeExecution = useRef("");
   const activeAgentPort = useRef<chrome.runtime.Port | null>(null);
+  const pendingSaves = useRef(Promise.resolve());
   const cancelledRequests = useRef(new Set<string>());
   const editingBase = useRef<{ conversationId: string; conversation: AgentConversation } | null>(null);
 
@@ -49,12 +56,13 @@ export function useAgentChat({
       ...conversation,
       messages: conversation.messages.map((message) => message.status === "sending" ? {
         ...message,
-        content: "上一次 AI 对话没有完成，请重新提问。",
+        content: `${message.content}${message.content ? "\n\n" : ""}上一次 AI 对话没有完成，可重新提问。`,
         status: "cancelled" as const,
         progress: undefined,
       } : message),
     }));
     setConversations(recovered);
+    if (resumeId.current) { const prior = recovered.find((item) => item.id === resumeId.current); resumeId.current = null; if (prior) setActiveConversation(prior); }
     return recovered;
   }, []);
 
@@ -102,6 +110,11 @@ export function useAgentChat({
     activeRequest.current = requestId;
     activeMessage.current = pendingMessage.id;
     cancelledRequests.current.delete(requestId);
+    let streamedText = "";
+    let lastSaved = 0;
+    let partialWrites = Promise.resolve();
+    const partialConversation = () => ({ ...pending, messages: pending.messages.map((message) =>
+      message.id === pendingMessage.id ? { ...message, content: streamedText } : message) });
     try {
       await persist(pending);
       const history = conversation.messages
@@ -109,31 +122,22 @@ export function useAgentChat({
         .slice(-10)
         .map((message) => ({ role: message.role, content: message.content }));
       const response = typeof chrome.runtime.connect === "function"
-        ? await new Promise<BookmarkAgentResponse>((resolve, reject) => {
-            const port = chrome.runtime.connect({ name: "agent-stream" });
-            activeAgentPort.current = port;
-            port.onMessage.addListener((raw: unknown) => {
-              const event = raw as { type?: string; text?: string; response?: BookmarkAgentResponse; error?: string };
-              if (event.type === "delta" && typeof event.text === "string") {
-                setActiveConversation((current) => current ? {
-                  ...current,
-                  messages: current.messages.map((message) =>
-                    message.id === pendingMessage.id
-                      ? { ...message, content: `${message.content}${event.text}` }
-                      : message
-                  )
-                } : current);
-              } else if (event.type === "done" && event.response) {
-                resolve(event.response);
-                port.disconnect();
-              } else if (event.type === "error") {
-                reject(new Error(event.error || "AI 暂时无法回答"));
-                port.disconnect();
+        ? await streamAgentTurn({
+            query, requestId, history,
+            onPort: (port) => { activeAgentPort.current = port; },
+            onDelta: (text) => {
+              streamedText += text;
+              setActiveConversation(partialConversation());
+              if (Date.now() - lastSaved >= 1_000) {
+                lastSaved = Date.now();
+                const partial = partialConversation();
+                partialWrites = partialWrites.then(() => persist(partial)).then(() => undefined).catch(() => undefined);
+                pendingSaves.current = partialWrites;
               }
-            });
-            port.postMessage({ type: "start", query, requestId, history });
+            },
           })
         : await sendExtensionRequest({ type: "ASK_BOOKMARK_AGENT", query, requestId, history });
+      await partialWrites;
       if (cancelledRequests.current.has(requestId)) return;
       const completed: AgentConversation = {
         ...pending,
@@ -152,13 +156,14 @@ export function useAgentChat({
       setActiveConversation(completed);
       await persist(completed);
     } catch (caught) {
+      await partialWrites;
       if (cancelledRequests.current.has(requestId)) return;
       const reason = caught instanceof Error ? caught.message : "AI 暂时无法回答";
       const failed: AgentConversation = {
         ...pending,
         updatedAt: new Date().toISOString(),
         messages: pending.messages.map((message) => message.id === pendingMessage.id
-          ? { ...message, content: `这次没有完成：${reason}`, status: "failed" }
+          ? { ...message, content: `${streamedText}${streamedText ? "\n\n" : ""}这次没有完成：${reason}`, status: "failed", progress: undefined }
           : message),
       };
       setActiveConversation(failed);
@@ -198,11 +203,12 @@ export function useAgentChat({
       ...activeConversation,
       updatedAt: new Date().toISOString(),
       messages: activeConversation.messages.map((message) => message.id === messageId
-        ? { ...message, content: "已停止本次回答。", status: "cancelled" as const, progress: undefined }
+        ? { ...message, content: `${message.content}${message.content ? "\n\n" : ""}已停止本次回答。`, status: "cancelled" as const, progress: undefined }
         : message),
     } : null;
     if (updated) {
       setActiveConversation(updated);
+      await pendingSaves.current;
       await persist(updated).catch(() => undefined);
     }
     await sendExtensionRequest({ type: "CANCEL_BOOKMARK_AGENT", requestId }).catch(() => undefined);
@@ -456,11 +462,14 @@ export function useAgentChat({
       } : current);
     };
     eventSource?.addListener(handleProgress);
-    return () => eventSource?.removeListener(handleProgress);
+    return () => {
+      eventSource?.removeListener(handleProgress);
+      activeAgentPort.current?.disconnect();
+    };
   }, []);
 
   return {
-    prompt, setPrompt, conversations, activeConversation, setActiveConversation,
+    prompt, setPrompt, conversations, activeConversation, setActiveConversation: (conversation: AgentConversation | null) => { resumeId.current = null; writeDraft("ai-conversation", conversation?.id || null); setActiveConversation(conversation); },
     loadConversations, deleteConversation,
     cancelRun, confirmActions, dropAction: (messageId: string, actionId: string) => updatePendingActions(messageId, actionId),
     toggleAction: togglePendingAction,

@@ -1,0 +1,5 @@
+
+> bookmark-layer@0.5.73 verify:artifacts
+> node scripts/verify-artifacts.mjs
+
+当前没有 outputs 交付物；跳过历史包校验。

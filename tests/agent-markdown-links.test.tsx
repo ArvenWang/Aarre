@@ -13,7 +13,7 @@ const citedSource: BookmarkAgentSource = {
 };
 
 describe("Agent Markdown bookmark links", () => {
-  it("renders a cited bookmark source as the same pill when the resource map is temporarily missing it", () => {
+  it("renders a cited bookmark source as a bookmark citation when the resource map is temporarily missing it", () => {
     const markup = renderToStaticMarkup(
       <AgentMarkdown
         content={
@@ -29,4 +29,14 @@ describe("Agent Markdown bookmark links", () => {
     expect(markup).toContain('href="https://example.com/bookmark"');
     expect(markup).toContain('href="https://outside.example/page"');
   });
+});
+
+it("preserves every table field and supplies readable headers when answers reflow", () => {
+  const markup=renderToStaticMarkup(<AgentMarkdown resourceByUrl={new Map()} siteBrandByHost={new Map()}
+    content={"| Name | **用途** | 来源 | 下一步 | 备注 |\n| --- | --- | --- | --- | --- |\n| VeryLongComponentName | 动画 | [文档](https://example.com) | 安装 | 完整内容 |"} />);
+  expect(markup).toContain('data-many-columns="true"');
+  expect(markup).toContain('data-column-label="用途"');
+  expect(markup).toContain('data-column-label="备注"');
+  expect(markup).toContain('class="markdown-cell-content"');
+  expect(markup).toContain('VeryLongComponentName'); expect(markup).toContain('完整内容');
 });

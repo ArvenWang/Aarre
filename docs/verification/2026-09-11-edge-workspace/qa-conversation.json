@@ -1,0 +1,49 @@
+{
+  "purpose": "Isolated DEV rendering verification only; no provider request, no user data.",
+  "conversation": {
+    "id": "qa-edge-long-answer",
+    "title": "帮我找一下有关动效的组件库。",
+    "createdAt": "2026-09-11T06:00:00.000Z",
+    "updatedAt": "2026-09-11T06:00:00.000Z",
+    "messages": [
+      {
+        "id": "qa-user",
+        "role": "user",
+        "content": "帮我找一下有关动效的组件库。",
+        "createdAt": "2026-09-11T06:00:00.000Z",
+        "status": "complete"
+      },
+      {
+        "id": "qa-answer",
+        "role": "assistant",
+        "content": "这是一条本地视觉验收回答，未发送到 AI 服务。\n\n**通用动画组件库**\n\n- [beUI · React 和 Next.js 的动画工具包](https://ui-0.example/) — 免费开源，支持复制源码或安装组件。\n- [Free & Open Source Animated ReactJS Components for Beautiful Interfaces](https://ui-1.example/) — 155+ 可复制粘贴的动画组件，适合长标题引用换行。\n- [Amicro – Premium React Micro-transitions & Interactive Components](https://ui-2.example/) — 轻量级，支持按需使用。\n\n普通长链接：\nhttps://documentation.example.com/design/components/verylongsegmentwithoutspacesabcdefghijklmnopqrstuvwxyz0123456789/end-of-link\n\n**选用方式**\n\n| 资料名称 | 主要用途 | 原始来源 |\n| --- | --- | --- |\n| 无障碍设计指南与组件规范 | 检查焦点、字号及键盘访问 | [完整文档](https://docs.example/) |\n| 响应式网页和布局参考 | 核对窄窗口及长文本展示 | documentation.example.com/responsive |\n\n```json\n{ \"title\": \"较长的代码应当完整换行，无需横向滚动\", \"source\": \"https://documentation.example.com/design/components/verylongsegmentwithoutspacesabcdefghijklmnopqrstuvwxyz0123456789/end-of-link\" }\n```\n\n| 名称 | 用途 | 来源 | 下一步 | 备注 |\n| --- | --- | --- | --- | --- |\n| 动画规范 | 过渡 | 官方文档 | 检查 | 五列也能读全 |\n\n全文结束。",
+        "createdAt": "2026-09-11T06:00:00.000Z",
+        "status": "complete",
+        "sources": [
+          {
+            "resourceKey": "qa-source-0",
+            "title": "beUI · React 和 Next.js 的动画工具包",
+            "url": "https://ui-0.example/",
+            "siteName": "QA 1",
+            "faviconUrl": ""
+          },
+          {
+            "resourceKey": "qa-source-1",
+            "title": "Free & Open Source Animated ReactJS Components for Beautiful Interfaces",
+            "url": "https://ui-1.example/",
+            "siteName": "QA 2",
+            "faviconUrl": ""
+          },
+          {
+            "resourceKey": "qa-source-2",
+            "title": "Amicro – Premium React Micro-transitions & Interactive Components",
+            "url": "https://ui-2.example/",
+            "siteName": "QA 3",
+            "faviconUrl": ""
+          }
+        ],
+        "actions": []
+      }
+    ]
+  }
+}

@@ -1,16 +1,9 @@
 import type { AuthenticatedAccount } from "./auth.js";
-import { assetCompleteSchema, assetCreateSchema } from "./contracts.js";
+import { AssetUploads } from "./asset-upload.js";
 import type { Config } from "./config.js";
 import type { Database } from "./db.js";
 import type { ObjectStore } from "./object-store.js";
 import type { EnvelopeEncryption } from "./encryption.js";
-
-function extensionForMime(mimeType: string): string {
-  if (mimeType === "image/png") return "png";
-  if (mimeType === "image/jpeg") return "jpg";
-  if (mimeType === "image/gif") return "gif";
-  return "webp";
-}
 
 export class AssetService {
   private readonly database: Database;
@@ -30,271 +23,10 @@ export class AssetService {
     this.encryption = encryption;
   }
 
-  async createUpload(account: AuthenticatedAccount, rawInput: unknown): Promise<Record<string, unknown>> {
-    const input = assetCreateSchema.parse(rawInput);
-    const protectedResult = await this.database.query(
-      `SELECT 1
-       FROM protection_rules rules
-       WHERE rules.user_id = $1
-         AND rules.deleted_at IS NULL
-         AND (
-           (rules.rule_kind = 'resource' AND rules.resource_key = $2)
-           OR EXISTS (
-             SELECT 1 FROM protection_rule_resources inherited
-             WHERE inherited.user_id = rules.user_id
-               AND inherited.protection_rule_id = rules.protection_rule_id
-               AND inherited.resource_key = $2
-           )
-         )`,
-      [account.userId, input.resourceKey]
-    );
-    if (protectedResult.rowCount) {
-      throw Object.assign(new Error("Protected resources cannot upload cloud assets."), { statusCode: 423 });
-    }
-    const quota = await this.database.query<{
-      quota_bytes: string;
-      metadata_bytes: string;
-      asset_bytes: string;
-    }>(
-      `SELECT u.quota_bytes, a.metadata_bytes, a.asset_bytes
-       FROM users u JOIN account_usage a ON a.user_id = u.id
-       WHERE u.id = $1`,
-      [account.userId]
-    );
-    const usage = quota.rows[0];
-    if (
-      !usage ||
-      Number(usage.metadata_bytes) + Number(usage.asset_bytes) + input.byteSize > Number(usage.quota_bytes)
-    ) {
-      throw Object.assign(new Error("Cloud storage quota has been reached."), { statusCode: 413 });
-    }
-    const objectKey = `users/${account.userId}/assets/${input.assetId}/${input.sha256}.${extensionForMime(input.mimeType)}`;
-    const bindingPayload = input.binding
-      ? await this.encryption.encryptJson(
-          account.userId,
-          `asset-binding:${input.assetId}`,
-          input.binding
-        )
-      : null;
-    const existing = await this.database.query<{ object_key: string; state: string }>(
-      "SELECT object_key, state FROM assets WHERE user_id = $1 AND asset_id = $2",
-      [account.userId, input.assetId]
-    );
-    // assetId 是「某个资源的某类图」这一槽位，换封面属于正常更新而非冲突。
-    // 对象路径按内容哈希寻址，因此内容变化会留下旧对象，排队回收即可。
-    // 延迟执行是为了给上传失败后的重试留出窗口，避免新图没传成旧图先没了。
-    const previousObjectKey = existing.rows[0]?.object_key;
-    if (previousObjectKey && previousObjectKey !== objectKey) {
-      await this.database.query(
-        `INSERT INTO asset_delete_jobs (user_id, asset_id, object_key, next_attempt_at)
-         VALUES ($1, $2, $3, now() + interval '1 hour')`,
-        [account.userId, input.assetId, previousObjectKey]
-      );
-    }
-    await this.database.query(
-      `INSERT INTO assets
-        (user_id, asset_id, resource_key, asset_kind, object_key, sha256,
-         byte_size, width, height, mime_type, captured_at, binding_payload, state)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'uploading')
-       ON CONFLICT (user_id, asset_id) DO UPDATE SET
-         resource_key = EXCLUDED.resource_key,
-         asset_kind = EXCLUDED.asset_kind,
-         object_key = EXCLUDED.object_key,
-         sha256 = EXCLUDED.sha256,
-         byte_size = EXCLUDED.byte_size,
-         width = EXCLUDED.width,
-         height = EXCLUDED.height,
-         mime_type = EXCLUDED.mime_type,
-         captured_at = EXCLUDED.captured_at,
-         binding_payload = EXCLUDED.binding_payload,
-         updated_at = now(),
-         state = CASE WHEN assets.state = 'ready' THEN assets.state ELSE 'uploading' END`,
-      [
-        account.userId,
-        input.assetId,
-        input.resourceKey,
-        input.kind,
-        objectKey,
-        input.sha256,
-        input.byteSize,
-        input.width || null,
-        input.height || null,
-        input.mimeType,
-        input.capturedAt || null,
-        bindingPayload
-      ]
-    );
-    // 取消该对象仍在排队的删除任务：历史清空/替换后，删除 worker
-    // 可能把客户端刚重新上传的对象物理删除，导致 complete 校验
-    // （head 404 / 元数据缺失）失败。新上传应优先于旧删除任务。
-    await this.database.query(
-      "DELETE FROM asset_delete_jobs WHERE object_key = $1 AND completed_at IS NULL",
-      [objectKey]
-    );
-    const signed = await this.objectStore.signUpload(objectKey, {
-      mimeType: input.mimeType,
-      byteSize: input.byteSize,
-      sha256: input.sha256,
-      expiresIn: this.config.ASSET_URL_TTL_SECONDS
-    });
-    return {
-      assetId: input.assetId,
-      uploadUrl: signed.url,
-      headers: signed.headers,
-      expiresIn: signed.expiresIn
-    };
-  }
+  private get uploads() { return new AssetUploads(this.database, this.objectStore, this.config, this.encryption); }
 
-  async completeUpload(
-    account: AuthenticatedAccount,
-    assetId: string,
-    rawInput: unknown
-  ): Promise<Record<string, unknown>> {
-    const input = assetCompleteSchema.parse(rawInput);
-    const client = await this.database.connect();
-    try {
-      await client.query("BEGIN");
-      const repeated = await client.query<{ response: Record<string, unknown> }>(
-        "SELECT response FROM sync_operations WHERE user_id = $1 AND operation_id = $2",
-        [account.userId, input.operationId]
-      );
-      if (repeated.rows[0]) {
-        await client.query("COMMIT");
-        return repeated.rows[0].response;
-      }
-      const result = await client.query<{
-        resource_key: string;
-        asset_kind: string;
-        object_key: string;
-        sha256: string;
-        byte_size: string;
-        state: string;
-        revision: string;
-      }>(
-        `SELECT resource_key, asset_kind, object_key, sha256, byte_size, state, revision
-         FROM assets WHERE user_id = $1 AND asset_id = $2 FOR UPDATE`,
-        [account.userId, assetId]
-      );
-      const asset = result.rows[0];
-      if (!asset) throw Object.assign(new Error("Asset upload does not exist."), { statusCode: 404 });
-      if (asset.state === "ready") {
-        const response = {
-          assetId,
-          revision: Number(asset.revision),
-          byteSize: Number(asset.byte_size),
-          kind: asset.asset_kind,
-          resourceKey: asset.resource_key
-        };
-        await client.query(
-          `INSERT INTO sync_operations (user_id, operation_id, response)
-           VALUES ($1, $2, $3) ON CONFLICT (user_id, operation_id) DO NOTHING`,
-          [account.userId, input.operationId, JSON.stringify(response)]
-        );
-        await client.query("COMMIT");
-        return response;
-      }
-      const blocked = await client.query(
-        `SELECT 1
-         FROM protection_rules rules
-         WHERE rules.user_id = $1
-           AND rules.deleted_at IS NULL
-           AND (
-             (rules.rule_kind = 'resource' AND rules.resource_key = $2)
-             OR EXISTS (
-               SELECT 1 FROM protection_rule_resources inherited
-               WHERE inherited.user_id = rules.user_id
-                 AND inherited.protection_rule_id = rules.protection_rule_id
-                 AND inherited.resource_key = $2
-             )
-           )`,
-        [account.userId, asset.resource_key]
-      );
-      if (blocked.rowCount) {
-        throw Object.assign(new Error("The resource became protected during upload."), { statusCode: 423 });
-      }
-      const head = await this.objectStore.head(asset.object_key);
-      if (
-        head.byteSize !== Number(asset.byte_size) ||
-        head.sha256 !== asset.sha256 ||
-        !["AES256", "cos/kms"].includes(head.serverSideEncryption)
-      ) {
-        throw Object.assign(new Error("Uploaded asset failed size, digest, or server-side encryption verification."), { statusCode: 422 });
-      }
-      const previous = await client.query<{
-        asset_id: string;
-        object_key: string;
-        byte_size: string;
-      }>(
-        `UPDATE assets SET state = 'deleting', deleted_at = now(), updated_at = now()
-         WHERE user_id = $1 AND resource_key = $2 AND asset_kind = $3
-           AND asset_id <> $4 AND state = 'ready'
-         RETURNING asset_id, object_key, byte_size`,
-        [account.userId, asset.resource_key, asset.asset_kind, assetId]
-      );
-      const removedBytes = previous.rows.reduce((sum, row) => sum + Number(row.byte_size), 0);
-      const quota = await client.query<{
-        quota_bytes: string;
-        metadata_bytes: string;
-        asset_bytes: string;
-      }>(
-        `SELECT u.quota_bytes, a.metadata_bytes, a.asset_bytes
-         FROM users u JOIN account_usage a ON a.user_id = u.id
-         WHERE u.id = $1 FOR UPDATE OF a`,
-        [account.userId]
-      );
-      const usage = quota.rows[0];
-      if (
-        !usage ||
-        Number(usage.metadata_bytes) + Number(usage.asset_bytes) - removedBytes + Number(asset.byte_size) > Number(usage.quota_bytes)
-      ) {
-        throw Object.assign(new Error("Cloud storage quota has been reached."), { statusCode: 413 });
-      }
-      for (const row of previous.rows) {
-        await client.query(
-          "INSERT INTO asset_delete_jobs (user_id, asset_id, object_key) VALUES ($1, $2, $3)",
-          [account.userId, row.asset_id, row.object_key]
-        );
-      }
-      const revision = Number(asset.revision) + 1;
-      await client.query(
-        `UPDATE assets SET state = 'ready', cos_version_id = $3, revision = $4,
-                           deleted_at = NULL, updated_at = now()
-         WHERE user_id = $1 AND asset_id = $2`,
-        [account.userId, assetId, head.versionId || null, revision]
-      );
-      await client.query(
-        `UPDATE account_usage
-         SET asset_bytes = GREATEST(0, asset_bytes - $2 + $3),
-             asset_count = GREATEST(0, asset_count - $4 + 1), updated_at = now()
-         WHERE user_id = $1`,
-        [account.userId, removedBytes, Number(asset.byte_size), previous.rowCount || 0]
-      );
-      const change = await client.query<{ sequence: string }>(
-        `INSERT INTO sync_changes (user_id, entity_type, entity_id, revision, deleted)
-         VALUES ($1, 'asset', $2, $3, false) RETURNING sequence`,
-        [account.userId, assetId, revision]
-      );
-      const response = {
-        assetId,
-        revision,
-        sequence: Number(change.rows[0].sequence),
-        byteSize: Number(asset.byte_size),
-        kind: asset.asset_kind,
-        resourceKey: asset.resource_key
-      };
-      await client.query(
-        "INSERT INTO sync_operations (user_id, operation_id, response) VALUES ($1, $2, $3)",
-        [account.userId, input.operationId, JSON.stringify(response)]
-      );
-      await client.query("COMMIT");
-      return response;
-    } catch (error) {
-      await client.query("ROLLBACK").catch(() => undefined);
-      throw error;
-    } finally {
-      client.release();
-    }
-  }
+  createUpload(account: AuthenticatedAccount, input: unknown) { return this.uploads.create(account, input); }
+  completeUpload(account: AuthenticatedAccount, assetId: string, input: unknown) { return this.uploads.complete(account, assetId, input); }
 
   async downloadUrl(account: AuthenticatedAccount, assetId: string): Promise<Record<string, unknown>> {
     const result = await this.database.query<{
@@ -362,9 +94,11 @@ export class AssetService {
   }
 
   async deleteAllForAccount(account: AuthenticatedAccount): Promise<{ queued: number }> {
+    await this.uploads.expire(account.userId);
     const client = await this.database.connect();
     try {
       await client.query("BEGIN");
+      await client.query("SELECT user_id FROM account_usage WHERE user_id = $1 FOR UPDATE", [account.userId]);
       const assets = await client.query<{
         asset_id: string;
         object_key: string;
@@ -400,6 +134,7 @@ export class AssetService {
   }
 
   async processDeleteJobs(limit = 50): Promise<{ processed: number; failed: number }> {
+    await this.uploads.expire();
     const jobs = await this.database.query<{
       id: string;
       user_id: string;

@@ -1,0 +1,559 @@
+[
+  {
+    "name": "save-protected-light",
+    "viewport": {
+      "width": 1280,
+      "height": 900
+    },
+    "theme": "light",
+    "panel": {
+      "x": 905,
+      "y": 200.5,
+      "width": 360,
+      "height": 499,
+      "top": 200.5,
+      "right": 1265,
+      "bottom": 699.5,
+      "left": 905
+    },
+    "frame": {
+      "width": 360,
+      "height": 499
+    },
+    "body": {
+      "x": 0,
+      "y": 49,
+      "width": 360,
+      "height": 389,
+      "top": 49,
+      "right": 360,
+      "bottom": 438,
+      "left": 0,
+      "scrollHeight": 389,
+      "scrollWidth": 360,
+      "clientHeight": 389,
+      "clientWidth": 360,
+      "scrollTop": 0
+    },
+    "content": {
+      "x": 16,
+      "y": 61,
+      "width": 328,
+      "height": 360.96875,
+      "top": 61,
+      "right": 344,
+      "bottom": 421.96875,
+      "left": 16
+    },
+    "footer": {
+      "x": 0,
+      "y": 438,
+      "width": 360,
+      "height": 61,
+      "top": 438,
+      "right": 360,
+      "bottom": 499,
+      "left": 0
+    },
+    "warning": {
+      "x": 16,
+      "y": 384.78125,
+      "width": 328,
+      "height": 37.1875,
+      "top": 384.78125,
+      "right": 344,
+      "bottom": 421.96875,
+      "left": 16
+    },
+    "horizontalOverflow": [],
+    "headerMargin": "0px",
+    "footerMargin": "0px",
+    "footerPadding": "12px 16px",
+    "title": "侧边栏设计评审",
+    "note": "",
+    "resizeHidden": true
+  },
+  {
+    "name": "save-protected-dark",
+    "viewport": {
+      "width": 1280,
+      "height": 900
+    },
+    "theme": "dark",
+    "panel": {
+      "x": 905,
+      "y": 200.5,
+      "width": 360,
+      "height": 499,
+      "top": 200.5,
+      "right": 1265,
+      "bottom": 699.5,
+      "left": 905
+    },
+    "frame": {
+      "width": 360,
+      "height": 499
+    },
+    "body": {
+      "x": 0,
+      "y": 49,
+      "width": 360,
+      "height": 389,
+      "top": 49,
+      "right": 360,
+      "bottom": 438,
+      "left": 0,
+      "scrollHeight": 389,
+      "scrollWidth": 360,
+      "clientHeight": 389,
+      "clientWidth": 360,
+      "scrollTop": 0
+    },
+    "content": {
+      "x": 16,
+      "y": 61,
+      "width": 328,
+      "height": 360.96875,
+      "top": 61,
+      "right": 344,
+      "bottom": 421.96875,
+      "left": 16
+    },
+    "footer": {
+      "x": 0,
+      "y": 438,
+      "width": 360,
+      "height": 61,
+      "top": 438,
+      "right": 360,
+      "bottom": 499,
+      "left": 0
+    },
+    "warning": {
+      "x": 16,
+      "y": 384.78125,
+      "width": 328,
+      "height": 37.1875,
+      "top": 384.78125,
+      "right": 344,
+      "bottom": 421.96875,
+      "left": 16
+    },
+    "horizontalOverflow": [],
+    "headerMargin": "0px",
+    "footerMargin": "0px",
+    "footerPadding": "12px 16px",
+    "title": "侧边栏设计评审",
+    "note": "",
+    "resizeHidden": true
+  },
+  {
+    "name": "save-narrow",
+    "viewport": {
+      "width": 320,
+      "height": 640
+    },
+    "theme": "light",
+    "panel": {
+      "x": 0,
+      "y": 54.5,
+      "width": 305,
+      "height": 531,
+      "top": 54.5,
+      "right": 305,
+      "bottom": 585.5,
+      "left": 0
+    },
+    "frame": {
+      "width": 305,
+      "height": 531
+    },
+    "body": {
+      "x": 0,
+      "y": 49,
+      "width": 305,
+      "height": 421,
+      "top": 49,
+      "right": 305,
+      "bottom": 470,
+      "left": 0,
+      "scrollHeight": 421,
+      "scrollWidth": 305,
+      "clientHeight": 421,
+      "clientWidth": 305,
+      "scrollTop": 0
+    },
+    "content": {
+      "x": 16,
+      "y": 61,
+      "width": 273,
+      "height": 392.96875,
+      "top": 61,
+      "right": 289,
+      "bottom": 453.96875,
+      "left": 16
+    },
+    "footer": {
+      "x": 0,
+      "y": 470,
+      "width": 305,
+      "height": 61,
+      "top": 470,
+      "right": 305,
+      "bottom": 531,
+      "left": 0
+    },
+    "warning": {
+      "x": 16,
+      "y": 416.78125,
+      "width": 273,
+      "height": 37.1875,
+      "top": 416.78125,
+      "right": 289,
+      "bottom": 453.96875,
+      "left": 16
+    },
+    "horizontalOverflow": [],
+    "headerMargin": "0px",
+    "footerMargin": "0px",
+    "footerPadding": "12px 16px",
+    "title": "侧边栏设计评审",
+    "note": "",
+    "resizeHidden": true
+  },
+  {
+    "name": "save-short",
+    "viewport": {
+      "width": 900,
+      "height": 380
+    },
+    "theme": "light",
+    "panel": {
+      "x": 525,
+      "y": 12,
+      "width": 360,
+      "height": 356,
+      "top": 12,
+      "right": 885,
+      "bottom": 368,
+      "left": 525
+    },
+    "frame": {
+      "width": 360,
+      "height": 356
+    },
+    "body": {
+      "x": 0,
+      "y": 49,
+      "width": 360,
+      "height": 246,
+      "top": 49,
+      "right": 360,
+      "bottom": 295,
+      "left": 0,
+      "scrollHeight": 389,
+      "scrollWidth": 360,
+      "clientHeight": 246,
+      "clientWidth": 360,
+      "scrollTop": 0
+    },
+    "content": {
+      "x": 16,
+      "y": 61,
+      "width": 328,
+      "height": 360.96875,
+      "top": 61,
+      "right": 344,
+      "bottom": 421.96875,
+      "left": 16
+    },
+    "footer": {
+      "x": 0,
+      "y": 295,
+      "width": 360,
+      "height": 61,
+      "top": 295,
+      "right": 360,
+      "bottom": 356,
+      "left": 0
+    },
+    "warning": {
+      "x": 16,
+      "y": 384.78125,
+      "width": 328,
+      "height": 37.1875,
+      "top": 384.78125,
+      "right": 344,
+      "bottom": 421.96875,
+      "left": 16
+    },
+    "horizontalOverflow": [],
+    "headerMargin": "0px",
+    "footerMargin": "0px",
+    "footerPadding": "12px 16px",
+    "title": "侧边栏设计评审",
+    "note": "",
+    "resizeHidden": true
+  },
+  {
+    "name": "save-light",
+    "viewport": {
+      "width": 1280,
+      "height": 900
+    },
+    "theme": "light",
+    "panel": {
+      "x": 905,
+      "y": 225,
+      "width": 360,
+      "height": 450,
+      "top": 225,
+      "right": 1265,
+      "bottom": 675,
+      "left": 905
+    },
+    "frame": {
+      "width": 360,
+      "height": 450
+    },
+    "body": {
+      "x": 0,
+      "y": 49,
+      "width": 360,
+      "height": 340,
+      "top": 49,
+      "right": 360,
+      "bottom": 389,
+      "left": 0,
+      "scrollHeight": 340,
+      "scrollWidth": 360,
+      "clientHeight": 340,
+      "clientWidth": 360,
+      "scrollTop": 0
+    },
+    "content": {
+      "x": 16,
+      "y": 61,
+      "width": 328,
+      "height": 311.78125,
+      "top": 61,
+      "right": 344,
+      "bottom": 372.78125,
+      "left": 16
+    },
+    "footer": {
+      "x": 0,
+      "y": 389,
+      "width": 360,
+      "height": 61,
+      "top": 389,
+      "right": 360,
+      "bottom": 450,
+      "left": 0
+    },
+    "warning": null,
+    "horizontalOverflow": [],
+    "headerMargin": "0px",
+    "footerMargin": "0px",
+    "footerPadding": "12px 16px",
+    "title": "阅读中的设计资料：布局、间距与界面细节",
+    "note": "",
+    "resizeHidden": true
+  },
+  {
+    "name": "save-long-url",
+    "viewport": {
+      "width": 1280,
+      "height": 900
+    },
+    "theme": "light",
+    "panel": {
+      "x": 905,
+      "y": 174.5,
+      "width": 360,
+      "height": 551,
+      "top": 174.5,
+      "right": 1265,
+      "bottom": 725.5,
+      "left": 905
+    },
+    "frame": {
+      "width": 360,
+      "height": 551
+    },
+    "body": {
+      "x": 0,
+      "y": 49,
+      "width": 360,
+      "height": 441,
+      "top": 49,
+      "right": 360,
+      "bottom": 490,
+      "left": 0,
+      "scrollHeight": 441,
+      "scrollWidth": 360,
+      "clientHeight": 441,
+      "clientWidth": 360,
+      "scrollTop": 0
+    },
+    "content": {
+      "x": 16,
+      "y": 61,
+      "width": 328,
+      "height": 412.75,
+      "top": 61,
+      "right": 344,
+      "bottom": 473.75,
+      "left": 16
+    },
+    "footer": {
+      "x": 0,
+      "y": 490,
+      "width": 360,
+      "height": 61,
+      "top": 490,
+      "right": 360,
+      "bottom": 551,
+      "left": 0
+    },
+    "warning": null,
+    "horizontalOverflow": [],
+    "headerMargin": "0px",
+    "footerMargin": "0px",
+    "footerPadding": "12px 16px",
+    "title": "阅读中的设计资料：布局、间距与界面细节",
+    "note": "",
+    "resizeHidden": true
+  },
+  {
+    "name": "save-error-narrow",
+    "viewport": {
+      "width": 320,
+      "height": 640
+    },
+    "theme": "light",
+    "panel": {
+      "x": 0,
+      "y": 19.5,
+      "width": 305,
+      "height": 601,
+      "top": 19.5,
+      "right": 305,
+      "bottom": 620.5,
+      "left": 0
+    },
+    "frame": {
+      "width": 305,
+      "height": 601
+    },
+    "body": {
+      "x": 0,
+      "y": 49,
+      "width": 305,
+      "height": 491,
+      "top": 49,
+      "right": 305,
+      "bottom": 540,
+      "left": 0,
+      "scrollHeight": 491,
+      "scrollWidth": 305,
+      "clientHeight": 491,
+      "clientWidth": 305,
+      "scrollTop": 0
+    },
+    "content": {
+      "x": 16,
+      "y": 61,
+      "width": 273,
+      "height": 463.4921875,
+      "top": 61,
+      "right": 289,
+      "bottom": 524.4921875,
+      "left": 16
+    },
+    "footer": {
+      "x": 0,
+      "y": 540,
+      "width": 305,
+      "height": 61,
+      "top": 540,
+      "right": 305,
+      "bottom": 601,
+      "left": 0
+    },
+    "warning": null,
+    "horizontalOverflow": [],
+    "headerMargin": "0px",
+    "footerMargin": "0px",
+    "footerPadding": "12px 16px",
+    "title": "阅读中的设计资料：布局、间距与界面细节",
+    "note": "保存失败后仍保留的备注，调整宽度也不应该消失。",
+    "resizeHidden": true
+  },
+  {
+    "name": "save-existing-dark",
+    "viewport": {
+      "width": 1280,
+      "height": 900
+    },
+    "theme": "dark",
+    "panel": {
+      "x": 905,
+      "y": 185,
+      "width": 360,
+      "height": 530,
+      "top": 185,
+      "right": 1265,
+      "bottom": 715,
+      "left": 905
+    },
+    "frame": {
+      "width": 360,
+      "height": 530
+    },
+    "body": {
+      "x": 0,
+      "y": 49,
+      "width": 360,
+      "height": 420,
+      "top": 49,
+      "right": 360,
+      "bottom": 469,
+      "left": 0,
+      "scrollHeight": 420,
+      "scrollWidth": 360,
+      "clientHeight": 420,
+      "clientWidth": 360,
+      "scrollTop": 0
+    },
+    "content": {
+      "x": 16,
+      "y": 61,
+      "width": 328,
+      "height": 391.9296875,
+      "top": 61,
+      "right": 344,
+      "bottom": 452.9296875,
+      "left": 16
+    },
+    "footer": {
+      "x": 0,
+      "y": 469,
+      "width": 360,
+      "height": 61,
+      "top": 469,
+      "right": 360,
+      "bottom": 530,
+      "left": 0
+    },
+    "warning": null,
+    "horizontalOverflow": [],
+    "headerMargin": "0px",
+    "footerMargin": "0px",
+    "footerPadding": "12px 16px",
+    "title": "已有的设计资料",
+    "note": "",
+    "selected": "设计赏析",
+    "resizeHidden": true
+  }
+]

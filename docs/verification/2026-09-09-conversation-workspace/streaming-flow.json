@@ -1,0 +1,15 @@
+{
+  "fixture": "Local Port replay; real stream client and UI; proposal not executed",
+  "partial": {
+    "sameComposer": true,
+    "stop": true,
+    "text": "这是一段本地流式界面验收内容。"
+  },
+  "done": {
+    "sameComposer": true,
+    "enabled": true,
+    "listeners": 0,
+    "disconnected": true,
+    "pageWidth": 400
+  }
+}

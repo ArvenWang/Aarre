@@ -1,0 +1,76 @@
+"""Generate the evidence gallery from screenshots that were actually inspected."""
+from pathlib import Path
+import hashlib
+import html
+import json
+
+root = Path(__file__).resolve().parent
+scenes = [
+    ('host-desktop-light','悬浮收藏 · 浅色','menu','菜单独立浮在网页上，主操作、搜索和收藏列表层级清楚。'),
+    ('host-desktop-dark','悬浮收藏 · 深色','menu','菜单与球共同切换主题，原网页保持自己的外观。'),
+    ('floating-ai-light','AI · 浅色','menu','未配置服务的真实初始状态，解释用途并提供配置入口。'),
+    ('floating-ai-dark','AI · 深色','menu','新会话、历史会话和配置入口清楚；没有用假回答冒充联调成功。'),
+    ('floating-settings-light','设置 · 浅色','menu','悬浮开关、网站范围、账号和 AI 服务分组；内容可内部滚动。'),
+    ('floating-settings-dark','设置 · 深色','menu','开关有明确名称和选中状态，暗色表面与文字一致。'),
+    ('manager-library-light','完整收藏库 · 浅色','library','搜索、筛选和排序共用控件系统，保留原有手绘兜底封面。'),
+    ('manager-library-dark','完整收藏库 · 深色','library','正文、次级文字、卡片和导航在暗色中可读。'),
+    ('manager-organize-light','整理提案 · 浅色','library','删除类建议默认不选中；说明与操作分开呈现。'),
+    ('manager-organize-dark','整理提案 · 深色','library','未选择时执行按钮禁用，保留原有真实确认机制。'),
+    ('manager-report-light','报告 · 浅色','library','指标和图表清楚；警示文字颜色已提高对比度。'),
+    ('manager-report-dark','报告 · 深色','library','指标层级、主题变化与风险状态在暗色中清楚。'),
+    ('manager-topics-light','主题图谱 · 浅色','library','新增主题目录；键盘展开知识管理，显示 12 条对应收藏。'),
+    ('manager-topics-dark','主题图谱 · 深色','library','24 个主题有可达的文字入口，图形文字不再按景深淡化。'),
+    ('manager-resurface-light','重新发现 · 浅色','library','收藏原因、时间和网址标题保留清楚的阅读层级。'),
+    ('manager-resurface-dark','重新发现 · 深色','library','长标题自然换行，暗色辅助文字清楚。'),
+    ('ball-collapsed-light','收起状态','layout','常驻入口为 52px 球，网页正文没有被挤窄。'),
+    ('corner-top-left','拖动到左上角','layout','真实指针操作；编辑弹层随菜单留在视口内。'),
+    ('corner-top-right','拖动到右上角','layout','菜单向内展开，编辑内容和固定操作区可达。'),
+    ('corner-bottom-left','拖动到左下角','layout','菜单向上展开，底部留出边缘间距。'),
+    ('corner-bottom-right','拖动到右下角','layout','球和菜单均未越界，保留编辑草稿。'),
+    ('pointer-resize-light','实际拖动调整大小','layout','从 400×600 调为 460×680，字段与操作区随可用空间布局。'),
+    ('host-narrow-light','360px 窄窗','layout','菜单为 321px，扣除浏览器滚动条和两边留白；三个标签完整显示。'),
+    ('host-420-light','420px 窄窗','layout','菜单内部滚动，为球保留底部位置。'),
+    ('manager-narrow-light','窄窗中的完整收藏库','layout','筛选纵向排列，导航可横向滚动，卡片保持单列。'),
+    ('editor-narrow-light','长内容编辑','layout','正文在弹窗内滚动，保存与取消固定在底部。'),
+    ('folder-select-narrow','窄窗文件夹选择','layout','HeroUI 选择列表约束高度，选项清楚，Escape 可先关闭下拉层。'),
+    ('delete-confirm-narrow','删除确认 · 浅色','recovery','确认文字在窄窗换行，按钮完整可见；没有执行删除。'),
+    ('delete-confirm-narrow-dark','删除确认 · 深色','recovery','危险按钮使用深色文字，修复原来白字对比不足的问题。'),
+    ('archive-preview-light','备份文件预览 · 浅色','recovery','读取真实测试文件并校验，显示目录/资源数量；尚未执行原生恢复。'),
+    ('archive-preview-dark','备份文件预览 · 深色','recovery','对话框居中，内容、数据范围与下一步操作清楚。'),
+    ('floating-empty','搜索没有结果','recovery','实际查询不存在的关键词，提供明确空状态与清空入口。'),
+    ('capture-ui-hidden','截图隐藏握手','recovery','宿主确认隐藏后实际截取：画面没有悬浮球或菜单。正式 Chrome 生成封面另待验证。'),
+    ('privacy-light','隐私说明 · 浅色','recovery','内容明确说明本地数据、显式完整备份与第三方请求。'),
+    ('privacy-dark','隐私说明 · 深色','recovery','隐私页面也使用共享主题与信息色。'),
+    ('onboarding-dark','首次引导 · 深色','recovery','真实引导入口可重新进入，操作按钮在 420px 窗口内可达。'),
+]
+assert len(scenes) == len(list((root/'final').glob('*.png'))) == 36
+records=[]
+cards=[]
+for name,title,group,note in scenes:
+    relative='final/'+name+'.png'
+    data=(root/relative).read_bytes()
+    records.append(dict(file=relative,title=title,group=group,note=note,version='0.6.0',source='DEV fixture / production UI',reviewed=True,reviewMethod='Opened with image viewing tool; agent visual inspection',sha256=hashlib.sha256(data).hexdigest()))
+    cards.append(f'<article class="scene" data-group="{group}"><a href="{relative}" target="_blank" rel="noopener"><img src="{relative}" alt="{html.escape(title)}的实际截图" loading="lazy"></a><div><h3>{html.escape(title)}</h3><p>{html.escape(note)}</p><small>0.6.0 · 实际渲染 · 点击查看原图</small></div></article>')
+(root/'visual-review.json').write_text(json.dumps(dict(scope='All screenshots use explicitly identified DEV data. No installed Chrome or real cloud claim.',screenshots=records),ensure_ascii=False,indent=2)+'\n')
+checks=[
+    '确认扩展实际加载版本为 0.6.0，错误列表没有新增异常',
+    '用球和快捷键打开菜单，拖动四角、缩放和按网站隐藏均正常',
+    '测试收藏、改名、备注、换目录、删除和撤销，并核对 Chrome 原生书签',
+    '用键盘和中文输入，检查明暗主题、窄窗、长内容与固定操作区',
+    '在独立空配置恢复备份，核对目录、备注、图片和重复导入结果',
+    '服务端升级后，再验收真实 AI、双设备同步、COS 恢复和实际显示帧性能',
+]
+checkhtml=''.join(f'<label><input type="checkbox" data-check="{i}"><span>{html.escape(value)}</span></label>' for i,value in enumerate(checks))
+page='''<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Aarre 0.6.0 · 实际截图与验收</title><style>
+:root{color-scheme:light;--ink:#17191c;--muted:#58616a;--line:#dce1e4;--soft:#f4f6f7;--green:#087b70}*{box-sizing:border-box}body{margin:0;background:#fff;color:var(--ink);font:15px/1.65 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}a{color:var(--green);text-underline-offset:3px}header,main,footer{width:min(1240px,calc(100% - 48px));margin:auto}header{padding:52px 0 30px;border-bottom:1px solid var(--line)}.eyebrow{font-size:12px;letter-spacing:.13em;color:var(--muted)}h1{font-size:clamp(32px,5vw,56px);line-height:1.15;letter-spacing:-.04em;margin:18px 0}h2{font-size:25px;line-height:1.3;margin:0 0 12px}h3{font-size:17px;line-height:1.4;margin:0 0 9px}p{margin:10px 0;color:var(--muted)}header p{max-width:900px}.links{display:flex;flex-wrap:wrap;gap:12px 24px;margin-top:22px}.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:30px}.metric{border-left:2px solid var(--ink);padding-left:16px}.metric strong{display:block;font-size:32px;line-height:1.3}.metric span{color:var(--muted);font-size:13px}section{padding:36px 0;border-bottom:1px solid var(--line)}.notice{padding:18px 22px;background:var(--soft);border-radius:12px}.notice strong{display:block;margin-bottom:4px}.notice p{margin:0}.filters{display:flex;flex-wrap:wrap;gap:8px;margin:24px 0}button{font:inherit;font-size:14px;border:1px solid var(--line);background:white;color:var(--ink);border-radius:8px;padding:9px 16px;cursor:pointer}button[aria-pressed=true]{background:var(--ink);color:white;border-color:var(--ink)}button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid #087b70;outline-offset:4px}.grid,.compare{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}.scene,.compare figure{margin:0;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:white}.scene>a,.compare figure>a{display:flex;background:var(--soft);height:350px;align-items:center;justify-content:center;padding:8px}.scene img,.compare img{max-width:100%;max-height:100%;object-fit:contain}.scene>div,.compare figcaption{padding:20px}.scene p{font-size:14px}.scene small{font-size:12px;color:var(--muted)}.scene[hidden]{display:none}.checklist{display:grid;gap:8px;margin:18px 0}.checklist label{display:flex;gap:12px;align-items:flex-start;padding:15px;background:var(--soft);border-radius:10px;cursor:pointer}.checklist input{width:20px;height:20px;flex:none;accent-color:var(--green);margin-top:2px}footer{padding:30px 0 60px;font-size:13px;color:var(--muted)}code{font-size:13px;overflow-wrap:anywhere}.small{font-size:13px}#shown,#checked{font-variant-numeric:tabular-nums}.compare{margin:20px 0}.compare figcaption strong{display:block;color:var(--ink)}@media(max-width:700px){header,main,footer{width:calc(100% - 32px)}header{padding-top:32px}.grid,.compare{grid-template-columns:1fr}.scene>a,.compare figure>a{height:290px}.metrics{gap:8px}.metric{padding-left:10px}.metric strong{font-size:28px}section{padding:28px 0}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style></head><body><header><div class="eyebrow">AARRE / 0.6.0 / 2026.09.09</div><h1>从侧栏，走回阅读现场。</h1><p>悬浮球与菜单已接入正式功能，完整收藏库使用统一的 HeroUI 界面。这里保存了实际浏览器截图、审计依据和回到电脑后可逐项勾选的验收步骤。</p><div class="links"><a href="README.md">完整验收记录</a><a href="../../FLOATING_UI_REMEDIATION_PLAN.md">修改计划与可验证目标</a><a href="../../AUDIT_2026-09-09.md">原始审计</a><a href="../../../AGENT_PROGRESS.md">项目进展</a></div><div class="metrics"><div class="metric"><strong>509</strong><span>前端测试通过</span></div><div class="metric"><strong>27</strong><span>服务端测试通过</span></div><div class="metric"><strong>36</strong><span>截图已逐张查看</span></div></div></header><main>
+<section><div class="notice"><strong>本地实现与视觉检查完成，实机和云端验收仍开放。</strong><p>截图使用明确标识的开发场景与测试收藏，不是用户已安装 Chrome。Mac 当前锁屏，真实 Provider、双设备同步与 COS 恢复尚未验证；服务端改动没有部署。搜索 DOM 更新 p95 172ms、暖展开 57ms，实际显示帧性能需要单独复核。</p></div></section>
+<section><h2>先看之前与现在</h2><p>保留同一天的原始证据，不制作假的“旧版正常界面”。旧侧栏当时只有开发预览启动失败的记录，没有取得安装态截图。</p><div class="compare"><figure><a href="../../audits/2026-09-09/screenshots/01-sidepanel-startup-error.png" target="_blank"><img src="../../audits/2026-09-09/screenshots/01-sidepanel-startup-error.png" alt="旧版侧栏 DEV 启动错误" loading="lazy"></a><figcaption><strong>之前 · 0.5.73 开发预览</strong>Chrome 事件接口缺失，预览无法打开。这不是旧侧栏的正常产品外观。</figcaption></figure><figure><a href="final/host-desktop-light.png" target="_blank"><img src="final/host-desktop-light.png" alt="新版悬浮菜单浅色" loading="lazy"></a><figcaption><strong>现在 · 0.6.0 正式宿主与 UI</strong>在标识清楚的开发验收网页中实际打开菜单，主操作与搜索列表完整显示。</figcaption></figure><figure><a href="../../audits/2026-09-09/screenshots/02-manager-dark.png" target="_blank"><img src="../../audits/2026-09-09/screenshots/02-manager-dark.png" alt="修改前管理页深色" loading="lazy"></a><figcaption><strong>之前 · 收藏库深色</strong>原始审计图，保留为对照。</figcaption></figure><figure><a href="final/manager-library-dark.png" target="_blank"><img src="final/manager-library-dark.png" alt="修改后管理页深色" loading="lazy"></a><figcaption><strong>现在 · 统一控件与主题</strong>导航、搜索、筛选和表单共用 HeroUI，新增备份与设置入口。</figcaption></figure></div></section>
+<section id="gallery"><h2>实际界面状态图集</h2><p>每张图都通过图像工具查看过。点击原图可检查文字、边缘、对齐和操作区；截图只证明画面与注明的交互，不替代真实服务结果。</p><nav class="filters" aria-label="截图分类"><button data-filter="all" aria-pressed="true">全部 36</button><button data-filter="menu" aria-pressed="false">悬浮菜单</button><button data-filter="library" aria-pressed="false">完整收藏库</button><button data-filter="layout" aria-pressed="false">布局与拖动</button><button data-filter="recovery" aria-pressed="false">恢复与边界</button></nav><p class="small" id="shown" role="status">显示 36 张截图</p><div class="grid">__CARDS__</div></section>
+<section id="acceptance"><h2>回到电脑后，按这六项验收</h2><p>可加载的目录：<code>outputs/Bookmark-Layer-0.6.0-unpacked</code>。已从本仓库 <code>dist</code> 加载的开发扩展，核对路径后刷新扩展和网页即可。备份恢复使用独立测试配置。</p><div class="checklist">__CHECKS__</div><p id="checked" class="small" role="status">已勾选 0 / 6</p><p class="small">勾选只保存在当前浏览器，用于你的现场验收；不会更改项目的自动化通过记录。</p><div class="links"><a href="../../../outputs/Bookmark-Layer-0.6.0.zip" download>扩展 ZIP</a><a href="../../../outputs/Bookmark-Layer-0.6.0-source.zip" download>源码 ZIP</a><a href="../../../outputs/Bookmark-Layer-0.6.0-build.json">构建与哈希清单</a><a href="README.md">安装步骤与全部 G01～G18 对账</a></div></section>
+</main><footer>源码基线 cc352cf · 本地实施分支 codex/aarre-floating-ui-20260909 · 未推送 / 未部署 / 未发布<br>逐图记录见 visual-review.json；数据、截图、自动化、安装态和真实服务分开记录。</footer><script>
+const buttons=[...document.querySelectorAll('[data-filter]')],scenes=[...document.querySelectorAll('[data-group]')];buttons.forEach(b=>b.addEventListener('click',()=>{buttons.forEach(x=>x.setAttribute('aria-pressed',String(x===b)));scenes.forEach(x=>x.hidden=b.dataset.filter!=='all'&&x.dataset.group!==b.dataset.filter);document.getElementById('shown').textContent='显示 '+scenes.filter(x=>!x.hidden).length+' 张截图';}));
+const key='aarre:review:20260909:v1',inputs=[...document.querySelectorAll('[data-check]')];let saved=[];try{saved=JSON.parse(localStorage.getItem(key)||'[]')}catch{}const update=()=>{document.getElementById('checked').textContent='已勾选 '+inputs.filter(i=>i.checked).length+' / '+inputs.length;try{localStorage.setItem(key,JSON.stringify(inputs.filter(i=>i.checked).map(i=>i.dataset.check)))}catch{}};inputs.forEach(i=>{i.checked=saved.includes(i.dataset.check);i.addEventListener('change',update)});update();
+</script></body></html>'''
+(root/'index.html').write_text(page.replace('__CARDS__',''.join(cards)).replace('__CHECKS__',checkhtml))
+print(f'Generated gallery with {len(records)} reviewed screenshots.')

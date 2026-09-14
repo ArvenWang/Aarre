@@ -8,9 +8,4 @@ export type LibrarySort =
   | "updated-desc"
   | "title-asc";
 
-export type ManagerView =
-  | "library"
-  | "organize"
-  | "report"
-  | "topics"
-  | "resurface";
+export type ManagerView = "library" | "topics";

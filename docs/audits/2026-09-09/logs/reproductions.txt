@@ -1,0 +1,310 @@
+
+ RUN  v4.1.10 /Users/nefish/Desktop/Coding/Aarre
+
+stdout | docs/audits/2026-09-09/auth.cases.ts > A07 keeps a recoverable session when refresh fails because the network is offline
+A07 { sessionRetainedAfterNetworkFailure: false }
+
+ ❯ docs/audits/2026-09-09/auth.cases.ts (1 test | 1 failed) 74ms
+   × A07 keeps a recoverable session when refresh fails because the network is offline 73ms
+stdout | docs/audits/2026-09-09/sync.cases.ts > September audit: required sync recovery behavior > A01 does not advance the cursor past changes that were never committed
+A01 { cursor: 11, localDataPersisted: false }
+
+stdout | docs/audits/2026-09-09/sync.cases.ts > September audit: required sync recovery behavior > A02 keeps an update followed by a tombstone deleted
+A02 { resurrected: true, nativeBookmarkIds: [ 'audit-native' ] }
+
+stdout | docs/audits/2026-09-09/sync.cases.ts > September audit: required sync recovery behavior > A03 never reports all data synced when a resource upload failed
+A03 {
+  phase: 'idle',
+  current: 0,
+  total: 0,
+  lastSyncedAt: '2026-09-09T00:00:00.000Z',
+  error: null,
+  nextRetryAt: null
+}
+
+stdout | docs/audits/2026-09-09/sync.cases.ts > September audit: required sync recovery behavior > A04 permits explicit retry after a recoverable network error
+A04 { requestsAfterManualRetry: 1, phase: 'error' }
+
+stdout | docs/audits/2026-09-09/sync.cases.ts > September audit: required sync recovery behavior > A05 keeps a newer local note when an older upload response arrives
+A05 { userNoteAfterReply: 'old note' }
+
+stdout | docs/audits/2026-09-09/sync.cases.ts > September audit: required sync recovery behavior > A06 does not upload unchanged old image bytes over a newer remote cover
+A06 {
+  oldBytesUploaded: true,
+  incomingRemoteHash: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+  localBytesWereUnchanged: true
+}
+
+stdout | docs/audits/2026-09-09/sync.cases.ts > September audit: required sync recovery behavior > A10 sends an explicit clear when the user deletes their note and last tag
+A10 { noteClearSent: false, tagsClearSent: false }
+
+ ❯ docs/audits/2026-09-09/sync.cases.ts (7 tests | 7 failed) 40ms
+     × A01 does not advance the cursor past changes that were never committed 11ms
+     × A02 keeps an update followed by a tombstone deleted 5ms
+     × A03 never reports all data synced when a resource upload failed 2ms
+     × A04 permits explicit retry after a recoverable network error 2ms
+     × A05 keeps a newer local note when an older upload response arrives 3ms
+     × A06 does not upload unchanged old image bytes over a newer remote cover 15ms
+     × A10 sends an explicit clear when the user deletes their note and last tag 2ms
+stdout | docs/audits/2026-09-09/ui.cases.ts > A08 releases the chat UI after the service worker port disconnects
+A08 {
+  disconnectListeners: 0,
+  busyAfterDisconnect: 'agent',
+  messageStatus: 'sending'
+}
+
+stdout | docs/audits/2026-09-09/ui.cases.ts > A09 exposes every retained undo batch or provides pagination
+A09 {
+  retainedBatches: 13,
+  renderedBatches: 12,
+  controlLabels: [
+    '撤销', '撤销',
+    '撤销', '撤销',
+    '撤销', '撤销',
+    '撤销', '撤销',
+    '撤销', '撤销',
+    '撤销', '撤销'
+  ]
+}
+
+ ❯ docs/audits/2026-09-09/ui.cases.ts (2 tests | 2 failed) 65ms
+   × A08 releases the chat UI after the service worker port disconnects 18ms
+   × A09 exposes every retained undo batch or provides pagination 46ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  docs/audits/2026-09-09/auth.cases.ts > A07 keeps a recoverable session when refresh fails because the network is offline
+AssertionError: expected undefined to be defined
+ ❯ docs/audits/2026-09-09/auth.cases.ts:20:23
+     18|   await expect(cloudRequest("/v1/account")).rejects.toThrow("offline");
+     19|   console.log("A07", { sessionRetainedAfterNetworkFailure: Boolean(val…
+     20|   expect(values[key]).toBeDefined();
+       |                       ^
+     21| });
+     22|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/10]⎯
+
+ FAIL  docs/audits/2026-09-09/sync.cases.ts > September audit: required sync recovery behavior > A01 does not advance the cursor past changes that were never committed
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ docs/audits/2026-09-09/sync.cases.ts:74:53
+     72|     const local = await getLocalResource("cursor-case");
+     73|     console.log("A01", { cursor: values[CURSOR], localDataPersisted: B…
+     74|     expect(values[CURSOR] === 10 || Boolean(local)).toBe(true);
+       |                                                     ^
+     75|   });
+     76|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/10]⎯
+
+ FAIL  docs/audits/2026-09-09/sync.cases.ts > September audit: required sync recovery behavior > A02 keeps an update followed by a tombstone deleted
+AssertionError: expected { resourceKey: 'deleted-case', …(23) } to be undefined
+
+- Expected:
+undefined
+
++ Received:
+{
+  "aiStatus": "ready",
+  "author": "",
+  "canonicalUrl": "https://example.com/deleted-case",
+  "contentExcerpt": "",
+  "contentHash": "",
+  "createdAt": "2026-09-09T00:00:00.000Z",
+  "faviconUrl": "",
+  "fieldUpdatedAt": {
+    "aiSchemaVersion": "2026-09-09T00:00:00.000Z",
+    "aliases": "2026-09-09T00:00:00.000Z",
+    "author": "2026-09-09T00:00:00.000Z",
+    "canonicalUrl": "2026-09-09T00:00:00.000Z",
+    "categoryCoverId": "2026-09-09T00:00:00.000Z",
+    "contentHash": "2026-09-09T00:00:00.000Z",
+    "contentType": "2026-09-09T00:00:00.000Z",
+    "coverContentHash": "2026-09-09T00:00:00.000Z",
+    "coverOrigin": "2026-09-09T00:00:00.000Z",
+    "coverSource": "2026-09-09T00:00:00.000Z",
+    "coverUpdatedAt": "2026-09-09T00:00:00.000Z",
+    "entities": "2026-09-09T00:00:00.000Z",
+    "language": "2026-09-09T00:00:00.000Z",
+    "linkHealth": "2026-09-09T00:00:00.000Z",
+    "questions": "2026-09-09T00:00:00.000Z",
+    "selectedText": "2026-09-09T00:00:00.000Z",
+    "siteName": "2026-09-09T00:00:00.000Z",
+    "summary": "2026-09-09T00:00:00.000Z",
+    "tags": "2026-09-09T00:00:00.000Z",
+    "tagsSource": "2026-09-09T00:00:00.000Z",
+    "topics": "2026-09-09T00:00:00.000Z",
+    "useCases": "2026-09-09T00:00:00.000Z",
+    "userNote": "2026-09-09T00:00:00.000Z",
+  },
+  "imageUrl": "",
+  "language": "",
+  "lastSyncedAt": "2026-09-09T04:46:20.426Z",
+  "nativeBookmarkIds": [
+    "audit-native",
+  ],
+  "nativeFolderPath": [],
+  "resourceKey": "deleted-case",
+  "selectedText": "",
+  "siteName": "Example",
+  "summary": "remote summary",
+  "syncStatus": "synced",
+  "tags": [],
+  "title": "deleted-case",
+  "topics": [],
+  "updatedAt": "2026-09-09T00:00:00.000Z",
+  "url": "https://example.com/deleted-case",
+  "userNote": "remote note",
+}
+
+ ❯ docs/audits/2026-09-09/sync.cases.ts:84:19
+     82|     const local = await getLocalResource("deleted-case");
+     83|     console.log("A02", { resurrected: Boolean(local), nativeBookmarkId…
+     84|     expect(local).toBeUndefined();
+       |                   ^
+     85|   });
+     86|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/10]⎯
+
+ FAIL  docs/audits/2026-09-09/sync.cases.ts > September audit: required sync recovery behavior > A03 never reports all data synced when a resource upload failed
+AssertionError: expected '2026-09-09T00:00:00.000Z' to be null
+
+- Expected:
+null
+
++ Received:
+"2026-09-09T00:00:00.000Z"
+
+ ❯ docs/audits/2026-09-09/sync.cases.ts:92:40
+     90|     await test.engine.sync();
+     91|     console.log("A03", test.status());
+     92|     expect(test.status().lastSyncedAt).toBeNull();
+       |                                        ^
+     93|   });
+     94|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/10]⎯
+
+ FAIL  docs/audits/2026-09-09/sync.cases.ts > September audit: required sync recovery behavior > A04 permits explicit retry after a recoverable network error
+AssertionError: expected "vi.fn()" to be called 2 times, but got 1 times
+ ❯ docs/audits/2026-09-09/sync.cases.ts:101:27
+     99|     await test.engine.sync("manual");
+    100|     console.log("A04", { requestsAfterManualRetry: pullResources.mock.…
+    101|     expect(pullResources).toHaveBeenCalledTimes(2);
+       |                           ^
+    102|   });
+    103|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/10]⎯
+
+ FAIL  docs/audits/2026-09-09/sync.cases.ts > September audit: required sync recovery behavior > A05 keeps a newer local note when an older upload response arrives
+AssertionError: expected 'old note' to be 'new local note' // Object.is equality
+
+Expected: "new local note"
+Received: "old note"
+
+ ❯ docs/audits/2026-09-09/sync.cases.ts:114:29
+    112|     const local = await getLocalResource(old.resourceKey);
+    113|     console.log("A05", { userNoteAfterReply: local?.userNote });
+    114|     expect(local?.userNote).toBe("new local note");
+       |                             ^
+    115|   });
+    116|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/10]⎯
+
+ FAIL  docs/audits/2026-09-09/sync.cases.ts > September audit: required sync recovery behavior > A06 does not upload unchanged old image bytes over a newer remote cover
+AssertionError: expected [ '/v1/assets/upload', …(1) ] to be undefined
+
+- Expected:
+undefined
+
++ Received:
+[
+  "/v1/assets/upload",
+  {
+    "body": "{\"assetId\":\"75b6f15d-484f-582d-a02c-51dcabbeb0c0\",\"operationId\":\"cf87d0cd-f4f9-47f4-9f7a-a7a31f303007\",\"resourceKey\":\"cover-race\",\"kind\":\"cover\",\"sha256\":\"039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81\",\"byteSize\":3,\"mimeType\":\"image/webp\",\"capturedAt\":\"2026-09-09T01:00:00.000Z\",\"binding\":{\"canonicalUrl\":\"https://example.com/cover-race\",\"coverOrigin\":\"user\"}}",
+    "method": "POST",
+  },
+]
+
+ ❯ docs/audits/2026-09-09/sync.cases.ts:144:20
+    142|     const payload = upload ? JSON.parse(String(upload[1]?.body)) : nul…
+    143|     console.log("A06", { oldBytesUploaded: payload?.sha256 === oldHash…
+    144|     expect(upload).toBeUndefined();
+       |                    ^
+    145|   });
+    146|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/10]⎯
+
+ FAIL  docs/audits/2026-09-09/sync.cases.ts > September audit: required sync recovery behavior > A10 sends an explicit clear when the user deletes their note and last tag
+AssertionError: expected { …(7) } to have property "userNote" with value ''
+
+- Expected:
+""
+
++ Received:
+undefined
+
+ ❯ docs/audits/2026-09-09/sync.cases.ts:150:21
+    148|     const payload = resourceCloudPayload(resource("clear-fields", { us…
+    149|     console.log("A10", { noteClearSent: Object.hasOwn(payload, "userNo…
+    150|     expect(payload).toHaveProperty("userNote", "");
+       |                     ^
+    151|     expect(payload).toHaveProperty("tags", []);
+    152|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/10]⎯
+
+ FAIL  docs/audits/2026-09-09/ui.cases.ts > A08 releases the chat UI after the service worker port disconnects
+AssertionError: expected 'agent' to be '' // Object.is equality
+
+- Expected
++ Received
+
++ agent
+
+ ❯ docs/audits/2026-09-09/ui.cases.ts:45:27
+     43|     await act(async () => onDisconnect.emit());
+     44|     console.log("A08", { disconnectListeners: onDisconnect.size(), bus…
+     45|     expect(current!.busy).toBe("");
+       |                           ^
+     46|   } finally {
+     47|     await act(async () => root.unmount());
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/10]⎯
+
+ FAIL  docs/audits/2026-09-09/ui.cases.ts > A09 exposes every retained undo batch or provides pagination
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ docs/audits/2026-09-09/ui.cases.ts:62:114
+     60|   const count = element.querySelectorAll("article").length;
+     61|   console.log("A09", { retainedBatches: 13, renderedBatches: count, co…
+     62|   expect(element.textContent?.includes("Retained action 13") || /加载更多|…
+       |                                                                                                                  ^
+     63| });
+     64|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/10]⎯
+
+
+ Test Files  3 failed (3)
+      Tests  10 failed (10)
+   Start at  12:46:19
+   Duration  3.10s (transform 519ms, setup 0ms, import 829ms, tests 179ms, environment 2.49s)
+

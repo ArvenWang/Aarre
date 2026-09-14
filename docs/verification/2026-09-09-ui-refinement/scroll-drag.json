@@ -1,0 +1,28 @@
+{
+  "start": {
+    "x": 386,
+    "y": 284.63861083984375,
+    "scrollTop": 280,
+    "width": 384
+  },
+  "drag": {
+    "scrollTop": 537.5,
+    "opacity": "1",
+    "dragging": "true",
+    "thumbSize": "5px",
+    "hitSize": 12
+  },
+  "fading": {
+    "opacity": "0.39278",
+    "duration": 160,
+    "pausedAt": 40
+  },
+  "idle": {
+    "scrollTop": 537.5,
+    "opacity": "0",
+    "native": "none",
+    "trackBackground": "rgba(0, 0, 0, 0)",
+    "clientWidth": 384
+  },
+  "method": "Actual pointer drag, real CSS fade paused at 40ms for middle screenshot, then resumed"
+}

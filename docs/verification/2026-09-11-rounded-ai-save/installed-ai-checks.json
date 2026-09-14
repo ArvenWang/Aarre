@@ -1,0 +1,23 @@
+{
+  "version": "0.6.7",
+  "extensionId": "ppjmhonejgpcdmjmcbbdjookgiagambm",
+  "source": "Native Chrome UI; no CDP or debugger attached",
+  "sourcePage": "https://example.com/?aarre-qa=20260911-067-reuse",
+  "observedPreviewAt": "2026-09-11T15:18:58.219Z",
+  "waitBeforeSavingSeconds": 78,
+  "summaryCharacters": 181,
+  "summaryUnchangedAfterSave": true,
+  "manualTitlePreserved": true,
+  "manualNotePreserved": true,
+  "qaBookmarksRemoved": 2,
+  "workerRestart": "Controlled integration test; native UI observation did not inspect worker lifecycle",
+  "productionKey": "Existing configured service; no key read or copied",
+  "pendingSave": "Controlled integration test with deferred provider response",
+  "finalPackagedBuildReload": "Native Chrome reloaded 0.6.7 from dist after package completion",
+  "provider": "DeepSeek",
+  "model": "deepseek-v4-flash",
+  "providerVerifiedInNativeSettings": true,
+  "finalMenuLoaded": true,
+  "finalComposerAvailable": true,
+  "temporaryNativeChromeTabsClosed": true
+}

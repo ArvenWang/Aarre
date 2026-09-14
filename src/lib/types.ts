@@ -97,6 +97,7 @@ export interface NavigationSuggestion {
 }
 
 export interface NavigationInput {
+  sourceTabId?: number;
   text: string;
   url?: string;
   tabId?: number;
@@ -165,6 +166,8 @@ export interface ResourceRecord {
    * 记录级的 updatedAt 无法表达这一点：它会让最近写过任何字段的一方赢下所有字段。
    */
   fieldUpdatedAt?: Record<string, string>;
+  /** Local intent: an empty value here means the user explicitly cleared it. */
+  fieldClears?: Array<"userNote" | "tags">;
 }
 
 export type SiteIconSource =
@@ -350,10 +353,22 @@ export interface SaveBookmarkInput {
   userNote: string;
   folderId: string;
   requestAi: true;
+  /** 后台生成的临时分析请求；只复用与此页面及来源匹配的结果。 */
+  aiPreparationId?: string;
   existingBookmarkId?: string;
   createSeparate?: boolean;
   confirmedCanonicalReuse?: boolean;
 }
+
+export interface PrepareBookmarkAiInput {
+  requestId: string;
+  capture: PageCapture;
+  sourceTabId?: number;
+}
+
+export type BookmarkAiPreview =
+  | { status: "ready"; summary: string; tags: string[]; reused?: boolean }
+  | { status: "unconfigured" | "protected" | "no_content" | "failed"; message: string };
 
 export interface SaveBookmarkResult {
   resource: ResourceRecord;

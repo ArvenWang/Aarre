@@ -1,0 +1,34 @@
+[
+  {
+    "number": "01",
+    "name": "蓝色探索稿",
+    "keepAsCandidate": false,
+    "file": "01.png",
+    "original": "/Users/nefish/.codex/generated_images/01a08469-63db-7310-98b4-2064fe966d1b/exec-6a5af3ff-22e5-4267-b605-cbf4244a9ed3.png",
+    "sha256": "a3d47db1f7fd3ed995d91cc16d2203a0e2e1194bdbba7f73fc72be8623a5482e"
+  },
+  {
+    "number": "02",
+    "name": "斜切琥珀",
+    "keepAsCandidate": true,
+    "file": "02.png",
+    "original": "/Users/nefish/.codex/generated_images/01a08469-63db-7310-98b4-2064fe966d1b/exec-b31a66ab-04e6-4293-8c3b-7b66bcf9a736.png",
+    "sha256": "1d9344d19b70a82021e648a64e308567cea708a2c6398485e1514c53f58e48a7"
+  },
+  {
+    "number": "03",
+    "name": "紫晶探索稿",
+    "keepAsCandidate": false,
+    "file": "03.png",
+    "original": "/Users/nefish/.codex/generated_images/01a08469-63db-7310-98b4-2064fe966d1b/exec-6f465fc7-c8cf-4308-b596-8f41d583bd34.png",
+    "sha256": "55de72b13c5d75113b9b1b8e6c22690af6302df04c0ebf794479db9116f1831d"
+  },
+  {
+    "number": "04",
+    "name": "红色原石",
+    "keepAsCandidate": true,
+    "file": "04.png",
+    "original": "/Users/nefish/.codex/generated_images/01a08469-63db-7310-98b4-2064fe966d1b/exec-ad8e7838-dbee-4b75-a937-c66549278950.png",
+    "sha256": "8e7012d3a2464ec91c6f36ce930de110cb7ebb776338a79c7b96aa91621e3aa5"
+  }
+]

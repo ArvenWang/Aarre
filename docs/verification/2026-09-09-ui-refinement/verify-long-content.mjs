@@ -1,0 +1,38 @@
+// Ego DEV-only QA: isolated preview data, no provider requests or Chrome writes.
+const fs = await import('node:fs/promises');
+const p = (await taskSpace(6)).page('p1');
+const out = '/Users/nefish/Desktop/Coding/Aarre/docs/verification/2026-09-09-ui-refinement/';
+await p.goto('http://127.0.0.1:5173/floating.html?preview=1',{waitUntil:'domcontentloaded',timeout:30000});
+await p.waitForSelector('.bookmark-row', {timeout: 30000});
+await p.cdp('Emulation.setDeviceMetricsOverride', {width:400,height:640,deviceScaleFactor:1,mobile:false});
+await p.evaluate(async () => {
+  const {previewMutable} = await import('/src/ui/sidepanel/preview-state.ts');
+  const now = new Date().toISOString();
+  const content = '这是用于视觉验收的本地测试会话，未向 AI 服务发送请求。\n\n## 收藏整理建议\n\n先按用途建立目录，再保留原始来源和备注，方便以后重新找到内容。\n\n| 资料名称 | 主要用途 | 下一步操作 | 原始来源 |\n| --- | --- | --- | --- |\n| 无障碍设计指南与组件规范 | 检查焦点、字号及键盘访问 | 对照实际页面逐项验证 | documentation.example.com/accessibility |\n| 响应式网页和布局参考 | 核对窄窗口及长文本展示 | 在多种窗口尺寸下检查 | documentation.example.com/responsive |\n\n```json\n{ "title": "这是较长的单行代码，用于验证横向滚动保持在代码区域之内", "source": "https://documentation.example.com/long-path/design-systems/scrollbars" }\n```\n\n' + Array.from({length:8},(_,i)=>`### ${i+1}. 检查收藏内容\n\n确认标题、网址、备注和文件夹都有清晰的位置。保留真实来源，不应为了排版省略关键操作。`).join('\n\n');
+  previewMutable.conversations = Array.from({length:22},(_,i)=>({id:`visual-qa-${i}`,title:i===0?'视觉验收：长回答与表格':`视觉验收记录 ${i+1}：收藏整理与阅读体验`,createdAt:now,updatedAt:now,messages:[{id:`q-${i}`,role:'user',content:'请展示一份用于视觉验收的长内容。',createdAt:now,status:'complete'},{id:`a-${i}`,role:'assistant',content:i===0?content:'本地测试记录，用于检查历史列表的长标题、省略、操作按钮和浮动滚动条。',createdAt:now,status:'complete'}]}));
+  (await import('/src/lib/theme.ts')).applyTheme('light');
+});
+const shot = name => p.screenshot({path:out+'final/'+name+'.png'});
+await p.click('loc=role:tab[name="AI"]');
+await p.click('loc=role:button[name="历史会话"]');
+await p.waitForSelector('.agent-history-list', {timeout:30000});
+await p.click('loc=css:.agent-history-list > .bookmark-row:first-child .agent-history-open');
+await p.waitForSelector('.agent-markdown table', {timeout:30000});
+await p.waitForFunction(()=>{const e=document.querySelector('.agent-thread');return e&&e.scrollWidth===e.clientWidth;},undefined,{timeout:30000});
+await p.evaluate(()=>document.querySelector('.agent-thread').scrollTo(0,0));
+await shot('ai-long-light');
+await p.evaluate(async()=> (await import('/src/lib/theme.ts')).applyTheme('dark'));
+await shot('ai-long-dark');
+await p.evaluate(()=>{const e=document.querySelector('.markdown-scroll-frame');e.scrollIntoView({block:'center'});e.querySelector('[role=scrollbar]').focus();});
+await p.keyboard.press('End');
+await shot('ai-table-scroll-dark');
+const table=await p.evaluate(()=>[...document.querySelectorAll('.agent-thread,.scroll-area-viewport')].map(e=>({class:e.className,id:e.id,width:e.clientWidth,scrollWidth:e.scrollWidth,height:e.clientHeight,scrollHeight:e.scrollHeight,left:e.scrollLeft,bars:[...document.querySelectorAll('[role=scrollbar]')].filter(b=>b.getAttribute('aria-controls')===e.id).length})));
+await p.cdp('Emulation.setDeviceMetricsOverride',{width:320,height:640,deviceScaleFactor:1,mobile:false});
+await p.evaluate(async()=> {document.activeElement.blur();document.querySelector('.agent-thread').scrollTo(0,0);(await import('/src/lib/theme.ts')).applyTheme('light');});
+await shot('ai-long-320-light');
+const narrow=await p.evaluate(()=>({pageWidth:document.documentElement.scrollWidth,threadWidth:document.querySelector('.agent-thread').clientWidth,threadScrollWidth:document.querySelector('.agent-thread').scrollWidth}));
+await p.click('loc=role:button[name="历史会话"]');await shot('history-light');
+await p.evaluate(async()=> (await import('/src/lib/theme.ts')).applyTheme('dark'));
+await shot('history-dark');
+await fs.writeFile(out+'long-content.json',JSON.stringify({fixture:'DEV local QA conversation, no provider request',table,narrow},null,2));
+console.log({table,narrow});

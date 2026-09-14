@@ -1,0 +1,13 @@
+{
+  "method": "Built-in image_gen",
+  "revision": "Irregular gemstone, one color, simplified imagery",
+  "status": "Visual concepts for user selection, not integrated into the extension",
+  "selectedPreviewFiles": [
+    "gem-a-raw-flat.png",
+    "gem-b-oblique-flat.png",
+    "gem-c-soft-flat.png",
+    "gem-d-shard.png"
+  ],
+  "refinement": "A/B/C had transparent or uneven interior patches. Re-edited with built-in image_gen to preserve geometry and restore solid monochrome fill on white. Original drafts retained separately.",
+  "refinementPromptFile": "refinement-prompt.txt"
+}

@@ -1,0 +1,333 @@
+{
+  "version": "0.6.4",
+  "reviewedAt": "2026-09-11T07:16:53.957Z",
+  "reviewer": "Codex visual inspection; user acceptance remains separate",
+  "scope": "Actual browser rendering of formal UI with isolated DEV data. No personal Chrome screenshots included.",
+  "capturePolicy": "Final theme variants captured after fonts, layout and CSS transitions settled. morph-opening-70ms intentionally captures a live animation frame.",
+  "galleryChecks": [
+    {
+      "viewport": 1150,
+      "documentWidth": 1135,
+      "loaded": 31,
+      "total": 31
+    },
+    {
+      "viewport": 420,
+      "documentWidth": 405,
+      "loaded": 31,
+      "total": 31
+    }
+  ],
+  "records": [
+    {
+      "file": "final/bar-light.png",
+      "title": "右侧快捷栏 · 日间",
+      "focus": "展开菜单与快捷收藏，两个独立按钮。",
+      "width": 1280,
+      "height": 860,
+      "bytes": 95429,
+      "sha256": "9bfc3533289468deb1c83bdbe3747d9cff7822ae784a00b138539e0315f7d63e",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/bar-dark.png",
+      "title": "右侧快捷栏 · 夜间",
+      "focus": "右侧贴边，保持清晰的按钮边界。",
+      "width": 1280,
+      "height": 860,
+      "bytes": 95468,
+      "sha256": "375418dbf423745f6bedf71cf720bb166a3baec2f526b174e45ba8944dda4f13",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/morph-opening-70ms.png",
+      "title": "展开过程 · 70ms",
+      "focus": "真实动画中间帧，内容在背景展开后渐入。",
+      "width": 1280,
+      "height": 860,
+      "bytes": 96021,
+      "sha256": "eceb523c8d49ccbc1c0501b037ff7fe89be56fd2cd38b1295a608dcd9bf8a329",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/menu-desktop-light.png",
+      "title": "网页内菜单 · 日间",
+      "focus": "400px 宽，顶部和底部随窗口保持间距。",
+      "width": 1280,
+      "height": 860,
+      "bytes": 160536,
+      "sha256": "bd3f2e103fd84ed9a65863145d189415bbfd895c2c3a7f2975726640eae4e0fe",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/menu-desktop-dark.png",
+      "title": "网页内菜单 · 夜间",
+      "focus": "保留收藏列表与底部常驻输入框。",
+      "width": 1280,
+      "height": 860,
+      "bytes": 159719,
+      "sha256": "0be831c89ee3efe7526e41deb37d536490f1fdd9c9f28e9502deed4c7143eaf1",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/menu-width-640.png",
+      "title": "拖宽至 640px",
+      "focus": "实际从左边拖动，菜单高度保持不变。",
+      "width": 1280,
+      "height": 860,
+      "bytes": 145174,
+      "sha256": "dfb87ae7d702fc03c1f5c0cf2ff79f1732b70a66b0ce45171622b5d3c7e20c28",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/menu-window-420.png",
+      "title": "窄窗口 · 420 × 640px",
+      "focus": "菜单适配可用区域，按钮和输入框可达。",
+      "width": 420,
+      "height": 640,
+      "bytes": 59380,
+      "sha256": "3db73ac5f59a43005b21d2f9a314be17d34d86ccf194ea27b54db985877ba651",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/answer-320-light.png",
+      "title": "320px 回答 · 日间",
+      "focus": "长引用与普通网址完整换行。",
+      "width": 320,
+      "height": 740,
+      "bytes": 71485,
+      "sha256": "a370df58e9db842d650efa64635da9a0408f03eee7ee38d5b4749baa951bdbd8",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/answer-320-dark.png",
+      "title": "320px 回答 · 夜间",
+      "focus": "全文保留，无需左右滚动。",
+      "width": 320,
+      "height": 740,
+      "bytes": 71101,
+      "sha256": "258ca3f628c6f216b6d77650e6d92e186809ee38eadf4c948cd96df021035176",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/table-320-dark.png",
+      "title": "320px 表格",
+      "focus": "窄表格转为带字段名的条目，多列表格保持可读。",
+      "width": 320,
+      "height": 740,
+      "bytes": 62083,
+      "sha256": "c63501a933e1f18dcdb8fcc76ba8811164866e27155e0f56f23cd382ecc9db11",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/code-320-dark.png",
+      "title": "320px 代码与多列表格",
+      "focus": "长代码自动换行，五列信息也能读全。",
+      "width": 320,
+      "height": 740,
+      "bytes": 47701,
+      "sha256": "fa04bda849b9a65502d622e141cb33a1e626ee6cdabebc21f411cf3780a9c0d6",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/answer-400-light.png",
+      "title": "400px 回答 · 日间",
+      "focus": "长引用与普通网址完整换行。",
+      "width": 400,
+      "height": 740,
+      "bytes": 75767,
+      "sha256": "487688ed029a92a9cf679e898e46b2c07d781a3c28af33447dcc9be388b6167d",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/answer-400-dark.png",
+      "title": "400px 回答 · 夜间",
+      "focus": "全文保留，无需左右滚动。",
+      "width": 400,
+      "height": 740,
+      "bytes": 75110,
+      "sha256": "bc280dcbd785dda5966946ae5fa330cc6e60666fd7644ecaf7ad3bdb8fe7099e",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/table-400-dark.png",
+      "title": "400px 表格",
+      "focus": "窄表格转为带字段名的条目，多列表格保持可读。",
+      "width": 400,
+      "height": 740,
+      "bytes": 64690,
+      "sha256": "df03ad5bde0662189aa6089eb18c7747d89479de5f59bc492567d192f14757b2",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/code-400-dark.png",
+      "title": "400px 代码与多列表格",
+      "focus": "长代码自动换行，五列信息也能读全。",
+      "width": 400,
+      "height": 740,
+      "bytes": 56111,
+      "sha256": "4854688bea8ca2930ffc2de616e7603a041e3221cb00ccad2999c4d6f2300ed7",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/answer-640-light.png",
+      "title": "640px 回答 · 日间",
+      "focus": "长引用与普通网址完整换行。",
+      "width": 640,
+      "height": 740,
+      "bytes": 95628,
+      "sha256": "679eeca54b6e07ced2fd2ea1046d6695496c0a1f5dd143fa5ac24da5674b3362",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/answer-640-dark.png",
+      "title": "640px 回答 · 夜间",
+      "focus": "全文保留，无需左右滚动。",
+      "width": 640,
+      "height": 740,
+      "bytes": 95422,
+      "sha256": "adeba4d80d7ad4bfc9e4b3082f454bb6898aab975672633d8abc891fff81410a",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/table-640-dark.png",
+      "title": "640px 表格",
+      "focus": "窄表格转为带字段名的条目，多列表格保持可读。",
+      "width": 640,
+      "height": 740,
+      "bytes": 69724,
+      "sha256": "645e994a355643c95444736b3573e91ad5a2546129730aa6b3eac0a4eab35bd6",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/code-640-dark.png",
+      "title": "640px 代码与多列表格",
+      "focus": "长代码自动换行，五列信息也能读全。",
+      "width": 640,
+      "height": 740,
+      "bytes": 69724,
+      "sha256": "645e994a355643c95444736b3573e91ad5a2546129730aa6b3eac0a4eab35bd6",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/settings-desktop-light.png",
+      "title": "分组设置 · 桌面",
+      "focus": "左侧选择分类，右侧承载具体设置。",
+      "width": 1280,
+      "height": 820,
+      "bytes": 89537,
+      "sha256": "a1301de81d504768bb899072af47a5ad77dde5610b796ee800c1efbabcda7c41",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/settings-ai-light.png",
+      "title": "AI 服务",
+      "focus": "标签另起一行，下拉控件保持内边距。",
+      "width": 1280,
+      "height": 820,
+      "bytes": 90533,
+      "sha256": "e6ab41c2f57c5c6015ecf5a9f14399d9a028e3a1f3f9aa0cc1fb65f7c6fc3459",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/settings-appearance-light.png",
+      "title": "外观与快捷栏 · 日间",
+      "focus": "主题、站点图标和右侧快捷栏归入同一组。",
+      "width": 1280,
+      "height": 820,
+      "bytes": 111521,
+      "sha256": "deebfa71f8876cb702ebb4be4354921fe381dc65f51290abc7b2af6453f7ba7d",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/settings-appearance-dark.png",
+      "title": "外观与快捷栏 · 夜间",
+      "focus": "开启的开关使用亮色拇指。",
+      "width": 1280,
+      "height": 820,
+      "bytes": 100402,
+      "sha256": "5166778c946eb97bc1dd9ec7c38ac9e11fd25a8e93ead2fc68ae80f4c1e91740",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/settings-account-light.png",
+      "title": "账号与同步",
+      "focus": "保留真实账号连接流程。",
+      "width": 1280,
+      "height": 820,
+      "bytes": 80706,
+      "sha256": "0da0d8fd42a3cf72c145d51f94e82a75d9614bfcb7bb34f0c6c01c1fa9d03b1d",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/settings-enhance-light.png",
+      "title": "书签增强",
+      "focus": "集中显示扫描状态与操作。",
+      "width": 1280,
+      "height": 820,
+      "bytes": 83442,
+      "sha256": "9e23f94e73e8ef5f72b1ca5df0fb0f1a7e175fe1817c19006e2f03fdb4476bf5",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/settings-activity-light.png",
+      "title": "最近动作",
+      "focus": "动作记录与撤销入口保留。",
+      "width": 1280,
+      "height": 820,
+      "bytes": 89605,
+      "sha256": "1c6259ff35da135e3e04f0be3e12a6932d7e98607619ebe30b9e201c95ab89b8",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/settings-data-light.png",
+      "title": "数据与帮助",
+      "focus": "备份、隐私和使用引导集中管理。",
+      "width": 1280,
+      "height": 820,
+      "bytes": 97894,
+      "sha256": "833478c13651dcd2ad1090bbc5c9cb0799890af028275c7bcff1549878c863c8",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/settings-mobile-light.png",
+      "title": "窄窗设置 · 日间",
+      "focus": "320px 窗口使用分类选择器。",
+      "width": 320,
+      "height": 640,
+      "bytes": 45063,
+      "sha256": "f0a0e4e53b29b21f8197463e52e1c0a19bb902e85c25c21497a8c5aa11d8efb4",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/settings-mobile-dark.png",
+      "title": "窄窗设置 · 夜间",
+      "focus": "当前分类独立滚动，窗口不横向溢出。",
+      "width": 320,
+      "height": 640,
+      "bytes": 43959,
+      "sha256": "b0e0cc7e70e36bb6d21d303c2ccc47ea250ff9be8f879f9eeda285c6dec0551e",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/library-two-sections.png",
+      "title": "完整收藏库",
+      "focus": "主导航只保留收藏库与主题图谱。",
+      "width": 1280,
+      "height": 820,
+      "bytes": 177025,
+      "sha256": "a1b2b5b1ec876f6d48f2b2f20cbd59f7be3d925e472f4b78c539c84665827a6c",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    },
+    {
+      "file": "final/topics.png",
+      "title": "主题图谱",
+      "focus": "主题列表和图形浏览继续保留。",
+      "width": 1280,
+      "height": 820,
+      "bytes": 138517,
+      "sha256": "e432fa1468d4dae596553d241507e9c883b1a18b472a7c11833e2ff20e091328",
+      "review": "Checked with image viewer, individually or in labeled contact sheets; no observed unintended clipping or layout overflow."
+    }
+  ]
+}

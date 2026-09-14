@@ -1,5 +1,7 @@
+import { TopicDirectory } from "../components/TopicDirectory";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
+  ResourceRecord,
   KnowledgeDashboard,
   TopicGraph,
   TopicGraphNode,
@@ -528,16 +530,14 @@ function TopicGraphCanvas({
         if (!labelled.has(point.index) && !emphasized && !isolated) {
           continue;
         }
-        const depthWeight = nearness(point.z);
         const dimmed = hoverIndex >= 0 && !neighbours.has(node.id);
+        if (dimmed && !emphasized) continue;
         const radius = screenRadius(node.count, point.scale);
         context.font = `${emphasized ? 650 : 400} ${(
-          10.5 * Math.min(1.15, point.scale)
+          Math.max(11, 12 * Math.min(1.15, point.scale))
         ).toFixed(1)}px ${tokens.font}`;
-        context.fillStyle = withAlpha(
-          emphasized ? tokens.ink : tokens.inkMuted,
-          dimmed ? 0.12 : 0.24 + depthWeight * 0.76,
-        );
+        // Depth belongs to the nodes; visible labels retain readable size and contrast.
+        context.fillStyle = emphasized ? tokens.ink : tokens.inkMuted;
         context.fillText(node.label, point.x, point.y + radius + 5);
       }
     }
@@ -720,9 +720,11 @@ function InsightRows({
 }
 
 export function TopicsView({
-  dashboard,
+  dashboard, resources = [], onOpenResource = (url) => { window.open(url, "_blank", "noopener"); },
 }: {
   dashboard: KnowledgeDashboard | null;
+  resources?: ResourceRecord[];
+  onOpenResource?: (url: string) => void;
 }) {
   const graph = dashboard?.topicGraph;
   const analysis = useMemo(
@@ -746,6 +748,7 @@ export function TopicsView({
 
   return (
     <section className="topic-graph-shell">
+      <TopicDirectory graph={graph} resources={resources} onOpenResource={onOpenResource}/>
       <TopicGraphCanvas graph={graph} analysis={analysis} />
       <div className="topic-insights">
         <section>

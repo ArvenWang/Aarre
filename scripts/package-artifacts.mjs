@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
-import { cp, mkdir, readFile } from "node:fs/promises";
+import { cp, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,7 +26,8 @@ const baseName = `Bookmark-Layer-${version}`;
 const unpackedDirectory = resolve(outputsDirectory, `${baseName}-unpacked`);
 const extensionZip = resolve(outputsDirectory, `${baseName}.zip`);
 const sourceZip = resolve(outputsDirectory, `${baseName}-source.zip`);
-const targets = [unpackedDirectory, extensionZip, sourceZip];
+const buildManifest = resolve(outputsDirectory, `${baseName}-build.json`);
+const targets = [unpackedDirectory, extensionZip, sourceZip, buildManifest];
 const existingTargets = targets.filter(existsSync);
 
 if (existingTargets.length) {
@@ -82,4 +84,37 @@ if (packagedManifest.version !== version) {
 run("unzip", ["-t", extensionZip]);
 run("unzip", ["-t", sourceZip]);
 
-console.log(`已生成并校验 ${baseName} 的扩展包、解压目录和源码包。`);
+async function fileRecord(path, base = outputsDirectory) {
+  const data = await readFile(path);
+  return {
+    path: path.slice(base.length + 1),
+    bytes: data.byteLength,
+    sha256: createHash("sha256").update(data).digest("hex")
+  };
+}
+async function directoryRecords(directory) {
+  const records = [];
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const path = resolve(directory, entry.name);
+    if (entry.isDirectory()) records.push(...await directoryRecords(path));
+    else records.push(await fileRecord(path));
+  }
+  return records.sort((left, right) => left.path.localeCompare(right.path));
+}
+await writeFile(buildManifest, JSON.stringify({
+  product: "Aarre",
+  version,
+  sourceCommit: run("git", ["rev-parse", "HEAD"]).trim(),
+  sourceTree: run("git", ["rev-parse", "HEAD^{tree}"]).trim(),
+  cleanSource: true,
+  builtAt: (await stat(resolve(distDirectory, "manifest.json"))).mtime.toISOString(),
+  packagedAt: new Date().toISOString(),
+  minimumChromeVersion: manifest.minimum_chrome_version,
+  files: [
+    ...await directoryRecords(unpackedDirectory),
+    await fileRecord(extensionZip),
+    await fileRecord(sourceZip)
+  ]
+}, null, 2) + "\n");
+
+console.log(`已生成并校验 ${baseName} 的扩展包、解压目录、源码包与 SHA-256 构建清单。`);

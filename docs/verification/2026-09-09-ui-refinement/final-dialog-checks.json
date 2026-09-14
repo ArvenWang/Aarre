@@ -1,0 +1,73 @@
+{
+  "direct": {
+    "dialogs": 1,
+    "inert": false
+  },
+  "reopened": {
+    "dialogs": 1,
+    "inert": false
+  },
+  "top": {
+    "viewport": 420,
+    "pageWidth": 420,
+    "gap": 20,
+    "bodyWidth": 402,
+    "bodyScrollWidth": 402,
+    "bodyHeight": 598,
+    "bodyScrollHeight": 673,
+    "footerTop": 731,
+    "footerBottom": 807,
+    "windowHeight": 820,
+    "buttons": [
+      {
+        "text": "删除",
+        "visible": true,
+        "left": 25,
+        "right": 75
+      },
+      {
+        "text": "取消",
+        "visible": true,
+        "left": 261,
+        "right": 311
+      },
+      {
+        "text": "保存修改",
+        "visible": true,
+        "left": 319,
+        "right": 395
+      }
+    ],
+    "bars": 1
+  },
+  "narrow": {
+    "viewport": 320,
+    "pageWidth": 320,
+    "gap": 20,
+    "bodyWidth": 302,
+    "bodyScrollWidth": 302,
+    "bodyHeight": 374,
+    "bodyScrollHeight": 729,
+    "footerTop": 507,
+    "footerBottom": 627,
+    "windowHeight": 640,
+    "buttons": [
+      {
+        "text": "取消",
+        "visible": true,
+        "left": 219,
+        "right": 269
+      },
+      {
+        "text": "确认删除",
+        "visible": true,
+        "left": 219,
+        "right": 295
+      }
+    ],
+    "bars": 1
+  },
+  "focusInside": true,
+  "deleteEscapeReturnedToEditor": true,
+  "secondEscapeClosed": true
+}

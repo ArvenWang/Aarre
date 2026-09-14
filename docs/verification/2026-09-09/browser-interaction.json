@@ -1,0 +1,49 @@
+{
+  "scope": "Ego browser, production host/UI with DEV Chrome API fixtures; not installed Chrome",
+  "checks": [
+    {
+      "name": "20 warm reopen cycles",
+      "hostCount": 1,
+      "sameIframe": true,
+      "samples": 20,
+      "p95Ms": 57.09999996423721
+    },
+    {
+      "name": "search retained after close",
+      "value": "不存在的验收关键词"
+    },
+    {
+      "name": "capture acknowledged",
+      "ack": {
+        "ok": true,
+        "lease": "qa-clean-capture"
+      },
+      "visibility": "hidden"
+    },
+    {
+      "name": "host reinserted after SPA removal",
+      "hosts": 1,
+      "ready": true
+    },
+    {
+      "name": "SPA removal rechecked against old iframe reference",
+      "hosts": 1,
+      "newIframeLoaded": true,
+      "ready": true
+    },
+    {
+      "name": "prefers reduced motion actual styles",
+      "hostReduced": true,
+      "frameReduced": true,
+      "ballTransition": "0s",
+      "buttonTransition": "0.16s, 0.16s"
+    },
+    {
+      "name": "Reduced motion after specificity correction",
+      "hostReduced": true,
+      "frameReduced": true,
+      "ballTransition": "0s",
+      "buttonTransition": "1e-05s"
+    }
+  ]
+}

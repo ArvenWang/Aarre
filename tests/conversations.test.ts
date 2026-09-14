@@ -72,7 +72,7 @@ describe("agent conversations", () => {
     expect(await getAgentConversations()).toEqual([]);
   });
 
-  it("keeps the 50 most recently updated conversations", async () => {
+  it("preserves older conversations instead of silently deleting them", async () => {
     for (let index = 0; index < 51; index += 1) {
       await saveAgentConversation(
         conversation(
@@ -85,11 +85,11 @@ describe("agent conversations", () => {
     }
 
     const saved = await getAgentConversations();
-    expect(saved).toHaveLength(50);
+    expect(saved).toHaveLength(51);
     expect(saved[0]?.id).toBe("conversation-50");
     expect(
       saved.some((item) => item.id === "conversation-0")
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("ignores corrupted stored messages instead of crashing the chat UI", async () => {

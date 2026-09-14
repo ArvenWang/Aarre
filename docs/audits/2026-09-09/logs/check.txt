@@ -1,0 +1,50 @@
+
+> bookmark-layer@0.5.73 check
+> npm run check:node && npm run check:design && npm run typecheck && npm run test && npm run build
+
+
+> bookmark-layer@0.5.73 check:node
+> node scripts/check-node.mjs
+
+
+> bookmark-layer@0.5.73 check:design
+> tsx scripts/check-design-tokens.ts
+
+设计 token 检查通过：9 个 CSS 文件与全部 tsx 无硬编码回归。
+
+> bookmark-layer@0.5.73 typecheck
+> tsc --noEmit
+
+
+> bookmark-layer@0.5.73 test
+> vitest run
+
+
+ RUN  v4.1.10 /Users/nefish/Desktop/Coding/Aarre
+
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+ ❯ tests/bookmark-undo.test.ts (3 tests | 1 failed) 9ms
+     × turns a Chrome folder removal event into one restorable subtree batch 7ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/bookmark-undo.test.ts > bookmark undo > turns a Chrome folder removal event into one restorable subtree batch
+Error: 这批更改已超过 30 天保留期，无法撤销。
+ ❯ undoBookmarkBatch src/lib/bookmark-undo.ts:310:11
+    308|   }
+    309|   if (Date.parse(batch.expiresAt) <= Date.now()) {
+    310|     throw new Error("这批更改已超过 30 天保留期，无法撤销。");
+       |           ^
+    311|   }
+    312|
+ ❯ tests/bookmark-undo.test.ts:99:28
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 86 passed (87)
+      Tests  1 failed | 450 passed (451)
+   Start at  12:27:00
+   Duration  4.70s (transform 3.89s, setup 0ms, import 8.19s, tests 4.28s, environment 15.63s)
+

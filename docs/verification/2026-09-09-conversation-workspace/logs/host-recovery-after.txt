@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /Users/nefish/Desktop/Coding/Aarre
+
+
+ Test Files  2 passed (2)
+      Tests  27 passed (27)
+   Start at  20:29:57
+   Duration  2.87s (transform 206ms, setup 56ms, import 195ms, tests 84ms, environment 2.55s)
+

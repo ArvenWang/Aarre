@@ -1,0 +1,16 @@
+[
+  {
+    "display": "grid",
+    "labelBottom": 498.234375,
+    "controlTop": 506.234375,
+    "controlWidth": 346,
+    "fieldWidth": 346
+  },
+  {
+    "display": "grid",
+    "labelBottom": 582.6328125,
+    "controlTop": 590.6328125,
+    "controlWidth": 346,
+    "fieldWidth": 346
+  }
+]

@@ -1,0 +1,35 @@
+
+ RUN  v4.1.11 /Users/nefish/Desktop/Coding/Aarre
+
+ ❯ tests/floating-host-recovery.integration.test.ts (2 tests | 1 failed) 79ms
+   × retains the live iframe after a slow first load recovers, so reopening does not discard the conversation 70ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/floating-host-recovery.integration.test.ts > retains the live iframe after a slow first load recovers, so reopening does not discard the conversation
+AssertionError: expected <iframe title="Aarre 收藏菜单" …(1)></iframe> to be <iframe title="Aarre 收藏菜单" …(1)></iframe> // Object.is equality
+
+If it should pass with deep equality, replace "toBe" with "toStrictEqual"
+
+Expected: <iframe title="Aarre 收藏菜单" …(1)></iframe>
+Received: serializes to the same string
+
+
+Compared values have no visual difference.
+
+ ❯ tests/floating-host-recovery.integration.test.ts:60:42
+     58|   expect(shadow.querySelector<HTMLElement>(".loading")!.hidden).toBe(t…
+     59|   await toggle(); await toggle();
+     60|   expect(shadow.querySelector("iframe")).toBe(frame);
+       |                                          ^
+     61| });
+     62|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  20:29:27
+   Duration  2.25s (transform 54ms, setup 20ms, import 16ms, tests 79ms, environment 1.96s)
+

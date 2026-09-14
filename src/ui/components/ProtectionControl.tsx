@@ -4,7 +4,7 @@ import {
   type ProtectionTarget,
 } from "../../lib/messages";
 import type { ItemProtectionState } from "../../lib/protection";
-import { Button } from "@/ui/components/ui/button";
+import { Switch } from "@/ui/components/ui/switch";
 
 interface ProtectionControlProps {
   target: ProtectionTarget;
@@ -100,20 +100,9 @@ export function ProtectionControl({
         <small>{protectionDescription(target, state)}</small>
         {error ? <small className="protection-control-error">{error}</small> : null}
       </div>
-      <Button
-        type="button"
-        variant="ghost"
-        size="unstyled"
-        className="protection-switch"
-        role="switch"
-        aria-checked={state?.protected === true}
-        aria-label={state?.protected ? "关闭受保护" : "开启受保护"}
-        disabled={unavailable}
-        data-state={state?.protected ? "checked" : "unchecked"}
-        onClick={() => void toggleProtection()}
-      >
-        <span aria-hidden="true" />
-      </Button>
+      <Switch checked={state?.protected === true} disabled={unavailable}
+        label={state?.protected ? "关闭受保护" : "开启受保护"}
+        onChange={() => void toggleProtection()} />
     </section>
   );
 }

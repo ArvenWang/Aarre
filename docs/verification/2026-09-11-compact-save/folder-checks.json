@@ -1,0 +1,46 @@
+{
+  "shortViewport": {
+    "width": 320,
+    "height": 380
+  },
+  "metrics": {
+    "popup": {
+      "x": 16,
+      "y": 195,
+      "width": 273,
+      "height": 149,
+      "top": 195,
+      "right": 289,
+      "bottom": 344,
+      "left": 16
+    },
+    "list": {
+      "x": 17,
+      "y": 196,
+      "width": 271,
+      "height": 147,
+      "top": 196,
+      "right": 288,
+      "bottom": 343,
+      "left": 17
+    },
+    "scrollTop": 157,
+    "scrollHeight": 304,
+    "clientHeight": 147,
+    "lastAction": {
+      "x": 21,
+      "y": 303,
+      "width": 263,
+      "height": 36,
+      "top": 303,
+      "right": 284,
+      "bottom": 339,
+      "left": 21
+    },
+    "overflowX": 0
+  },
+  "lastActionFullyVisible": true,
+  "escapeKeepsSaveForm": true,
+  "draftPreserved": true,
+  "newFolderFieldsOpenedAndCancelledWithoutWrite": true
+}

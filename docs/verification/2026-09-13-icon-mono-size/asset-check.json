@@ -1,0 +1,30 @@
+{
+  "darkPalette": [
+    "#000000",
+    "#F5F5F5",
+    "#F5F5F5",
+    "#F5F5F5"
+  ],
+  "figmaPathsUnchanged": true,
+  "publicAndDistIdentical": true,
+  "sharedModules": [
+    "contract.ts",
+    "geometry.ts",
+    "morph.ts",
+    "background.ts",
+    "parking.ts",
+    "client.ts",
+    "ui.ts"
+  ],
+  "iconSize": 36,
+  "buttonSize": 44,
+  "versions": {
+    "aarre": {
+      "version": "0.6.18"
+    },
+    "nexalign": {
+      "version": "0.1.0",
+      "version_name": "0.1.0 · 2a7bd4ac · 20260913T1325Z"
+    }
+  }
+}

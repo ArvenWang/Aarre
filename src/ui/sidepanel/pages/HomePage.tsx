@@ -1,3 +1,4 @@
+import { FloatingScrollbars } from "@/ui/components/ui/scroll-area";
 import { useEffect, type ComponentProps, type RefObject } from "react";
 import { Button } from "@/ui/components/ui/button";
 import type { ListCoverStyle } from "../../../lib/display-settings";
@@ -13,7 +14,6 @@ import { BookmarkEditorDialog } from "../components/BookmarkEditorDialog";
 import { BookmarkPreviewLayer } from "../components/BookmarkPreview";
 import { BookmarkTree } from "../components/BookmarkTree";
 import { LibraryHeader } from "../components/LibraryHeader";
-import { LibraryNotices } from "../components/LibraryNotices";
 import { RankedBookmarkResults, type RankedBookmarkResult } from "../components/RankedBookmarkResults";
 import { SearchBar } from "../components/SearchBar";
 
@@ -43,20 +43,11 @@ interface LibraryModel {
   onMove: (id: string, parentId: string, index?: number) => Promise<void>;
 }
 
-interface ScrollModel {
-  scrollable: boolean;
-  visible: boolean;
-  height: number;
-  offset: number;
-  atEnd: boolean;
-  onPointerDown: ComponentProps<"div">["onPointerDown"];
-  onPointerMove: ComponentProps<"div">["onPointerMove"];
-  onPointerEnd: ComponentProps<"div">["onPointerUp"];
-}
+interface ScrollModel { atEnd: boolean; }
 
 interface HomePageProps {
+  floating?: boolean;
   header: ComponentProps<typeof LibraryHeader>;
-  notices: ComponentProps<typeof LibraryNotices>;
   search: ComponentProps<typeof SearchBar>;
   library: LibraryModel;
   scroll: ScrollModel;
@@ -73,8 +64,8 @@ interface HomePageProps {
 }
 
 export default function HomePage({
+  floating,
   header,
-  notices,
   search,
   library,
   scroll,
@@ -83,7 +74,6 @@ export default function HomePage({
   agent,
   editor,
 }: HomePageProps) {
-  const content = library.contentRef.current;
 
   useEffect(() => {
     if (!status.notice) return;
@@ -99,8 +89,7 @@ export default function HomePage({
 
   return (
     <main className="native-panel">
-      <LibraryHeader {...header} />
-      <LibraryNotices {...notices} />
+      {!floating && <LibraryHeader {...header} />}
       <SearchBar {...search} />
       <div className="native-content-frame" data-has-folders={library.hasVisibleFolders} data-at-end={scroll.atEnd}>
         {status.error ? (
@@ -167,23 +156,7 @@ export default function HomePage({
             )
           ) : <div className="empty-state">正在读取 Chrome 书签…</div>}
         </section>
-        {scroll.scrollable ? (
-          <div
-            className="native-scroll-thumb"
-            data-visible={scroll.visible}
-            style={{ height: `${scroll.height}px`, transform: `translateY(${scroll.offset}px)` }}
-            role="scrollbar"
-            aria-controls="bookmark-list"
-            aria-orientation="vertical"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={content ? Math.round((content.scrollTop / Math.max(1, content.scrollHeight - content.clientHeight)) * 100) : 0}
-            onPointerDown={scroll.onPointerDown}
-            onPointerMove={scroll.onPointerMove}
-            onPointerUp={scroll.onPointerEnd}
-            onPointerCancel={scroll.onPointerEnd}
-          />
-        ) : null}
+        <FloatingScrollbars viewportRef={library.contentRef} label="Chrome 书签" />
       </div>
       {status.notice && !status.error ? (
         <div className="native-notice" role="status">
@@ -191,8 +164,8 @@ export default function HomePage({
         </div>
       ) : null}
       <BookmarkPreviewLayer {...preview} />
-      {agent ? <AgentComposer {...agent} /> : null}
-      <BookmarkEditorDialog {...editor} />
+      {agent && !floating ? <AgentComposer {...agent} /> : null}
+      {!floating && <BookmarkEditorDialog {...editor} />}
     </main>
   );
 }

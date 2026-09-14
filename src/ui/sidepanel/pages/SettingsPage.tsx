@@ -1,7 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { registerParkPreparation } from "../../../shared/suite-dock/parking";
+import { ScrollSurface } from "@/ui/components/ui/scroll-area";
+import { FloatingSettingsSection } from "../../floating/FloatingSettingsSection";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Accordion } from "@heroui/react/accordion";
 import "../../sidepanel-lazy.css";
 import { Button } from "@/ui/components/ui/button";
-import { ArrowLeftIcon, ChevronRightIcon } from "../../components/Icons";
+import { ArrowLeftIcon } from "../../components/Icons";
 import { getAiProviderPreset } from "../../../lib/settings";
 import {
   requestPageSnapshotPermission,
@@ -24,7 +28,15 @@ import type {
 } from "../../../lib/types";
 import type { CloudStorageUsage } from "../../../lib/cloud-settings";
 
+const SETTINGS_GROUPS = [
+  ["ai", "AI 服务"], ["appearance", "外观与快捷栏"], ["account", "账号与同步"],
+  ["enhance", "书签增强"], ["activity", "最近动作"], ["data", "数据与帮助"],
+] as const;
+type SettingsGroup = typeof SETTINGS_GROUPS[number][0];
+
 interface SettingsPageProps {
+  layout?: "manager" | "compact";
+  onAiConfiguredChange?: (configured: boolean) => void;
   appState: AppState | null;
   publicFaviconFallback: boolean;
   onPublicFaviconFallbackChange: (enabled: boolean) => void;
@@ -34,6 +46,8 @@ interface SettingsPageProps {
 }
 
 function SettingsPage({
+  layout = "compact",
+  onAiConfiguredChange,
   appState,
   publicFaviconFallback,
   onPublicFaviconFallbackChange,
@@ -66,9 +80,15 @@ function SettingsPage({
     tone: "error" | "success";
     message: string;
   } | null>(null);
-  // Everything that is read once and then never touched again lives on a
-  // second page, so the first screen stays at three decisions.
-  const [settingsPage, setSettingsPage] = useState<"main" | "more">("main");
+  useEffect(() => registerParkPreparation(() => {
+    if (action) throw new Error("设置操作仍在进行，完成后再切换应用。");
+    if (apiKey.trim() || (settings && (provider !== settings.provider || model !== settings.model))) {
+      const message = "AI 设置尚未保存，请先保存或还原，再切换应用。";
+      setProviderFeedback({ tone: "error", message });
+      throw new Error(message);
+    }
+  }), [action, apiKey, model, provider, settings]);
+  const contentRef = useRef<HTMLElement | null>(null);
   const backButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
@@ -131,6 +151,7 @@ function SettingsPage({
         },
       });
       setSettings(next);
+      onAiConfiguredChange?.(next.apiKeyConfigured);
       setProvider(next.provider);
       setModel(next.model);
       setApiKey("");
@@ -158,7 +179,7 @@ function SettingsPage({
       onAppStateChange(state);
       setCloudFeedback({
         tone: "success",
-        message: "账号已连接。云端恢复与同步会在后台继续，你可以继续使用侧边栏。",
+        message: "账号已连接。开启完整备份后，才会开始云端恢复与同步。",
       });
     } catch (caught) {
       setCloudFeedback({
@@ -299,118 +320,61 @@ function SettingsPage({
   }
 
   return (
-    <main className="native-panel native-settings-panel">
+    <main className="native-panel native-settings-panel" data-layout={layout}>
       <header className="settings-page-header">
-        <Button
-          ref={backButtonRef}
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className="icon-button settings-back-button"
-          aria-label={settingsPage === "more" ? "返回设置" : "返回我的书签"}
-          title="返回"
-          onClick={() => {
-            if (settingsPage === "more") {
-              setSettingsPage("main");
-              return;
-            }
-            onClose();
-          }}
-        >
+        <Button ref={backButtonRef} type="button" variant="ghost" size="icon-sm"
+          className="icon-button settings-back-button" aria-label="返回收藏" onClick={onClose}>
           <ArrowLeftIcon />
         </Button>
-        <div>
-          <h1>{settingsPage === "more" ? "最近动作" : "设置"}</h1>
-        </div>
+        <h1>设置</h1>
       </header>
-
-      <section className="settings-page-content">
-        {settingsPage === "main" ? (
-          <>
-
-            <AccountCloudSection
-              appState={appState}
-              action={action}
-              status={syncStatus}
-              usage={cloudUsage}
-              feedback={cloudFeedback}
-              onLogin={() => void handleLogin()}
-              onSignOut={() => void handleSignOut()}
-              onSync={() => void handleSyncNow()}
-            />
-
-            <AiServiceSection
-              settings={settings}
-              provider={provider}
-              model={model}
-              apiKey={apiKey}
-              action={action}
-              feedback={providerFeedback}
+      <div className="settings-workspace">
+        <ScrollSurface as="section" className="settings-page-content" ref={contentRef}>
+          <Accordion className="settings-drawers" defaultExpandedKeys={["ai"]} allowsMultipleExpanded={false}>
+          <SettingsDrawer id="ai">
+            <AiServiceSection settings={settings} provider={provider} model={model} apiKey={apiKey}
+              action={action} feedback={providerFeedback}
               onProviderChange={(nextProvider, nextModel) => {
-                setProvider(nextProvider);
-                setModel(nextModel);
-                setApiKey("");
-                setProviderFeedback(null);
-              }}
-              onApiKeyChange={setApiKey}
-              onSubmit={() => void saveApiSettings()}
-            />
-
-            <DisplaySettingsSection
-              publicFaviconFallback={publicFaviconFallback}
-              disabled={Boolean(action)}
-              onPublicFaviconFallbackChange={(enabled) =>
-                void handlePublicFaviconFallback(enabled)
-              }
-            />
-
-            <LibraryScanSection
-              appState={appState}
-              settings={settings}
-              action={action}
-              feedback={scanFeedback}
-              onAction={(intent) => void handleLibraryScan(intent)}
-            />
-
-            <section className="settings-section settings-more-entry" aria-label="更多设置">
-              <Button
-                type="button"
-                variant="ghost"
-                size="unstyled"
-                className="settings-more-button"
-                onClick={() => {
-                  setSettingsPage("more");
-                }}
-              >
-                <span>
-                  <strong>最近动作</strong>
-                </span>
-                <ChevronRightIcon />
-              </Button>
+                setProvider(nextProvider); setModel(nextModel); setApiKey(""); setProviderFeedback(null);
+              }} onApiKeyChange={setApiKey} onSubmit={() => void saveApiSettings()} />
+          </SettingsDrawer>
+          <SettingsDrawer id="appearance">
+            <DisplaySettingsSection publicFaviconFallback={publicFaviconFallback} disabled={Boolean(action)}
+              onPublicFaviconFallbackChange={(enabled) => void handlePublicFaviconFallback(enabled)} />
+            <FloatingSettingsSection />
+          </SettingsDrawer>
+          <SettingsDrawer id="account">
+            <AccountCloudSection appState={appState} action={action} status={syncStatus} usage={cloudUsage}
+              feedback={cloudFeedback} onLogin={() => void handleLogin()}
+              onSignOut={() => void handleSignOut()} onSync={() => void handleSyncNow()} />
+          </SettingsDrawer>
+          <SettingsDrawer id="enhance">
+            <LibraryScanSection appState={appState} settings={settings} action={action}
+              feedback={scanFeedback} onAction={(intent) => void handleLibraryScan(intent)} />
+          </SettingsDrawer>
+          <SettingsDrawer id="activity">
+            <SettingsMoreContent action={action} undoBatches={undoBatches}
+              onUndo={(batchId) => void handleUndoBatch(batchId)} />
+          </SettingsDrawer>
+          <SettingsDrawer id="data">
+            <section className="settings-section settings-data-links">
               <div className="settings-link-row">
-                <strong>首次使用引导</strong>
-                <Button variant="tertiary" size="sm" type="button" onClick={onRestartOnboarding}>
-                  重新查看
-                </Button>
+                <div><strong>本地备份与恢复</strong><small>导出收藏副本，或从备份恢复。</small></div>
+                <Button variant="tertiary" size="sm" asChild><a href={chrome.runtime.getURL("manager.html?archive=1")} target="_blank" rel="noreferrer">打开</a></Button>
               </div>
               <div className="settings-link-row">
-                <strong>隐私与数据</strong>
-                <Button variant="tertiary" size="sm" asChild>
-                  <a href={chrome.runtime.getURL("privacy.html")} target="_blank" rel="noreferrer">
-                    查看
-                  </a>
-                </Button>
+                <div><strong>隐私与数据</strong><small>了解收藏、AI 与同步的数据使用方式。</small></div>
+                <Button variant="tertiary" size="sm" asChild><a href={chrome.runtime.getURL("privacy.html")} target="_blank" rel="noreferrer">查看</a></Button>
+              </div>
+              <div className="settings-link-row">
+                <div><strong>首次使用引导</strong><small>重新了解 Aarre 的使用方式。</small></div>
+                <Button variant="tertiary" size="sm" type="button" onClick={onRestartOnboarding}>重新查看</Button>
               </div>
             </section>
-          </>
-        ) : (
-          <SettingsMoreContent
-            action={action}
-            undoBatches={undoBatches}
-            onUndo={(batchId) => void handleUndoBatch(batchId)}
-          />
-        )}
-      </section>
+          </SettingsDrawer>
+          </Accordion>
+        </ScrollSurface>
+      </div>
 
       <LibraryScanConfirmDialog
         estimate={scanEstimate}
@@ -422,5 +386,19 @@ function SettingsPage({
   );
 }
 
+
+function SettingsDrawer({ id, children }: { id: SettingsGroup; children: ReactNode }) {
+  const label = SETTINGS_GROUPS.find(([key]) => key === id)![1];
+  return <Accordion.Item id={id} className="settings-drawer">
+    <Accordion.Heading className="settings-drawer-heading">
+      <Accordion.Trigger className="settings-drawer-trigger">
+        <span>{label}</span><Accordion.Indicator />
+      </Accordion.Trigger>
+    </Accordion.Heading>
+    <Accordion.Panel className="settings-group-panel" aria-label={label}>
+      <div className="settings-drawer-content">{children}</div>
+    </Accordion.Panel>
+  </Accordion.Item>;
+}
 
 export default SettingsPage;

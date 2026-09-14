@@ -487,7 +487,7 @@ async function navigate(
     if (disposition === "new") {
       await createNavigationTab(parsed.url, openedFromAarre);
     } else {
-      const tab = await activeTab();
+      const tab = input.sourceTabId ? await chrome.tabs.get(input.sourceTabId) : await activeTab();
       if (tab?.id) {
         const resource = openedFromAarre
           ? await bookmarkedResourceForLoadedUrl(parsed.url)

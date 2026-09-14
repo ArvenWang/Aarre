@@ -1,3 +1,7 @@
+import { getCloudSyncSettings } from "./cloud-settings";
+import { cloudOwner } from "./cloud-owner";
+import { readCloudResourceTracking } from "./cloud-resource-store";
+import { commitDownloadedAsset } from "./cloud-asset-restore";
 import { cloudRequest } from "./auth";
 import { pinnedBrandAssetNeedsRefresh } from "./cover-rules";
 import {
@@ -12,12 +16,9 @@ import {
   getPageSnapshots,
   getSiteBrand,
   getSiteBrands,
-  putSiteBrand,
-  upsertLocalResource
 } from "./storage";
-import { putCoverSnapshot, putCoverVisual } from "./visuals";
 import { SITE_ICON_RENDER_VERSION } from "./thumbnail";
-import type { PageSnapshot, ResourceRecord, SiteBrandRecord } from "./types";
+import type { ResourceRecord } from "./types";
 import { resourceKeyForUrl } from "./url";
 
 const CLOUD_ASSET_STATE_KEY = "aarre:cloud-asset-state:v1";
@@ -30,7 +31,7 @@ interface CloudAssetStateEntry {
 
 type CloudAssetState = Record<string, CloudAssetStateEntry>;
 
-interface CloudAssetDescriptor {
+export interface CloudAssetDescriptor {
   assetId: string;
   resourceKey: string;
   kind: "cover" | "snapshot" | "site-icon" | "user-cover";
@@ -194,7 +195,12 @@ export async function clearCloudAssetSyncState(): Promise<void> {
   await chrome.storage.local.remove(CLOUD_ASSET_STATE_KEY);
 }
 
+async function requireAssetConsent(owner?: string) {
+  if (!(await getCloudSyncSettings()).enabled || (owner && await cloudOwner() !== owner)) throw new Error("完整备份未开启或账号已变化，图片仍保留在本机。");
+}
+
 async function uploadAsset(input: {
+  owner?: string;
   identity: string;
   resourceKey: string;
   kind: CloudAssetDescriptor["kind"];
@@ -210,22 +216,37 @@ async function uploadAsset(input: {
     coverOrigin?: "user" | "auto";
   };
   state: CloudAssetState;
+  previousState?: CloudAssetState;
+  remote?: CloudAssetDescriptor;
+  expectedHash?: string;
+  writePreconditions?: boolean;
 }): Promise<boolean> {
   const { bytes, mimeType } = dataUrlBytes(input.dataUrl);
   const digest = await sha256(bytes);
   if (!cloudAssetNeedsUpload(input.state, input.identity, digest)) return false;
+  // Old releases hashed the data-URL text for hand-picked covers. Recognize that format
+  // during migration, but never associate unrelated cached bytes with new metadata.
+  if (input.expectedHash && input.expectedHash !== digest &&
+      input.expectedHash !== await sha256(new TextEncoder().encode(input.dataUrl))) return false;
+  const previous = input.previousState?.[input.identity];
+  const remote = input.remote;
+  if (remote && (previous?.sha256 === digest ||
+      (remote.capturedAt && (!input.capturedAt || Date.parse(remote.capturedAt) > Date.parse(input.capturedAt))))) return false;
   // assetId 标识「哪个资源的哪类图」这个槽位，与图片内容无关。
   // 一旦把内容哈希编进来，换封面就会生成新 assetId，云端既积压孤儿资产，
   // 又会因为同一资源绑定了两个 id 而彼此覆盖。
   const assetId = await stableAssetId(input.identity);
+  await requireAssetConsent(input.owner);
   const upload = await cloudRequest<{
     uploadUrl: string;
+    uploadId?: string;
     headers: Record<string, string>;
   }>("/v1/assets/upload", {
     method: "POST",
     body: JSON.stringify({
       assetId,
       operationId: crypto.randomUUID(),
+      ...(input.writePreconditions ? { baseRevision: input.state[input.identity]?.revision || 0 } : {}),
       resourceKey: input.resourceKey,
       kind: input.kind,
       sha256: digest,
@@ -236,9 +257,10 @@ async function uploadAsset(input: {
       capturedAt: input.capturedAt,
       binding: input.binding
     })
-  });
+  }, input.owner);
   const headers = new Headers(upload.headers);
   headers.delete("content-length");
+  await requireAssetConsent(input.owner);
   const response = await fetch(upload.uploadUrl, {
     method: "PUT",
     headers,
@@ -246,12 +268,13 @@ async function uploadAsset(input: {
     signal: AbortSignal.timeout(60_000)
   });
   if (!response.ok) throw new Error(`图片上传失败（${response.status}）。`);
+  await requireAssetConsent(input.owner);
   const completed = await cloudRequest<{ revision: number }>(
     `/v1/assets/${assetId}/complete`,
     {
       method: "POST",
-      body: JSON.stringify({ operationId: crypto.randomUUID() })
-    }
+      body: JSON.stringify({ operationId: crypto.randomUUID(), ...(upload.uploadId ? { uploadId: upload.uploadId, sha256: digest } : {}) })
+    }, input.owner
   );
   input.state[input.identity] = { assetId, sha256: digest, revision: completed.revision };
   return true;
@@ -263,6 +286,8 @@ export async function syncCloudAssets(maxUploads = 12): Promise<{
   total: number;
   remaining: boolean;
 }> {
+  const owner = await cloudOwner();
+  await requireAssetConsent(owner);
   const [resources, snapshots, brands, protectionSettings, tree, storedState] = await Promise.all([
     getLocalResources(),
     getPageSnapshots(),
@@ -273,8 +298,12 @@ export async function syncCloudAssets(maxUploads = 12): Promise<{
   ]);
   // 云端 active 列表才是当前账号的权威上传状态。登录流程会清理本机追踪，
   // 这里必须从远端哈希重新建账；否则退出后登录同一账号会重传全部图片。
-  const remoteAssets = await cloudRequest<{ assets: CloudAssetDescriptor[] }>("/v1/assets");
+  const remoteAssets = await cloudRequest<{ assets: CloudAssetDescriptor[]; writePreconditions?: boolean }>("/v1/assets");
   const state = reconcileCloudAssetState(storedState, remoteAssets.assets);
+  const remoteByIdentity = new Map(remoteAssets.assets.map((asset) => [cloudAssetIdentity(asset), asset]));
+  const uploadContext = (identity: string) => ({
+    owner, state, previousState: storedState, remote: remoteByIdentity.get(identity), writePreconditions: remoteAssets.writePreconditions,
+  });
   const policy = buildProtectionPolicy(tree, protectionSettings);
   const unprotected = resources.filter(
     (resource) => resource.nativeBookmarkIds.length && !isResourceUserProtected(resource, policy)
@@ -299,12 +328,13 @@ export async function syncCloudAssets(maxUploads = 12): Promise<{
       resourceKey: resource.resourceKey,
       kind: "cover",
       dataUrl: resource.thumbnailDataUrl!,
+      expectedHash: resource.coverContentHash,
       capturedAt: resource.coverUpdatedAt,
       binding: {
         canonicalUrl: resource.canonicalUrl,
         ...(resource.coverOrigin ? { coverOrigin: resource.coverOrigin } : {})
       },
-      state
+      ...uploadContext(`cover:${resource.resourceKey}`)
     }));
   }
   for (const snapshot of snapshots) {
@@ -318,8 +348,8 @@ export async function syncCloudAssets(maxUploads = 12): Promise<{
       width: snapshot.width,
       height: snapshot.height,
       capturedAt: snapshot.capturedAt,
-      binding: { canonicalUrl: snapshot.canonicalUrl },
-      state
+      binding: { canonicalUrl: snapshot.canonicalUrl, coverOrigin: resourcesByKey.get(resourceKey)?.coverOrigin || "auto" },
+      ...uploadContext(`snapshot:${resourceKey}`)
     }));
   }
   for (const brand of brands) {
@@ -339,12 +369,13 @@ export async function syncCloudAssets(maxUploads = 12): Promise<{
       dataUrl: icon,
       width: brand.nativeWidth,
       height: brand.nativeHeight,
+      capturedAt: brand.updatedAt,
       binding: {
         host: brand.host,
         iconRenderVersion: SITE_ICON_RENDER_VERSION,
         ...(brand.iconAssetUrl ? { iconAssetUrl: brand.iconAssetUrl } : {}),
       },
-      state
+      ...uploadContext(`site-icon:${brand.host}`)
     }));
   }
 
@@ -385,6 +416,7 @@ export async function restoreCloudAssets(maxDownloads = 24): Promise<{
   total: number;
   remaining: boolean;
 }> {
+  const tracking = await readCloudResourceTracking();
   const response = await cloudRequest<{ assets: CloudAssetDescriptor[] }>("/v1/assets");
   const state = await readState();
   let restored = 0;
@@ -403,7 +435,8 @@ export async function restoreCloudAssets(maxDownloads = 24): Promise<{
         : null;
       if (
         localBrand?.iconDataUrl &&
-        localBrand.iconRenderVersion === SITE_ICON_RENDER_VERSION
+        localBrand.iconRenderVersion === SITE_ICON_RENDER_VERSION &&
+        await dataUrlMatchesSha256(localBrand.iconDataUrl, asset.sha256)
       ) {
         inspected += 1;
         continue;
@@ -421,8 +454,7 @@ export async function restoreCloudAssets(maxDownloads = 24): Promise<{
       const localResource = await getLocalResource(asset.resourceKey);
       if (
         localResource?.thumbnailDataUrl &&
-        (localResource.coverContentHash === asset.sha256 ||
-          await dataUrlMatchesSha256(localResource.thumbnailDataUrl, asset.sha256))
+        await dataUrlMatchesSha256(localResource.thumbnailDataUrl, asset.sha256)
       ) {
         inspected += 1;
         continue;
@@ -430,83 +462,8 @@ export async function restoreCloudAssets(maxDownloads = 24): Promise<{
     }
     const bytes = await downloadAsset(asset);
     const dataUrl = bytesDataUrl(bytes, asset.mimeType);
-    if (asset.kind === "snapshot" && asset.binding?.canonicalUrl) {
-      const resource = await getLocalResource(asset.resourceKey);
-      if (!resource) {
-        inspected += 1;
-        continue;
-      }
-      const remoteOrigin = asset.binding.coverOrigin === "user" ? "user" : "auto";
-      const snapshot: PageSnapshot = {
-        canonicalUrl: asset.binding.canonicalUrl,
-        imageDataUrl: dataUrl,
-        capturedAt: asset.capturedAt || new Date().toISOString(),
-        width: asset.width || 1,
-        height: asset.height || 1
-      };
-      await putCoverSnapshot(resource, snapshot, remoteOrigin, {
-        source: "cloud-snapshot",
-        contentHash: asset.sha256
-      });
-    } else if (asset.kind === "site-icon" && asset.binding?.host) {
-      const existing = await getSiteBrand(asset.binding.host);
-      const brand: SiteBrandRecord = {
-        ...(existing || { host: asset.binding.host }),
-        host: asset.binding.host,
-        iconDataUrl: dataUrl,
-        iconDataUrlLight: dataUrl,
-        // 云端图标字节始终有效：恢复时直接使用当前渲染版本，
-        // 不因云端 binding 的旧版本号而拒绝恢复，避免版本升级后
-        // 本地图标被清空又无法从云端拉回。
-        iconRenderVersion: SITE_ICON_RENDER_VERSION,
-        iconAssetUrl: asset.binding.iconAssetUrl,
-        updatedAt: new Date().toISOString()
-      };
-      await putSiteBrand(brand);
-    } else if (asset.kind === "cover" || asset.kind === "user-cover") {
-      const resource = await getLocalResource(asset.resourceKey);
-      if (resource) {
-        const remoteIsUserCover =
-          asset.kind === "user-cover" || asset.binding?.coverOrigin === "user";
-        // 按内容哈希而不是时间戳判断是否需要写入。上传方曾长期不带 capturedAt，
-        // 用时间比较会让本地任何封面都「不早于云端」，导致下载被永远跳过。
-        const sameContent =
-          Boolean(resource.thumbnailDataUrl) &&
-          resource.coverContentHash === asset.sha256;
-        // 用户手动指定的封面不接受自动采集封面的覆盖。
-        const localUserCoverWins =
-          Boolean(resource.thumbnailDataUrl) &&
-          resource.coverOrigin === "user" &&
-          !remoteIsUserCover;
-        if (sameContent || localUserCoverWins) {
-          inspected += 1;
-          continue;
-        }
-        const nextOrigin = remoteIsUserCover ? "user" : resource.coverOrigin || "auto";
-        const visualStored = await putCoverVisual({
-          resource,
-          dataUrl,
-          width: asset.width || 0,
-          height: asset.height || 0,
-          origin: nextOrigin,
-          source: "cloud-cover",
-          contentHash: asset.sha256,
-          updatedAt: asset.capturedAt || new Date().toISOString()
-        });
-        if (!visualStored) {
-          inspected += 1;
-          continue;
-        }
-        await upsertLocalResource({
-          ...resource,
-          thumbnailDataUrl: dataUrl,
-          coverContentHash: asset.sha256,
-          coverOrigin: nextOrigin,
-          coverUpdatedAt:
-            asset.capturedAt || resource.coverUpdatedAt || new Date().toISOString()
-        });
-      }
-    }
+    const applied = await commitDownloadedAsset(asset, dataUrl, tracking.generation);
+    if (!applied) { inspected += 1; continue; }
     state[identity] = { assetId: asset.assetId, sha256: asset.sha256, revision: asset.revision };
     restored += 1;
     inspected += 1;

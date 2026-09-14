@@ -1,10 +1,9 @@
+import { ScrollSurface } from "@/ui/components/ui/scroll-area";
 import React, { Fragment, useEffect, useRef } from "react";
 import "../../sidepanel-lazy.css";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { AgentMarkdown } from "../components/AgentMarkdown";
 import { Button } from "@/ui/components/ui/button";
 import { Checkbox } from "@/ui/components/ui/checkbox";
-import { registrableHost } from "../../../lib/cover-registry";
 import { canonicalizeUrl } from "../../../lib/url";
 import { currentSiteBrandImageUrl } from "../../../lib/thumbnail";
 import type {
@@ -18,59 +17,11 @@ import { ArrowLeftIcon, CloseIcon } from "../../components/Icons";
 import { SiteThumbnail } from "../../components/SiteThumbnail";
 import { AgentComposer } from "../components/AgentComposer";
 import { AgentThinkingSteps } from "../components/AgentThinkingSteps";
-import { bookmarkSourceForUrl } from "../bookmark-link";
+import { ChevronDown, SquarePen } from "lucide-react";
+import { resourceForUrl, siteBrandForUrl } from "../bookmark-link";
 import { hostFromUrl } from "../utils";
 
-export function AgentMarkdown({
-  content,
-  resourceByUrl,
-  siteBrandByHost,
-  sources,
-}: {
-  content: string;
-  resourceByUrl: Map<string, ResourceRecord>;
-  siteBrandByHost: Map<string, SiteBrandRecord>;
-  sources?: BookmarkAgentSource[];
-}) {
-  return (
-    <div className="agent-markdown">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
-            const resource = href ? resourceForUrl(resourceByUrl, href) : undefined;
-            const source = href ? bookmarkSourceForUrl(sources, href) : undefined;
-            const bookmarkUrl = resource?.url || source?.url;
-            if (!bookmarkUrl) {
-              return <a href={href} target="_blank" rel="noreferrer noopener">{children}</a>;
-            }
-            const bookmarkTitle = resource?.title || source?.title || bookmarkUrl;
-            return (
-              <a className="agent-inline-source" href={bookmarkUrl} target="_blank" rel="noreferrer noopener" title={bookmarkTitle}>
-                <SiteThumbnail
-                  url={bookmarkUrl}
-                  imageUrl={resource?.thumbnailDataUrl}
-                  brandImageUrl={
-                    currentSiteBrandImageUrl(
-                      siteBrandForUrl(siteBrandByHost, bookmarkUrl),
-                    ) || source?.faviconUrl
-                  }
-                  categoryCoverId={resource?.categoryCoverId}
-                  forceSiteBrand
-                  label={resource?.siteName || source?.siteName || bookmarkTitle}
-                  className="agent-inline-source-thumbnail"
-                />
-                <span>{children}</span>
-              </a>
-            );
-          }
-        }}
-      >
-        {content}
-      </ReactMarkdown>
-    </div>
-  );
-}
+export { AgentMarkdown } from "../components/AgentMarkdown";
 
 function sourceIsCited(content: string, source: BookmarkAgentSource): boolean {
   if (content.includes(source.url)) return true;
@@ -92,18 +43,6 @@ function uncitedSources(
   return (sources || []).filter((source) => !sourceIsCited(content, source));
 }
 
-function resourceForUrl(resourceByUrl: Map<string, ResourceRecord>, url: string) {
-  const direct = resourceByUrl.get(url);
-  if (direct) return direct;
-  try { return resourceByUrl.get(canonicalizeUrl(url)); } catch { return undefined; }
-}
-
-function siteBrandForUrl(siteBrandByHost: Map<string, SiteBrandRecord>, input: string) {
-  try {
-    const host = new URL(input).hostname.toLocaleLowerCase();
-    return siteBrandByHost.get(host) || siteBrandByHost.get(registrableHost(host));
-  } catch { return undefined; }
-}
 function conversationDate(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
@@ -146,6 +85,7 @@ function agentActionCardTitle(actions: BookmarkAgentActionProposal[]): string {
 }
 
 interface AgentChatPageProps {
+  embedded?: boolean;
   conversation: AgentConversation;
   resourceByUrl: Map<string, ResourceRecord>;
   siteBrandByHost: Map<string, SiteBrandRecord>;
@@ -170,6 +110,7 @@ interface AgentChatPageProps {
 }
 
 function AgentChatPage({
+  embedded = false,
   conversation,
   resourceByUrl,
   siteBrandByHost,
@@ -205,7 +146,7 @@ function AgentChatPage({
 
   return (
     <main className="native-panel agent-chat-panel">
-      <header className="agent-page-header">
+      {!embedded && <header className="agent-page-header">
         <Button
           type="button"
           variant="ghost"
@@ -220,8 +161,19 @@ function AgentChatPage({
         <div>
           <h1>收藏对话</h1>
         </div>
-      </header>
-      <section className="agent-thread" aria-live="polite">
+      </header>}
+      <ScrollSurface as="section" className="agent-thread" aria-live="polite">
+        {!embedded && !conversation.messages.length && !busy && !error ? (
+          <div className="agent-chat-welcome">
+            <h2>和你的收藏聊聊</h2>
+            <p>找回读过的资料，串联相关主题，或预览一份整理建议。</p>
+            {configured ? (
+              <Button variant="secondary" onClick={() => onPromptChange("帮我概括收藏中的主要主题，并为每个主题推荐几条值得重读的资料。")}>梳理我的收藏</Button>
+            ) : (
+              <p>先连接你自己的 AI 服务。书签的修改和删除会在你确认后执行。</p>
+            )}
+          </div>
+        ) : null}
         {conversation.messages.map((message) => (
           <article
             key={message.id}
@@ -230,7 +182,7 @@ function AgentChatPage({
             data-status={message.status || "complete"}
           >
             <div className="agent-message-copy">
-              {message.status === "sending" ? (
+              {message.status === "sending" && !message.content.trim() ? (
                 <AgentThinkingSteps
                   progress={message.progress}
                   thinking={message.thinking}
@@ -311,11 +263,11 @@ function AgentChatPage({
                     {message.actions.some(
                       (action) => action.status === "pending",
                     )
-                      ? `命中 ${
+                      ? `待确认 ${
                           message.actions.filter(
                             (action) => action.status === "pending",
                           ).length
-                        } 条`
+                        } 项`
                       : `${message.actions.length} 项`}
                   </small>
                 </header>
@@ -325,11 +277,12 @@ function AgentChatPage({
                     key={group.label || "default"}
                   >
                     <summary>
-                      <span>{group.label || "其他操作"}</span>
+                      <span>{group.label || (group.actions.length === 1 ? group.actions[0].label : "查看操作明细")}</span>
                       <strong>{group.actions.length} 项</strong>
                       {group.actions.some((action) => action.destructive) ? (
                         <span aria-label="包含删除操作">⚠</span>
                       ) : null}
+                      <ChevronDown size={14} className="agent-action-chevron" aria-hidden="true" />
                     </summary>
                     <ul>
                       {group.actions.map((action) => (
@@ -432,11 +385,13 @@ function AgentChatPage({
                   <Button
                     type="button"
                     variant="ghost"
-                    size="sm"
+                    size="icon-sm"
+                    aria-label="编辑问题并重发"
+                    title="编辑问题并重发"
                     disabled={busy}
                     onClick={() => onEditQuestion(message.id)}
                   >
-                    编辑并重发
+                    <SquarePen size={14} aria-hidden="true" />
                   </Button>
                 ) : (
                   <Fragment>
@@ -471,8 +426,8 @@ function AgentChatPage({
           </div>
         ) : null}
         <div ref={endRef} />
-      </section>
-      <AgentComposer
+      </ScrollSurface>
+      {!embedded && <AgentComposer
         value={prompt}
         busy={busy}
         configured={configured}
@@ -481,7 +436,7 @@ function AgentChatPage({
         onSubmit={onSubmit}
         onCancel={onCancel}
         onConfigure={onConfigure}
-      />
+      />}
     </main>
   );
 }

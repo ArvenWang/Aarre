@@ -1,0 +1,392 @@
+[
+  {
+    "name": "archive-320-dark",
+    "viewport": {
+      "width": 320,
+      "height": 640
+    },
+    "pageWidth": 320,
+    "documentTop": 0,
+    "bars": [
+      {
+        "label": "收藏库导航横向滚动条",
+        "controls": "react-aria1146375597-_r_6_",
+        "orientation": "horizontal",
+        "value": "0",
+        "max": "177"
+      },
+      {
+        "label": "页面纵向滚动条",
+        "controls": "scroll-_r_m_",
+        "orientation": "vertical",
+        "value": "0",
+        "max": "91611"
+      }
+    ]
+  },
+  {
+    "name": "archive-320-light",
+    "viewport": {
+      "width": 320,
+      "height": 640
+    },
+    "pageWidth": 320,
+    "documentTop": 0,
+    "bars": [
+      {
+        "label": "收藏库导航横向滚动条",
+        "controls": "react-aria1146375597-_r_6_",
+        "orientation": "horizontal",
+        "value": "0",
+        "max": "177"
+      },
+      {
+        "label": "页面纵向滚动条",
+        "controls": "scroll-_r_m_",
+        "orientation": "vertical",
+        "value": "0",
+        "max": "91611"
+      }
+    ]
+  },
+  {
+    "name": "manager-settings-420-light",
+    "viewport": {
+      "width": 420,
+      "height": 820
+    },
+    "pageWidth": 420,
+    "documentTop": 0,
+    "dialogCount": 1,
+    "bars": [
+      {
+        "label": "收藏库导航横向滚动条",
+        "controls": "react-aria1146375597-_r_6_",
+        "orientation": "horizontal",
+        "value": "0",
+        "max": "77"
+      },
+      {
+        "label": "页面纵向滚动条",
+        "controls": "scroll-_r_m_",
+        "orientation": "vertical",
+        "value": "0",
+        "max": "114586"
+      },
+      {
+        "label": "对话框纵向滚动条",
+        "controls": "scroll-_r_27r_",
+        "orientation": "vertical",
+        "value": "0",
+        "max": "447"
+      }
+    ]
+  },
+  {
+    "name": "manager-settings-420-dark",
+    "viewport": {
+      "width": 420,
+      "height": 820
+    },
+    "pageWidth": 420,
+    "documentTop": 0,
+    "dialogCount": 1,
+    "bars": [
+      {
+        "label": "收藏库导航横向滚动条",
+        "controls": "react-aria1146375597-_r_6_",
+        "orientation": "horizontal",
+        "value": "0",
+        "max": "77"
+      },
+      {
+        "label": "页面纵向滚动条",
+        "controls": "scroll-_r_m_",
+        "orientation": "vertical",
+        "value": "0",
+        "max": "114586"
+      },
+      {
+        "label": "对话框纵向滚动条",
+        "controls": "scroll-_r_27r_",
+        "orientation": "vertical",
+        "value": "0",
+        "max": "447"
+      }
+    ]
+  },
+  {
+    "name": "snapshot-confirm-420-dark",
+    "viewport": {
+      "width": 420,
+      "height": 820
+    },
+    "pageWidth": 420,
+    "documentTop": 0,
+    "dialogCount": 1,
+    "bars": [
+      {
+        "label": "收藏库导航横向滚动条",
+        "controls": "react-aria1146375597-_r_6_",
+        "orientation": "horizontal",
+        "value": "0",
+        "max": "77"
+      },
+      {
+        "label": "页面纵向滚动条",
+        "controls": "scroll-_r_m_",
+        "orientation": "vertical",
+        "value": "0",
+        "max": "114586"
+      }
+    ]
+  },
+  {
+    "name": "snapshot-confirm-420-light",
+    "viewport": {
+      "width": 420,
+      "height": 820
+    },
+    "pageWidth": 420,
+    "documentTop": 0,
+    "dialogCount": 1,
+    "bars": [
+      {
+        "label": "收藏库导航横向滚动条",
+        "controls": "react-aria1146375597-_r_6_",
+        "orientation": "horizontal",
+        "value": "0",
+        "max": "77"
+      },
+      {
+        "label": "页面纵向滚动条",
+        "controls": "scroll-_r_m_",
+        "orientation": "vertical",
+        "value": "0",
+        "max": "114586"
+      }
+    ]
+  },
+  {
+    "name": "manager-editor-420-light",
+    "viewport": {
+      "width": 420,
+      "height": 820
+    },
+    "pageWidth": 420,
+    "documentTop": 0,
+    "dialogCount": 1,
+    "bars": [
+      {
+        "label": "收藏库导航横向滚动条",
+        "controls": "react-aria1146375597-_r_6_",
+        "orientation": "horizontal",
+        "value": "0",
+        "max": "77"
+      },
+      {
+        "label": "页面纵向滚动条",
+        "controls": "scroll-_r_m_",
+        "orientation": "vertical",
+        "value": "0",
+        "max": "114586"
+      },
+      {
+        "label": "对话框纵向滚动条",
+        "controls": "scroll-_r_299_",
+        "orientation": "vertical",
+        "value": "0",
+        "max": "203"
+      }
+    ]
+  },
+  {
+    "name": "manager-editor-420-dark",
+    "viewport": {
+      "width": 420,
+      "height": 820
+    },
+    "pageWidth": 420,
+    "documentTop": 0,
+    "dialogCount": 1,
+    "bars": [
+      {
+        "label": "收藏库导航横向滚动条",
+        "controls": "react-aria1146375597-_r_6_",
+        "orientation": "horizontal",
+        "value": "0",
+        "max": "77"
+      },
+      {
+        "label": "页面纵向滚动条",
+        "controls": "scroll-_r_m_",
+        "orientation": "vertical",
+        "value": "0",
+        "max": "114586"
+      },
+      {
+        "label": "对话框纵向滚动条",
+        "controls": "scroll-_r_299_",
+        "orientation": "vertical",
+        "value": "0",
+        "max": "203"
+      }
+    ]
+  },
+  {
+    "name": "editor-320-light",
+    "viewport": {
+      "width": 320,
+      "height": 640
+    },
+    "pageWidth": 320,
+    "documentTop": 0,
+    "dialogCount": 1,
+    "bars": [
+      {
+        "label": "Chrome 书签纵向滚动条",
+        "controls": "bookmark-list",
+        "orientation": "vertical",
+        "value": "0",
+        "max": "2580"
+      },
+      {
+        "label": "内容纵向滚动条",
+        "controls": "scroll-_r_18p_",
+        "orientation": "vertical",
+        "value": "0",
+        "max": "238"
+      }
+    ]
+  },
+  {
+    "name": "folder-320-light",
+    "viewport": {
+      "width": 320,
+      "height": 640
+    },
+    "pageWidth": 320,
+    "documentTop": 0,
+    "dialogCount": 2,
+    "bars": [
+      {
+        "label": "Chrome 书签纵向滚动条",
+        "controls": "bookmark-list",
+        "orientation": "vertical",
+        "value": "0",
+        "max": "2580"
+      },
+      {
+        "label": "内容纵向滚动条",
+        "controls": "scroll-_r_18p_",
+        "orientation": "vertical",
+        "value": "0",
+        "max": "238"
+      }
+    ]
+  },
+  {
+    "name": "editor-note-320-light",
+    "viewport": {
+      "width": 320,
+      "height": 640
+    },
+    "pageWidth": 320,
+    "documentTop": 0,
+    "dialogCount": 1,
+    "bars": [
+      {
+        "label": "Chrome 书签纵向滚动条",
+        "controls": "bookmark-list",
+        "orientation": "vertical",
+        "value": "0",
+        "max": "2580"
+      },
+      {
+        "label": "文本纵向滚动条",
+        "controls": "scroll-_r_18o_",
+        "orientation": "vertical",
+        "value": "1278",
+        "max": "1287"
+      },
+      {
+        "label": "内容纵向滚动条",
+        "controls": "scroll-_r_18p_",
+        "orientation": "vertical",
+        "value": "238",
+        "max": "238"
+      }
+    ]
+  },
+  {
+    "name": "editor-note-320-dark",
+    "viewport": {
+      "width": 320,
+      "height": 640
+    },
+    "pageWidth": 320,
+    "documentTop": 0,
+    "dialogCount": 1,
+    "bars": [
+      {
+        "label": "Chrome 书签纵向滚动条",
+        "controls": "bookmark-list",
+        "orientation": "vertical",
+        "value": "0",
+        "max": "2580"
+      },
+      {
+        "label": "文本纵向滚动条",
+        "controls": "scroll-_r_18o_",
+        "orientation": "vertical",
+        "value": "1278",
+        "max": "1287"
+      },
+      {
+        "label": "内容纵向滚动条",
+        "controls": "scroll-_r_18p_",
+        "orientation": "vertical",
+        "value": "238",
+        "max": "238"
+      }
+    ]
+  },
+  {
+    "name": "settings-dark",
+    "viewport": {
+      "width": 400,
+      "height": 640
+    },
+    "pageWidth": 400,
+    "documentTop": 0,
+    "dialogCount": 0,
+    "bars": [
+      {
+        "label": "内容纵向滚动条",
+        "controls": "scroll-_r_1aq_",
+        "orientation": "vertical",
+        "value": "0",
+        "max": "619"
+      }
+    ]
+  },
+  {
+    "name": "settings-light",
+    "viewport": {
+      "width": 400,
+      "height": 640
+    },
+    "pageWidth": 400,
+    "documentTop": 0,
+    "dialogCount": 0,
+    "bars": [
+      {
+        "label": "内容纵向滚动条",
+        "controls": "scroll-_r_1aq_",
+        "orientation": "vertical",
+        "value": "0",
+        "max": "619"
+      }
+    ]
+  }
+]

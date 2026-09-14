@@ -93,7 +93,7 @@ export function renderHomePage(baseUrl: string): string {
     description: "Aarre is a Chrome bookmark extension for local summaries, tags, search, covers, organization, and optional encrypted cloud sync.",
     eyebrow: "Aarre · Bookmark intelligence",
     heading: "Aarre",
-    intro: "Aarre is a Chrome bookmark extension for local summaries, tags, search, covers, organization, and optional encrypted cloud sync. Aarre 保留 Chrome 原生书签，在本机补充摘要、标签、检索和封面；云端同步默认关闭，只有在你主动登录并选择范围后才会启用。",
+    intro: "Aarre is a Chrome bookmark extension for local summaries, tags, search, covers, organization, and optional encrypted cloud sync. Aarre 保留 Chrome 原生书签，在本机补充摘要、标签、检索和封面；云端同步默认关闭，只有在你主动登录并确认开启完整备份后才会启用。",
     path: "/",
     language: "en",
     body: `
@@ -114,7 +114,7 @@ export function renderHomePage(baseUrl: string): string {
         </section>
         <section class="card">
           <h2>明确选择云端范围</h2>
-          <p>“仅文字与设置”不上传图片；只有“完整云端备份”会把允许的封面与快照加密上传到私有对象存储。</p>
+          <p>登录只连接账号。确认开启“完整云端备份”后，允许的智能信息和图片才会加密上传。</p>
         </section>
         <section class="card">
           <h2>保护规则优先</h2>
@@ -123,7 +123,7 @@ export function renderHomePage(baseUrl: string): string {
       </div>
       <section>
         <h2>如何使用</h2>
-        <p>Aarre 的产品界面位于 Chrome 扩展的侧边栏与网页端。本页面只提供公开的产品、隐私和条款信息，不收集表单或书签内容。</p>
+        <p>Aarre 的产品界面位于 Chrome 扩展的网页悬浮菜单和完整收藏库。本页面只提供公开的产品、隐私和条款信息，不收集表单或书签内容。</p>
       </section>
       <div class="note"><p><strong>English summary.</strong> Aarre enhances native Chrome bookmarks locally. Cloud sync is optional and off by default. Protected resources, API keys, page bodies, cookies, full browsing history, and native bookmark IDs are not uploaded to Aarre Cloud.</p></div>
     `
@@ -155,7 +155,7 @@ export function renderPrivacyPage(baseUrl: string): string {
       <section>
         <h2>3. 可选的 Aarre 云端</h2>
         <p>用户主动使用 Google 登录时，Aarre 接收 Google 提供的账号标识、已验证邮箱、显示名称和头像，用于建立账号和显示登录状态。服务不请求 Google Drive、Gmail、通讯录或离线 Google API 权限。</p>
-        <p>“仅文字与设置”会加密同步允许的摘要、标签、主题、别名、备注、设置、稳定会话、报告、保护规则和恢复信息。“完整云端备份”还会上传允许的页面封面、快照与站点标识。图片存储在腾讯云私有 COS；元数据存储在独立 PostgreSQL 数据库。数据库字段使用逐用户信封加密，COS 使用 SSE-COS AES-256。这不是只有用户能解密的端到端加密。</p>
+        <p>登录不会自动上传。用户确认开启“完整云端备份”后，会加密同步允许的摘要、标签、主题、别名、备注、设置、稳定会话、报告、保护规则和恢复信息，以及允许的页面封面、快照与站点标识。图片存储在腾讯云私有 COS；元数据存储在独立 PostgreSQL 数据库。数据库字段使用逐用户信封加密，COS 使用 SSE-COS AES-256。这不是只有用户能解密的端到端加密。</p>
       </section>
       <section>
         <h2>4. 其他网络请求</h2>
@@ -179,7 +179,7 @@ export function renderPrivacyPage(baseUrl: string): string {
       </section>
       <section>
         <h2>7. 你的选择</h2>
-        <p>你可以暂停同步、退出账号、导出本地或云端数据、撤销设备、切换同步范围，或请求删除整个云端账号。API Key 不进入导出文件。隐私问题可通过页面底部的 GitHub Issues 联系；请勿在公开问题中附带私人书签、Token、API Key 或网页正文。</p>
+        <p>你可以暂停同步、退出账号、导出本地或云端数据、撤销设备、重新确认完整备份，或请求删除整个云端账号。API Key 不进入导出文件。隐私问题可通过页面底部的 GitHub Issues 联系；请勿在公开问题中附带私人书签、Token、API Key 或网页正文。</p>
       </section>
       <div class="note"><p><strong>English summary.</strong> Aarre is local-first and cloud sync is optional. Google Sign-In provides identity only. Text metadata is encrypted in Aarre's database; images are uploaded only after the user selects full cloud backup. API keys, page bodies, cookies, full history, native bookmark IDs, and protected resources are excluded from Aarre Cloud. Users can export, disconnect devices, pause sync, or request account deletion.</p></div>
     `

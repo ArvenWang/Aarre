@@ -1,0 +1,42 @@
+{
+  "bar": {
+    "x": 1098,
+    "y": 400,
+    "width": 52,
+    "height": 100,
+    "top": 400,
+    "right": 1150,
+    "bottom": 500,
+    "left": 1098
+  },
+  "buttons": [
+    {
+      "rect": {
+        "x": 1102,
+        "y": 404,
+        "width": 44,
+        "height": 44,
+        "top": 404,
+        "right": 1146,
+        "bottom": 448,
+        "left": 1102
+      },
+      "radius": "16px"
+    },
+    {
+      "rect": {
+        "x": 1102,
+        "y": 452,
+        "width": 44,
+        "height": 44,
+        "top": 452,
+        "right": 1146,
+        "bottom": 496,
+        "left": 1102
+      },
+      "radius": "16px"
+    }
+  ],
+  "outerRadius": "20px",
+  "glass": "blur(16px) saturate(1.3)"
+}

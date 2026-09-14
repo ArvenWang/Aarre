@@ -635,7 +635,7 @@ export class SyncService {
     );
     const rows = result.rows.slice(0, limit);
     const changes = await Promise.all(rows.map(async (row) => {
-      if (row.entity_type !== "resource" || row.deleted) {
+      if (row.entity_type !== "resource") {
         return {
           sequence: Number(row.sequence),
           entityType: row.entity_type,
@@ -646,9 +646,11 @@ export class SyncService {
       }
       const resource = await this.database.query<{
         payload: Buffer;
+        revision: string;
+        deleted_at: Date | null;
         field_clocks: Record<string, string>;
       }>(
-        "SELECT payload, field_clocks FROM resources WHERE user_id = $1 AND resource_key = $2",
+        "SELECT payload, field_clocks, revision, deleted_at FROM resources WHERE user_id = $1 AND resource_key = $2",
         [account.userId, row.entity_id]
       );
       const current = resource.rows[0];
@@ -656,9 +658,9 @@ export class SyncService {
         sequence: Number(row.sequence),
         entityType: row.entity_type,
         entityId: row.entity_id,
-        revision: Number(row.revision),
-        deleted: false,
-        payload: current
+        revision: Number(current?.revision || row.revision),
+        deleted: !current || Boolean(current.deleted_at),
+        payload: current && !current.deleted_at
           ? await this.encryption.decryptJson<ResourcePayload>(
               account.userId,
               `resource:${row.entity_id}`,

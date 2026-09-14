@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createRemovedNodeUndoBatch,
   undoBookmarkBatch
@@ -15,6 +15,8 @@ const removeTree = vi.fn();
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-07-30T12:00:00.000Z"));
   vi.stubGlobal("chrome", {
     bookmarks: {
       get,
@@ -27,6 +29,8 @@ beforeEach(() => {
     }
   });
 });
+
+afterEach(() => vi.useRealTimers());
 
 function batch(
   mutations: UndoSnapshotBatch["mutations"]
@@ -44,6 +48,16 @@ function batch(
 }
 
 describe("bookmark undo", () => {
+  it("rejects an expired removal without writing Chrome bookmarks", async () => {
+    const removed = createRemovedNodeUndoBatch({
+      parentId: "parent",
+      index: 0,
+      at: new Date("2026-06-01T00:00:00.000Z"),
+      node: { id: "old", title: "过期收藏", url: "https://example.com/old", syncing: true }
+    });
+    await expect(undoBookmarkBatch(removed, async () => "fallback")).rejects.toThrow("30 天");
+    expect(create).not.toHaveBeenCalled();
+  });
   it("turns a Chrome folder removal event into one restorable subtree batch", async () => {
     const removed = createRemovedNodeUndoBatch({
       parentId: "bookmarks-bar",

@@ -17,6 +17,7 @@ import { deriveFieldClocks, mergeResourceByFieldClocks } from "./field-clocks";
 const MAX_OUTBOX_CONTENT_LENGTH = 50_000;
 
 interface BookmarkLayerDatabase extends DBSchema {
+  syncMetadata: { key: string; value: unknown };
   resources: {
     key: string;
     value: ResourceRecord;
@@ -248,7 +249,10 @@ export function normalizeResourceRecord(value: unknown): ResourceRecord {
       : {}),
     ...(record.fieldUpdatedAt && typeof record.fieldUpdatedAt === "object"
       ? { fieldUpdatedAt: stringRecord(record.fieldUpdatedAt) }
-      : {})
+      : {}),
+    ...(Array.isArray(record.fieldClears) ? {
+      fieldClears: record.fieldClears.filter((field): field is "userNote" | "tags" => field === "userNote" || field === "tags")
+    } : {})
   };
 }
 
@@ -260,13 +264,14 @@ function stringRecord(value: unknown): Record<string, string> {
   ) as Record<string, string>;
 }
 
-function database(): Promise<IDBPDatabase<BookmarkLayerDatabase>> {
+export function database(): Promise<IDBPDatabase<BookmarkLayerDatabase>> {
   if (!databasePromise) {
     databasePromise = openDB<BookmarkLayerDatabase>(
       "bookmark-layer",
-      5,
+      6,
       {
         upgrade(db, oldVersion) {
+          if (oldVersion < 6) db.createObjectStore("syncMetadata");
           if (oldVersion < 1) {
             const resources = db.createObjectStore("resources", {
               keyPath: "resourceKey"
@@ -301,7 +306,12 @@ function database(): Promise<IDBPDatabase<BookmarkLayerDatabase>> {
             visuals.createIndex("kind", "kind");
             visuals.createIndex("identity", "identity");
           }
-        }
+        },
+        blocking() {
+          void databasePromise?.then((db) => db.close());
+          databasePromise = null;
+        },
+        terminated() { databasePromise = null; }
       }
     );
   }
@@ -669,8 +679,14 @@ export async function upsertLocalResource(
   const next = normalizeResourceRecord(nextResource);
   const stored = await transaction.store.get(next.resourceKey);
   const previous = stored ? normalizeResourceRecord(stored) : undefined;
+  const fieldClears = new Set(next.fieldClears || previous?.fieldClears || []);
+  for (const field of ["userNote", "tags"] as const) {
+    if (next[field].length) fieldClears.delete(field);
+    else if (previous?.[field].length) fieldClears.add(field);
+  }
   await transaction.store.put({
     ...next,
+    fieldClears: [...fieldClears],
     fieldUpdatedAt: deriveFieldClocks(previous, next)
   });
   await transaction.done;
@@ -679,6 +695,30 @@ export async function upsertLocalResource(
 export async function deleteLocalResource(resourceKey: string): Promise<void> {
   const db = await database();
   await db.delete("resources", resourceKey);
+}
+
+/** Read and patch in one transaction so async AI completion cannot replace
+ * fields edited by another extension view between reading and writing. */
+export async function patchLocalResource(
+  resourceKey: string,
+  patch: (current: ResourceRecord) => ResourceRecord | null,
+): Promise<ResourceRecord | null> {
+  const db = await database();
+  const transaction = db.transaction("resources", "readwrite");
+  const stored = await transaction.store.get(resourceKey);
+  const previous = stored ? normalizeResourceRecord(stored) : undefined;
+  const patched = previous ? patch(previous) : null;
+  if (!patched || !previous) { await transaction.done; return null; }
+  const next = normalizeResourceRecord(patched);
+  const fieldClears = new Set(next.fieldClears || previous.fieldClears || []);
+  for (const field of ["userNote", "tags"] as const) {
+    if (next[field].length) fieldClears.delete(field);
+    else if (previous[field].length) fieldClears.add(field);
+  }
+  const updated = { ...next, fieldClears: [...fieldClears], fieldUpdatedAt: deriveFieldClocks(previous, next) };
+  await transaction.store.put(updated);
+  await transaction.done;
+  return updated;
 }
 
 export async function mergeLocalResources(
@@ -693,31 +733,29 @@ export async function mergeLocalResources(
     const local = storedLocal
       ? normalizeResourceRecord(storedLocal)
       : undefined;
-    const { record, localHasUnsyncedFields } = mergeResourceByFieldClocks(
-      local,
-      item
-    );
-    await transaction.store.put({
-      ...record,
-      ...(local?.thumbnailDataUrl
-        ? { thumbnailDataUrl: local.thumbnailDataUrl }
-        : {}),
-      nativeBookmarkIds:
-        local?.nativeBookmarkIds.length && !item.nativeBookmarkIds.length
-          ? local.nativeBookmarkIds
-          : item.nativeBookmarkIds,
-      // aiStatus 不参与云端同步，合并又以本地记录为基底，
-      // 因此必须按合并后的字段重新判定：否则从云端取回一条已增强的收藏后，
-      // 本机仍会认为它欠一次 AI 调用，对同一个网页重复计费并覆盖对方的结果。
-      aiStatus: hasCompleteAiFields(record) ? "ready" : record.aiStatus,
-      // 本地留有云端尚未收录的字段时保持待同步，下一轮把差量补上去，
-      // 让补齐是双向的而不是只从云端流向本地。
-      syncStatus: localHasUnsyncedFields ? "pending" : record.syncStatus
-    });
+    await transaction.store.put(mergeCloudResource(local, item));
   }
 
   await transaction.done;
   return getLocalResources();
+}
+
+/** Cloud merge never advances local edit clocks or replaces native bindings. */
+export function mergeCloudResource(local: ResourceRecord | undefined, item: ResourceRecord): ResourceRecord {
+  const { record, localHasUnsyncedFields } = mergeResourceByFieldClocks(local, item);
+  const coverChanged = Boolean(local?.thumbnailDataUrl && record.coverContentHash &&
+    local.coverContentHash !== record.coverContentHash);
+  return {
+    ...record,
+    // Metadata for a different image must never label cached old bytes as new.
+    thumbnailDataUrl: coverChanged ? undefined : local?.thumbnailDataUrl || item.thumbnailDataUrl,
+    nativeBookmarkIds: local ? local.nativeBookmarkIds : item.nativeBookmarkIds,
+    nativeFolderPath: local ? local.nativeFolderPath : item.nativeFolderPath,
+    updatedAt: (local?.updatedAt || "") > item.updatedAt ? local!.updatedAt : item.updatedAt,
+    lastSyncedAt: item.lastSyncedAt,
+    aiStatus: hasCompleteAiFields(record) ? "ready" : record.aiStatus,
+    syncStatus: localHasUnsyncedFields || local?.deletedAt ? "pending" : "synced"
+  };
 }
 
 export async function getOutbox(): Promise<OutboxItem[]> {
@@ -735,7 +773,9 @@ export async function enqueueOutbox(
   content: string
 ): Promise<OutboxItem> {
   const db = await database();
-  const normalizedResource = normalizeResourceRecord(resource);
+  const storedResource = await db.get("resources", resource.resourceKey);
+  const latest = storedResource ? normalizeResourceRecord(storedResource) : undefined;
+  const normalizedResource = latest && latest.updatedAt >= resource.updatedAt ? latest : normalizeResourceRecord(resource);
   const existing = await db.get(
     "outbox",
     normalizedResource.resourceKey

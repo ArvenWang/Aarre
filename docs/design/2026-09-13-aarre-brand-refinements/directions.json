@@ -1,0 +1,68 @@
+[
+  {
+    "id": "A1",
+    "family": "cabinet",
+    "familyName": "拾集",
+    "name": "聚拢",
+    "subtitle": "保留三枚独立块面，让符号更紧凑",
+    "lead": "圆润、亲切，收藏感更直接。",
+    "detail": "保留三枚不规则块面的识别，让外轮廓和间隙更稳定；橘红色主导，宽厚字标与散布图形强化轻松感。",
+    "file": "A1-cabinet-cluster.png",
+    "reference": "/Users/nefish/Desktop/Coding/Aarre/docs/design/2026-09-13-aarre-brand-directions/03-cabinet.png"
+  },
+  {
+    "id": "A2",
+    "family": "cabinet",
+    "familyName": "拾集",
+    "name": "拼合",
+    "subtitle": "让三枚块面组成更完整的轮廓",
+    "lead": "依然轻松，但更有秩序和包容感。",
+    "detail": "把三块图形拼成更完整的收纳轮廓，保留宽裕的留白缝隙；奶油色与淡紫色占比提高，字标更舒展。",
+    "file": "A2-cabinet-fit.png",
+    "reference": "/Users/nefish/Desktop/Coding/Aarre/docs/design/2026-09-13-aarre-brand-directions/03-cabinet.png"
+  },
+  {
+    "id": "B1",
+    "family": "current",
+    "familyName": "回流",
+    "name": "方环",
+    "subtitle": "收紧几何与转角，强调清晰稳定",
+    "lead": "辨识直接，像一件可靠的数字工具。",
+    "detail": "以原来的 a 形回环为基础，调整转角和开口的秩序；钴蓝保持强识别，图标与紧凑界面的关系更统一。",
+    "file": "B1-current-square.png",
+    "reference": "/Users/nefish/Desktop/Coding/Aarre/docs/design/2026-09-13-aarre-brand-directions/02-current.png"
+  },
+  {
+    "id": "B2",
+    "family": "current",
+    "familyName": "回流",
+    "name": "旋流",
+    "subtitle": "放松直角，让回环更有动势",
+    "lead": "更轻快、更连续，突出重新发现的感觉。",
+    "detail": "保留钴蓝与回环识别，让路径更流畅、开口更鲜明；用放大的回环曲线组织版面，增加速度感和轻盈感。",
+    "file": "B2-current-flow.png",
+    "reference": "/Users/nefish/Desktop/Coding/Aarre/docs/design/2026-09-13-aarre-brand-directions/02-current.png"
+  },
+  {
+    "id": "C1",
+    "family": "grove",
+    "familyName": "林间",
+    "name": "新芽",
+    "subtitle": "保留双瓣回环，增加生长感",
+    "lead": "自然、亲切，有一点向上的活力。",
+    "detail": "延续松绿与嫩黄色，修整双瓣回环的轮廓和内孔；更明亮的配色比例与柔和字标表达自然生长。",
+    "file": "C1-grove-sprout.png",
+    "reference": "/Users/nefish/Desktop/Coding/Aarre/docs/design/2026-09-13-aarre-brand-directions/05-grove.png"
+  },
+  {
+    "id": "C2",
+    "family": "grove",
+    "familyName": "林间",
+    "name": "林隙",
+    "subtitle": "拉开内侧留白，强调围合与安静",
+    "lead": "更沉静、更耐看，像保存好东西的小小空间。",
+    "detail": "把有机回环调整为更开阔的围合形，放大内侧留白；深松绿、亚麻白与轻量字标形成更克制的表达。",
+    "file": "C2-grove-clearing.png",
+    "reference": "/Users/nefish/Desktop/Coding/Aarre/docs/design/2026-09-13-aarre-brand-directions/05-grove.png"
+  }
+]

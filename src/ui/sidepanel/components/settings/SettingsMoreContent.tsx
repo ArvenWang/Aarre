@@ -1,4 +1,5 @@
 import { Button } from "@/ui/components/ui/button";
+import { useState } from "react";
 import type { UndoSnapshotBatch } from "../../../../lib/types";
 import { conversationDate } from "../../utils";
 
@@ -13,13 +14,14 @@ export function SettingsMoreContent({
   undoBatches,
   onUndo,
 }: SettingsMoreContentProps) {
+  const [visibleCount, setVisibleCount] = useState(12);
   return (
     <>
       <section className="settings-section" aria-label="可撤销的最近动作">
         <p className="settings-change-retention">删除的书签和文件夹保留 30 天。</p>
         {undoBatches.length ? (
           <div className="settings-change-list">
-            {undoBatches.slice(0, 12).map((batch) => (
+            {undoBatches.slice(0, visibleCount).map((batch) => (
               <article className="bookmark-row" key={batch.batchId} data-destructive={batch.destructive}>
                 <div>
                   <strong>{batch.label}</strong>
@@ -40,6 +42,11 @@ export function SettingsMoreContent({
                 </Button>
               </article>
             ))}
+            {visibleCount < undoBatches.length ? (
+              <Button variant="ghost" size="sm" onClick={() => setVisibleCount((count) => count + 12)}>
+                加载更多（{visibleCount}/{undoBatches.length}）
+              </Button>
+            ) : null}
           </div>
         ) : (
           <p className="settings-empty-state">最近没有可撤销的更改。</p>

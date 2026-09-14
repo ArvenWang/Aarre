@@ -1,0 +1,446 @@
+[
+  {
+    "width": 1440,
+    "theme": "light",
+    "pageWidth": 1440,
+    "scrollWidth": 1440,
+    "items": [
+      {
+        "label": "tabs__tab aarre-tab",
+        "x": 240.4765625,
+        "y": 0,
+        "width": 47,
+        "height": 64,
+        "top": 0,
+        "right": 287.4765625,
+        "bottom": 64,
+        "left": 240.4765625
+      },
+      {
+        "label": "tabs__tab aarre-tab",
+        "x": 319.4765625,
+        "y": 0,
+        "width": 60,
+        "height": 64,
+        "top": 0,
+        "right": 379.4765625,
+        "bottom": 64,
+        "left": 319.4765625
+      },
+      {
+        "label": "manager-utilities",
+        "x": 1198,
+        "y": 14,
+        "width": 114,
+        "height": 36,
+        "top": 14,
+        "right": 1312,
+        "bottom": 50,
+        "left": 1198
+      },
+      {
+        "label": "搜索收藏库",
+        "x": 136,
+        "y": 131.3984375,
+        "width": 728,
+        "height": 46,
+        "top": 131.3984375,
+        "right": 864,
+        "bottom": 177.3984375,
+        "left": 136
+      },
+      {
+        "label": "收藏筛选与排序",
+        "x": 880,
+        "y": 105,
+        "width": 424,
+        "height": 72.3984375,
+        "top": 105,
+        "right": 1304,
+        "bottom": 177.3984375,
+        "left": 880
+      },
+      {
+        "label": "library-toolbar-secondary",
+        "x": 136,
+        "y": 193.3984375,
+        "width": 1168,
+        "height": 40,
+        "top": 193.3984375,
+        "right": 1304,
+        "bottom": 233.3984375,
+        "left": 136
+      }
+    ]
+  },
+  {
+    "width": 1440,
+    "theme": "dark",
+    "pageWidth": 1440,
+    "scrollWidth": 1440,
+    "items": [
+      {
+        "label": "tabs__tab aarre-tab",
+        "x": 240.4765625,
+        "y": 0,
+        "width": 47,
+        "height": 64,
+        "top": 0,
+        "right": 287.4765625,
+        "bottom": 64,
+        "left": 240.4765625
+      },
+      {
+        "label": "tabs__tab aarre-tab",
+        "x": 319.4765625,
+        "y": 0,
+        "width": 60,
+        "height": 64,
+        "top": 0,
+        "right": 379.4765625,
+        "bottom": 64,
+        "left": 319.4765625
+      },
+      {
+        "label": "manager-utilities",
+        "x": 1198,
+        "y": 14,
+        "width": 114,
+        "height": 36,
+        "top": 14,
+        "right": 1312,
+        "bottom": 50,
+        "left": 1198
+      },
+      {
+        "label": "搜索收藏库",
+        "x": 136,
+        "y": 131.3984375,
+        "width": 728,
+        "height": 46,
+        "top": 131.3984375,
+        "right": 864,
+        "bottom": 177.3984375,
+        "left": 136
+      },
+      {
+        "label": "收藏筛选与排序",
+        "x": 880,
+        "y": 105,
+        "width": 424,
+        "height": 72.3984375,
+        "top": 105,
+        "right": 1304,
+        "bottom": 177.3984375,
+        "left": 880
+      },
+      {
+        "label": "library-toolbar-secondary",
+        "x": 136,
+        "y": 193.3984375,
+        "width": 1168,
+        "height": 40,
+        "top": 193.3984375,
+        "right": 1304,
+        "bottom": 233.3984375,
+        "left": 136
+      }
+    ]
+  },
+  {
+    "width": 768,
+    "theme": "light",
+    "pageWidth": 768,
+    "scrollWidth": 768,
+    "items": [
+      {
+        "label": "tabs__tab aarre-tab",
+        "x": 136.4765625,
+        "y": 0,
+        "width": 47,
+        "height": 64,
+        "top": 0,
+        "right": 183.4765625,
+        "bottom": 64,
+        "left": 136.4765625
+      },
+      {
+        "label": "tabs__tab aarre-tab",
+        "x": 215.4765625,
+        "y": 0,
+        "width": 60,
+        "height": 64,
+        "top": 0,
+        "right": 275.4765625,
+        "bottom": 64,
+        "left": 215.4765625
+      },
+      {
+        "label": "manager-utilities",
+        "x": 630,
+        "y": 14,
+        "width": 114,
+        "height": 36,
+        "top": 14,
+        "right": 744,
+        "bottom": 50,
+        "left": 630
+      },
+      {
+        "label": "搜索收藏库",
+        "x": 32,
+        "y": 105,
+        "width": 704,
+        "height": 46,
+        "top": 105,
+        "right": 736,
+        "bottom": 151,
+        "left": 32
+      },
+      {
+        "label": "收藏筛选与排序",
+        "x": 32,
+        "y": 167,
+        "width": 704,
+        "height": 72.3984375,
+        "top": 167,
+        "right": 736,
+        "bottom": 239.3984375,
+        "left": 32
+      },
+      {
+        "label": "library-toolbar-secondary",
+        "x": 32,
+        "y": 255.3984375,
+        "width": 704,
+        "height": 40,
+        "top": 255.3984375,
+        "right": 736,
+        "bottom": 295.3984375,
+        "left": 32
+      }
+    ]
+  },
+  {
+    "width": 768,
+    "theme": "dark",
+    "pageWidth": 768,
+    "scrollWidth": 768,
+    "items": [
+      {
+        "label": "tabs__tab aarre-tab",
+        "x": 136.4765625,
+        "y": 0,
+        "width": 47,
+        "height": 64,
+        "top": 0,
+        "right": 183.4765625,
+        "bottom": 64,
+        "left": 136.4765625
+      },
+      {
+        "label": "tabs__tab aarre-tab",
+        "x": 215.4765625,
+        "y": 0,
+        "width": 60,
+        "height": 64,
+        "top": 0,
+        "right": 275.4765625,
+        "bottom": 64,
+        "left": 215.4765625
+      },
+      {
+        "label": "manager-utilities",
+        "x": 630,
+        "y": 14,
+        "width": 114,
+        "height": 36,
+        "top": 14,
+        "right": 744,
+        "bottom": 50,
+        "left": 630
+      },
+      {
+        "label": "搜索收藏库",
+        "x": 32,
+        "y": 105,
+        "width": 704,
+        "height": 46,
+        "top": 105,
+        "right": 736,
+        "bottom": 151,
+        "left": 32
+      },
+      {
+        "label": "收藏筛选与排序",
+        "x": 32,
+        "y": 167,
+        "width": 704,
+        "height": 72.3984375,
+        "top": 167,
+        "right": 736,
+        "bottom": 239.3984375,
+        "left": 32
+      },
+      {
+        "label": "library-toolbar-secondary",
+        "x": 32,
+        "y": 255.3984375,
+        "width": 704,
+        "height": 40,
+        "top": 255.3984375,
+        "right": 736,
+        "bottom": 295.3984375,
+        "left": 32
+      }
+    ]
+  },
+  {
+    "width": 320,
+    "theme": "light",
+    "pageWidth": 320,
+    "scrollWidth": 320,
+    "items": [
+      {
+        "label": "tabs__tab aarre-tab",
+        "x": 20,
+        "y": 52,
+        "width": 47,
+        "height": 52,
+        "top": 52,
+        "right": 67,
+        "bottom": 104,
+        "left": 20
+      },
+      {
+        "label": "tabs__tab aarre-tab",
+        "x": 99,
+        "y": 52,
+        "width": 60,
+        "height": 52,
+        "top": 52,
+        "right": 159,
+        "bottom": 104,
+        "left": 99
+      },
+      {
+        "label": "manager-utilities",
+        "x": 190,
+        "y": 8,
+        "width": 114,
+        "height": 36,
+        "top": 8,
+        "right": 304,
+        "bottom": 44,
+        "left": 190
+      },
+      {
+        "label": "搜索收藏库",
+        "x": 24,
+        "y": 145,
+        "width": 272,
+        "height": 46,
+        "top": 145,
+        "right": 296,
+        "bottom": 191,
+        "left": 24
+      },
+      {
+        "label": "收藏筛选与排序",
+        "x": 24,
+        "y": 207,
+        "width": 272,
+        "height": 72.3984375,
+        "top": 207,
+        "right": 296,
+        "bottom": 279.3984375,
+        "left": 24
+      },
+      {
+        "label": "library-toolbar-secondary",
+        "x": 24,
+        "y": 295.3984375,
+        "width": 272,
+        "height": 96,
+        "top": 295.3984375,
+        "right": 296,
+        "bottom": 391.3984375,
+        "left": 24
+      }
+    ]
+  },
+  {
+    "width": 320,
+    "theme": "dark",
+    "pageWidth": 320,
+    "scrollWidth": 320,
+    "items": [
+      {
+        "label": "tabs__tab aarre-tab",
+        "x": 20,
+        "y": 52,
+        "width": 47,
+        "height": 52,
+        "top": 52,
+        "right": 67,
+        "bottom": 104,
+        "left": 20
+      },
+      {
+        "label": "tabs__tab aarre-tab",
+        "x": 99,
+        "y": 52,
+        "width": 60,
+        "height": 52,
+        "top": 52,
+        "right": 159,
+        "bottom": 104,
+        "left": 99
+      },
+      {
+        "label": "manager-utilities",
+        "x": 190,
+        "y": 8,
+        "width": 114,
+        "height": 36,
+        "top": 8,
+        "right": 304,
+        "bottom": 44,
+        "left": 190
+      },
+      {
+        "label": "搜索收藏库",
+        "x": 24,
+        "y": 145,
+        "width": 272,
+        "height": 46,
+        "top": 145,
+        "right": 296,
+        "bottom": 191,
+        "left": 24
+      },
+      {
+        "label": "收藏筛选与排序",
+        "x": 24,
+        "y": 207,
+        "width": 272,
+        "height": 72.3984375,
+        "top": 207,
+        "right": 296,
+        "bottom": 279.3984375,
+        "left": 24
+      },
+      {
+        "label": "library-toolbar-secondary",
+        "x": 24,
+        "y": 295.3984375,
+        "width": 272,
+        "height": 96,
+        "top": 295.3984375,
+        "right": 296,
+        "bottom": 391.3984375,
+        "left": 24
+      }
+    ]
+  }
+]

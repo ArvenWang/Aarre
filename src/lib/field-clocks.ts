@@ -33,8 +33,7 @@ export const SYNCED_FIELDS = [
 export type SyncedField = (typeof SYNCED_FIELDS)[number];
 
 /**
- * 空值代表「这台设备没有这份内容」，而不是「这台设备认为该内容应为空」。
- * 合并时空值一律不参与覆盖，多端才能互相补齐缺失的部分。
+ * 未携带清空意图的空值代表缺失；用户明确清空的备注/标签按字段时钟合并。
  */
 export function isEmptyFieldValue(value: unknown): boolean {
   if (value === undefined || value === null || value === "") return true;
@@ -98,7 +97,7 @@ export interface FieldMergeResult {
  * 按字段时钟合并本地与云端记录，得到两端内容的并集。
  *
  * 规则依次为：
- * 1. 云端该字段为空 → 保留本地（云端只是没有，不代表要清空）。
+ * 1. 云端该字段为空且没有明确清空意图 → 保留本地。
  * 2. 用户显式指定的封面优先于自动采集的封面，不看时间。
  * 3. 其余字段比较字段时钟，较新者胜出。
  */
@@ -120,6 +119,7 @@ export function mergeResourceByFieldClocks(
   const writable = merged as unknown as Record<string, unknown>;
   const clocks: Record<string, string> = { ...localClocks };
   let localHasUnsyncedFields = false;
+  const clears = new Set(local.fieldClears || []);
 
   for (const field of SYNCED_FIELDS) {
     const remoteValue = remote[field];
@@ -129,7 +129,8 @@ export function mergeResourceByFieldClocks(
       localClocks[field] ||
       (isEmptyFieldValue(localValue) ? "" : local.updatedAt || "");
 
-    if (isEmptyFieldValue(remoteValue)) {
+    const remoteCleared = (field === "userNote" || field === "tags") && remote.fieldClears?.includes(field);
+    if (isEmptyFieldValue(remoteValue) && !remoteCleared) {
       if (!isEmptyFieldValue(localValue)) localHasUnsyncedFields = true;
       continue;
     }
@@ -140,13 +141,17 @@ export function mergeResourceByFieldClocks(
     if (remoteClock >= localClock) {
       writable[field] = remoteValue;
       clocks[field] = remoteClock;
+      if (field === "userNote" || field === "tags") {
+        if (remoteCleared) clears.add(field);
+        else clears.delete(field);
+      }
       continue;
     }
     localHasUnsyncedFields = true;
   }
 
   return {
-    record: { ...merged, fieldUpdatedAt: clocks },
+    record: { ...merged, fieldUpdatedAt: clocks, fieldClears: [...clears] },
     localHasUnsyncedFields
   };
 }

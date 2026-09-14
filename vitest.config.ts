@@ -6,6 +6,7 @@ export default mergeConfig(
   viteConfig,
   defineConfig({
     test: {
+      setupFiles: ["./tests/browser-layout-setup.ts"],
       exclude: [...configDefaults.exclude, "server/**"]
     }
   })

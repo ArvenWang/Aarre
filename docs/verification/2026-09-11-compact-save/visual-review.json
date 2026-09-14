@@ -1,0 +1,73 @@
+{
+  "version": "0.6.6",
+  "date": "2026-09-11",
+  "evidence": "Formal UI with isolated development fixtures; inspected individually with image tool. Installed Chrome verified separately through native UI.",
+  "files": [
+    {
+      "file": "save-error-narrow.png",
+      "bytes": 49112,
+      "sha256": "57e4895dbaf3604231455097c5e6844431e1c86cb2e70e37e6e65da0ff4bb0b2",
+      "reviewedVisually": true
+    },
+    {
+      "file": "save-existing-dark.png",
+      "bytes": 142645,
+      "sha256": "c8b7bdb1f7fc82c55882c8036a88c769e821b8efaf29385a66c6429d39fb4559",
+      "reviewedVisually": true
+    },
+    {
+      "file": "save-folder-picker.png",
+      "bytes": 129186,
+      "sha256": "2abc3a97166dde5981a08982af9111e362dea4eb3c8e12fdb5ae19a401907c5b",
+      "reviewedVisually": true
+    },
+    {
+      "file": "save-folder-short.png",
+      "bytes": 29439,
+      "sha256": "c6fb71f1c77e1e7bf17564be57c2e2bb9a7a99a5acc9bc244deb1060f11d4489",
+      "reviewedVisually": true
+    },
+    {
+      "file": "save-light.png",
+      "bytes": 137676,
+      "sha256": "d609477f05ce1429bb796b801afecd330940ee4652835181d630f5fdb4537a0f",
+      "reviewedVisually": true
+    },
+    {
+      "file": "save-long-url.png",
+      "bytes": 150785,
+      "sha256": "10e99e841b80c3257666c49eb9a80f3fb0458221ea69673f27444f6d6e0f679a",
+      "reviewedVisually": true
+    },
+    {
+      "file": "save-narrow.png",
+      "bytes": 51696,
+      "sha256": "72a4d88663ca8898483e14cb5aaf67f7280b1562ea4285ac8a4b7b7c8bd105f4",
+      "reviewedVisually": true
+    },
+    {
+      "file": "save-protected-dark.png",
+      "bytes": 143371,
+      "sha256": "5fe92ad57f13e8c6565beb82502dc2f20f4b23a429828c995f9529be00324c0b",
+      "reviewedVisually": true
+    },
+    {
+      "file": "save-protected-light.png",
+      "bytes": 143108,
+      "sha256": "a42ec4d6a07bf3c42523331695110caa39f0516899bbb002fff43c93dc339625",
+      "reviewedVisually": true
+    },
+    {
+      "file": "save-short-bottom.png",
+      "bytes": 62412,
+      "sha256": "ff7d5c29f8e930a33e848199f5ae5c556cc3e0cde19209e675725b86b6d8a028",
+      "reviewedVisually": true
+    },
+    {
+      "file": "save-short.png",
+      "bytes": 60146,
+      "sha256": "66038791723b2c781f0a189777f86068d68a2154e1978eeafc420bbcee280d75",
+      "reviewedVisually": true
+    }
+  ]
+}

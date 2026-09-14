@@ -1,4 +1,4 @@
-import { previewEvent, previewRuntimeMessageEvent } from "./preview-state";
+import { previewEvent, previewRuntimeMessageEvent, previewState } from "./preview-state";
 import { PREVIEW_UNHANDLED, type PreviewRequest } from "./preview-request";
 import { handlePreviewDataMessage } from "./preview-message-data";
 import { handlePreviewServiceMessage } from "./preview-message-service";
@@ -39,6 +39,18 @@ export function installSidePanelPreview() {
       onMoved: previewEvent,
       onRemoved: previewEvent,
       onChildrenReordered: previewEvent
+    },
+    tabs: {
+      onActivated: previewEvent,
+      onUpdated: previewEvent,
+      async query() {
+        const tab = previewState.activeTab;
+        return tab ? [{ ...tab, active: true, windowId: 1, favIconUrl: tab.faviconUrl }] : [];
+      }
+    },
+    windows: {
+      WINDOW_ID_NONE: -1,
+      onFocusChanged: previewEvent
     },
     permissions: {
       async contains() {

@@ -1,3 +1,4 @@
+import { openFloatingMenu } from "../floating/lifecycle";
 import {
   CONTEXT_MENU_IMAGE_COVER_ID,
   CONTEXT_MENU_LINK_ID,
@@ -39,11 +40,11 @@ export function registerUiEvents(dependencies: UiEventDependencies): void {
       info.menuItemId === CONTEXT_MENU_PAGE_ID ||
       info.menuItemId === CONTEXT_MENU_LINK_ID
     ) {
-      // sidePanel.open 必须直接发生在 Chrome 的右键点击回调里。其余较重的
+      // 点击后立即启动来源页菜单。其余较重的
       // 草稿与编辑逻辑仍可延迟加载，但不能让动态 import 消耗用户手势。
       const openPanelRequest =
         typeof tab?.id === "number"
-          ? chrome.sidePanel.open({ tabId: tab.id })
+          ? openFloatingMenu(tab)
           : undefined;
       void contextMenus.handleSave(info, tab, openPanelRequest);
       return;

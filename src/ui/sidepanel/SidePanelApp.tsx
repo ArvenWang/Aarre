@@ -1,8 +1,17 @@
-import { Suspense, lazy, useCallback, useState } from "react";
+import { registerParkPreparation } from "../../shared/suite-dock/parking";
+import { AgentComposer } from "./components/AgentComposer";
+import { BookmarkEditorDialog } from "./components/BookmarkEditorDialog";
+import { AppModal } from "@/ui/components/ui/modal";
+import { Button } from "@/ui/components/ui/button";
+import { X } from "lucide-react";
+import { FloatingShell } from "../floating/FloatingShell";
+import { FLOATING_VIEW_EVENT, postToFloatingHost } from "../floating/bridge";
+import { useFloatingSave } from "../floating/use-floating-save";
+import { Suspense, lazy, useCallback, useEffect, useState, type ReactNode } from "react";
 import { sendExtensionRequest } from "../../lib/messages";
 import type { ListCoverStyle } from "../../lib/display-settings";
 import { restartOnboarding } from "../../lib/onboarding";
-import { useScrollThumb } from "./hooks/use-scroll-thumb";
+import { useScrollBoundary } from "./hooks/use-scroll-boundary";
 import { useBookmarkPreview } from "./hooks/use-bookmark-preview";
 import { useAgentChat, type SidePanelView } from "./hooks/use-agent-chat";
 import { useBookmarks } from "./hooks/use-bookmarks";
@@ -20,15 +29,26 @@ const AgentHistoryPage = lazy(() => import("./pages/AgentHistoryPage"));
 const OnboardingPage = lazy(() => import("./pages/OnboardingPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 
-export function SidePanelApp() {
-  const [organizationNoticeBusy, setOrganizationNoticeBusy] = useState(false);
+export function SidePanelApp({ surface = "sidebar" }: { surface?: "sidebar" | "floating" } = {}) {
   const [listCoverStyle, setListCoverStyle] = useState<ListCoverStyle>("site");
   const [publicFaviconFallback, setPublicFaviconFallback] = useState(true);
   const [pageSnapshotsEnabled, setPageSnapshotsEnabled] = useState(true);
   const [onboardingVisible, setOnboardingVisible] = useState<boolean>(() =>
-    localStorage.getItem("aarre:onboarding-done") !== "1"
+    new URLSearchParams(location.search).has("onboarding") || localStorage.getItem("aarre:onboarding-done") !== "1"
   );
-  const [panelView, setPanelView] = useState<SidePanelView>("library");
+  const [panelView, setWorkspaceView] = useState<SidePanelView>("library");
+  const [utilityView, setUtilityView] = useState<"settings" | "history" | null>(null);
+  useEffect(() => { postToFloatingHost({ type: "FLOAT_CURRENT_VIEW", view: utilityView ?? panelView }); }, [panelView, utilityView]);
+  const setPanelView = useCallback((next: SidePanelView) => {
+    if (surface === "floating" && (next === "settings" || next === "history")) setUtilityView(next);
+    else { setWorkspaceView(next); setUtilityView(null); }
+  }, [surface]);
+  const [emptyConversation] = useState(() => ({ id: crypto.randomUUID(), title: "问问你的收藏", messages: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }));
+  useEffect(() => {
+    const handle = (event: Event) => { const view = (event as CustomEvent<string>).detail; if (["library", "chat", "settings", "history"].includes(view)) setPanelView(view as SidePanelView); };
+    window.addEventListener(FLOATING_VIEW_EVENT, handle);
+    return () => window.removeEventListener(FLOATING_VIEW_EVENT, handle);
+  }, [setPanelView]);
   const applyDisplaySettings = useCallback((settings: {
     listCoverStyle: ListCoverStyle;
     pageSnapshotsEnabled: boolean;
@@ -47,6 +67,9 @@ export function SidePanelApp() {
     dismiss: dismissBookmarkPreviewImmediately,
   } = useBookmarkPreview();
   const [busy, setBusy] = useState("");
+  useEffect(() => registerParkPreparation(() => {
+    if (busy) throw new Error("当前操作仍在进行，完成后再切换应用。");
+  }), [busy]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const dismissError = useCallback(() => setError(""), []);
@@ -57,9 +80,6 @@ export function SidePanelApp() {
     setAppState,
     resources,
     siteBrands,
-    contextResurfacing,
-    organizationNotice,
-    setOrganizationNotice,
     aiConfigured,
     setAiConfigured,
     refresh,
@@ -123,15 +143,12 @@ export function SidePanelApp() {
     deleteEditorNode,
   } = editorController;
   usePendingSave({ activeTabId: appState?.activeTab?.id, startSave, setError });
-  const {
-    contentRef,
-    thumb: scrollThumb,
-    sync: syncScrollThumb,
-    reveal: revealScrollThumb,
-    onPointerDown: handleScrollThumbPointerDown,
-    onPointerMove: handleScrollThumbPointerMove,
-    onPointerEnd: handleScrollThumbPointerEnd,
-  } = useScrollThumb(panelView);
+  useFloatingSave({
+    enabled: surface === "floating", ready: Boolean(appState?.activeTab), busy: Boolean(busy), editorKind: editor?.kind,
+    onOpen: () => { setOnboardingVisible(false); setUtilityView(null); void startSave(); },
+    onDeferred: () => setNotice("请先完成当前操作，再添加收藏。正在编辑的内容已保留。"),
+  });
+  const { contentRef, atEnd, sync: syncScrollBoundary } = useScrollBoundary(panelView);
 
   const {
     expanded,
@@ -157,7 +174,7 @@ export function SidePanelApp() {
     siteBrands,
     removedNodeIds,
     contentRef,
-    syncScrollThumb,
+    syncScrollThumb: syncScrollBoundary,
     refresh,
     setError,
   });
@@ -197,8 +214,8 @@ export function SidePanelApp() {
     expanded,
     setExpanded,
     contentRef,
-    syncScrollThumb,
-    revealScrollThumb,
+    syncScrollThumb: syncScrollBoundary,
+    revealScrollThumb: syncScrollBoundary,
     loadConversations,
     setError,
   });
@@ -209,8 +226,39 @@ export function SidePanelApp() {
     submitAgentQuery(agentPrompt);
   }
 
+  const focusComposer = () => requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>("#bookmark-agent-prompt")?.focus());
+  const closeUtility = () => { setUtilityView(null); void refresh().catch(caught => setError(caught instanceof Error ? caught.message : "刷新设置失败")); focusComposer(); };
+  const currentView = panelView === "chat" && activeConversation ? "chat" : "library";
+  const renderSurface = (children: ReactNode) => surface === "floating"
+    ? <>
+      <FloatingShell view={currentView} onViewChange={setPanelView} onboarding={onboardingVisible}
+        conversationTitle={activeConversation?.title}
+        busy={Boolean(busy)} currentSaved={currentSaved} canSave={Boolean(appState?.activeTab?.supported)} canCreateFolder={Boolean(snapshot)}
+        onSaveCurrent={() => void startSave()} onCreateFolder={() => snapshot && startCreateFolder(snapshot.primaryRootId || snapshot.root.id)}
+        onNewConversation={() => { setActiveConversation(null); setAgentPrompt(""); setPanelView("library"); focusComposer(); }}
+        onHistory={() => { void loadConversations().then(() => setUtilityView("history")).catch(caught => setError(caught instanceof Error ? caught.message : "历史会话读取失败")); }}
+        composer={<AgentComposer value={agentPrompt} onChange={setAgentPrompt} onSubmit={handleAgentSubmit}
+          configured={aiConfigured} busy={Boolean(busy)} onConfigure={() => setUtilityView("settings")}
+          onResume={currentView === "library" && activeConversation ? () => setPanelView("chat") : undefined}
+          onCancel={busy === "agent" || busy === "agent-actions" ? () => void cancelAgentRun() : undefined} />}>
+        {children}
+      </FloatingShell>
+      {!onboardingVisible && <BookmarkEditorDialog error={error} presentation={editor?.kind === "save" ? "page" : "dialog"} controller={editorController} busy={busy} setNotice={setNotice} refresh={refresh} />}
+      {utilityView && <AppModal labelledBy="floating-utility-title" className="floating-utility-dialog" onClose={closeUtility}>
+        <header className="floating-utility-heading"><h2 id="floating-utility-title">{utilityView === "settings" ? "设置" : "历史会话"}</h2><Button variant="ghost" size="icon-sm" aria-label="关闭窗口" onClick={closeUtility}><X size={16}/></Button></header>
+        <Suspense fallback={<p className="utility-loading" role="status">正在打开…</p>}>
+          {utilityView === "settings" ? <SettingsPage appState={appState} publicFaviconFallback={publicFaviconFallback}
+            onPublicFaviconFallbackChange={setPublicFaviconFallback} onAppStateChange={setAppState} onAiConfiguredChange={setAiConfigured}
+            onClose={closeUtility} onRestartOnboarding={() => { void restartOnboarding().then(() => { localStorage.removeItem("aarre:onboarding-done"); setUtilityView(null); setOnboardingVisible(true); }); }} />
+            : <AgentHistoryPage conversations={conversations} onDelete={deleteConversation} onBack={closeUtility}
+              onOpen={conversation => { setActiveConversation(conversation); setAgentPrompt(""); setError(""); setPanelView("chat"); focusComposer(); }} />}
+        </Suspense>
+      </AppModal>}
+    </>
+    : children;
+
   if (onboardingVisible) {
-    return (
+    return renderSurface(
       <Suspense fallback={null}>
         <OnboardingPage
           resourceCount={
@@ -221,6 +269,7 @@ export function SidePanelApp() {
             if (configured) setAiConfigured(true);
             localStorage.setItem("aarre:onboarding-done", "1");
             setOnboardingVisible(false);
+            const url = new URL(location.href); url.searchParams.delete("onboarding"); history.replaceState(null, "", url);
             void refresh();
           }}
         />
@@ -229,7 +278,7 @@ export function SidePanelApp() {
   }
 
   if (panelView === "settings") {
-    return (
+    return renderSurface(
       <Suspense fallback={null}>
         <SettingsPage
           appState={appState}
@@ -253,7 +302,7 @@ export function SidePanelApp() {
   }
 
   if (panelView === "history") {
-    return (
+    return renderSurface(
       <Suspense fallback={null}>
         <AgentHistoryPage
           conversations={conversations}
@@ -270,11 +319,12 @@ export function SidePanelApp() {
     );
   }
 
-  if (panelView === "chat" && activeConversation) {
-    return (
+  if (panelView === "chat" && (surface !== "floating" || activeConversation)) {
+    return renderSurface(
       <Suspense fallback={null}>
         <AgentChatPage
-        conversation={activeConversation}
+        embedded={surface === "floating"}
+        conversation={activeConversation || emptyConversation}
         resourceByUrl={resourceByUrl}
         siteBrandByHost={siteBrandByHost}
         prompt={agentPrompt}
@@ -309,8 +359,9 @@ export function SidePanelApp() {
     );
   }
 
-  return (
+  return renderSurface(
     <HomePage
+      floating={surface === "floating"}
       header={{
         appState,
         hasSnapshot: Boolean(snapshot),
@@ -320,23 +371,6 @@ export function SidePanelApp() {
         onOpenHistory: () => { void loadConversations(); setPanelView("history"); },
         onOpenManager: () => void sendExtensionRequest({ type: "OPEN_MANAGER" }),
         onOpenSettings: () => setPanelView("settings"),
-      }}
-      notices={{
-        query: libraryQuery,
-        organizationNotice,
-        organizationNoticeBusy,
-        resurfacing: contextResurfacing,
-        onDismissOrganization: () => {
-          setOrganizationNoticeBusy(true);
-          void sendExtensionRequest({ type: "DISMISS_ORGANIZATION_NOTICE" })
-            .then(() => setOrganizationNotice(null))
-            .catch((caught) => setError(caught instanceof Error ? caught.message : "暂时无法隐藏整理提示"))
-            .finally(() => setOrganizationNoticeBusy(false));
-        },
-        onOpenOrganization: () => void sendExtensionRequest({ type: "OPEN_MANAGER", view: "organize" })
-          .catch((caught) => setError(caught instanceof Error ? caught.message : "无法打开整理提案")),
-        onOpenResurfacing: () => void sendExtensionRequest({ type: "OPEN_MANAGER", view: "resurface" }),
-        onOpenItem: (item) => void openNavigation({ text: item.url, url: item.url }),
       }}
       search={{
         value: libraryQuery,
@@ -380,12 +414,7 @@ export function SidePanelApp() {
         onDragEnd: () => setDraggedId(""),
         onMove: moveNode,
       }}
-      scroll={{
-        ...scrollThumb,
-        onPointerDown: handleScrollThumbPointerDown,
-        onPointerMove: handleScrollThumbPointerMove,
-        onPointerEnd: handleScrollThumbPointerEnd,
-      }}
+      scroll={{ atEnd }}
       preview={{ snapshot: previewSnapshot, hidden: Boolean(editor), placement: bookmarkPreview }}
       agent={aiConfigured ? {
         value: agentPrompt,
