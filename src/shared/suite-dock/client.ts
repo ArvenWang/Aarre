@@ -1,4 +1,4 @@
-import { AARRE_ID, isApp, isRatio, isTheme, resolvedTheme, SUITE_DOCK_PORT, SUITE_THEME_PORT, type SuiteApp, type SuiteState, type SuiteTheme } from "./contract";
+import { AARRE_ID, isApp, isDockSide, isRatio, isTheme, resolvedTheme, SUITE_DOCK_PORT, SUITE_THEME_PORT, type DockSide, type SuiteApp, type SuiteState, type SuiteTheme } from "./contract";
 
 export function createSuiteClient(app: SuiteApp, hooks: {
   state: (state: SuiteState) => void; theme: (theme: "light" | "dark") => void;
@@ -27,11 +27,14 @@ export function createSuiteClient(app: SuiteApp, hooks: {
     try {
       const port = app === "aarre" ? chrome.runtime.connect({ name: SUITE_DOCK_PORT }) : chrome.runtime.connect(AARRE_ID, { name: SUITE_DOCK_PORT });
       dock = port;
-      port.onDisconnect.addListener(() => { void chrome.runtime.lastError; if (dock === port) disconnectDock(); });
+      // Reading lastError consumes Chrome's expected disconnect diagnostic.
+      // Reflect keeps the getter side effect through release minification;
+      // an unused optional property read would be optimized away.
+      port.onDisconnect.addListener(() => { Reflect.get(chrome.runtime ?? {}, "lastError"); if (dock === port) disconnectDock(); });
       port.onMessage.addListener(message => {
         if (dock !== port || disposed) return;
         if (message?.type === "STATE" && typeof message.paired === "boolean" && (message.active === null || isApp(message.active))) {
-          connected = true; state = { paired: message.paired, active: message.active, ...(isRatio(message.ratio) ? { ratio: message.ratio } : {}) }; hooks.state(state);
+          connected = true; state = { paired: message.paired, active: message.active, suppressed: message.suppressed === true, ...(isRatio(message.ratio) ? { ratio: message.ratio } : {}), ...(isDockSide(message.side) ? { side: message.side } : {}) }; hooks.state(state);
         }
         if (message?.type === "THEME" && isTheme(message.theme)) post(themes, { type: "MERGE", theme: message.theme });
         if (message?.type === "PING" && typeof message.id === "string" && alive()) post(port, { type: "PONG", id: message.id });
@@ -54,7 +57,7 @@ export function createSuiteClient(app: SuiteApp, hooks: {
         if (message?.type !== "THEME" || !isTheme(message.theme)) return;
         currentTheme = message.theme; paint(); post(dock, message);
       });
-      port.onDisconnect.addListener(() => { void chrome.runtime.lastError; if (themes === port) { themes = undefined; alive(); } });
+      port.onDisconnect.addListener(() => { Reflect.get(chrome.runtime ?? {}, "lastError"); if (themes === port) { themes = undefined; alive(); } });
     } catch { /* The extension was unloaded. */ }
   };
   connectThemes(); connect();
@@ -62,7 +65,7 @@ export function createSuiteClient(app: SuiteApp, hooks: {
   const heartbeat = setInterval(() => { connectThemes(); connect(); post(dock, { type: "PING" }); post(themes, { type: "PING" }); }, 20_000);
   return {
     get paired() { return state.paired; },
-    position(ratio: number) { if (isRatio(ratio)) post(dock, { type: "POSITION", ratio }); },
+    position(ratio: number, side: DockSide = "right") { if (isRatio(ratio) && isDockSide(side)) post(dock, { type: "POSITION", ratio, side }); },
     enabled(value: boolean) { if (enabled !== value) { enabled = value; hello(); } },
     changed(value: boolean) {
       if (opened === value) return;

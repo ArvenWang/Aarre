@@ -71,8 +71,12 @@ it("reveals the left action on hover, keeps the pointer crossing usable and dism
 it("lets keyboard users reach the secondary action and dismiss it without opening the menu", () => {
   const button = shadow.querySelector<HTMLButtonElement>(".bar-toggle")!;
   const actions = shadow.querySelector<HTMLElement>(".quick-actions")!;
+  // jsdom does not model keyboard focus modality in a closed shadow root.
+  vi.spyOn(button,"matches").mockImplementation(selector=>selector===":focus-visible");
   button.focus();
-  button.dispatchEvent(new KeyboardEvent("keydown", {key:"ArrowLeft",bubbles:true,composed:true}));
+  expect(actions.inert).toBe(false);
+  // Tab follows the normal focus order; arrows now move the dock itself.
+  shadow.querySelector<HTMLButtonElement>(".bar-save")!.focus();
   expect(shadow.activeElement).toBe(shadow.querySelector(".bar-save"));
   window.document.dispatchEvent(new KeyboardEvent("keydown", {key:"Escape",bubbles:true}));
   expect(actions.inert).toBe(true);

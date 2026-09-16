@@ -1,6 +1,7 @@
 export const hostStyles = `
 :host { all:initial !important; position:fixed !important; inset:0 !important; width:100vw !important; height:100vh !important; max-width:none !important; max-height:none !important; margin:0 !important; padding:0 !important; border:0 !important; background:transparent !important; overflow:visible !important; pointer-events:none !important; z-index:2147483647 !important; color-scheme:light dark; --dock-bg:#fff; --dock-ink:#17191c; --dock-line:#dbe0e4; --dock-hover:#f3f5f6; --dock-accent:#b74624; --dock-glass:rgb(255 255 255 / .72); }
-:host([data-hidden="true"]), :host([data-capturing="true"]) { visibility:hidden !important; }
+:host([data-suite-suppressed="true"]), :host([data-hidden="true"]), :host([data-capturing="true"]) { visibility:hidden !important; }
+:host([data-suite-suppressed="true"]) * { visibility:hidden !important; pointer-events:none !important; }
 * { box-sizing:border-box; }
 [hidden] { display:none !important; }
 .dock-surface { position:fixed; background:var(--dock-bg); border:1px solid var(--dock-line); border-radius:var(--suite-container-radius); box-shadow:0 5px 24px #0f11131c,0 1px 4px #0f111312; transform-origin:top left; }
@@ -10,6 +11,8 @@ export const hostStyles = `
 .bar-product { position:relative; width:44px; height:44px; }
 .quick-actions { position:absolute; top:-4px; right:calc(100% + 10px); display:grid; width:52px; height:52px; padding:4px; border:0; border-radius:var(--suite-container-radius); background:var(--dock-bg); box-shadow:0 4px 18px #0f11131c; opacity:0; visibility:hidden; pointer-events:none; transform:translateX(8px); transition:background-color 120ms ease-out,opacity 120ms ease-out,transform 160ms ease-out,visibility 0s linear 120ms; }
 .quick-actions::after { content:""; position:absolute; left:100%; top:0; width:10px; height:100%; }
+:host([data-dock-side="left"]) .quick-actions { right:auto; left:calc(100% + 10px); transform:translateX(-8px); }
+:host([data-dock-side="left"]) .quick-actions::after { left:auto; right:100%; }
 .bar-product[data-actions-open="true"] .quick-actions { opacity:1; visibility:visible; pointer-events:auto; transform:none; transition-delay:0s; }
 .bar-save[data-saved="true"] { color:var(--suite-ink); }
 .bar-save { position:relative; }
@@ -23,6 +26,7 @@ export const hostStyles = `
 iframe { display:block; width:100%; height:100%; border:0; background:inherit; color-scheme:inherit; }
 .resize { position:absolute; left:0; top:0; bottom:0; width:8px; cursor:ew-resize; touch-action:none; pointer-events:auto; outline:none; }
 .resize::after { content:""; position:absolute; top:calc(50% - 20px); left:2px; width:2px; height:40px; border-radius:2px; background:var(--dock-accent); opacity:0; transition:opacity 120ms; }
+:host([data-dock-side="left"]) .resize { left:auto; right:0; }
 .resize:hover::after, .resize:focus-visible::after, :host([data-resizing="true"]) .resize::after { opacity:.8; }
 :host([data-resizing="true"]) iframe { pointer-events:none; }
 .loading { position:absolute; inset:0; display:grid; place-content:center; gap:8px; padding:24px; overflow-wrap:anywhere; text-align:center; background:inherit; color:inherit; font:13px/1.5 "Avenir Next","PingFang SC",sans-serif; }

@@ -144,12 +144,12 @@ try {
     const b=await until(()=>inspect(selector),'拖动入口');
     await source.mouse.move(b.x+b.width/2,b.y+b.height/2);
     await source.mouse.down();await source.mouse.move(b.x+b.width/2+dx,y,{steps:18});await source.mouse.up();
-    await pause(200);
+    await pause(320);
   };
   const view=()=>source.evaluate(()=>({width:visualViewport?.width||innerWidth,height:visualViewport?.height||innerHeight}));
-  const menuInside=async(cls,label)=>{
+  const menuInside=async(cls,label,side='right')=>{
     const b=await until(()=>inspect(byClass(cls)),label),v=await view();
-    check(near(b.x+b.width,v.width-8)&&near(b.y,12)&&near(b.height,v.height-24)&&b.corners.every(c=>c==='20px'),label,b);
+    check((side==='left'?near(b.x,8):near(b.x+b.width,v.width-8))&&near(b.y,12)&&near(b.height,v.height-24)&&b.corners.every(c=>c==='20px'),label,b);
     return b;
   };
   const closeA=async()=>{await frame().getByRole('button',{name:'收起菜单',exact:true}).click();await closed();};
@@ -191,12 +191,55 @@ try {
     await source.screenshot({path:path.join(artifact,`save-hover-${theme}.png`),clip:{x:1050,y:340,width:230,height:220}});
   }
   await manager.close();
-  // Horizontal pointer movement is ignored by placement, but still suppresses a drag's click.
+  // Follow the pointer during a drag, then snap to whichever edge is closer.
   const beforeHorizontal=await surface();await dragTo(beforeHorizontal.y+26,-220);
-  b=await surface();check(near(b.x,beforeHorizontal.x)&&near(b.y,beforeHorizontal.y)&&(await state()).a.open==='false','横向拖动不改变位置、不误开菜单',b);
+  b=await surface();check(near(b.x,beforeHorizontal.x)&&near(b.y,beforeHorizontal.y)&&(await state()).a.open==='false','右半区松手吸附回右侧、不误开菜单',b);
+  const handle=await inspect(byClass('bar-toggle'));
+  await source.mouse.move(handle.x+22,handle.y+22);await source.mouse.down();
+  await source.mouse.move(430,handle.y+22,{steps:24});
+  b=await surface();check(near(b.x+26,430),'拖动中悬浮球实时跟随横向指针',b);
+  await source.mouse.up();await closed();b=await surface();
+  check(near(b.x,8)&&(await state()).a.open==='false','左半区松手吸附左侧、不误开菜单',b);
+  await hoverAarre();const leftQuick=await until(async()=>{const box=await inspect(byClass('quick-actions'));return box?.opacity===1&&box.transform==='none'?box:false;},'左侧收藏入口完成展开');
+  check(leftQuick.x>b.x+b.width,'左侧悬浮球的收藏入口朝页面内侧展开',leftQuick);
+  await click(byClass('bar-save'));await until(async()=>frame()&&await frame().getByRole('textbox',{name:'名称',exact:true}).isVisible(),'左侧收藏表单');await pause(320);
+  const leftSave=await inspect(byClass('panel'));check(near(leftSave.x,8)&&leftSave.y>=12,'收藏表单跟随左侧且不越界',leftSave);
+  await frame().locator('.native-dialog-actions').getByRole('button',{name:'取消',exact:true}).click();await closed();
+  for (const [app,panel,resizeClass] of [['aarre','panel','resize'],['nexalign','menu','menu-resize']]) {
+    await click(byClass(app==='aarre'?'bar-toggle':'bar-nexalign'));
+    await until(async()=>app==='aarre'?frame()&&await frame().getByRole('button',{name:'收起菜单',exact:true}).isVisible():nFrame()&&await nFrame().locator('.floating-source-panel').isVisible(),'左侧主菜单');await pause(320);
+    const before=await menuInside(panel,app+' 从左侧展开','left');
+    if(app==='nexalign') {
+      const session=await nFrame().evaluate(()=>chrome.runtime.sendMessage({type:'SESSION_CONNECT'}));
+      const layers=session.snapshot.layers, heading=layers.find(layer=>layer.nodeName==='h1');
+      assert.ok(heading,'真实网页标题应出现在目录中');
+      const ancestors=[];let parent=layers.find(layer=>layer.backendNodeId===heading.parentBackendNodeId);
+      while(parent){ancestors.unshift(parent);parent=layers.find(layer=>layer.backendNodeId===parent.parentBackendNodeId);}
+      for(const layer of ancestors){const row=nFrame().locator(`.layer-row[data-layer-id="${layer.backendNodeId}"]`);if(await row.getAttribute('aria-expanded')==='false')await row.locator('.layer-toggle').click();}
+      await nFrame().locator(`.layer-row[data-layer-id="${heading.backendNodeId}"]`).getByRole('button',{name:'定位图层',exact:true}).click();await pause(400);
+      const located=await source.locator('h1').boundingBox();
+      check(located.x>before.x+before.width&&located.x+located.width<(await view()).width,'左侧菜单的图层定位把元素放在右方可见页面',located);
+    }
+    const edge=await inspect(byClass(resizeClass));
+    check(near(edge.x+edge.width,before.x+before.width),app+' 调整宽度把手位于内侧边缘',edge);
+    await source.mouse.move(edge.x+edge.width/2,edge.y+edge.height/2);await source.mouse.down();await source.mouse.move(edge.x+edge.width/2+48,edge.y+edge.height/2,{steps:10});await source.mouse.up();await pause(320);
+    const resized=await inspect(byClass(panel));check(near(resized.width,before.width+48)&&near(resized.x,8),app+' 左侧菜单向内增宽且贴边不动',resized);
+    await source.screenshot({path:path.join(artifact,`left-${app}.png`)});
+    const next=await inspect(byClass(resizeClass));await source.mouse.move(next.x+next.width/2,next.y+next.height/2);await source.mouse.down();await source.mouse.move(next.x+next.width/2-48,next.y+next.height/2,{steps:10});await source.mouse.up();await pause(300);
+    if(app==='aarre')await closeA();else await closeN();
+    check(near((await surface()).x,8),app+' 关闭后回到左侧共享入口');
+  }
+  const leftParked=await surface();await source.reload();await until(async()=>{const s=await state();return s.a?.suitePaired==='true'&&s.n?.suitePaired==='true';},'刷新恢复左侧共享入口');await closed();
+  check(near((await surface()).x,8)&&near((await surface()).y,leftParked.y),'刷新后保留左右边缘和上下位置');
+  await source.setViewportSize({width:360,height:480});await pause(320);
+  check(near((await surface()).x,8),'窄窗口保持左侧贴边');
+  await click(byClass('bar-nexalign'));await until(async()=>nFrame()&&await nFrame().locator('.floating-source-panel').isVisible(),'左侧窄窗口菜单');await pause(320);
+  await menuInside('menu','左侧窄窗口完整展开','left');await closeN();
+  await source.setViewportSize({width:1280,height:900});await pause(320);
+  await dragTo(350,900);check(near((await surface()).x+(await surface()).width,(await view()).width-8),'跨过中线松手吸附回右侧');
   for(const [label,y] of [['top',5],['middle',390],['bottom',895]]) {
     await dragTo(y,-160);await closed();b=await surface();v=await view();
-    check(near(b.x+b.width,v.width-8)&&b.y>=7.5&&b.y+b.height<=v.height-7.5,`${label}：仅上下移动且不超出视口`,b);
+    check(near(b.x+b.width,v.width-8)&&b.y>=7.5&&b.y+b.height<=v.height-7.5,`${label}：上下移动并保持就近贴边、不超出视口`,b);
     const parked=b;
     if(label==='bottom') await sampleMotion('dock-surface','__dockAOpen',650);
     await click(byClass('bar-toggle'));await until(async()=>frame()&&await frame().getByRole('button',{name:'收起菜单',exact:true}).isVisible(),'Aarre 真正就绪');await pause(320);
@@ -238,6 +281,12 @@ try {
   await source.keyboard.press('Home');await pause(120);check(near((await surface()).y,8),'Home 将把手移到顶部');
   await source.keyboard.press('End');await pause(120);b=await surface();v=await view();check(near(b.y,v.height-b.height-8),'End 将把手移到底部');
   await source.keyboard.press('ArrowUp');await pause(120);check(near((await surface()).y,b.y-12),'方向键可上下微调');
+  await source.keyboard.press('ArrowLeft');await pause(320);check(near((await surface()).x,8),'左方向键贴左边');
+  await source.keyboard.press('ArrowRight');await pause(320);check(near((await surface()).x+(await surface()).width,(await view()).width-8),'右方向键贴右边');
+  for(let i=0;i<12;i++){await source.keyboard.press('Tab');if((await inspect(byClass('bar-toggle')))?.focused)break;}
+  check((await inspect(byClass('bar-toggle')))?.focused,'Tab 可以进入共享入口');
+  await source.keyboard.press('Tab');check((await inspect(byClass('bar-save')))?.focused,'Tab 可以进入收藏动作');
+  await source.keyboard.press('Escape');
   await source.emulateMedia({reducedMotion:'reduce'});
   await click(byClass('bar-toggle'));await until(async()=>frame()&&await frame().getByRole('button',{name:'收起菜单',exact:true}).isVisible(),'减少动态效果');
   await menuInside('panel','减少动态效果仍正常展开');await closeA();await source.emulateMedia({reducedMotion:'no-preference'});
@@ -252,23 +301,23 @@ try {
   await source.screenshot({path:path.join(artifact,'saved-hover.png'),clip:{x:1050,y:680,width:230,height:220}});
   await source.mouse.move(500,300);await browser.send('Extensions.uninstall',{id:aarreId});
   await until(async()=>{const s=await state();return !s.a&&s.n?.suitePaired==='false';},'独立 NexAlign',25000);await pause(320);
-  await dragTo(140,-200,a=>'data-floating-launcher' in a);const single=await inspect(byClass('dock-surface-nex'));
+  await dragTo(140,-900,a=>'data-floating-launcher' in a);const single=await inspect(byClass('dock-surface-nex'));
   const singleN=await inspect(a=>'data-floating-launcher' in a);
   check(singleN.iconSizes[0].w===36&&JSON.stringify(singleN.productPaths)===JSON.stringify(productPaths.nexalign),'独立 NexAlign 仍使用正式应用图标',singleN);
   await source.screenshot({path:path.join(artifact,'standalone-nexalign.png'),clip:{x:1150,y:40,width:130,height:220}});
-  check(single.width===52&&single.height===52&&near(single.x+single.width,1272)&&single.y<200&&(await state()).n.menuOpen==='false','NexAlign 单独安装可上下拖动、松手不误开',single);
+  check(single.width===52&&single.height===52&&near(single.x,8)&&single.y<200&&(await state()).n.menuOpen==='false','NexAlign 单独安装可左右上下拖动、就近吸附、不误开',single);
   await click(a=>'data-floating-launcher' in a);await until(async()=>nFrame()&&await nFrame().locator('.floating-source-panel').isVisible(),'独立 NexAlign 展开');await pause(320);
-  await menuInside('menu','独立 NexAlign 拖动后正常展开');await click(a=>'data-floating-launcher' in a);await pause(350);
+  await menuInside('menu','独立 NexAlign 拖动后从左侧正常展开','left');await click(a=>'data-floating-launcher' in a);await pause(350);
   check(near((await inspect(byClass('dock-surface-nex'))).y,single.y),'独立 NexAlign 收起返回拖动位置');
   await browser.send('Extensions.uninstall',{id:nexId});
   await browser.send('Extensions.loadUnpacked',{path:aarrePath});await source.reload();
   await until(()=>inspect(byClass('bar-toggle')),'独立 Aarre');await pause(350);
-  await dragTo(200,100);b=await surface();check(b.height===52&&near(b.x+b.width,1272)&&b.y<240&&(await state()).a.open==='false','Aarre 单独安装可上下拖动、松手不误开',b);
+  await dragTo(200,-900);b=await surface();check(b.height===52&&near(b.x,8)&&b.y<240&&(await state()).a.open==='false','Aarre 单独安装可左右上下拖动、就近吸附、不误开',b);
   const singleA=await inspect(byClass('bar-toggle'));
   check(singleA.iconSizes[0].w===36&&JSON.stringify(singleA.productPaths)===JSON.stringify(productPaths.aarre),'独立 Aarre 仍使用正式应用图标',singleA);
   await source.screenshot({path:path.join(artifact,'standalone-aarre.png'),clip:{x:1150,y:100,width:130,height:220}});
   await click(byClass('bar-toggle'));await until(async()=>frame()&&await frame().getByRole('button',{name:'收起菜单',exact:true}).isVisible(),'独立 Aarre 展开');await pause(320);
-  await menuInside('panel','独立 Aarre 拖动后正常展开');await frame().getByRole('button',{name:'收起菜单',exact:true}).click();await pause(350);
+  await menuInside('panel','独立 Aarre 拖动后从左侧正常展开','left');await frame().getByRole('button',{name:'收起菜单',exact:true}).click();await pause(350);
   check(near((await surface()).y,b.y),'独立 Aarre 收起返回拖动位置');
   check(report.errors.length===0,'没有记录到页面运行异常');
 } catch(error) {report.error=error.stack;console.error(error);process.exitCode=1;await context?.pages()[0]?.screenshot({path:path.join(artifact,'error.png')}).catch(()=>{});}

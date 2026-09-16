@@ -89,3 +89,18 @@ it("shows and hides immediately for reduced motion without creating animations",
   expect(f.base).not.toHaveBeenCalled(); expect(f.content).not.toHaveBeenCalled();
   expect(dockDuration(false)).toBe(0);
 });
+
+it("anchors left content during width changes and follows the pointer without animation lag", () => {
+  const f=fixture(), {bar,menu}=dockRects({width:1280,height:900},400,96,.5,"left");
+  f.controller.layout(bar,false,false,"left",true);
+  expect(f.base).not.toHaveBeenCalled();
+  f.controller.layout(menu,true,true,"left");
+  expect(f.content.mock.calls[0][0]).toEqual([{opacity:0},{opacity:1}]);
+  f.base.mock.results[0].value.playState="finished";
+  vi.spyOn(f.surface,"getBoundingClientRect").mockReturnValue({...menu} as DOMRect);
+  f.controller.layout({...menu,width:480},true,false,"left");
+  expect(f.content).toHaveBeenCalledTimes(1);
+  f.controller.layout({...bar,x:500},false,false,"left",true);
+  expect(f.surface.style.left).toBe("500px");
+  expect(f.base).toHaveBeenCalledTimes(1);
+});

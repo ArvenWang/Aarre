@@ -1,9 +1,10 @@
 import type { DockRect } from "./geometry";
+import type { DockSide } from "./contract";
 
 const motion = { open: 280, close: 210, contentOpen: 140, contentClose: 120, delay: 100, easing: "cubic-bezier(.22,1,.36,1)" };
 export const dockDuration = (open: boolean) => matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : open ? motion.open : motion.close;
 
-/** Scale only the surface; content and controls share its moving right edge. */
+/** Scale only the surface; content and controls follow the docked edge. */
 export function createDockMorph(surface: HTMLElement, panel: HTMLElement, controls: HTMLElement[] = []) {
   let animation: Animation | undefined, content: Animation | undefined;
   let edges: Animation[] = [];
@@ -13,15 +14,16 @@ export function createDockMorph(surface: HTMLElement, panel: HTMLElement, contro
   // and asynchronous iframe readiness or broker acknowledgements.
   panel.style.opacity = "0"; panel.style.transform = "none";
   return {
-    layout(target: DockRect, nextOpen: boolean, animate = false) {
+    layout(target: DockRect, nextOpen: boolean, animate = false, side: DockSide = "right", immediate = false) {
       const current = surface.getBoundingClientRect();
       const from = current.width ? current : rect;
       const changed = !rect || rect.x !== target.x || rect.y !== target.y || rect.width !== target.width || rect.height !== target.height;
       const stateChanged = nextOpen !== open;
-      const duration = dockDuration(nextOpen);
+      const duration = immediate ? 0 : dockDuration(nextOpen);
       if (changed || stateChanged) {
         const running = animation?.playState === "running";
-        const edgeChanged = rect && Math.abs(target.x + target.width - rect.x - rect.width) > .5;
+        const edge = (r: DockRect) => r.x + (side === "left" ? 0 : r.width);
+        const edgeChanged = rect && Math.abs(edge(target) - edge(rect)) > .5;
         // A viewport/content resize during a transition keeps its deadline;
         // repeated state notifications neither restart nor cancel the motion.
         const remaining = running && !stateChanged
@@ -37,7 +39,7 @@ export function createDockMorph(surface: HTMLElement, panel: HTMLElement, contro
           ], timing);
           // Only follow a real edge change, never add a decorative entrance offset.
           // This also retargets an in-flight open/close without a second deadline.
-          const dx = from.x + from.width - target.x - target.width;
+          const dx = edge(from) - edge(target);
           if (Math.abs(dx) > .01) edges = [panel, ...controls].map(element => element.animate([
             { transform: `translateX(${dx}px)` }, { transform: "none" },
           ], timing));

@@ -9,6 +9,7 @@ const flush = async () => { await vi.advanceTimersByTimeAsync(0); };
 beforeEach(() => {
   vi.useFakeTimers(); stored = {}; own = event(); external = event(); messages = event(); changes = event();
   vi.stubGlobal("chrome", { runtime: { id: "aarre", getURL: (path: string) => `chrome-extension://aarre/${path}`,
+    getManifest: () => ({externally_connectable:{ids:NEXALIGN_IDS}}),
     onConnect: own, onConnectExternal: external, onMessage: messages },
     storage: { local: { get: async () => ({ ...stored }), set: async (next: Record<string, unknown>) => {
       const diff = Object.fromEntries(Object.entries(next).map(([key, newValue]) => [key, { oldValue: stored[key], newValue }]));
@@ -103,14 +104,46 @@ it("recovers from an uninstalled caller even when Chrome leaves its external Por
   expect(sent(a, "STATE").at(-1)).toMatchObject({ paired: false, active: null });
 });
 
-it("shares a valid vertical position only from the visible paired handle", async () => {
+it("shares both axes only from the visible paired handle", async () => {
   const a=port("aarre"), n=port("nexalign"); await flush();
-  a.onMessage.emit({type:"POSITION",ratio:.19}); await flush();
-  expect(sent(n,"STATE").at(-1).ratio).toBe(.19);
+  a.onMessage.emit({type:"POSITION",ratio:.19,side:"left"}); await flush();
+  expect(sent(n,"STATE").at(-1)).toMatchObject({ratio:.19,side:"left"});
   for(const ratio of [NaN,Infinity,-1,2,".5",null]) a.onMessage.emit({type:"POSITION",ratio});
-  n.onMessage.emit({type:"POSITION",ratio:.8}); await flush();
-  expect(sent(a,"STATE").at(-1).ratio).toBe(.19);
+  n.onMessage.emit({type:"POSITION",ratio:.8,side:"right"}); await flush();
+  expect(sent(a,"STATE").at(-1)).toMatchObject({ratio:.19,side:"left"});
   await openNex(a,n);
   a.onMessage.emit({type:"POSITION",ratio:.7}); await flush();
-  expect(sent(n,"STATE").at(-1).ratio).toBe(.19);
+  expect(sent(n,"STATE").at(-1)).toMatchObject({ratio:.19,side:"left"});
+});
+
+function viewportPort(override: object = {}) {
+  const p = { name: "nex-suite-viewport-v1", sender: { id: NEXALIGN_IDS[1], url: `chrome-extension://${NEXALIGN_IDS[1]}/background.js`, ...override },
+    onMessage: event(), onDisconnect: event(), postMessage: vi.fn(), disconnect: vi.fn(() => p.onDisconnect.emit()) };
+  external.emit(p); return p;
+}
+it("hides only the mobile tab across navigation and releases it on desktop/disconnect", async () => {
+  const a=port("aarre"), other=port("aarre",{tab:{id:8}}), v=viewportPort();
+  v.onMessage.emit({type:"VIEWPORT",tabId:7});
+  expect(sent(a,"STATE").at(-1).suppressed).toBe(true);
+  expect(sent(other,"STATE").at(-1).suppressed).toBe(false);
+  const navigated=port("aarre",{documentId:"new-document"});
+  expect(sent(navigated,"STATE").at(-1).suppressed).toBe(true);
+  v.onMessage.emit({type:"VIEWPORT",tabId:null});
+  expect(sent(navigated,"STATE").at(-1).suppressed).toBe(false);
+  v.onMessage.emit({type:"VIEWPORT",tabId:7});v.disconnect();
+  expect(sent(navigated,"STATE").at(-1).suppressed).toBe(false);
+});
+it("rejects web/content callers, malformed mobile leases and retires dead publishers", async () => {
+  const a=port("aarre");
+  for(const sender of [{tab:{id:7}},{id:"untrusted"},{url:"https://example.com"}]) {
+    expect(viewportPort(sender).disconnect).toHaveBeenCalled();
+  }
+  const v=viewportPort();
+  for(const tabId of [-1,NaN,Infinity,"7",undefined]) v.onMessage.emit({type:"VIEWPORT",tabId});
+  expect(sent(a,"STATE").at(-1).suppressed).toBe(false);
+  v.onMessage.emit({type:"VIEWPORT",tabId:7});
+  a.onMessage.emit({type:"REQUEST",app:"aarre"}); await flush();
+  expect(sent(a,"OPEN")).toHaveLength(0);
+  await vi.advanceTimersByTimeAsync(4_001);
+  expect(v.disconnect).toHaveBeenCalled();expect(sent(a,"STATE").at(-1).suppressed).toBe(false);
 });

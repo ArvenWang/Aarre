@@ -1,4 +1,5 @@
-import { canonicalTheme, compareTheme, isApp, isMode, isRatio, isTheme, NEXALIGN_IDS, SUITE_DOCK_PORT, SUITE_THEME_KEY, SUITE_THEME_PORT, type SuiteApp, type SuiteTheme } from "./contract";
+import { installSuiteViewportBroker } from "./viewport";
+import { canonicalTheme, compareTheme, isApp, isDockSide, isMode, isRatio, isTheme, SUITE_DOCK_PORT, SUITE_THEME_KEY, SUITE_THEME_PORT, type DockSide, type SuiteApp, type SuiteTheme } from "./contract";
 
 export function installSuiteBackground(app: SuiteApp) {
   const themePorts = new Set<chrome.runtime.Port>();
@@ -52,22 +53,29 @@ export function installSuiteBackground(app: SuiteApp) {
       if (message?.type === "MERGE") void update(message.theme).catch(() => undefined);
       if (message?.type === "PING") safePost(port, { type: "PONG" });
     });
-    port.onDisconnect.addListener(() => { themePorts.delete(port); });
+    port.onDisconnect.addListener(() => {
+      // 页面进入前进/后退缓存时 Chrome 会主动断连；须在回调内读取原因，再清理连接。
+      void chrome.runtime.lastError;
+      themePorts.delete(port);
+    });
   });
   chrome.storage.onChanged.addListener((changes, area) => {
     const next = changes[SUITE_THEME_KEY]?.newValue;
     if (area === "local" && isTheme(next) && (!theme || compareTheme(next, theme) > 0)) { theme = next; publish(next); }
   });
   if (app !== "aarre") return;
+  // 与 Chrome 使用同一份安装包允许列表，避免本机构建已放行却被旧 ID 常量再次拒绝。
+  const nexalignIds = chrome.runtime.getManifest().externally_connectable?.ids ?? [];
 
   type Client = { port: chrome.runtime.Port; app: SuiteApp; enabled: boolean; opened: boolean };
-  type Group = { clients: Map<SuiteApp, Client>; active: SuiteApp | null; ratio?: number; sequence: number; queue?: Promise<void> };
+  type Group = { clients: Map<SuiteApp, Client>; active: SuiteApp | null; tabId: number; ratio?: number; side?: DockSide; sequence: number; queue?: Promise<void> };
   const groups = new Map<string, Group>();
   const replies = new Map<string, { port: chrome.runtime.Port; finish: (ok: boolean) => void }>();
   const paired = (group: Group) => group.clients.get("aarre")?.enabled === true && group.clients.get("nexalign")?.enabled === true;
   const broadcast = (group: Group) => {
-    for (const client of group.clients.values()) safePost(client.port, { type: "STATE", paired: paired(group), active: group.active, ratio: group.ratio });
+    for (const client of group.clients.values()) safePost(client.port, { type: "STATE", paired: paired(group), active: group.active, suppressed: mobileViewport(group.tabId), ratio: group.ratio, side: group.side });
   };
+  const mobileViewport = installSuiteViewportBroker(() => { for (const group of groups.values()) broadcast(group); });
   const command = (client: Client, type: "OPEN" | "CLOSE") => new Promise<boolean>(resolve => {
     const id = crypto.randomUUID();
     const timer = setTimeout(() => finish(false), 4_000);
@@ -76,7 +84,7 @@ export function installSuiteBackground(app: SuiteApp) {
     safePost(client.port, { type, id });
   });
   const performActivation = async (group: Group, target: SuiteApp | null, sequence: number) => {
-    if (sequence !== group.sequence || (target && !group.clients.get(target)?.enabled)) return;
+    if (sequence !== group.sequence || (target && (mobileViewport(group.tabId) || !group.clients.get(target)?.enabled))) return;
     const other = [...group.clients.values()].find(client => target ? client.app !== target : client.app === group.active);
     if (other && !await command(other, "CLOSE")) {
       if (group.sequence === sequence) {
@@ -110,11 +118,11 @@ export function installSuiteBackground(app: SuiteApp) {
     if (port.name !== SUITE_DOCK_PORT) return;
     const sender = port.sender;
     const app: SuiteApp = external ? "nexalign" : "aarre";
-    if (!sender || (external ? !NEXALIGN_IDS.includes(sender.id ?? "") : sender.id !== chrome.runtime.id)
+    if (!sender || (external ? !nexalignIds.includes(sender.id ?? "") : sender.id !== chrome.runtime.id)
       || sender.frameId !== 0 || typeof sender.tab?.id !== "number" || !sender.documentId
       || sender.documentLifecycle !== "active" || !/^https?:\/\//.test(sender.url ?? "")) { port.disconnect(); return; }
     const key = `${sender.tab.id}:${sender.documentId}`;
-    const group: Group = groups.get(key) ?? { clients: new Map(), active: null, sequence: 0 };
+    const group: Group = groups.get(key) ?? { clients: new Map(), active: null, tabId: sender.tab.id, sequence: 0 };
     groups.set(key, group);
     const old = group.clients.get(app);
     const client: Client = { port, app, enabled: false, opened: false };
@@ -149,7 +157,9 @@ export function installSuiteBackground(app: SuiteApp) {
       // The hosts persist the accepted ratio through their existing settings.
       if (message?.type === "POSITION" && isRatio(message.ratio) && client.enabled
         && (!paired(group) || app === "aarre") && !group.active) {
-        group.ratio = message.ratio; broadcast(group);
+        group.ratio = message.ratio;
+        group.side = isDockSide(message.side) ? message.side : "right";
+        broadcast(group);
       }
       if (message?.type === "HELLO" && message.version === 1) {
         if (client.enabled && message.enabled !== true) group.sequence++;
@@ -172,7 +182,7 @@ export function installSuiteBackground(app: SuiteApp) {
       if (message?.type === "THEME") void update(message.theme).catch(() => undefined);
       if (message?.type === "PING") safePost(port, { type: "PONG" });
     });
-    port.onDisconnect.addListener(disconnected);
+    port.onDisconnect.addListener(() => { void chrome.runtime.lastError; disconnected(); });
   };
   chrome.runtime.onConnect.addListener(port => connect(port, false));
   chrome.runtime.onConnectExternal.addListener(port => connect(port, true));

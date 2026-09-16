@@ -27,6 +27,21 @@ beforeEach(() => {
 });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 describe("floating geometry", () => {
+  it("keeps left menus, save forms and the paired handle on the same edge", () => {
+    for (const viewport of [{width:1280,height:900},{width:320,height:360,left:30,top:20}]) {
+      for (const handleRatio of [0,.5,1]) {
+        const position={width:400,handleRatio,side:"left" as const};
+        const {bar,menu}=floatingRects(position,viewport,96);
+        const save=floatingSaveRect(viewport,560,position,96);
+        expect(bar.x).toBe((viewport.left??0)+8);
+        expect(menu.x).toBe(bar.x); expect(save.x).toBe(bar.x);
+        expect(save.y).toBeGreaterThanOrEqual(menu.y);
+        expect(save.y+save.height).toBeLessThanOrEqual(menu.y+menu.height);
+      }
+    }
+    expect(normalizeFloatingSettings({position:{width:400,side:"left"}}).position.side).toBe("left");
+    expect(normalizeFloatingSettings({position:{width:400,side:"invalid"}}).position.side).toBeUndefined();
+  });
   it("sizes the save task to content independently of the workspace and centers it on the launcher", () => {
     expect(floatingSaveRect({width:1280,height:900},420)).toEqual({x:912,y:240,width:360,height:420});
     expect(floatingRects({width:600},{width:1280,height:900}).menu).toEqual({x:672,y:12,width:600,height:876});

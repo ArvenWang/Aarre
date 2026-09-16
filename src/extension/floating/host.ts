@@ -3,7 +3,7 @@ import { createSuiteClient } from "../../shared/suite-dock/client";
 import { suiteIcons, suiteStyles, SUITE_BAR_HEIGHT } from "../../shared/suite-dock/ui";
 import { createFrameParking } from "../../shared/suite-dock/parking";
 import { hostStyles } from "./host-styles";
-import { dockViewport } from "../../shared/suite-dock/geometry";
+import { dockViewport, dockDragBounds } from "../../shared/suite-dock/geometry";
 import { createDockMorph, dockDuration } from "../../shared/suite-dock/morph";
 import { installDockDrag } from "../../shared/suite-dock/drag";
 
@@ -36,7 +36,7 @@ function startHost() {
   const surface = document.createElement("div"); surface.className = "dock-surface"; surface.setAttribute("aria-hidden", "true");
   const bar = document.createElement("div"); bar.className = "bar"; bar.setAttribute("role", "group"); bar.setAttribute("aria-label", "Aarre 快捷栏");
   const toggle = document.createElement("button"); toggle.type = "button"; toggle.className = "bar-toggle";
-  toggle.setAttribute("aria-label", "展开 Aarre 菜单"); toggle.setAttribute("aria-expanded", "false"); toggle.setAttribute("aria-haspopup", "dialog"); toggle.title = "展开 Aarre；上下拖动或使用方向键调整位置";
+  toggle.setAttribute("aria-label", "展开 Aarre 菜单"); toggle.setAttribute("aria-expanded", "false"); toggle.setAttribute("aria-haspopup", "dialog"); toggle.title = "展开 Aarre；拖动后就近贴边，方向键调整位置";
   toggle.innerHTML = suiteIcons.aarre;
   const quickSave = document.createElement("button"); quickSave.type = "button"; quickSave.className = "bar-save";
   quickSave.setAttribute("aria-label", "添加当前网页到收藏"); quickSave.setAttribute("aria-haspopup", "dialog"); quickSave.title = "添加到收藏";
@@ -46,7 +46,7 @@ function startHost() {
   quickActions.setAttribute("role", "group"); quickActions.setAttribute("aria-label", "Aarre 快捷操作"); quickActions.inert = true;
   quickActions.append(quickSave); product.append(toggle, quickActions);
   const nexToggle = document.createElement("button"); nexToggle.type = "button"; nexToggle.className = "bar-nexalign"; nexToggle.hidden = true;
-  nexToggle.setAttribute("aria-label", "展开 NexAlign 菜单"); nexToggle.setAttribute("aria-haspopup", "dialog"); nexToggle.title = "展开 NexAlign；上下拖动或使用方向键调整位置";
+  nexToggle.setAttribute("aria-label", "展开 NexAlign 菜单"); nexToggle.setAttribute("aria-haspopup", "dialog"); nexToggle.title = "展开 NexAlign；拖动后就近贴边，方向键调整位置";
   nexToggle.innerHTML = suiteIcons.nexalign;
   bar.append(product, nexToggle);
   const feedback = document.createElement("div"); feedback.className = "quick-feedback"; feedback.setAttribute("role", "status"); feedback.hidden = true;
@@ -54,7 +54,7 @@ function startHost() {
   const loading = document.createElement("div"); loading.className = "loading"; loading.setAttribute("role", "status");
   const resize = document.createElement("div"); resize.className = "resize"; resize.tabIndex = 0;
   resize.setAttribute("role", "separator"); resize.setAttribute("aria-orientation", "vertical"); resize.setAttribute("aria-label", "调整菜单宽度");
-  resize.setAttribute("aria-valuemin", "320"); resize.setAttribute("aria-valuemax", "640"); resize.title = "拖动左边调整宽度，或使用左右方向键";
+  resize.setAttribute("aria-valuemin", "320"); resize.setAttribute("aria-valuemax", "640"); resize.title = "拖动内侧边缘调整宽度，或使用左右方向键";
   panel.append(loading, resize); shadow.append(style, surface, bar, panel, feedback);
   let suite: ReturnType<typeof createSuiteClient> | undefined;
   let suiteTheme: "light" | "dark" | undefined;
@@ -62,6 +62,7 @@ function startHost() {
   let info: HostInfo | null = null, iframe: HTMLIFrameElement | null = null;
   let position = { ...defaultFloatingPosition }, opened = false, opening = false, forced = false, disposed = false, ready = false, needsRetry = false;
   let positionRevision = 0, positionWrites = Promise.resolve();
+  let dragRatio: number | undefined;
   let view = "library", generation = 0, parkedView = false;
   let pendingSaveRequest: string | null = null;
   let saveHeight: number | null = null;
@@ -89,20 +90,20 @@ function startHost() {
     if (!product.contains(event.relatedTarget as Node | null) && !product.matches(":hover")) setQuickActions(false);
   });
   product.addEventListener("keydown", event => {
-    if (event.key === "ArrowLeft") { event.preventDefault(); setQuickActions(true); quickSave.focus(); }
-    if (event.key === "ArrowRight" && shadow.activeElement === quickSave) { event.preventDefault(); toggle.focus(); }
+    if (event.key === "ArrowRight" && shadow.activeElement === quickSave) { event.preventDefault(); event.stopPropagation(); toggle.focus(); }
   });
   const viewport = (): Viewport => dockViewport();
   type Rect = { x: number; y: number; width: number; height: number };
   const rectStyle = (element: HTMLElement, rect: Rect) => Object.assign(element.style, { left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.width}px`, height: `${rect.height}px` });
   function layout(animate = false) {
     const vp = viewport();
-    const rects = floatingRects(position, vp, suite?.paired ? SUITE_BAR_HEIGHT : undefined);
+    const rects = floatingRects(position, vp, suite?.paired ? SUITE_BAR_HEIGHT : undefined, dragRatio);
     const menu = saveHeight === null ? rects.menu : floatingSaveRect(vp, saveHeight, position, suite?.paired ? SUITE_BAR_HEIGHT : undefined);
     const presented = opened || openingShell;
     if (presented || host.dataset.suiteAway === "true") setQuickActions(false);
     const target = presented ? menu : rects.bar;
     host.dataset.open = String(presented);
+    host.dataset.dockSide = position.side ?? "right";
     host.dataset.savePreparing = String(preparingSave);
     bar.hidden = presented;
     panel.inert = !presented;
@@ -111,13 +112,13 @@ function startHost() {
     rectStyle(bar, rects.bar);
     // Keep the outgoing compact form at its current size during collapse.
     if (opened || openingShell || panel.hidden) rectStyle(panel, menu);
-    else panel.style.left = `${target.x + target.width - panel.offsetWidth}px`;
+    else panel.style.left = `${position.side === "left" ? target.x : target.x + target.width - panel.offsetWidth}px`;
     resize.hidden = saveHeight !== null;
-    feedback.style.left = `${Math.max(vp.left || 0, rects.bar.x - 272)}px`; feedback.style.top = `${rects.bar.y}px`;
+    feedback.style.left = `${position.side === "left" ? rects.bar.x + rects.bar.width + 12 : Math.max(vp.left || 0, rects.bar.x - 272)}px`; feedback.style.top = `${rects.bar.y}px`;
     resize.setAttribute("aria-valuenow", String(Math.round(rects.menu.width)));
     resize.setAttribute("aria-valuemin", String(Math.min(320, viewport().width)));
     resize.setAttribute("aria-valuemax", String(Math.min(640, viewport().width)));
-    dockMorph.layout(target, presented, animate);
+    dockMorph.layout(target, presented, animate, position.side, dragRatio !== undefined);
   }
   const mountHost = () => {
     const parent = document.fullscreenElement || document.documentElement;
@@ -136,10 +137,10 @@ function startHost() {
   const dockDrag = installDockDrag(bar, {
     allowed: event => !opened && !openingShell && host.dataset.suiteAway !== "true" && !event.composedPath().includes(quickActions),
     ratio: () => position.handleRatio ?? .5,
-    bounds: () => { const vp = viewport(), height = suite?.paired ? SUITE_BAR_HEIGHT : undefined;
-      return { min: floatingRects({ ...position, handleRatio: 0 }, vp, height).bar.y, max: floatingRects({ ...position, handleRatio: 1 }, vp, height).bar.y }; },
-    change: ratio => { position.handleRatio = ratio; layout(); },
-    commit: () => { persist(); suite?.position(position.handleRatio ?? .5); },
+    side: () => position.side ?? "right",
+    bounds: () => dockDragBounds(viewport(), suite?.paired ? SUITE_BAR_HEIGHT : undefined),
+    change: (ratio, xRatio) => { position.handleRatio = ratio; dragRatio = xRatio; layout(); },
+    commit: side => { position.side = side; dragRatio = undefined; layout(true); persist(); suite?.position(position.handleRatio ?? .5, side); },
     dragging: active => { host.dataset.dragging = String(active); if (active) setQuickActions(false); },
   });
   async function initialize() {
@@ -306,14 +307,14 @@ function startHost() {
   });
   resize.addEventListener("pointermove", (event) => {
     if (!drag || event.pointerId !== drag.id) return;
-    position = { ...position, width: floatingWidth(drag.width + drag.x - event.clientX) }; layout();
+    position = { ...position, width: floatingWidth(drag.width + (drag.x - event.clientX) * (position.side === "left" ? -1 : 1)) }; layout();
   });
   const endResize = () => { if (!drag) return; drag = null; host.dataset.resizing = "false"; persist(); };
   resize.addEventListener("pointerup", endResize); resize.addEventListener("pointercancel", endResize); resize.addEventListener("lostpointercapture", endResize);
   resize.addEventListener("keydown", (event) => {
     if (saveHeight !== null) return;
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return; event.preventDefault();
-    position = { ...position, width: event.key === "Home" ? 320 : event.key === "End" ? 640 : floatingWidth(position.width + (event.key === "ArrowLeft" ? 1 : -1) * (event.shiftKey ? 40 : 10)) }; layout(); persist();
+    position = { ...position, width: event.key === "Home" ? 320 : event.key === "End" ? 640 : floatingWidth(position.width + (event.key === "ArrowLeft" ? 1 : -1) * (position.side === "left" ? -1 : 1) * (event.shiftKey ? 40 : 10)) }; layout(); persist();
   });
   const outside = (event: PointerEvent) => { if (!event.composedPath().includes(host)) { setQuickActions(false); if (opened || openingShell) close(); } };
   const escape = (event: KeyboardEvent) => {
@@ -322,6 +323,7 @@ function startHost() {
     else if (product.dataset.actionsOpen === "true") { toggle.focus({ preventScroll: true }); setQuickActions(false); event.preventDefault(); }
   };
   const receive = (event: MessageEvent) => {
+    if (!chrome.runtime?.id) { window.__aarreFloatingHost?.destroy(); return; }
     if (!iframe || !info || event.source !== iframe.contentWindow || event.origin !== chrome.runtime.getURL("").replace(/\/$/, "") || event.data?.session !== info.nonce) return;
     if (event.data.type === "SUITE_PARK_READY") { frameParking.receive(event.data); return; }
     if (event.data.type === "FLOAT_READY") {
@@ -392,11 +394,15 @@ function startHost() {
     retire: () => window.__aarreFloatingHost?.destroy(),
     state: state => {
       host.dataset.suitePaired = String(state.paired);
+      host.dataset.suiteSuppressed = String(state.suppressed === true);
+      host.inert = state.suppressed === true;
+      if (state.suppressed) setQuickActions(false);
       host.dataset.suiteAway = String(state.paired && state.active === "nexalign");
       nexToggle.hidden = !state.paired;
       bar.setAttribute("aria-label", state.paired ? "Aarre 与 NexAlign 快捷栏" : "Aarre 快捷栏");
       if (!state.paired && !opened) bar.hidden = false;
-      if (info && !dockDrag.active && state.active === null && state.ratio !== (position.handleRatio ?? .5)) suite?.position(position.handleRatio ?? .5);
+      if (info && !dockDrag.active && state.active === null
+        && (state.ratio !== (position.handleRatio ?? .5) || state.side !== (position.side ?? "right"))) suite?.position(position.handleRatio ?? .5, position.side ?? "right");
       // The common controller ignores unchanged geometry during a transition.
       layout();
     },

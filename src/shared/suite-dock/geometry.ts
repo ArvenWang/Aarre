@@ -1,3 +1,5 @@
+import type { DockSide } from "./contract";
+
 export type DockRect = { x: number; y: number; width: number; height: number };
 export type DockViewport = { width: number; height: number; left?: number; top?: number };
 export const DOCK_EDGE = 12;
@@ -17,7 +19,7 @@ export function dockViewport(): DockViewport {
 }
 
 /** Both main workspaces fill the same viewport; compact tasks size separately. */
-export function dockRects(viewport: DockViewport, preferredWidth = 400, handleHeight = 52, ratio = .5) {
+export function dockRects(viewport: DockViewport, preferredWidth = 400, handleHeight = 52, ratio = .5, side: DockSide = "right", dragRatio?: number) {
   const left = viewport.left || 0, top = viewport.top || 0;
   const w = Math.max(1, viewport.width), h = Math.max(1, viewport.height);
   const gap = Math.min(DOCK_GAP, w / 8, h / 8), available = w - gap * 2;
@@ -30,7 +32,16 @@ export function dockRects(viewport: DockViewport, preferredWidth = 400, handleHe
   const anchor = Math.min(DOCK_SLOT, h - gap * 2);
   const barTop = Math.min(top + gap + (h - gap * 2 - anchor) * dockRatio(ratio), top + h - gap - barHeight);
   return {
-    bar: { x: left + w - gap - barWidth, y: Math.max(top + gap, barTop), width: barWidth, height: barHeight },
-    menu: { x: left + w - gap - width, y: top + margin, width, height: h - margin * 2 },
+    bar: { x: left + gap + (available - barWidth) * dockRatio(dragRatio ?? (side === "left" ? 0 : 1)), y: Math.max(top + gap, barTop), width: barWidth, height: barHeight },
+    menu: { x: side === "left" ? left + gap : left + w - gap - width, y: top + margin, width, height: h - margin * 2 },
   };
+}
+
+/** Ratios use the first slot's travel even when a paired bar reaches bottom. */
+export function dockDragBounds(viewport: DockViewport, handleHeight = DOCK_SLOT) {
+  const first = dockRects(viewport, 400, DOCK_SLOT, 0, "left").bar;
+  const last = dockRects(viewport, 400, DOCK_SLOT, 1).bar;
+  const bottom = dockRects(viewport, 400, handleHeight, 1).bar;
+  return { min: first.y, max: last.y, left: first.x, right: last.x,
+    maxRatio: dockRatio((bottom.y - first.y) / Math.max(1, last.y - first.y)) };
 }

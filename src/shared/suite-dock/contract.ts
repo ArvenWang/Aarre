@@ -1,8 +1,10 @@
 // Vendored identically by NexAlign and Aarre. Protocol v1 carries no page/business data.
 export type SuiteApp = "aarre" | "nexalign";
+export type DockSide = "left" | "right";
+export const isDockSide = (value: unknown): value is DockSide => value === "left" || value === "right";
 export type SuiteMode = "light" | "dark" | "system";
 export interface SuiteTheme { mode: SuiteMode; clock: number; writer: SuiteApp; id: string }
-export interface SuiteState { paired: boolean; active: SuiteApp | null; ratio?: number }
+export interface SuiteState { paired: boolean; active: SuiteApp | null; suppressed?: boolean; ratio?: number; side?: DockSide }
 export const isRatio = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
 export const SUITE_THEME_KEY = "nex-suite:theme:v1";
 export const SUITE_THEME_PORT = "nex-suite-theme-v1";
