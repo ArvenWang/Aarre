@@ -2,6 +2,8 @@ export type DockRect = { x: number; y: number; width: number; height: number };
 export type DockViewport = { width: number; height: number; left?: number; top?: number };
 export const DOCK_EDGE = 12;
 export const DOCK_GAP = 8;
+/** One app's handle. The bar keeps this slot put and grows past it. */
+export const DOCK_SLOT = 52;
 export const dockWidth = (width: number) => Math.max(320, Math.min(640, width));
 export const dockRatio = (ratio: number) => Number.isFinite(ratio) ? Math.max(0, Math.min(1, ratio)) : .5;
 
@@ -20,9 +22,15 @@ export function dockRects(viewport: DockViewport, preferredWidth = 400, handleHe
   const w = Math.max(1, viewport.width), h = Math.max(1, viewport.height);
   const gap = Math.min(DOCK_GAP, w / 8, h / 8), available = w - gap * 2;
   const margin = Math.min(DOCK_EDGE, h / 8), width = Math.min(dockWidth(preferredWidth), available);
-  const barWidth = Math.min(52, available), barHeight = Math.min(handleHeight, h - gap * 2);
+  const barWidth = Math.min(DOCK_SLOT, available), barHeight = Math.min(handleHeight, h - gap * 2);
+  // The second app joins the bar the moment its page gains a host, which can
+  // land in the middle of the user's click. Anchoring the first slot instead
+  // of the bar's centre lets the bar grow downward, so a handle that is
+  // already on screen never slides out from under the pointer.
+  const anchor = Math.min(DOCK_SLOT, h - gap * 2);
+  const barTop = Math.min(top + gap + (h - gap * 2 - anchor) * dockRatio(ratio), top + h - gap - barHeight);
   return {
-    bar: { x: left + w - gap - barWidth, y: top + gap + (h - gap * 2 - barHeight) * dockRatio(ratio), width: barWidth, height: barHeight },
+    bar: { x: left + w - gap - barWidth, y: Math.max(top + gap, barTop), width: barWidth, height: barHeight },
     menu: { x: left + w - gap - width, y: top + margin, width, height: h - margin * 2 },
   };
 }
