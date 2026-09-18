@@ -13,12 +13,12 @@ export const SUITE_DOCK_PORT = "nex-suite-dock-v1";
 export const AARRE_ID = "ppjmhonejgpcdmjmcbbdjookgiagambm";
 // Store identity and the existing development installation; never migrate user IDs silently.
 export const NEXALIGN_IDS = ["aaepppdlfiikfmomfllpghojedjkmopf", "obnemfdgnkklhbdngemomokiklpaenmj", "chipcgfbmplmodejemnchonefjlgagog", "mhpmlmjlpmimambapeindalgaijefdom", "iidfabidanlmdnfobkelcckjaoncdgbj"];
-export const NEXCATCHER_IDS = ["doehochgbphonldcfeagmikbblpgmngm"];
+export const NEXCATCHER_IDS = ["doehochgbphonldcfeagmikbblpgmngm", "cikmhfhlgnmbohnojofenoncbdjhjkjd"];
 export const isApp = (value: unknown): value is SuiteApp => SUITE_APPS.includes(value as SuiteApp);
 // 先检查实际安装包的允许列表，再区分身份；网页的 HELLO 内容不能自称另一款应用。
 export function peerApp(id: string | undefined, allowed: string[]): SuiteApp | undefined {
   if (!id || !allowed.includes(id)) return;
-  return id === AARRE_ID ? "aarre" : NEXCATCHER_IDS.includes(id) ? "nexcatcher" : "nexalign";
+  return id === AARRE_ID ? "aarre" : NEXCATCHER_IDS.includes(id) ? "nexcatcher" : NEXALIGN_IDS.includes(id) ? "nexalign" : undefined;
 }
 export const isMode = (value: unknown): value is SuiteMode => value === "light" || value === "dark" || value === "system";
 export function isTheme(value: unknown): value is SuiteTheme {

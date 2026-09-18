@@ -1,3 +1,10 @@
+## NexCatcher 三款融合修复（2026-09-19）
+
+- 按用户授权修复日常 Chrome 三款无法融合。补充已核实的 Catcher ID `cikmhfhlgnmbohnojofenoncbdjhjkjd` 到本项目 Manifest 与共享协议；未知扩展不再被默认认作 NexAlign。未迁移身份、账号或增加站点权限。
+- Aarre 本地构建通过，三仓 9 个共享模块逐字节一致。NexCatcher 仓库最终共享入口安装态回归 7/7 通过；日常 Chrome 已重载，Pinterest 单个三成员入口可使用。这是代理验收，非用户人工验收，也不是本项目全部业务回归。
+- Catcher 当前页图片新增跨来源/格式分组、最佳版本、缓存与动态整理。完整证据在 NexCatcher 的 `docs/execution/IMAGE_REFINEMENT_2026-09-19.md` 和 `reports/images/refinement/verification.json`。
+- 本批仅提交 Manifest、共享 contract 和本段进展；下方本轮入场前的未提交记录及其他研究文件完整保留，不纳入此提交。无持续文件占用。
+
 # 当前交付：0.6.32 与 NexAlign 0.1.3 联动及双仓库 Git 交付（2026-09-17）
 
 > **没有经过人工验证。** 以下是自动化检查和代理工具操作记录，不代表用户人工验收；两个扩展的最终使用体验仍待用户复验。
