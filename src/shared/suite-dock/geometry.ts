@@ -2,6 +2,7 @@ import type { DockSide } from "./contract";
 
 export type DockRect = { x: number; y: number; width: number; height: number };
 export type DockViewport = { width: number; height: number; left?: number; top?: number };
+export const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 export const DOCK_EDGE = 12;
 export const DOCK_GAP = 8;
 /** One app's handle. The bar keeps this slot put and grows past it. */
@@ -19,11 +20,11 @@ export function dockViewport(): DockViewport {
 }
 
 /** Both main workspaces fill the same viewport; compact tasks size separately. */
-export function dockRects(viewport: DockViewport, preferredWidth = 400, handleHeight = 52, ratio = .5, side: DockSide = "right", dragRatio?: number) {
+export function dockRects(viewport: DockViewport, preferredWidth = 400, handleHeight = 52, ratio = .5, side: DockSide = "right", dragRatio?: number, widthLimits = { min: 320, max: 640 }) {
   const left = viewport.left || 0, top = viewport.top || 0;
   const w = Math.max(1, viewport.width), h = Math.max(1, viewport.height);
   const gap = Math.min(DOCK_GAP, w / 8, h / 8), available = w - gap * 2;
-  const margin = Math.min(DOCK_EDGE, h / 8), width = Math.min(dockWidth(preferredWidth), available);
+  const margin = Math.min(DOCK_EDGE, h / 8), width = Math.min(clamp(preferredWidth, widthLimits.min, widthLimits.max), available);
   const barWidth = Math.min(DOCK_SLOT, available), barHeight = Math.min(handleHeight, h - gap * 2);
   // The second app joins the bar the moment its page gains a host, which can
   // land in the middle of the user's click. Anchoring the first slot instead

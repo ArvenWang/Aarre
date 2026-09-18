@@ -1,18 +1,25 @@
-// Vendored identically by NexAlign and Aarre. Protocol v1 carries no page/business data.
-export type SuiteApp = "aarre" | "nexalign";
+// 三款扩展携带同一份协议；只交换菜单、位置和外观，不交换业务数据。
+export type SuiteApp = "aarre" | "nexalign" | "nexcatcher";
+export const SUITE_APPS: SuiteApp[] = ["aarre", "nexalign", "nexcatcher"];
 export type DockSide = "left" | "right";
 export const isDockSide = (value: unknown): value is DockSide => value === "left" || value === "right";
 export type SuiteMode = "light" | "dark" | "system";
 export interface SuiteTheme { mode: SuiteMode; clock: number; writer: SuiteApp; id: string }
-export interface SuiteState { paired: boolean; active: SuiteApp | null; suppressed?: boolean; ratio?: number; side?: DockSide }
+export interface SuiteState { paired: boolean; active: SuiteApp | null; members?: SuiteApp[]; owner?: SuiteApp | null; suppressed?: boolean; ratio?: number; side?: DockSide }
 export const isRatio = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
 export const SUITE_THEME_KEY = "nex-suite:theme:v1";
 export const SUITE_THEME_PORT = "nex-suite-theme-v1";
 export const SUITE_DOCK_PORT = "nex-suite-dock-v1";
 export const AARRE_ID = "ppjmhonejgpcdmjmcbbdjookgiagambm";
 // Store identity and the existing development installation; never migrate user IDs silently.
-export const NEXALIGN_IDS = ["aaepppdlfiikfmomfllpghojedjkmopf", "obnemfdgnkklhbdngemomokiklpaenmj"];
-export const isApp = (value: unknown): value is SuiteApp => value === "aarre" || value === "nexalign";
+export const NEXALIGN_IDS = ["aaepppdlfiikfmomfllpghojedjkmopf", "obnemfdgnkklhbdngemomokiklpaenmj", "chipcgfbmplmodejemnchonefjlgagog", "mhpmlmjlpmimambapeindalgaijefdom", "iidfabidanlmdnfobkelcckjaoncdgbj"];
+export const NEXCATCHER_IDS = ["doehochgbphonldcfeagmikbblpgmngm"];
+export const isApp = (value: unknown): value is SuiteApp => SUITE_APPS.includes(value as SuiteApp);
+// 先检查实际安装包的允许列表，再区分身份；网页的 HELLO 内容不能自称另一款应用。
+export function peerApp(id: string | undefined, allowed: string[]): SuiteApp | undefined {
+  if (!id || !allowed.includes(id)) return;
+  return id === AARRE_ID ? "aarre" : NEXCATCHER_IDS.includes(id) ? "nexcatcher" : "nexalign";
+}
 export const isMode = (value: unknown): value is SuiteMode => value === "light" || value === "dark" || value === "system";
 export function isTheme(value: unknown): value is SuiteTheme {
   const theme = value as SuiteTheme | null;

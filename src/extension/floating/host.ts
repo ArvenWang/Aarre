@@ -1,6 +1,6 @@
 import { defaultFloatingPosition, floatingRects, floatingSaveRect, floatingWidth, SAVE_PANEL_INITIAL_HEIGHT, type FloatingPosition, type Viewport } from "../../lib/floating-geometry";
 import { createSuiteClient } from "../../shared/suite-dock/client";
-import { suiteIcons, suiteStyles, SUITE_BAR_HEIGHT } from "../../shared/suite-dock/ui";
+import { suiteIcons, suiteStyles, suiteBarHeight } from "../../shared/suite-dock/ui";
 import { createFrameParking } from "../../shared/suite-dock/parking";
 import { hostStyles } from "./host-styles";
 import { dockViewport, dockDragBounds } from "../../shared/suite-dock/geometry";
@@ -48,7 +48,10 @@ function startHost() {
   const nexToggle = document.createElement("button"); nexToggle.type = "button"; nexToggle.className = "bar-nexalign"; nexToggle.hidden = true;
   nexToggle.setAttribute("aria-label", "展开 NexAlign 菜单"); nexToggle.setAttribute("aria-haspopup", "dialog"); nexToggle.title = "展开 NexAlign；拖动后就近贴边，方向键调整位置";
   nexToggle.innerHTML = suiteIcons.nexalign;
-  bar.append(product, nexToggle);
+  const catcherToggle = document.createElement("button"); catcherToggle.type = "button"; catcherToggle.className = "bar-nexcatcher"; catcherToggle.hidden = true;
+  catcherToggle.setAttribute("aria-label", "展开 NexCatcher 菜单"); catcherToggle.setAttribute("aria-haspopup", "dialog"); catcherToggle.title = "展开 NexCatcher，发现网页图片";
+  catcherToggle.innerHTML = suiteIcons.nexcatcher;
+  bar.append(product, nexToggle, catcherToggle);
   const feedback = document.createElement("div"); feedback.className = "quick-feedback"; feedback.setAttribute("role", "status"); feedback.hidden = true;
   const panel = document.createElement("div"); panel.className = "panel"; panel.hidden = true; panel.inert = true;
   const loading = document.createElement("div"); loading.className = "loading"; loading.setAttribute("role", "status");
@@ -97,8 +100,8 @@ function startHost() {
   const rectStyle = (element: HTMLElement, rect: Rect) => Object.assign(element.style, { left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.width}px`, height: `${rect.height}px` });
   function layout(animate = false) {
     const vp = viewport();
-    const rects = floatingRects(position, vp, suite?.paired ? SUITE_BAR_HEIGHT : undefined, dragRatio);
-    const menu = saveHeight === null ? rects.menu : floatingSaveRect(vp, saveHeight, position, suite?.paired ? SUITE_BAR_HEIGHT : undefined);
+    const rects = floatingRects(position, vp, suiteBarHeight(suite?.members.length ?? 1), dragRatio);
+    const menu = saveHeight === null ? rects.menu : floatingSaveRect(vp, saveHeight, position, suiteBarHeight(suite?.members.length ?? 1));
     const presented = opened || openingShell;
     if (presented || host.dataset.suiteAway === "true") setQuickActions(false);
     const target = presented ? menu : rects.bar;
@@ -138,7 +141,7 @@ function startHost() {
     allowed: event => !opened && !openingShell && host.dataset.suiteAway !== "true" && !event.composedPath().includes(quickActions),
     ratio: () => position.handleRatio ?? .5,
     side: () => position.side ?? "right",
-    bounds: () => dockDragBounds(viewport(), suite?.paired ? SUITE_BAR_HEIGHT : undefined),
+    bounds: () => dockDragBounds(viewport(), suiteBarHeight(suite?.members.length ?? 1)),
     change: (ratio, xRatio) => { position.handleRatio = ratio; dragRatio = xRatio; layout(); },
     commit: side => { position.side = side; dragRatio = undefined; layout(true); persist(); suite?.position(position.handleRatio ?? .5, side); },
     dragging: active => { host.dataset.dragging = String(active); if (active) setQuickActions(false); },
@@ -298,6 +301,7 @@ function startHost() {
     void open(view).catch(() => showLoadError("连接暂时中断，请重新打开 Aarre。"));
   });
   nexToggle.addEventListener("click", () => { suite?.activate("nexalign"); });
+  catcherToggle.addEventListener("click", () => { suite?.activate("nexcatcher"); });
   toggle.addEventListener("click", () => { if (opened || opening || openingShell) close(true); else void open(view).catch(() => showLoadError("连接暂时中断，请重新打开 Aarre。")); });
   let drag: { id: number; x: number; width: number } | null = null;
   resize.addEventListener("pointerdown", (event) => {
@@ -397,9 +401,12 @@ function startHost() {
       host.dataset.suiteSuppressed = String(state.suppressed === true);
       host.inert = state.suppressed === true;
       if (state.suppressed) setQuickActions(false);
-      host.dataset.suiteAway = String(state.paired && state.active === "nexalign");
-      nexToggle.hidden = !state.paired;
-      bar.setAttribute("aria-label", state.paired ? "Aarre 与 NexAlign 快捷栏" : "Aarre 快捷栏");
+      const members = state.members ?? ["aarre"];
+      host.style.setProperty("--suite-count", String(members.length));
+      host.dataset.suiteAway = String(state.paired && (state.active !== null && state.active !== "aarre" || state.owner !== "aarre"));
+      nexToggle.hidden = !members.includes("nexalign");
+      catcherToggle.hidden = !members.includes("nexcatcher");
+      bar.setAttribute("aria-label", members.map(app => ({ aarre: "Aarre", nexalign: "NexAlign", nexcatcher: "NexCatcher" })[app]).join(" 与 ") + " 快捷栏");
       if (!state.paired && !opened) bar.hidden = false;
       if (info && !dockDrag.active && state.active === null
         && (state.ratio !== (position.handleRatio ?? .5) || state.side !== (position.side ?? "right"))) suite?.position(position.handleRatio ?? .5, position.side ?? "right");

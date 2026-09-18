@@ -1,4 +1,4 @@
-import { AARRE_ID } from "./contract";
+import { AARRE_ID, peerApp, type SuiteApp } from "./contract";
 
 const PORT = "nex-suite-viewport-v1";
 const validTab = (value: unknown): value is number => Number.isSafeInteger(value) && Number(value) >= 0;
@@ -8,6 +8,10 @@ const post = (port: chrome.runtime.Port, message: unknown) => {
 
 /** Background-only, tab-scoped lease; no website or persistent preference is involved. */
 export function createSuiteViewportPublisher() {
+  const publishers = [AARRE_ID, chrome.runtime.id].map(createViewportPublisher);
+  return (tabId: number | null) => publishers.forEach(publish => publish(tabId));
+}
+function createViewportPublisher(id: string) {
   let tabId: number | null = null;
   let port: chrome.runtime.Port | undefined;
   let retry: ReturnType<typeof setTimeout> | undefined;
@@ -15,7 +19,7 @@ export function createSuiteViewportPublisher() {
   const connect = () => {
     if (port || tabId === null) return;
     try {
-      const next = chrome.runtime.connect(AARRE_ID, { name: PORT });
+      const next = id === chrome.runtime.id ? chrome.runtime.connect({ name: PORT }) : chrome.runtime.connect(id, { name: PORT });
       port = next;
       next.onMessage.addListener(message => {
         if (next === port && message?.type === "PING") post(next, { type: "VIEWPORT", tabId, id: message.id });
@@ -42,14 +46,14 @@ export function createSuiteViewportPublisher() {
   };
 }
 
-export function installSuiteViewportBroker(changed: () => void) {
+export function installSuiteViewportBroker(changed: () => void, app: SuiteApp = "aarre") {
   const leases = new Map<chrome.runtime.Port, number | null>();
   const ids = chrome.runtime.getManifest().externally_connectable?.ids ?? [];
-  chrome.runtime.onConnectExternal.addListener(port => {
+  const connect = (port: chrome.runtime.Port, external: boolean) => {
     if (port.name !== PORT) return;
     const sender = port.sender;
     // A content script has sender.tab and must never suppress a different tab.
-    if (!sender || sender.tab || !ids.includes(sender.id ?? "")
+    if (!sender || sender.tab || (external ? peerApp(sender.id, ids) !== "nexalign" : app !== "nexalign" || sender.id !== chrome.runtime.id)
       || !sender.url?.startsWith(`chrome-extension://${sender.id}/`)) { port.disconnect(); return; }
     leases.set(port, null);
     let probe: string | undefined;
@@ -65,6 +69,8 @@ export function installSuiteViewportBroker(changed: () => void) {
       if (leases.get(port) !== message.tabId) { leases.set(port, message.tabId); changed(); }
     });
     port.onDisconnect.addListener(() => { Reflect.get(chrome.runtime ?? {}, "lastError"); retire(); });
-  });
+  };
+  chrome.runtime.onConnectExternal.addListener(port => connect(port, true));
+  chrome.runtime.onConnect.addListener(port => connect(port, false));
   return (tabId: number) => [...leases.values()].includes(tabId);
 }

@@ -1,5 +1,6 @@
 // Two 44px targets and 4px outer padding: 36px artwork has an 8px gap/inset.
 export const SUITE_BAR_HEIGHT = 96;
+export const suiteBarHeight = (count: number) => 8 + 44 * Math.max(1, count);
 const icon = (path: string) => `<span class="suite-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${path}</svg></span>`;
 
 // Figma A1 geometry, with a neutral dark palette: Aarre public/icons/icon{,-dark}.svg.
@@ -42,17 +43,19 @@ export const suiteIcons = {
 <path id="Rectangle 1329138822" d="M27 73L108.5 40L149.25 56.5L190 73L108.5 106L67.75 89.5L27 73Z" fill="white"/>
 </g>
 </svg></span>`,
+  nexcatcher: `<span class="product-icon product-icon-catcher" aria-hidden="true"><svg viewBox="0 0 36 36" fill="none"><path d="M14 8H8v6m14-6h6v6M8 22v6h6m14-6v6h-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><rect x="15" y="15" width="6" height="6" rx="1.5" fill="currentColor"/></svg></span>`,
   save: icon('<path d="m12 3 2.8 5.7 6.3.9-4.5 4.4 1 6.2-5.6-3-5.6 3 1-6.2L2.9 9.6l6.3-.9L12 3Z"/>'),
 };
 export const suiteStyles = `
 :host{--suite-icon-size:22px;--suite-product-icon-size:36px;--suite-icon-radius:8px;--suite-container-radius:16px;--suite-button-radius:12px;--suite-bg:#fff;--suite-ink:#666;--suite-line:rgba(0,0,0,.12);--suite-hover:#f5f5f5;--suite-active:#ececec}
 :host([data-suite-theme="dark"]),:host([data-theme="dark"]),:host([data-floating-theme="dark"]){--suite-bg:#202020;--suite-ink:#bcbcbc;--suite-line:rgba(255,255,255,.13);--suite-hover:#2a2a2a;--suite-active:#323232}
 :host([data-theme]),:host([data-floating-theme]){--dock-bg:var(--suite-bg);--dock-ink:var(--suite-ink);--dock-line:var(--suite-line);--dock-hover:var(--suite-hover);--dock-glass:var(--suite-bg)}
-:host([data-suite-paired="true"]) .bar{grid-template-rows:repeat(2,44px);row-gap:0}
+:host([data-suite-paired="true"]) .bar{grid-template-rows:repeat(var(--suite-count,2),44px);row-gap:0}
 .product-icon{display:block;grid-area:1/1;width:var(--suite-product-icon-size);height:var(--suite-product-icon-size);border-radius:var(--suite-icon-radius);overflow:hidden;pointer-events:none}
 .bar .product-icon svg,.launcher .product-icon svg{display:block;width:100%;height:100%;stroke:none}
 .product-icon-aarre svg>rect{rx:calc(128 * var(--suite-icon-radius) / 36);ry:calc(128 * var(--suite-icon-radius) / 36)}
 .product-icon-dark{display:none}
+.product-icon-catcher{color:var(--suite-ink);display:grid;place-items:center}
 :host([data-theme="dark"]) .product-icon-light,:host([data-floating-theme="dark"]) .product-icon-light{display:none}
 :host([data-theme="dark"]) .product-icon-dark,:host([data-floating-theme="dark"]) .product-icon-dark{display:block}
 .suite-icon{display:grid;place-items:center;width:var(--suite-icon-size);height:var(--suite-icon-size);pointer-events:none}
@@ -70,8 +73,8 @@ export const suiteStyles = `
 :host([data-dragging="true"]) .bar,:host([data-dragging="true"]) .bar button,:host([data-dragging="true"]) .launcher{cursor:grabbing}
 :host([data-dragging="true"]) .bar button,:host([data-dragging="true"]) .launcher{background:transparent}
 :host([data-dragging="true"]) .dock-surface,:host([data-dragging="true"]) .dock-surface-nex{box-shadow:0 8px 28px #0003,0 1px 4px #0002}
-:host([data-suite-away="true"]) .dock-surface,:host([data-suite-away="true"]) .bar{visibility:hidden!important;pointer-events:none!important}
-:host([data-suite-paired="true"]:not([data-menu-open="true"])) .anchor,:host([data-suite-paired="true"]:not([data-menu-open="true"]):not([data-suite-closing="true"])) .dock-surface-nex{visibility:hidden!important;pointer-events:none!important}
+:host([data-suite-away="true"]) .dock-surface,:host([data-suite-away="true"]) .bar,:host([data-suite-away="true"]) .anchor,:host([data-suite-away="true"]) .dock-surface-nex{visibility:hidden!important;pointer-events:none!important}
+:host([data-suite-paired="true"]:not([data-suite-owner="true"]):not([data-menu-open="true"])) .anchor,:host([data-suite-paired="true"]:not([data-suite-owner="true"]):not([data-menu-open="true"]):not([data-suite-closing="true"])) .dock-surface-nex{visibility:hidden!important;pointer-events:none!important}
 @media(prefers-reduced-motion:reduce){.bar button,.launcher{transition:none!important}}
 @media(forced-colors:active){.bar button,.launcher{color:ButtonText}.bar button:focus-visible,.launcher:focus-visible{outline-color:Highlight}.quick-actions{outline:1px solid ButtonText}}
 `;

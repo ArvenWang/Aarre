@@ -1,4 +1,4 @@
-import { AARRE_ID, isApp, isDockSide, isRatio, isTheme, resolvedTheme, SUITE_DOCK_PORT, SUITE_THEME_PORT, type DockSide, type SuiteApp, type SuiteState, type SuiteTheme } from "./contract";
+import { AARRE_ID, NEXALIGN_IDS, isApp, isDockSide, isRatio, isTheme, resolvedTheme, SUITE_DOCK_PORT, SUITE_THEME_PORT, type DockSide, type SuiteApp, type SuiteState, type SuiteTheme } from "./contract";
 
 export function createSuiteClient(app: SuiteApp, hooks: {
   state: (state: SuiteState) => void; theme: (theme: "light" | "dark") => void;
@@ -9,6 +9,7 @@ export function createSuiteClient(app: SuiteApp, hooks: {
   let currentTheme: SuiteTheme | undefined;
   let state: SuiteState = { paired: false, active: null };
   let retry: ReturnType<typeof setTimeout> | undefined;
+  let discovering = false, coordinator: string | undefined;
   const post = (port: chrome.runtime.Port | undefined, message: unknown) => { try { port?.postMessage(message); } catch { /* Reconnect on disconnect. */ } };
   const alive = () => {
     try { if (chrome.runtime.id && chrome.runtime.getManifest()) return true; } catch { /* Unloaded extension. */ }
@@ -22,11 +23,27 @@ export function createSuiteClient(app: SuiteApp, hooks: {
     dock = undefined; connected = false; if (disposed || !alive()) return; state = { paired: false, active: opened ? app : null }; hooks.state(state);
     clearTimeout(retry); if (!disposed) retry = setTimeout(connect, 4_000);
   };
-  function connect() {
-    if (disposed || dock) return;
+  async function connect() {
+    if (disposed || discovering || dock && (coordinator === AARRE_ID || app === "aarre")) return;
+    discovering = true;
     try {
-      const port = app === "aarre" ? chrome.runtime.connect({ name: SUITE_DOCK_PORT }) : chrome.runtime.connect(AARRE_ID, { name: SUITE_DOCK_PORT });
+      // 固定优先级选已安装的协调者；少装 Aarre 时，NexAlign 与 NexCatcher 仍可融合。
+      const candidates = app === "aarre" ? [] : [AARRE_ID, ...(app === "nexcatcher" ? NEXALIGN_IDS : [])];
+      const available = await Promise.all(candidates.map(async id => {
+        let timeout: ReturnType<typeof setTimeout> | undefined;
+        try {
+          const response = await Promise.race([chrome.runtime.sendMessage(id, { type: "SUITE_DOCK_DISCOVER" }), new Promise<null>(resolve => { timeout = setTimeout(() => resolve(null), 1000); })]);
+          return response?.version === 2 && response.app === (id === AARRE_ID ? "aarre" : "nexalign") ? id : null;
+        } catch { return null; } finally { clearTimeout(timeout); }
+      }));
+      if (disposed || !alive()) return;
+      const id = available.find(Boolean) ?? chrome.runtime.id;
+      if (dock && coordinator === id) return;
+      const old = dock;
+      const port = id === chrome.runtime.id ? chrome.runtime.connect({ name: SUITE_DOCK_PORT }) : chrome.runtime.connect(id, { name: SUITE_DOCK_PORT });
       dock = port;
+      coordinator = id; connected = false;
+      try { old?.disconnect(); } catch { /* 旧协调者已卸载。 */ }
       // Reading lastError consumes Chrome's expected disconnect diagnostic.
       // Reflect keeps the getter side effect through release minification;
       // an unused optional property read would be optimized away.
@@ -34,7 +51,8 @@ export function createSuiteClient(app: SuiteApp, hooks: {
       port.onMessage.addListener(message => {
         if (dock !== port || disposed) return;
         if (message?.type === "STATE" && typeof message.paired === "boolean" && (message.active === null || isApp(message.active))) {
-          connected = true; state = { paired: message.paired, active: message.active, suppressed: message.suppressed === true, ...(isRatio(message.ratio) ? { ratio: message.ratio } : {}), ...(isDockSide(message.side) ? { side: message.side } : {}) }; hooks.state(state);
+          const members = Array.isArray(message.members) && message.members.length <= 3 && message.members.every(isApp) ? [...new Set<SuiteApp>(message.members)] : message.paired ? ["aarre", "nexalign"] as SuiteApp[] : [app];
+          connected = true; state = { paired: members.length > 1, members, owner: members[0] ?? null, active: message.active, suppressed: message.suppressed === true, ...(isRatio(message.ratio) ? { ratio: message.ratio } : {}), ...(isDockSide(message.side) ? { side: message.side } : {}) }; hooks.state(state);
         }
         if (message?.type === "THEME" && isTheme(message.theme)) post(themes, { type: "MERGE", theme: message.theme });
         if (message?.type === "PING" && typeof message.id === "string" && alive()) post(port, { type: "PONG", id: message.id });
@@ -48,6 +66,7 @@ export function createSuiteClient(app: SuiteApp, hooks: {
       });
       hello(); if (currentTheme) post(port, { type: "THEME", theme: currentTheme });
     } catch { disconnectDock(); }
+    finally { discovering = false; }
   }
   const connectThemes = () => {
     if (disposed || themes) return;
@@ -65,6 +84,8 @@ export function createSuiteClient(app: SuiteApp, hooks: {
   const heartbeat = setInterval(() => { connectThemes(); connect(); post(dock, { type: "PING" }); post(themes, { type: "PING" }); }, 20_000);
   return {
     get paired() { return state.paired; },
+    get members() { return state.members ?? [app]; },
+    get owner() { return state.owner ?? app; },
     position(ratio: number, side: DockSide = "right") { if (isRatio(ratio) && isDockSide(side)) post(dock, { type: "POSITION", ratio, side }); },
     enabled(value: boolean) { if (enabled !== value) { enabled = value; hello(); } },
     changed(value: boolean) {

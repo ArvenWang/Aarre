@@ -1,7 +1,9 @@
 import { installSuiteViewportBroker } from "./viewport";
-import { canonicalTheme, compareTheme, isApp, isDockSide, isMode, isRatio, isTheme, SUITE_DOCK_PORT, SUITE_THEME_KEY, SUITE_THEME_PORT, type DockSide, type SuiteApp, type SuiteTheme } from "./contract";
+import { canonicalTheme, compareTheme, isApp, isDockSide, isMode, isRatio, isTheme, peerApp, SUITE_APPS, SUITE_DOCK_PORT, SUITE_THEME_KEY, SUITE_THEME_PORT, type DockSide, type SuiteApp, type SuiteMode, type SuiteTheme } from "./contract";
 
-export function installSuiteBackground(app: SuiteApp) {
+export function installSuiteBackground(app: SuiteApp, saveTheme?: (mode: SuiteMode) => Promise<void>) {
+  const ownApp = app;
+  const settingsMode = (value: unknown) => typeof value === "object" && value !== null && "theme" in value ? value.theme : undefined;
   const themePorts = new Set<chrome.runtime.Port>();
   const dockPorts = new Set<chrome.runtime.Port>();
   let theme: SuiteTheme | undefined;
@@ -9,10 +11,11 @@ export function installSuiteBackground(app: SuiteApp) {
   const safePost = (port: chrome.runtime.Port, message: unknown) => { try { port.postMessage(message); } catch { /* Disconnected document. */ } };
   const read = async () => {
     if (theme) return theme;
-    const key = app === "aarre" ? "aarre:theme-sync:v1" : "layerscope-ui-theme";
+    const key = app === "aarre" ? "aarre:theme-sync:v1" : app === "nexalign" ? "layerscope-ui-theme" : "settings";
     const stored = await chrome.storage.local.get([SUITE_THEME_KEY, key]);
+    const mode = app === "nexcatcher" ? settingsMode(stored[key]) : stored[key];
     return theme ??= isTheme(stored[SUITE_THEME_KEY]) ? canonicalTheme(stored[SUITE_THEME_KEY]) : {
-      mode: isMode(stored[key]) ? stored[key] : "system", clock: 0, writer: app, id: "migration",
+      mode: isMode(mode) ? mode : "system", clock: 0, writer: app, id: "migration",
     } satisfies SuiteTheme;
   };
   const publish = (next: SuiteTheme) => {
@@ -27,9 +30,10 @@ export function installSuiteBackground(app: SuiteApp) {
       if (!isTheme(candidate) || compareTheme(candidate, previous) <= 0) return previous;
       const next = canonicalTheme(candidate);
       theme = next;
-      const native: Record<string, unknown> = app === "nexalign" ? { "layerscope-ui-theme": next.mode }
+      const native: Record<string, unknown> = app === "nexcatcher" ? {} : app === "nexalign" ? { "layerscope-ui-theme": next.mode }
         : next.mode === "system" ? {} : { "aarre:theme-sync:v1": next.mode };
       await chrome.storage.local.set({ [SUITE_THEME_KEY]: next, ...native });
+      await saveTheme?.(next.mode);
       publish(next);
       return next;
     });
@@ -62,20 +66,27 @@ export function installSuiteBackground(app: SuiteApp) {
   chrome.storage.onChanged.addListener((changes, area) => {
     const next = changes[SUITE_THEME_KEY]?.newValue;
     if (area === "local" && isTheme(next) && (!theme || compareTheme(next, theme) > 0)) { theme = next; publish(next); }
+    const mode = settingsMode(changes.settings?.newValue);
+    if (app === "nexcatcher" && area === "local" && isMode(mode) && mode !== settingsMode(changes.settings?.oldValue) && mode !== theme?.mode) void update(mode, true).catch(() => undefined);
   });
-  if (app !== "aarre") return;
-  // 与 Chrome 使用同一份安装包允许列表，避免本机构建已放行却被旧 ID 常量再次拒绝。
-  const nexalignIds = chrome.runtime.getManifest().externally_connectable?.ids ?? [];
+  const allowedIds = chrome.runtime.getManifest().externally_connectable?.ids ?? [];
+  chrome.runtime.onMessageExternal?.addListener((message, sender, respond) => {
+    if (message?.type !== "SUITE_DOCK_DISCOVER") return false;
+    if (peerApp(sender.id, allowedIds)) respond({ version: 2, app });
+    return false;
+  });
 
   type Client = { port: chrome.runtime.Port; app: SuiteApp; enabled: boolean; opened: boolean };
   type Group = { clients: Map<SuiteApp, Client>; active: SuiteApp | null; tabId: number; ratio?: number; side?: DockSide; sequence: number; queue?: Promise<void> };
   const groups = new Map<string, Group>();
   const replies = new Map<string, { port: chrome.runtime.Port; finish: (ok: boolean) => void }>();
-  const paired = (group: Group) => group.clients.get("aarre")?.enabled === true && group.clients.get("nexalign")?.enabled === true;
+  const members = (group: Group) => SUITE_APPS.filter(app => group.clients.get(app)?.enabled);
+  const paired = (group: Group) => members(group).length > 1;
   const broadcast = (group: Group) => {
-    for (const client of group.clients.values()) safePost(client.port, { type: "STATE", paired: paired(group), active: group.active, suppressed: mobileViewport(group.tabId), ratio: group.ratio, side: group.side });
+    const present = members(group);
+    for (const client of group.clients.values()) safePost(client.port, { type: "STATE", paired: present.length > 1, members: present, owner: present[0] ?? null, active: group.active, suppressed: mobileViewport(group.tabId), ratio: group.ratio, side: group.side });
   };
-  const mobileViewport = installSuiteViewportBroker(() => { for (const group of groups.values()) broadcast(group); });
+  const mobileViewport = installSuiteViewportBroker(() => { for (const group of groups.values()) broadcast(group); }, app);
   const command = (client: Client, type: "OPEN" | "CLOSE") => new Promise<boolean>(resolve => {
     const id = crypto.randomUUID();
     const timer = setTimeout(() => finish(false), 4_000);
@@ -85,16 +96,19 @@ export function installSuiteBackground(app: SuiteApp) {
   });
   const performActivation = async (group: Group, target: SuiteApp | null, sequence: number) => {
     if (sequence !== group.sequence || (target && (mobileViewport(group.tabId) || !group.clients.get(target)?.enabled))) return;
-    const other = [...group.clients.values()].find(client => target ? client.app !== target : client.app === group.active);
-    if (other && !await command(other, "CLOSE")) {
+    // 三款都可能保留后台工作；逐一等旧菜单释放交互权，不能只关闭第一个邻居。
+    const others = [...group.clients.values()].filter(client => target ? client.app !== target : client.app === group.active);
+    for (const other of others) {
+    if (!await command(other, "CLOSE")) {
       if (group.sequence === sequence) {
         safePost(group.clients.get(target!)?.port ?? other.port, { type: "ERROR", message: "上一个侧栏暂未关闭，请重试。" });
         broadcast(group);
       }
       return;
     }
-    if (other) other.opened = false;
+    other.opened = false;
     if (sequence !== group.sequence) return;
+    }
     group.active = target;
     broadcast(group);
     if (target) {
@@ -117,10 +131,11 @@ export function installSuiteBackground(app: SuiteApp) {
   const connect = (port: chrome.runtime.Port, external: boolean) => {
     if (port.name !== SUITE_DOCK_PORT) return;
     const sender = port.sender;
-    const app: SuiteApp = external ? "nexalign" : "aarre";
-    if (!sender || (external ? !nexalignIds.includes(sender.id ?? "") : sender.id !== chrome.runtime.id)
+    const sourceApp = external ? peerApp(sender?.id, allowedIds) : sender?.id === chrome.runtime.id ? ownApp : undefined;
+    if (!sender || !sourceApp
       || sender.frameId !== 0 || typeof sender.tab?.id !== "number" || !sender.documentId
       || sender.documentLifecycle !== "active" || !/^https?:\/\//.test(sender.url ?? "")) { port.disconnect(); return; }
+    const app = sourceApp;
     const key = `${sender.tab.id}:${sender.documentId}`;
     const group: Group = groups.get(key) ?? { clients: new Map(), active: null, tabId: sender.tab.id, sequence: 0 };
     groups.set(key, group);
@@ -156,7 +171,7 @@ export function installSuiteBackground(app: SuiteApp) {
       // Only the visible handle's owning host can move the paired surface.
       // The hosts persist the accepted ratio through their existing settings.
       if (message?.type === "POSITION" && isRatio(message.ratio) && client.enabled
-        && (!paired(group) || app === "aarre") && !group.active) {
+        && app === members(group)[0] && !group.active) {
         group.ratio = message.ratio;
         group.side = isDockSide(message.side) ? message.side : "right";
         broadcast(group);
@@ -167,7 +182,7 @@ export function installSuiteBackground(app: SuiteApp) {
         if (client.opened && !group.active) group.active = app;
         if (!client.enabled && group.active === app) group.active = null;
         broadcast(group);
-        if (paired(group) && client.opened && group.active !== app) void command(client, "CLOSE");
+        if (paired(group) && client.opened && group.active !== app) void activate(group, app);
       }
       if (message?.type === "REQUEST" && (isApp(message.app) || message.app === null) && (paired(group) || message.app === app || message.app === null)) void activate(group, message.app);
       if (message?.type === "ACK" && typeof message.id === "string") {
