@@ -1,7 +1,8 @@
-import { AARRE_ID, NEXALIGN_IDS, isApp, isDockSide, isRatio, isTheme, resolvedTheme, SUITE_DOCK_PORT, SUITE_THEME_PORT, type DockSide, type SuiteApp, type SuiteState, type SuiteTheme } from "./contract";
+import { AARRE_ID, NEXALIGN_IDS, isApp, isDockSide, isRatio, isTheme, resolvedTheme, SUITE_APPS, SUITE_DOCK_PORT, SUITE_THEME_PORT, type DockSide, type SuiteApp, type SuiteState, type SuiteTheme } from "./contract";
 
 export function createSuiteClient(app: SuiteApp, hooks: {
   state: (state: SuiteState) => void; theme: (theme: "light" | "dark") => void;
+  ready?: (ready: boolean) => void;
   retire: () => void; open: () => boolean | void | Promise<boolean | void>; close: () => void | Promise<void>; error: (message: string) => void;
 }) {
   let disposed = false, enabled = false, opened = false, remoteCommand = false, connected = false;
@@ -10,18 +11,40 @@ export function createSuiteClient(app: SuiteApp, hooks: {
   let state: SuiteState = { paired: false, active: null };
   let retry: ReturnType<typeof setTimeout> | undefined;
   let discovering = false, coordinator: string | undefined;
+  let ready = false, publishTimer: ReturnType<typeof setTimeout> | undefined, grace: ReturnType<typeof setTimeout> | undefined;
+  let pendingState: SuiteState | undefined, requested: SuiteApp | null | undefined;
+  let recovering = false;
+  hooks.ready?.(false);
+  const publish = () => {
+    if (disposed || !pendingState) return;
+    state = pendingState; pendingState = undefined; hooks.state(state);
+    if (!ready) { ready = true; hooks.ready?.(true); }
+    if (requested !== undefined && connected) {
+      if (requested === null || state.members?.includes(requested)) post(dock, { type: "REQUEST", app: requested });
+      else hooks.error("这个工具的连接尚未恢复，请稍后重试。");
+      requested = undefined;
+    }
+  };
   const post = (port: chrome.runtime.Port | undefined, message: unknown) => { try { port?.postMessage(message); } catch { /* Reconnect on disconnect. */ } };
   const alive = () => {
     try { if (chrome.runtime.id && chrome.runtime.getManifest()) return true; } catch { /* Unloaded extension. */ }
     if (!disposed) hooks.retire(); return false;
   };
-  const hello = () => post(dock, { type: "HELLO", version: 1, enabled, opened });
+  const hello = () => post(dock, { type: "HELLO", version: 1, enabled, opened, visible: document.visibilityState !== "hidden" });
   const media = matchMedia("(prefers-color-scheme: dark)");
   const paint = () => { if (currentTheme) hooks.theme(resolvedTheme(currentTheme.mode)); };
   media.addEventListener("change", paint);
   const disconnectDock = () => {
-    dock = undefined; connected = false; if (disposed || !alive()) return; state = { paired: false, active: opened ? app : null }; hooks.state(state);
-    clearTimeout(retry); if (!disposed) retry = setTimeout(connect, 4_000);
+    dock = undefined; connected = false; if (disposed || !alive()) return;
+    recovering = true; clearTimeout(publishTimer); pendingState = undefined;
+    // A worker restart is not an uninstall. Keep the existing dock geometry
+    // through a bounded reconnect window instead of showing three solo bars.
+    if (!grace) grace = setTimeout(() => {
+      grace = undefined; recovering = false;
+      pendingState ??= { paired: false, active: opened ? app : null, members: [app], owner: app };
+      publish();
+    }, 2500);
+    clearTimeout(retry); retry = setTimeout(connect, 150);
   };
   async function connect() {
     if (disposed || discovering || dock && (coordinator === AARRE_ID || app === "aarre")) return;
@@ -52,8 +75,16 @@ export function createSuiteClient(app: SuiteApp, hooks: {
       port.onMessage.addListener(message => {
         if (dock !== port || disposed) return;
         if (message?.type === "STATE" && typeof message.paired === "boolean" && (message.active === null || isApp(message.active))) {
-          const members = Array.isArray(message.members) && message.members.length <= 3 && message.members.every(isApp) ? [...new Set<SuiteApp>(message.members)] : message.paired ? ["aarre", "nexalign"] as SuiteApp[] : [app];
-          connected = true; state = { paired: members.length > 1, members, owner: members[0] ?? null, active: message.active, suppressed: message.suppressed === true, ...(isRatio(message.ratio) ? { ratio: message.ratio } : {}), ...(isDockSide(message.side) ? { side: message.side } : {}) }; hooks.state(state);
+          const members = Array.isArray(message.members) && message.members.length <= SUITE_APPS.length && message.members.every(isApp) ? [...new Set<SuiteApp>(message.members)] : message.paired ? ["aarre", "nexalign"] as SuiteApp[] : [app];
+          connected = true; pendingState = { paired: members.length > 1, members, owner: members[0] ?? null, active: message.active, suppressed: message.suppressed === true, ...(isRatio(message.ratio) ? { ratio: message.ratio } : {}), ...(isDockSide(message.side) ? { side: message.side } : {}) };
+          const sameMembers = members.join() === state.members?.join();
+          clearTimeout(publishTimer);
+          if (recovering && !sameMembers) return; // Await the other surviving clients.
+          clearTimeout(grace); grace = undefined; recovering = false;
+          // Coalesce initial membership announcements; explicit opening and
+          // established position/state changes still update immediately.
+          if (ready && (sameMembers || message.active !== null)) publish();
+          else publishTimer = setTimeout(publish, ready && state.members?.some(member => !members.includes(member)) ? 1500 : ready ? 180 : 300);
         }
         if (message?.type === "THEME" && isTheme(message.theme)) post(themes, { type: "MERGE", theme: message.theme });
         if (message?.type === "PING" && typeof message.id === "string" && alive()) post(port, { type: "PONG", id: message.id });
@@ -94,6 +125,13 @@ export function createSuiteClient(app: SuiteApp, hooks: {
     } catch { /* The extension was unloaded. */ }
   };
   connectThemes(); connect();
+  const visibility = () => {
+    post(dock, { type: "VISIBILITY", visible: document.visibilityState !== "hidden" });
+    if (document.visibilityState !== "hidden") { connectThemes(); void connect(); }
+  };
+  const resume = () => { visibility(); hello(); };
+  document.addEventListener("visibilitychange", visibility);
+  window.addEventListener("pageshow", resume);
   // A bounded heartbeat also reconnects after worker suspension. No DOM event grants peer authority.
   const heartbeat = setInterval(() => { connectThemes(); connect(); post(dock, { type: "PING" }); post(themes, { type: "PING" }); }, 20_000);
   return {
@@ -107,11 +145,19 @@ export function createSuiteClient(app: SuiteApp, hooks: {
       opened = value; if (!remoteCommand) post(dock, { type: value ? "OPENED" : "CLOSED" });
     },
     activate(target: SuiteApp) {
-      if (!connected || !enabled || (!state.paired && target !== app)) return false;
+      if (!enabled || (!state.paired && target !== app)) return false;
+      if (!connected || recovering) {
+        void connect();
+        // The local host can open immediately and advertise OPENED on hello.
+        // Only a peer click needs to wait for a recovered route.
+        if (target === app) return false;
+        requested = state.active === target ? null : target; return true;
+      }
       post(dock, { type: "REQUEST", app: state.active === target ? null : target }); return true;
     },
     destroy() {
-      disposed = true; clearTimeout(retry); clearInterval(heartbeat); media.removeEventListener("change", paint);
+      disposed = true; clearTimeout(retry); clearTimeout(grace); clearTimeout(publishTimer); clearInterval(heartbeat); media.removeEventListener("change", paint);
+      document.removeEventListener("visibilitychange", visibility); window.removeEventListener("pageshow", resume);
       const oldDock = dock, oldThemes = themes; dock = themes = undefined;
       // Uninstall invalidates the runtime before host teardown. A dead Port
       // must not prevent removing the old UI and its recovery observers.

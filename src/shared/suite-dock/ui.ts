@@ -74,6 +74,7 @@ export const suiteStyles = `
 :host([data-dragging="true"]) .bar button,:host([data-dragging="true"]) .launcher{background:transparent}
 :host([data-dragging="true"]) .dock-surface,:host([data-dragging="true"]) .dock-surface-nex{box-shadow:0 8px 28px #0003,0 1px 4px #0002}
 :host([data-suite-away="true"]) .dock-surface,:host([data-suite-away="true"]) .bar,:host([data-suite-away="true"]) .anchor,:host([data-suite-away="true"]) .dock-surface-nex{visibility:hidden!important;pointer-events:none!important}
+:host([data-suite-ready="false"]:not([data-open="true"]):not([data-menu-open="true"])) :is(.dock-surface,.bar,.anchor,.dock-surface-nex){visibility:hidden!important;pointer-events:none!important}
 :host([data-suite-paired="true"]:not([data-suite-owner="true"]):not([data-menu-open="true"])) .anchor,:host([data-suite-paired="true"]:not([data-suite-owner="true"]):not([data-menu-open="true"]):not([data-suite-closing="true"])) .dock-surface-nex{visibility:hidden!important;pointer-events:none!important}
 @media(prefers-reduced-motion:reduce){.bar button,.launcher{transition:none!important}}
 @media(forced-colors:active){.bar button,.launcher{color:ButtonText}.bar button:focus-visible,.launcher:focus-visible{outline-color:Highlight}.quick-actions{outline:1px solid ButtonText}}

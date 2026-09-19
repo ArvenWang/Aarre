@@ -8,9 +8,9 @@ import { createDockMorph, dockDuration } from "../../shared/suite-dock/morph";
 import { installDockDrag } from "../../shared/suite-dock/drag";
 
 interface HostInfo { tabId: number; documentId: string; nonce: string; enabled: boolean; position: FloatingPosition; theme?: string; saved?: boolean }
-declare global { interface Window { __aarreFloatingHost?: { version: string; destroy(): void } } }
+declare global { interface Window { __aarreFloatingHost?: { version: string; alive?: () => boolean; destroy(): void } } }
 const version = chrome.runtime.getManifest().version;
-if (window.top === window) {
+if (window.top === window && !(window.__aarreFloatingHost?.version === version && window.__aarreFloatingHost.alive?.())) {
   // The background injects only after a failed health check. Version equality
   // does not prove liveness after reloading an unpacked extension.
   try { window.__aarreFloatingHost?.destroy(); } catch { /* Old runtime is invalidated. */ }
@@ -366,7 +366,7 @@ function startHost() {
   };
   const refresh = async () => { await init(); if (opened && !iframe) await open(view); };
   const runtimeListener = (message: Record<string, any>, sender: chrome.runtime.MessageSender, respond: (response: unknown) => void) => {
-    if (message.type === "FLOAT_PING") { void refresh().then(() => respond({ ok: !disposed, version }), () => respond({ ok: false, version })); return true; }
+    if (message.type === "FLOAT_PING") { respond({ ok: sender.id === chrome.runtime.id && !disposed && host.isConnected, version }); return false; }
     if (message.type === "FLOAT_VERIFY_FRAME") {
       if (sender.id !== chrome.runtime.id || !iframe || !info || message.session !== info.nonce || typeof message.challenge !== "string") { respond({ ok: false }); return false; }
       send({ type: "FLOAT_IDENTITY_CHALLENGE", challenge: message.challenge }); respond({ ok: true }); return false;
@@ -387,9 +387,9 @@ function startHost() {
   document.addEventListener("pointerdown", outside, true); document.addEventListener("keydown", escape); document.addEventListener("fullscreenchange", attach);
   window.addEventListener("message", receive); window.addEventListener("resize", attach);
   window.visualViewport?.addEventListener("resize", attach); window.visualViewport?.addEventListener("scroll", attach);
-  const pageshow = () => { void refresh().catch(() => undefined); }; window.addEventListener("pageshow", pageshow);
+  const pageshow = (event: PageTransitionEvent) => { if (event.persisted) void refresh().catch(() => undefined); }; window.addEventListener("pageshow", pageshow);
   chrome.runtime.onMessage.addListener(runtimeListener);
-  window.__aarreFloatingHost = { version, destroy() {
+  window.__aarreFloatingHost = { version, alive: () => { try { return !!chrome.runtime.getManifest() && !disposed && host.isConnected; } catch { return false; } }, destroy() {
     disposed = true; cancelAnimationFrame(resizeFrame); dockDrag.destroy(); frameParking.destroy(); suite?.destroy(); generation++; observer.disconnect(); dockMorph.destroy(); if (saveRevealFrame !== undefined) cancelAnimationFrame(saveRevealFrame); clearTimeout(watchdog); clearTimeout(loadTimeout); clearTimeout(closeTimer); clearTimeout(feedbackTimer); clearTimeout(quickActionsTimer); host.remove();
     try { chrome.runtime.onMessage.removeListener(runtimeListener); } catch { /* Extension reload invalidates old listeners. */ }
     document.removeEventListener("pointerdown", outside, true); document.removeEventListener("keydown", escape); document.removeEventListener("fullscreenchange", attach);
@@ -398,6 +398,7 @@ function startHost() {
   } };
   host.addEventListener("aarre-floating-retire", window.__aarreFloatingHost.destroy, { once: true });
   suite = createSuiteClient("aarre", {
+    ready: ready => { host.dataset.suiteReady = String(ready); },
     retire: () => window.__aarreFloatingHost?.destroy(),
     state: state => {
       host.dataset.suitePaired = String(state.paired);

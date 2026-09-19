@@ -52,6 +52,19 @@ function ready(frame: HTMLIFrameElement) {
   }));
 }
 
+it("answers health checks synchronously without reinitializing a healthy host", async () => {
+  const host = document.querySelector('aarre-floating-host');
+  const before = positionMessages().mock.calls.length;
+  const listener = vi.mocked(chrome.runtime.onMessage.addListener).mock.calls[0][0];
+  const reply = vi.fn();
+  const pending = listener({ type: 'FLOAT_PING' }, { id: 'aarre' }, reply);
+  expect(pending).toBe(false); expect(reply).toHaveBeenCalledWith({ ok: true, version: '0.6.5' });
+  expect(positionMessages().mock.calls.length).toBe(before);
+  vi.resetModules(); await import('../src/extension/floating/host');
+  expect(document.querySelector('aarre-floating-host')).toBe(host);
+  expect(positionMessages().mock.calls.length).toBe(before);
+});
+
 it("reveals the left action on hover, keeps the pointer crossing usable and dismisses it on leave", async () => {
   const product = shadow.querySelector<HTMLElement>(".bar-product")!;
   const actions = shadow.querySelector<HTMLElement>(".quick-actions")!;
@@ -160,7 +173,7 @@ it("retains the user's new geometry when an older settings read finishes late", 
     if (message.type === "FLOAT_HOST_INIT") return new Promise<unknown>(resolve => { finishRead = resolve; });
     return { ok: true };
   });
-  window.dispatchEvent(new Event("pageshow"));
+  window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }));
   await vi.advanceTimersByTimeAsync(0);
   shadow.querySelector<HTMLElement>(".resize")!.dispatchEvent(new KeyboardEvent("keydown", { key: "End", bubbles: true }));
   finishRead({ ok: true, data: { tabId: 7, documentId: "host-document", nonce, enabled: true, theme: "light", position: { width: 400 } } });
@@ -188,7 +201,7 @@ it("persists rapid geometry changes in order before refreshing host settings", a
   const separator = shadow.querySelector<HTMLElement>(".resize")!;
   separator.dispatchEvent(new KeyboardEvent("keydown", { key: "End", bubbles: true }));
   separator.dispatchEvent(new KeyboardEvent("keydown", { key: "Home", bubbles: true }));
-  window.dispatchEvent(new Event("pageshow"));
+  window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }));
   await vi.advanceTimersByTimeAsync(0);
   expect(requests).toEqual(["write:640"]);
   releaseWrite();
@@ -330,6 +343,7 @@ it("reverses a save close without clearing the outgoing form or sending a stale 
 });
 it("replaces an invalidated same-version host and leaves exactly one working launcher", async () => {
   const oldHost = shadow.host;
+  window.__aarreFloatingHost!.alive = () => false; // The old extension world can no longer answer health checks.
   vi.mocked(chrome.runtime.onMessage.removeListener).mockImplementationOnce(() => { throw new Error("Extension context invalidated"); });
   vi.resetModules(); await import("../src/extension/floating/host"); await vi.advanceTimersByTimeAsync(0);
   expect(document.querySelectorAll("aarre-floating-host")).toHaveLength(1);
@@ -354,6 +368,7 @@ it("retires a host from an earlier isolated world even when its window global is
   expect(document.querySelectorAll('[data-aarre-ui="floating-host"]')).toHaveLength(1);
 });
 it("neutralizes a legacy observer without letting it resurrect an interactive bar", async () => {
+  window.__aarreFloatingHost?.destroy(); delete window.__aarreFloatingHost;
   const legacy = document.createElement("aarre-floating-host"); legacy.dataset.aarreUi = "floating-host";
   legacy.dataset.hidden = "false"; legacy.setAttribute("popover", "manual"); document.documentElement.append(legacy);
   const observer = new MutationObserver(() => { if (!legacy.isConnected) document.documentElement.append(legacy); });
@@ -369,7 +384,7 @@ it("reconnects an open menu when a restored document receives a new session", as
   (vi.mocked(chrome.runtime.sendMessage) as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, data: {
     tabId: 7, documentId: "host-document", nonce: "restored-session", enabled: true, position: { width: 400 },
   } });
-  window.dispatchEvent(new Event("pageshow")); await vi.advanceTimersByTimeAsync(0);
+  window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true })); await vi.advanceTimersByTimeAsync(0);
   expect(currentFrame()).not.toBe(previous);
   expect(new URL(currentFrame().src).searchParams.get("session")).toBe("restored-session");
   expect(shadow.host.getAttribute("data-open")).toBe("true");
@@ -440,6 +455,7 @@ it.each([false, true])("keeps a parked draft when saving fails or a newer open w
     postMessage: vi.fn(), disconnect: vi.fn(), onDisconnect: {addListener: vi.fn()},
     onMessage: {addListener: (listener: (message: unknown) => void) => { if(name === "nex-suite-dock-v1") listeners.push(listener); }},
   })) });
+  window.__aarreFloatingHost?.destroy(); delete window.__aarreFloatingHost;
   vi.resetModules(); await import("../src/extension/floating/host"); await vi.advanceTimersByTimeAsync(0);
   const command = listeners[0];
   command({type:"STATE",paired:true,active:"aarre",members:["aarre","nexalign"],owner:"aarre"});
@@ -461,6 +477,7 @@ it.each([false, true])("keeps a parked draft when saving fails or a newer open w
 
 it("keeps the launcher reachable after initial background failure", async () => {
   vi.mocked(chrome.runtime.sendMessage).mockRejectedValue(new Error("Background unavailable"));
+  window.__aarreFloatingHost?.destroy(); delete window.__aarreFloatingHost;
   vi.resetModules(); await import("../src/extension/floating/host"); await vi.advanceTimersByTimeAsync(0);
   expect(shadow.host.getAttribute("data-hidden")).toBe("false");
   await toggle();
@@ -513,6 +530,7 @@ it.each([
     postMessage: post, disconnect: vi.fn(), onDisconnect: {addListener: vi.fn()},
     onMessage: {addListener: (listener: (message: unknown) => void) => { if(name === "nex-suite-dock-v1") listeners.push(listener); }},
   })) });
+  window.__aarreFloatingHost?.destroy(); delete window.__aarreFloatingHost;
   vi.resetModules(); await import("../src/extension/floating/host"); await vi.advanceTimersByTimeAsync(0);
   listeners[0]({type:"STATE",paired:true,active:null});
   shadow.querySelector<HTMLButtonElement>(button)!.click();

@@ -76,8 +76,8 @@ export function installSuiteBackground(app: SuiteApp, saveTheme?: (mode: SuiteMo
     return false;
   });
 
-  type Client = { port: chrome.runtime.Port; app: SuiteApp; enabled: boolean; opened: boolean };
-  type Group = { clients: Map<SuiteApp, Client>; active: SuiteApp | null; tabId: number; ratio?: number; side?: DockSide; sequence: number };
+  type Client = { port: chrome.runtime.Port; app: SuiteApp; enabled: boolean; opened: boolean; visible: boolean };
+  type Group = { clients: Map<SuiteApp, Client>; active: SuiteApp | null; tabId: number; ratio?: number; side?: DockSide; sequence: number; visible: boolean };
   const groups = new Map<string, Group>();
   const replies = new Map<string, { port: chrome.runtime.Port; finish: (ok: boolean) => void }>();
   const members = (group: Group) => SUITE_APPS.filter(app => group.clients.get(app)?.enabled);
@@ -125,10 +125,10 @@ export function installSuiteBackground(app: SuiteApp, saveTheme?: (mode: SuiteMo
       || sender.documentLifecycle !== "active" || !/^https?:\/\//.test(sender.url ?? "")) { port.disconnect(); return; }
     const app = sourceApp;
     const key = `${sender.tab.id}:${sender.documentId}`;
-    const group: Group = groups.get(key) ?? { clients: new Map(), active: null, tabId: sender.tab.id, sequence: 0 };
+    const group: Group = groups.get(key) ?? { clients: new Map(), active: null, tabId: sender.tab.id, sequence: 0, visible: true };
     groups.set(key, group);
     const old = group.clients.get(app);
-    const client: Client = { port, app, enabled: false, opened: false };
+    const client: Client = { port, app, enabled: false, opened: false, visible: true };
     group.clients.set(app, client); old?.port.disconnect(); dockPorts.add(port);
     let probe: string | undefined, probeAt = 0;
     let watchdog: ReturnType<typeof setInterval> | undefined;
@@ -144,6 +144,7 @@ export function installSuiteBackground(app: SuiteApp, saveTheme?: (mode: SuiteMo
     // Ports can survive an uninstalled extension. Still bound stale ownership,
     // but tolerate temporary page long tasks instead of evicting after one miss.
     if (external) watchdog = setInterval(() => {
+      if (!group.visible) { probe = undefined; return; }
       if (probe && Date.now() - probeAt >= 15_000) {
         disconnected();
         try { port.disconnect(); } catch { /* Already invalidated. */ }
@@ -155,6 +156,7 @@ export function installSuiteBackground(app: SuiteApp, saveTheme?: (mode: SuiteMo
     port.onMessage.addListener(message => {
       if (group.clients.get(app) !== client) return;
       if (message?.type === "PONG" && message.id === probe) probe = undefined;
+      if (message?.type === "VISIBILITY" && typeof message.visible === "boolean") { group.visible = client.visible = message.visible; probe = undefined; }
       // Only the visible handle's owning host can move the paired surface.
       // The hosts persist the accepted ratio through their existing settings.
       if (message?.type === "POSITION" && isRatio(message.ratio) && client.enabled
@@ -166,6 +168,7 @@ export function installSuiteBackground(app: SuiteApp, saveTheme?: (mode: SuiteMo
       if (message?.type === "HELLO" && message.version === 1) {
         if (client.enabled && message.enabled !== true) group.sequence++;
         client.enabled = message.enabled === true; client.opened = message.opened === true;
+        group.visible = client.visible = message.visible !== false; probe = undefined;
         if (client.opened && !group.active) group.active = app;
         if (!client.enabled && group.active === app) group.active = null;
         broadcast(group);
