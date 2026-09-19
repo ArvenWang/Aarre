@@ -48,6 +48,7 @@ export function createSuiteClient(app: SuiteApp, hooks: {
       // Reflect keeps the getter side effect through release minification;
       // an unused optional property read would be optimized away.
       port.onDisconnect.addListener(() => { Reflect.get(chrome.runtime ?? {}, "lastError"); if (dock === port) disconnectDock(); });
+      let commandRevision = 0;
       port.onMessage.addListener(message => {
         if (dock !== port || disposed) return;
         if (message?.type === "STATE" && typeof message.paired === "boolean" && (message.active === null || isApp(message.active))) {
@@ -58,10 +59,23 @@ export function createSuiteClient(app: SuiteApp, hooks: {
         if (message?.type === "PING" && typeof message.id === "string" && alive()) post(port, { type: "PONG", id: message.id });
         if (message?.type === "ERROR") hooks.error(String(message.message));
         if ((message?.type === "OPEN" || message?.type === "CLOSE") && typeof message.id === "string") {
+          const revision = Number.isSafeInteger(message.revision) ? message.revision : commandRevision + 1;
+          if (revision < commandRevision) { post(port, { type: "ACK", id: message.id, ok: false }); return; }
+          commandRevision = revision;
+          opened = message.type === "OPEN";
           remoteCommand = true;
-          void Promise.resolve().then(() => message.type === "OPEN" ? hooks.open() : hooks.close()).then(result => {
-            const ok = result !== false; if (ok) opened = message.type === "OPEN"; post(port, { type: "ACK", id: message.id, ok });
-          }, error => { hooks.error(error instanceof Error ? error.message : String(error)); post(port, { type: "ACK", id: message.id, ok: false }); }).finally(() => { remoteCommand = false; });
+          let result: boolean | void | Promise<boolean | void>;
+          try { result = message.type === "OPEN" ? hooks.open() : hooks.close(); }
+          catch (error) { result = Promise.reject(error); }
+          finally { remoteCommand = false; }
+          void Promise.resolve(result).then(value => {
+            const ok = value !== false;
+            if (revision === commandRevision && !ok) opened = false;
+            post(port, { type: "ACK", id: message.id, ok });
+          }, error => {
+            if (revision === commandRevision) hooks.error(error instanceof Error ? error.message : String(error));
+            post(port, { type: "ACK", id: message.id, ok: false });
+          });
         }
       });
       hello(); if (currentTheme) post(port, { type: "THEME", theme: currentTheme });

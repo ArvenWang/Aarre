@@ -14,18 +14,12 @@ if (!window.__bookmarkLayerCaptureInstalled) {
       return false;
     }
 
-    try {
-      const capture = extractPage(document, {
-        pageUrl: window.location.href,
-        selectedText: window.getSelection()?.toString() || ""
-      });
-      sendResponse({ ok: true, data: capture });
-    } catch (error) {
-      sendResponse({
-        ok: false,
-        error: error instanceof Error ? error.message : "无法读取当前网页。"
-      });
-    }
+    void extractPage(document, {
+      pageUrl: window.location.href,
+      selectedText: window.getSelection()?.toString() || ""
+    }).then(data => sendResponse({ ok: true, data }), error => sendResponse({
+      ok: false, error: error instanceof Error ? error.message : "无法读取当前网页。"
+    }));
 
     return true;
   });

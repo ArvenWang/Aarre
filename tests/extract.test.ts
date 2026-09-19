@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { extractPage } from "../src/content/extract";
 
 describe("extractPage", () => {
-  it("extracts readable content and respects canonical metadata", () => {
+  it("extracts readable content and respects canonical metadata", async () => {
     document.head.innerHTML = `
       <title>Original browser title</title>
       <link rel="canonical" href="https://example.com/guide?utm_source=test">
@@ -24,7 +24,7 @@ describe("extractPage", () => {
       <form><input value="secret form value"></form>
     `;
 
-    const result = extractPage(document, {
+    const result = await extractPage(document, {
       pageUrl: "https://example.com/guide?utm_campaign=email",
       selectedText: "fragment shaders"
     });
@@ -36,5 +36,23 @@ describe("extractPage", () => {
     expect(result.content).not.toContain("secret form value");
     expect(result.selectedText).toBe("fragment shaders");
     expect(result.siteName).toBe("Graphics Notes");
+  });
+
+  it("retains article siblings and excludes all suite interfaces from a bounded long-page copy", async () => {
+    document.head.innerHTML = '<title>Feed</title>';
+    document.body.innerHTML = `<article><h1>First story</h1><p>${'First article content. '.repeat(40)}</p></article>
+      <article><h2>Second story</h2><p>${'Second article content. '.repeat(40)}</p></article>
+      <aarre-floating-host>PRIVATE AARRE</aarre-floating-host><div id="nexcatcher-ui-host">PRIVATE CATCHER</div>
+      <div data-layerscope-canvas-toolbar>PRIVATE NEXALIGN</div><script>${'script content '.repeat(50000)}</script>
+      <section>${'<p>More readable content.</p>'.repeat(15000)}</section>`;
+    let yielded = false;
+    const timer = setTimeout(() => { yielded = true; }, 0);
+    const result = await extractPage(document, { pageUrl: 'https://example.com/feed' });
+    clearTimeout(timer);
+    expect(yielded).toBe(true);
+    expect(result.content).toContain('First article content.');
+    expect(result.content).toContain('Second article content.');
+    expect(result.content).not.toMatch(/PRIVATE|script content/);
+    expect(result.content.length).toBeLessThanOrEqual(80000);
   });
 });

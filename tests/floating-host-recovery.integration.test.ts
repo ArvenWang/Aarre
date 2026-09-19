@@ -434,6 +434,40 @@ it("shows retry and close inside the panel after preparation times out", async (
   expect(shadow.host.getAttribute("data-open")).toBe("false");
 });
 
+it.each([false, true])("keeps a parked draft when saving fails or a newer open wins (reopen=%s)", async reopen => {
+  const listeners: Array<(message: unknown) => void> = [];
+  Object.assign(chrome.runtime, { connect: vi.fn(({name}: {name: string}) => ({
+    postMessage: vi.fn(), disconnect: vi.fn(), onDisconnect: {addListener: vi.fn()},
+    onMessage: {addListener: (listener: (message: unknown) => void) => { if(name === "nex-suite-dock-v1") listeners.push(listener); }},
+  })) });
+  vi.resetModules(); await import("../src/extension/floating/host"); await vi.advanceTimersByTimeAsync(0);
+  const command = listeners[0];
+  command({type:"STATE",paired:true,active:"aarre",members:["aarre","nexalign"],owner:"aarre"});
+  command({type:"OPEN",id:"open-1",revision:1}); await vi.advanceTimersByTimeAsync(0);
+  const frame = currentFrame(); ready(frame); frame.dataset.draft = "unfinished notes";
+  command({type:"CLOSE",id:"close-2",revision:2});
+  expect(shadow.host.getAttribute("data-open")).toBe("false");
+  expect(shadow.querySelector<HTMLElement>(".panel")!.inert).toBe(true);
+  const preparation = vi.mocked(frame.contentWindow!.postMessage).mock.calls.map(([message]) => message).find(message => message.type === "SUITE_PREPARE_PARK");
+  expect(preparation).toBeDefined();
+  if (reopen) {
+    command({type:"OPEN",id:"open-3",revision:3}); await vi.advanceTimersByTimeAsync(0);
+    window.dispatchEvent(new MessageEvent("message", {source:frame.contentWindow,origin,data:{type:"SUITE_PARK_READY",session:nonce,id:preparation.id,ok:true}}));
+  }
+  await vi.advanceTimersByTimeAsync(2000);
+  expect(currentFrame()).toBe(frame); expect(frame.dataset.draft).toBe("unfinished notes");
+  expect(shadow.host.getAttribute("data-open")).toBe(String(reopen));
+});
+
+it("keeps the launcher reachable after initial background failure", async () => {
+  vi.mocked(chrome.runtime.sendMessage).mockRejectedValue(new Error("Background unavailable"));
+  vi.resetModules(); await import("../src/extension/floating/host"); await vi.advanceTimersByTimeAsync(0);
+  expect(shadow.host.getAttribute("data-hidden")).toBe("false");
+  await toggle();
+  expect(shadow.host.getAttribute("data-open")).toBe("true");
+  expect(shadow.querySelector(".loading")?.textContent).toContain("重新打开");
+});
+
 it.each([
   {button: ".bar-save", dismiss: ".loading-cancel", width: "360px"},
   {button: ".bar-toggle", dismiss: ".loading-close", width: "400px"},

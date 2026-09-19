@@ -266,10 +266,10 @@ function startHost() {
       showView(); if (!preparingSave) iframe.focus();
     }
   }
-  function close(focus = false, resetSave = false, requestId?: string) {
+  function close(focus = false, resetSave = false, requestId?: string, preserveFrame = false) {
     if (openingShell) cancelledShell = true;
     openingShell = false;
-    const discardLoadingFrame = preparingSave;
+    const discardLoadingFrame = preparingSave && !preserveFrame;
     closingSave = saveHeight !== null && !preparingSave;
     if (saveRevealFrame !== undefined) cancelAnimationFrame(saveRevealFrame);
     saveRevealFrame = undefined; preparingSave = false; saveAccepted = false; saveLayoutReady = false; pendingSaveRequest = null;
@@ -304,6 +304,8 @@ function startHost() {
   catcherToggle.addEventListener("click", () => { suite?.activate("nexcatcher"); });
   toggle.addEventListener("click", () => { if (opened || opening || openingShell) close(true); else void open(view).catch(() => showLoadError("连接暂时中断，请重新打开 Aarre。")); });
   let drag: { id: number; x: number; width: number } | null = null;
+  let resizeFrame = 0, resizeWidth: number | null = null;
+  const flushResize = () => { cancelAnimationFrame(resizeFrame); resizeFrame = 0; if (resizeWidth !== null) { position = { ...position, width: resizeWidth }; resizeWidth = null; layout(); } };
   resize.addEventListener("pointerdown", (event) => {
     if (event.button !== 0 || saveHeight !== null) return; event.preventDefault();
     drag = { id: event.pointerId, x: event.clientX, width: floatingRects(position, viewport()).menu.width }; resize.setPointerCapture(event.pointerId);
@@ -311,9 +313,10 @@ function startHost() {
   });
   resize.addEventListener("pointermove", (event) => {
     if (!drag || event.pointerId !== drag.id) return;
-    position = { ...position, width: floatingWidth(drag.width + (drag.x - event.clientX) * (position.side === "left" ? -1 : 1)) }; layout();
+    resizeWidth = floatingWidth(drag.width + (drag.x - event.clientX) * (position.side === "left" ? -1 : 1));
+    if (!resizeFrame) resizeFrame = requestAnimationFrame(flushResize);
   });
-  const endResize = () => { if (!drag) return; drag = null; host.dataset.resizing = "false"; persist(); };
+  const endResize = () => { if (!drag) return; flushResize(); drag = null; host.dataset.resizing = "false"; persist(); };
   resize.addEventListener("pointerup", endResize); resize.addEventListener("pointercancel", endResize); resize.addEventListener("lostpointercapture", endResize);
   resize.addEventListener("keydown", (event) => {
     if (saveHeight !== null) return;
@@ -379,7 +382,7 @@ function startHost() {
     }
     return false;
   };
-  const observer = new MutationObserver(() => { if (!disposed && !host.isConnected && document.documentElement) { iframe?.remove(); iframe = null; info = null; ready = false; attach(); if (opened) void open(view).catch(() => { host.dataset.hidden = "true"; }); } });
+  const observer = new MutationObserver(() => { if (!disposed && !host.isConnected && document.documentElement) { iframe?.remove(); iframe = null; info = null; ready = false; attach(); if (opened) void open(view).catch(() => showLoadError("连接暂时中断，请重新打开 Aarre。")); } });
   observer.observe(document, { childList: true, subtree: true });
   document.addEventListener("pointerdown", outside, true); document.addEventListener("keydown", escape); document.addEventListener("fullscreenchange", attach);
   window.addEventListener("message", receive); window.addEventListener("resize", attach);
@@ -387,7 +390,7 @@ function startHost() {
   const pageshow = () => { void refresh().catch(() => undefined); }; window.addEventListener("pageshow", pageshow);
   chrome.runtime.onMessage.addListener(runtimeListener);
   window.__aarreFloatingHost = { version, destroy() {
-    disposed = true; dockDrag.destroy(); frameParking.destroy(); suite?.destroy(); generation++; observer.disconnect(); dockMorph.destroy(); if (saveRevealFrame !== undefined) cancelAnimationFrame(saveRevealFrame); clearTimeout(watchdog); clearTimeout(loadTimeout); clearTimeout(closeTimer); clearTimeout(feedbackTimer); clearTimeout(quickActionsTimer); host.remove();
+    disposed = true; cancelAnimationFrame(resizeFrame); dockDrag.destroy(); frameParking.destroy(); suite?.destroy(); generation++; observer.disconnect(); dockMorph.destroy(); if (saveRevealFrame !== undefined) cancelAnimationFrame(saveRevealFrame); clearTimeout(watchdog); clearTimeout(loadTimeout); clearTimeout(closeTimer); clearTimeout(feedbackTimer); clearTimeout(quickActionsTimer); host.remove();
     try { chrome.runtime.onMessage.removeListener(runtimeListener); } catch { /* Extension reload invalidates old listeners. */ }
     document.removeEventListener("pointerdown", outside, true); document.removeEventListener("keydown", escape); document.removeEventListener("fullscreenchange", attach);
     window.removeEventListener("message", receive); window.removeEventListener("resize", attach); window.removeEventListener("pageshow", pageshow);
@@ -422,11 +425,15 @@ function startHost() {
       return opened;
     },
     close: async () => {
-      if (ready) await frameParking.prepare();
-      close(); parkedView = true; iframe?.remove(); iframe = null; ready = false; info = null;
-      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      const retainedFrame = iframe, shouldSave = ready;
+      close(false, false, undefined, true);
+      const closingGeneration = generation;
+      try { if (shouldSave) await frameParking.prepare(); }
+      catch { return; } // Keep the hidden iframe and its draft for a later reopen.
+      if (disposed || opened || generation !== closingGeneration || iframe !== retainedFrame) return;
+      parkedView = true; iframe?.remove(); iframe = null; ready = false; info = null;
     },
     error: message => { if (openingShell) close(true, true); showQuickFeedback(message, true); },
   });
-  void init().catch(() => { host.dataset.hidden = "true"; });
+  void init().catch(() => { if (disposed) return; host.dataset.hidden = "false"; suite?.enabled(true); attach(); });
 }

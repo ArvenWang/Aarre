@@ -31,25 +31,52 @@ function absoluteUrl(value: string, pageUrl: string): string {
   }
 }
 
+// Copy only readable DOM, in short slices. An infinite feed must not first
+// duplicate all scripts, SVG paths and extension interfaces into memory.
+async function readableDocument(source: Document, pageUrl: string) {
+  const originalUrl = source.URL;
+  const clone = source.implementation.createHTMLDocument(source.title);
+  clone.documentElement.lang = source.documentElement.lang;
+  const base = clone.createElement("base"); base.href = source.baseURI || pageUrl; clone.head.append(base);
+  for (const meta of source.head?.querySelectorAll("meta") ?? []) clone.head.append(clone.importNode(meta, false));
+  if (!source.body) return clone;
+  const excluded = "script,style,noscript,template,svg,canvas,iframe,form,input,textarea,select,button,nav,footer,[aria-hidden='true'],aarre-floating-host,[data-aarre-ui],#nexcatcher-ui-host,[data-layerscope-canvas-toolbar]";
+  // A feed can contain many article siblings; selecting its first article
+  // would discard the rest before Readability gets a chance to rank it.
+  const sourceRoot = source.querySelector("main") || source.body;
+  const contentRoot = sourceRoot === source.body ? clone.body : clone.body.appendChild(clone.importNode(sourceRoot, false));
+  const walker = source.createTreeWalker(sourceRoot, 5, { acceptNode: node => node.nodeType === 1 && (node as Element).matches(excluded) ? 2 : 1 });
+  const parents = new WeakMap<Node, Node>([[sourceRoot, contentRoot]]);
+  let nodes = 0, characters = 0, started = performance.now();
+  for (let node = walker.nextNode(); node && nodes < 12_000 && characters < MAX_CONTENT_LENGTH * 2; node = walker.nextNode()) {
+    if (performance.now() - started >= 5) {
+      await new Promise<void>(resolve => setTimeout(resolve, 0)); started = performance.now();
+      if (source.URL !== originalUrl) throw new Error("网页已变化，请重新保存当前网页。");
+    }
+    const parent = node.parentNode && parents.get(node.parentNode);
+    if (!parent) continue;
+    const copy = clone.importNode(node, false);
+    if (node.nodeType === 3) {
+      const text = (node.textContent || "").replace(/\s+/g, " ");
+      copy.textContent = text.slice(0, MAX_CONTENT_LENGTH * 2 - characters); characters += copy.textContent.length;
+    }
+    parent.appendChild(copy); parents.set(node, copy); nodes++;
+  }
+  return clone;
+}
+
 export interface ExtractPageOptions {
   pageUrl: string;
   selectedText?: string;
 }
 
-export function extractPage(
+export async function extractPage(
   document: Document,
   options: ExtractPageOptions
-): PageCapture {
+): Promise<PageCapture> {
   const pageUrl = options.pageUrl;
-  const clone = document.cloneNode(true) as Document;
-
-  clone.querySelectorAll("aarre-floating-host, [data-aarre-ui]").forEach((node) => node.remove());
+  const clone = await readableDocument(document, pageUrl);
   const cleanFallback = normalizeText(clone.querySelector("main, article")?.textContent || clone.body?.textContent || "");
-  clone
-    .querySelectorAll(
-      "script, style, noscript, template, form, input, textarea, select, button, nav, footer, [aria-hidden='true']"
-    )
-    .forEach((node) => node.remove());
 
   let readable:
     | {

@@ -30,7 +30,6 @@ function port(app: "aarre" | "nexalign", override: object = {}) {
 const sent = (p: ReturnType<typeof port>, type: string) => p.postMessage.mock.calls.map(([m]) => m).filter(m => m.type === type);
 async function openNex(a: ReturnType<typeof port>, n: ReturnType<typeof port>) {
   a.onMessage.emit({ type: "REQUEST", app: "nexalign" }); await flush();
-  const close = sent(a, "CLOSE").at(-1); a.onMessage.emit({ type: "ACK", id: close.id, ok: true }); await flush();
   const request = sent(n, "OPEN").at(-1); expect(request).toBeDefined();
   n.onMessage.emit({ type: "ACK", id: request.id, ok: true }); await flush();
 }
@@ -47,31 +46,27 @@ it("only pairs allowlisted extensions in the same top-level committed document",
   n.onMessage.emit({ type: "HELLO", version: 1, enabled: false });
   expect(sent(a, "STATE").at(-1).paired).toBe(false);
 });
-it("waits for the exact old panel's cleanup acknowledgement before opening the next", async () => {
+it("opens the next shell while the old frame saves without blocking ownership", async () => {
   const a = port("aarre"), n = port("nexalign"); await openNex(a, n);
   n.onMessage.emit({ type: "REQUEST", app: "aarre" }); await flush();
   const close = sent(n, "CLOSE").at(-1);
-  expect(sent(a, "OPEN")).toHaveLength(0);
+  expect(close).toBeDefined(); expect(sent(a, "OPEN")).toHaveLength(1);
   a.onMessage.emit({ type: "ACK", id: close.id, ok: true }); await flush();
-  expect(sent(a, "OPEN")).toHaveLength(0);
-  n.onMessage.emit({ type: "ACK", id: close.id, ok: true }); await flush();
-  expect(sent(a, "OPEN")).toHaveLength(1);
+  expect(sent(a, "STATE").at(-1).active).toBe("aarre");
 });
-it("keeps a reachable entrance if cleanup times out, and immediately recovers after uninstall", async () => {
+it("keeps a reachable entrance if cleanup times out, and recovers after uninstall", async () => {
   const a = port("aarre"), n = port("nexalign"); await openNex(a, n);
   n.onMessage.emit({ type: "REQUEST", app: "aarre" }); await vi.advanceTimersByTimeAsync(4_001);
-  expect(sent(a, "OPEN")).toHaveLength(0); expect(sent(a, "ERROR")).toHaveLength(1);
-  n.disconnect(); expect(sent(a, "STATE").at(-1)).toMatchObject({ paired: false, active: null });
+  expect(sent(a, "OPEN")).toHaveLength(1); expect(sent(a, "ERROR")).toHaveLength(1);
+  n.disconnect(); expect(sent(a, "STATE").at(-1)).toMatchObject({ paired: false, active: "aarre" });
 });
 it("does not let a delayed handover override the user's more recent choice", async () => {
   const a = port("aarre"), n = port("nexalign"); await openNex(a, n);
   n.onMessage.emit({ type: "REQUEST", app: "aarre" }); await flush();
-  const close = sent(n, "CLOSE").at(-1);
+  const older = sent(a, "OPEN").at(-1);
   a.onMessage.emit({ type: "REQUEST", app: "nexalign" }); await flush();
-  n.onMessage.emit({ type: "ACK", id: close.id, ok: true }); await flush();
-  expect(sent(a, "OPEN")).toHaveLength(0);
-  const secondClose = sent(a, "CLOSE").at(-1);
-  a.onMessage.emit({ type: "ACK", id: secondClose.id, ok: true }); await flush();
+  a.onMessage.emit({ type: "ACK", id: older.id, ok: false }); await flush();
+  expect(sent(a, "OPEN")).toHaveLength(1);
   expect(sent(n, "OPEN")).toHaveLength(2);
   expect(sent(n, "STATE").at(-1).active).toBe("nexalign");
 });
@@ -99,7 +94,7 @@ it("recovers from an uninstalled caller even when Chrome leaves its external Por
   const a = port("aarre"), n = port("nexalign"); await flush();
   expect(sent(a, "STATE").at(-1).paired).toBe(true);
   n.postMessage.mockImplementation(() => undefined);
-  await vi.advanceTimersByTimeAsync(4_001);
+  await vi.advanceTimersByTimeAsync(18_001);
   expect(n.disconnect).toHaveBeenCalled();
   expect(sent(a, "STATE").at(-1)).toMatchObject({ paired: false, active: null });
 });

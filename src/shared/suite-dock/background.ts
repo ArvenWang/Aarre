@@ -77,7 +77,7 @@ export function installSuiteBackground(app: SuiteApp, saveTheme?: (mode: SuiteMo
   });
 
   type Client = { port: chrome.runtime.Port; app: SuiteApp; enabled: boolean; opened: boolean };
-  type Group = { clients: Map<SuiteApp, Client>; active: SuiteApp | null; tabId: number; ratio?: number; side?: DockSide; sequence: number; queue?: Promise<void> };
+  type Group = { clients: Map<SuiteApp, Client>; active: SuiteApp | null; tabId: number; ratio?: number; side?: DockSide; sequence: number };
   const groups = new Map<string, Group>();
   const replies = new Map<string, { port: chrome.runtime.Port; finish: (ok: boolean) => void }>();
   const members = (group: Group) => SUITE_APPS.filter(app => group.clients.get(app)?.enabled);
@@ -87,46 +87,34 @@ export function installSuiteBackground(app: SuiteApp, saveTheme?: (mode: SuiteMo
     for (const client of group.clients.values()) safePost(client.port, { type: "STATE", paired: present.length > 1, members: present, owner: present[0] ?? null, active: group.active, suppressed: mobileViewport(group.tabId), ratio: group.ratio, side: group.side });
   };
   const mobileViewport = installSuiteViewportBroker(() => { for (const group of groups.values()) broadcast(group); }, app);
-  const command = (client: Client, type: "OPEN" | "CLOSE") => new Promise<boolean>(resolve => {
+  const command = (client: Client, type: "OPEN" | "CLOSE", revision: number) => new Promise<boolean>(resolve => {
     const id = crypto.randomUUID();
     const timer = setTimeout(() => finish(false), 4_000);
     const finish = (ok: boolean) => { clearTimeout(timer); replies.delete(id); resolve(ok); };
     replies.set(id, { port: client.port, finish });
-    safePost(client.port, { type, id });
+    safePost(client.port, { type, id, revision });
   });
-  const performActivation = async (group: Group, target: SuiteApp | null, sequence: number) => {
-    if (sequence !== group.sequence || (target && (mobileViewport(group.tabId) || !group.clients.get(target)?.enabled))) return;
-    // 三款都可能保留后台工作；逐一等旧菜单释放交互权，不能只关闭第一个邻居。
-    const others = [...group.clients.values()].filter(client => target ? client.app !== target : client.app === group.active);
-    for (const other of others) {
-    if (!await command(other, "CLOSE")) {
-      if (group.sequence === sequence) {
-        safePost(group.clients.get(target!)?.port ?? other.port, { type: "ERROR", message: "上一个侧栏暂未关闭，请重试。" });
-        broadcast(group);
-      }
-      return;
-    }
-    other.opened = false;
-    if (sequence !== group.sequence) return;
-    }
+  const activate = async (group: Group, target: SuiteApp | null) => {
+    if (target && (mobileViewport(group.tabId) || !group.clients.get(target)?.enabled)) return;
+    const sequence = ++group.sequence, previous = group.active;
+    // Visibility/input ownership changes first. Saving an outgoing iframe is a
+    // separate lifecycle, never a prerequisite for showing the destination.
     group.active = target;
     broadcast(group);
-    if (target) {
-      const client = group.clients.get(target);
-      if (client?.enabled) {
-        const ok = await command(client, "OPEN");
-        if (sequence !== group.sequence) return;
-        client.opened = ok;
-        if (!ok) { group.active = null; broadcast(group); }
-      }
+    for (const other of group.clients.values()) {
+      if (other.app === target || !other.opened && other.app !== previous) continue;
+      other.opened = false;
+      void command(other, "CLOSE", sequence);
     }
-  };
-  const activate = (group: Group, target: SuiteApp | null) => {
-    const sequence = ++group.sequence;
-    // Finish any admitted close before a newer intent can reopen the same app.
-    const operation = (group.queue ?? Promise.resolve()).catch(() => undefined)
-      .then(() => performActivation(group, target, sequence));
-    group.queue = operation; return operation;
+    if (!target) return;
+    const client = group.clients.get(target);
+    if (!client?.enabled) return;
+    client.opened = true;
+    const ok = await command(client, "OPEN", sequence);
+    if (sequence !== group.sequence || group.clients.get(target) !== client) return;
+    // A late ACK is not evidence that the document is dead. Keep the shell
+    // available; explicit CLOSED/disconnect or a newer intent owns its exit.
+    if (!ok) safePost(client.port, { type: "ERROR", message: "内容仍在准备，侧栏可以继续操作。" });
   };
   const connect = (port: chrome.runtime.Port, external: boolean) => {
     if (port.name !== SUITE_DOCK_PORT) return;
@@ -142,7 +130,7 @@ export function installSuiteBackground(app: SuiteApp, saveTheme?: (mode: SuiteMo
     const old = group.clients.get(app);
     const client: Client = { port, app, enabled: false, opened: false };
     group.clients.set(app, client); old?.port.disconnect(); dockPorts.add(port);
-    let probe: string | undefined;
+    let probe: string | undefined, probeAt = 0;
     let watchdog: ReturnType<typeof setInterval> | undefined;
     const disconnected = () => {
       clearInterval(watchdog);
@@ -153,15 +141,14 @@ export function installSuiteBackground(app: SuiteApp, saveTheme?: (mode: SuiteMo
       if (group.active === app) group.active = null;
       if (!group.clients.size) groups.delete(key); else broadcast(group);
     };
-    // Chrome can retain an external content-script Port after its extension
-    // is uninstalled on a loading document. Require a live peer, not a Port
-    // object: two-second probes bound this stale ownership to four seconds.
+    // Ports can survive an uninstalled extension. Still bound stale ownership,
+    // but tolerate temporary page long tasks instead of evicting after one miss.
     if (external) watchdog = setInterval(() => {
-      if (probe) {
+      if (probe && Date.now() - probeAt >= 15_000) {
         disconnected();
         try { port.disconnect(); } catch { /* Already invalidated. */ }
-      } else {
-        probe = crypto.randomUUID(); safePost(port, { type: "PING", id: probe });
+      } else if (!probe) {
+        probeAt = Date.now(); probe = crypto.randomUUID(); safePost(port, { type: "PING", id: probe });
       }
     }, 2_000);
     void read().then(theme => safePost(port, { type: "THEME", theme }));
